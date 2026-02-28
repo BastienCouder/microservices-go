@@ -12,6 +12,7 @@ type Config struct {
 	AuthServiceURL          string
 	OrganizationsServiceURL string
 	PermissionServiceURL    string
+	PermissionServiceGRPC   string
 	BillingServiceURL       string
 	NotificationServiceURL  string
 	RateLimitRPM            int
@@ -42,6 +43,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	permissionServiceGRPC, err := requiredEnv("PERMISSION_SERVICE_GRPC_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
 
 	billingServiceURL, err := requiredEnv("BILLING_SERVICE_URL")
 	if err != nil {
@@ -64,6 +69,7 @@ func Load() (Config, error) {
 		AuthServiceURL:          authServiceURL,
 		OrganizationsServiceURL: organizationsServiceURL,
 		PermissionServiceURL:    permissionServiceURL,
+		PermissionServiceGRPC:   permissionServiceGRPC,
 		BillingServiceURL:       billingServiceURL,
 		NotificationServiceURL:  notificationServiceURL,
 		RateLimitRPM:            rateLimitRPM,

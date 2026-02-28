@@ -9,9 +9,12 @@ import (
 )
 
 type Querier interface {
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
-	GetUserByAuthIdentityID(ctx context.Context, authIdentityID string) (User, error)
-	GetUserByID(ctx context.Context, id int64) (User, error)
+	CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error)
+	GetUserByAuthIdentityID(ctx context.Context, authIdentityID string) (GetUserByAuthIdentityIDRow, error)
+	GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error)
+	RestoreUser(ctx context.Context, id int64) (int64, error)
+	SetUserBanned(ctx context.Context, arg SetUserBannedParams) (int64, error)
+	SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) (int64, error)
 }
 
 var _ Querier = (*Queries)(nil)

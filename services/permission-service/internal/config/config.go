@@ -9,12 +9,17 @@ import (
 
 type Config struct {
 	HTTPAddr                string
+	GRPCAddr                string
 	DatabaseURL             string
 	OrganizationsServiceURL string
 }
 
 func Load() (Config, error) {
 	httpAddr, err := requiredEnv("HTTP_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	grpcAddr, err := requiredEnv("GRPC_ADDR")
 	if err != nil {
 		return Config{}, err
 	}
@@ -28,6 +33,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		HTTPAddr:                httpAddr,
+		GRPCAddr:                grpcAddr,
 		DatabaseURL:             databaseURL,
 		OrganizationsServiceURL: organizationsServiceURL,
 	}, nil

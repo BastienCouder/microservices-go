@@ -26,11 +26,10 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.work
+      - name: Install golangci-lint (latest stable)
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
       - name: golangci-lint (strict)
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
-          args: --config .golangci.yml
+        run: golangci-lint run --config .golangci.yml
 
   test:
     runs-on: ubuntu-latest

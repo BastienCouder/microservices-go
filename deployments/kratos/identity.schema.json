@@ -12,13 +12,17 @@
           "format": "email",
           "title": "Email",
           "minLength": 3,
-          "ory.sh/kratos": {
-            "credentials": {
-              "password": {
-                "identifier": true
-              }
-            },
-            "verification": {
+            "ory.sh/kratos": {
+              "credentials": {
+                "password": {
+                  "identifier": true
+                },
+                "code": {
+                  "identifier": true,
+                  "via": "email"
+                }
+              },
+              "verification": {
               "via": "email"
             },
             "recovery": {

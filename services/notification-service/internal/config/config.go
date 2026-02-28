@@ -8,8 +8,11 @@ import (
 )
 
 type Config struct {
-	HTTPAddr    string
-	DatabaseURL string
+	HTTPAddr         string
+	DatabaseURL      string
+	EmailRendererURL string
+	ResendAPIKey     string
+	ResendFromEmail  string
 }
 
 func Load() (Config, error) {
@@ -21,7 +24,25 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	return Config{HTTPAddr: httpAddr, DatabaseURL: databaseURL}, nil
+	emailRendererURL, err := requiredEnv("EMAIL_RENDERER_URL")
+	if err != nil {
+		return Config{}, err
+	}
+	resendAPIKey, err := passwordFromEnv("RESEND_API_KEY", "RESEND_API_KEY_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	resendFromEmail, err := requiredEnv("RESEND_FROM_EMAIL")
+	if err != nil {
+		return Config{}, err
+	}
+	return Config{
+		HTTPAddr:         httpAddr,
+		DatabaseURL:      databaseURL,
+		EmailRendererURL: emailRendererURL,
+		ResendAPIKey:     resendAPIKey,
+		ResendFromEmail:  resendFromEmail,
+	}, nil
 }
 
 func DatabaseURLFromEnv() (string, error) {

@@ -15,4 +15,7 @@ type User struct {
 	FirstName      string
 	LastName       string
 	CreatedAt      pgtype.Timestamptz
+	Banned         bool
+	BannedAt       pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
 }

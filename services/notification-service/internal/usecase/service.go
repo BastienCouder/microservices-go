@@ -10,12 +10,22 @@ import (
 )
 
 type Service struct {
-	repo domain.Repository
-	now  func() time.Time
+	repo      domain.Repository
+	email     EmailSender
+	templates TemplateRenderer
+	now       func() time.Time
 }
 
-func NewService(repo domain.Repository) *Service {
-	return &Service{repo: repo, now: time.Now}
+type EmailSender interface {
+	Send(ctx context.Context, toEmail, subject, htmlBody, textBody string) error
+}
+
+type TemplateRenderer interface {
+	RenderNotification(ctx context.Context, title, message string) (subject, html, text string, err error)
+}
+
+func NewService(repo domain.Repository, email EmailSender, templates TemplateRenderer) *Service {
+	return &Service{repo: repo, email: email, templates: templates, now: time.Now}
 }
 
 func (s *Service) Send(ctx context.Context, channel, recipient, subject, message string) (*domain.Notification, error) {
@@ -31,6 +41,18 @@ func (s *Service) Send(ctx context.Context, channel, recipient, subject, message
 	}
 	if err := s.repo.Create(ctx, notification); err != nil {
 		return nil, fmt.Errorf("create notification: %w", err)
+	}
+	if notification.Channel == "email" {
+		if s.email == nil || s.templates == nil {
+			return nil, fmt.Errorf("email delivery is not configured")
+		}
+		subject, htmlBody, textBody, err := s.templates.RenderNotification(ctx, notification.Subject, notification.Message)
+		if err != nil {
+			return nil, fmt.Errorf("render notification template: %w", err)
+		}
+		if err := s.email.Send(ctx, notification.Recipient, subject, htmlBody, textBody); err != nil {
+			return nil, fmt.Errorf("send notification email: %w", err)
+		}
 	}
 	return notification, nil
 }

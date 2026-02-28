@@ -12,9 +12,9 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users (auth_identity_id, email, first_name, last_name, created_at)
-VALUES ($1, $2, $3, $4, $5)
-RETURNING id, auth_identity_id, email, first_name, last_name, created_at
+INSERT INTO users (auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at)
+VALUES ($1, $2, $3, $4, false, NULL, $5, NULL)
+RETURNING id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
 `
 
 type CreateUserParams struct {
@@ -25,7 +25,19 @@ type CreateUserParams struct {
 	CreatedAt      pgtype.Timestamptz
 }
 
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
+type CreateUserRow struct {
+	ID             int64
+	AuthIdentityID string
+	Email          string
+	FirstName      string
+	LastName       string
+	Banned         bool
+	BannedAt       pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
 	row := q.db.QueryRow(ctx, createUser,
 		arg.AuthIdentityID,
 		arg.Email,
@@ -33,54 +45,146 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		arg.LastName,
 		arg.CreatedAt,
 	)
-	var i User
+	var i CreateUserRow
 	err := row.Scan(
 		&i.ID,
 		&i.AuthIdentityID,
 		&i.Email,
 		&i.FirstName,
 		&i.LastName,
+		&i.Banned,
+		&i.BannedAt,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getUserByAuthIdentityID = `-- name: GetUserByAuthIdentityID :one
-SELECT id, auth_identity_id, email, first_name, last_name, created_at
+SELECT id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
 FROM users
 WHERE auth_identity_id = $1
+  AND deleted_at IS NULL
 `
 
-func (q *Queries) GetUserByAuthIdentityID(ctx context.Context, authIdentityID string) (User, error) {
+type GetUserByAuthIdentityIDRow struct {
+	ID             int64
+	AuthIdentityID string
+	Email          string
+	FirstName      string
+	LastName       string
+	Banned         bool
+	BannedAt       pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserByAuthIdentityID(ctx context.Context, authIdentityID string) (GetUserByAuthIdentityIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByAuthIdentityID, authIdentityID)
-	var i User
+	var i GetUserByAuthIdentityIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.AuthIdentityID,
 		&i.Email,
 		&i.FirstName,
 		&i.LastName,
+		&i.Banned,
+		&i.BannedAt,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, auth_identity_id, email, first_name, last_name, created_at
+SELECT id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
 FROM users
 WHERE id = $1
+  AND deleted_at IS NULL
 `
 
-func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
+type GetUserByIDRow struct {
+	ID             int64
+	AuthIdentityID string
+	Email          string
+	FirstName      string
+	LastName       string
+	Banned         bool
+	BannedAt       pgtype.Timestamptz
+	CreatedAt      pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, id int64) (GetUserByIDRow, error) {
 	row := q.db.QueryRow(ctx, getUserByID, id)
-	var i User
+	var i GetUserByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.AuthIdentityID,
 		&i.Email,
 		&i.FirstName,
 		&i.LastName,
+		&i.Banned,
+		&i.BannedAt,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const restoreUser = `-- name: RestoreUser :execrows
+UPDATE users
+SET deleted_at = NULL
+WHERE id = $1
+  AND deleted_at IS NOT NULL
+`
+
+func (q *Queries) RestoreUser(ctx context.Context, id int64) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreUser, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setUserBanned = `-- name: SetUserBanned :execrows
+UPDATE users
+SET banned = $2,
+    banned_at = $3
+WHERE id = $1
+  AND deleted_at IS NULL
+`
+
+type SetUserBannedParams struct {
+	ID       int64
+	Banned   bool
+	BannedAt pgtype.Timestamptz
+}
+
+func (q *Queries) SetUserBanned(ctx context.Context, arg SetUserBannedParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setUserBanned, arg.ID, arg.Banned, arg.BannedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const softDeleteUser = `-- name: SoftDeleteUser :execrows
+UPDATE users
+SET deleted_at = $2
+WHERE id = $1
+  AND deleted_at IS NULL
+`
+
+type SoftDeleteUserParams struct {
+	ID        int64
+	DeletedAt pgtype.Timestamptz
+}
+
+func (q *Queries) SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteUser, arg.ID, arg.DeletedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

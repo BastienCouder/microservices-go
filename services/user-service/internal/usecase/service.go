@@ -50,3 +50,43 @@ func (s *Service) GetUserByAuthIdentityID(ctx context.Context, authIdentityID st
 	}
 	return user, nil
 }
+
+func (s *Service) BanUser(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: user id must be positive", domain.ErrInvalidUser)
+	}
+	if err := s.repo.SetBanned(ctx, id, true, s.now().UTC()); err != nil {
+		return fmt.Errorf("ban user %d: %w", id, err)
+	}
+	return nil
+}
+
+func (s *Service) UnbanUser(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: user id must be positive", domain.ErrInvalidUser)
+	}
+	if err := s.repo.SetBanned(ctx, id, false, time.Time{}); err != nil {
+		return fmt.Errorf("unban user %d: %w", id, err)
+	}
+	return nil
+}
+
+func (s *Service) DeleteUser(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: user id must be positive", domain.ErrInvalidUser)
+	}
+	if err := s.repo.SoftDelete(ctx, id, s.now().UTC()); err != nil {
+		return fmt.Errorf("delete user %d: %w", id, err)
+	}
+	return nil
+}
+
+func (s *Service) RestoreUser(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: user id must be positive", domain.ErrInvalidUser)
+	}
+	if err := s.repo.Restore(ctx, id); err != nil {
+		return fmt.Errorf("restore user %d: %w", id, err)
+	}
+	return nil
+}

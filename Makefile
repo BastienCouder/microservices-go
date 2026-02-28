@@ -1,7 +1,7 @@
 .PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev
 
 run-gateway:
-	HTTP_ADDR=:8080 USER_SERVICE_URL=http://localhost:8081 AUTH_SERVICE_URL=http://localhost:8083 ORGANIZATIONS_SERVICE_URL=http://localhost:8084 PERMISSION_SERVICE_URL=http://localhost:8085 BILLING_SERVICE_URL=http://localhost:8086 NOTIFICATION_SERVICE_URL=http://localhost:8087 RATE_LIMIT_RPM=120 go run ./services/api-gateway/cmd/api
+	HTTP_ADDR=:8080 USER_SERVICE_URL=http://localhost:8081 AUTH_SERVICE_URL=http://localhost:8083 ORGANIZATIONS_SERVICE_URL=http://localhost:8084 PERMISSION_SERVICE_URL=http://localhost:8085 PERMISSION_SERVICE_GRPC_ADDR=localhost:9085 BILLING_SERVICE_URL=http://localhost:8086 NOTIFICATION_SERVICE_URL=http://localhost:8087 RATE_LIMIT_RPM=120 go run ./services/api-gateway/cmd/api
 
 run-user:
 	HTTP_ADDR=:8081 USER_DB_HOST=localhost USER_DB_PORT=5432 USER_DB_USER=usersvc USER_DB_NAME=usersvc USER_DB_SSLMODE=disable USER_DB_PASSWORD=usersvc go run ./services/user-service/cmd/api
@@ -102,7 +102,7 @@ sqlc-generate-notification:
 sqlc-generate-all: sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification
 
 run-permission:
-	HTTP_ADDR=:8085 PERMISSION_DB_HOST=localhost PERMISSION_DB_PORT=5432 PERMISSION_DB_USER=permsvc PERMISSION_DB_NAME=permsvc PERMISSION_DB_SSLMODE=disable PERMISSION_DB_PASSWORD=permsvc ORGANIZATIONS_SERVICE_URL=http://localhost:8084 go run ./services/permission-service/cmd/api
+	HTTP_ADDR=:8085 GRPC_ADDR=:9085 PERMISSION_DB_HOST=localhost PERMISSION_DB_PORT=5432 PERMISSION_DB_USER=permsvc PERMISSION_DB_NAME=permsvc PERMISSION_DB_SSLMODE=disable PERMISSION_DB_PASSWORD=permsvc ORGANIZATIONS_SERVICE_URL=http://localhost:8084 go run ./services/permission-service/cmd/api
 
 run-billing:
 	HTTP_ADDR=:8086 BILLING_DB_HOST=localhost BILLING_DB_PORT=5432 BILLING_DB_USER=billsvc BILLING_DB_NAME=billsvc BILLING_DB_SSLMODE=disable BILLING_DB_PASSWORD=billsvc go run ./services/billing-service/cmd/api
@@ -139,10 +139,10 @@ test-integration-notification:
 test-integration-db: test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification
 
 lint:
-	docker run --rm -v $$(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run --config .golangci.yml
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --config .golangci.yml
 
 lint-fix:
-	docker run --rm -v $$(pwd):/app -w /app golangci/golangci-lint:latest golangci-lint run --fix --config .golangci.yml
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --fix --config .golangci.yml
 
 fmt:
 	gofmt -w cmd services

@@ -23,6 +23,7 @@ type Organization struct {
 	Name            string
 	OwnerIdentityID int64
 	CreatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 func (o *Organization) Validate() error {
@@ -40,6 +41,7 @@ type Team struct {
 	OrganizationID int64
 	Name           string
 	CreatedAt      time.Time
+	DeletedAt      *time.Time
 }
 
 func (t *Team) Validate() error {
@@ -58,6 +60,7 @@ type Member struct {
 	TeamID         int64
 	Roles          []string
 	AddedAt        time.Time
+	DeletedAt      *time.Time
 }
 
 func (m *Member) Validate() error {

@@ -22,23 +22,19 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
+	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+		os.Exit(code)
+	}
 
-	startupCtx, startupCancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer startupCancel()
-
-	db, err := pgxpool.New(startupCtx, cfg.DatabaseURL)
+	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "user-service")
 	if err != nil {
-		log.Fatalf("create user pgx pool: %v", err)
+		log.Fatalf("wait for user database: %v", err)
 	}
 	defer db.Close()
 
-	if err := db.Ping(startupCtx); err != nil {
-		log.Fatalf("ping user database: %v", err)
-	}
-
 	repo := postgres.NewRepository(db)
 	svc := usecase.NewService(repo)
-	h := httpadapter.NewHandler(svc)
+	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()
 	h.Register(mux)
@@ -60,5 +56,66 @@ func main() {
 	defer shutdownCancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
+	}
+}
+
+func runHealthcheckMode(databaseURL string) (int, bool) {
+	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
+		return 0, false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	db, err := pgxpool.New(ctx, databaseURL)
+	if err != nil {
+		return 1, true
+	}
+	defer db.Close()
+	if err := db.Ping(ctx); err != nil {
+		return 1, true
+	}
+	return 0, true
+}
+
+func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
+	return func(ctx context.Context) error {
+		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		return db.Ping(pingCtx)
+	}
+}
+
+func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+
+	for {
+		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		db, err := pgxpool.New(attemptCtx, dsn)
+		if err == nil {
+			err = db.Ping(attemptCtx)
+		}
+		cancel()
+
+		if err == nil {
+			return db, nil
+		}
+		if db != nil {
+			db.Close()
+		}
+
+		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(backoff):
+		}
+
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
 	}
 }

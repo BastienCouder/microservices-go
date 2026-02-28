@@ -12,9 +12,9 @@ import (
 )
 
 const createOrganization = `-- name: CreateOrganization :one
-INSERT INTO organizations (name, owner_user_id, created_at)
-VALUES ($1, $2, $3)
-RETURNING id, name, owner_user_id, created_at
+INSERT INTO organizations (name, owner_user_id, created_at, deleted_at)
+VALUES ($1, $2, $3, NULL)
+RETURNING id, name, owner_user_id, created_at, deleted_at
 `
 
 type CreateOrganizationParams struct {
@@ -31,38 +31,45 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 		&i.Name,
 		&i.OwnerUserID,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const createTeam = `-- name: CreateTeam :one
-INSERT INTO teams (organization_id, name, created_at)
-VALUES ($1, $2, $3)
-RETURNING id, organization_id, name, created_at
+INSERT INTO teams (organization_id, name, created_at, deleted_at)
+SELECT o.id, $2, $3, NULL
+FROM organizations o
+WHERE o.id = $1
+  AND o.deleted_at IS NULL
+RETURNING id, organization_id, name, created_at, deleted_at
 `
 
 type CreateTeamParams struct {
-	OrganizationID int64
-	Name           string
-	CreatedAt      pgtype.Timestamptz
+	ID        int64
+	Name      string
+	CreatedAt pgtype.Timestamptz
 }
 
 func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error) {
-	row := q.db.QueryRow(ctx, createTeam, arg.OrganizationID, arg.Name, arg.CreatedAt)
+	row := q.db.QueryRow(ctx, createTeam, arg.ID, arg.Name, arg.CreatedAt)
 	var i Team
 	err := row.Scan(
 		&i.ID,
 		&i.OrganizationID,
 		&i.Name,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getMemberByOrgAndUser = `-- name: GetMemberByOrgAndUser :one
-SELECT organization_id, user_id, COALESCE(team_id, 0) AS team_id, added_at
+SELECT organization_id, user_id, COALESCE(team_id, 0) AS team_id, added_at, deleted_at
 FROM organization_members
-WHERE organization_id = $1 AND user_id = $2
+WHERE organization_id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL
 `
 
 type GetMemberByOrgAndUserParams struct {
@@ -75,6 +82,7 @@ type GetMemberByOrgAndUserRow struct {
 	UserID         int64
 	TeamID         int64
 	AddedAt        pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
 }
 
 func (q *Queries) GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgAndUserParams) (GetMemberByOrgAndUserRow, error) {
@@ -85,14 +93,16 @@ func (q *Queries) GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgA
 		&i.UserID,
 		&i.TeamID,
 		&i.AddedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getOrganizationByID = `-- name: GetOrganizationByID :one
-SELECT id, name, owner_user_id, created_at
+SELECT id, name, owner_user_id, created_at, deleted_at
 FROM organizations
 WHERE id = $1
+  AND deleted_at IS NULL
 `
 
 func (q *Queries) GetOrganizationByID(ctx context.Context, id int64) (Organization, error) {
@@ -103,13 +113,21 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id int64) (Organizati
 		&i.Name,
 		&i.OwnerUserID,
 		&i.CreatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const insertMemberRole = `-- name: InsertMemberRole :exec
 INSERT INTO member_roles (organization_id, user_id, role)
-VALUES ($1, $2, $3)
+SELECT $1, $2, $3
+WHERE EXISTS (
+  SELECT 1
+  FROM organization_members m
+  WHERE m.organization_id = $1
+    AND m.user_id = $2
+    AND m.deleted_at IS NULL
+)
 ON CONFLICT (organization_id, user_id, role) DO NOTHING
 `
 
@@ -126,8 +144,16 @@ func (q *Queries) InsertMemberRole(ctx context.Context, arg InsertMemberRolePara
 
 const listMemberRolesByOrgAndUser = `-- name: ListMemberRolesByOrgAndUser :many
 SELECT role
-FROM member_roles
-WHERE organization_id = $1 AND user_id = $2
+FROM member_roles mr
+WHERE mr.organization_id = $1
+  AND mr.user_id = $2
+  AND EXISTS (
+    SELECT 1
+    FROM organization_members m
+    WHERE m.organization_id = $1
+      AND m.user_id = $2
+      AND m.deleted_at IS NULL
+  )
 ORDER BY role
 `
 
@@ -157,9 +183,10 @@ func (q *Queries) ListMemberRolesByOrgAndUser(ctx context.Context, arg ListMembe
 }
 
 const listTeamsByOrganization = `-- name: ListTeamsByOrganization :many
-SELECT id, organization_id, name, created_at
+SELECT id, organization_id, name, created_at, deleted_at
 FROM teams
 WHERE organization_id = $1
+  AND deleted_at IS NULL
 ORDER BY id
 `
 
@@ -177,6 +204,7 @@ func (q *Queries) ListTeamsByOrganization(ctx context.Context, organizationID in
 			&i.OrganizationID,
 			&i.Name,
 			&i.CreatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -189,22 +217,29 @@ func (q *Queries) ListTeamsByOrganization(ctx context.Context, organizationID in
 }
 
 const upsertMember = `-- name: UpsertMember :exec
-INSERT INTO organization_members (organization_id, user_id, team_id, added_at)
-VALUES ($1, $2, $3, $4)
+INSERT INTO organization_members (organization_id, user_id, team_id, added_at, deleted_at)
+SELECT o.id, $2, $3, $4, NULL
+FROM organizations o
+LEFT JOIN teams t ON t.id = $3 AND t.organization_id = o.id AND t.deleted_at IS NULL
+WHERE o.id = $1
+  AND o.deleted_at IS NULL
+  AND ($3 IS NULL OR t.id IS NOT NULL)
 ON CONFLICT (organization_id, user_id)
-DO UPDATE SET team_id = EXCLUDED.team_id
+DO UPDATE SET team_id = EXCLUDED.team_id,
+              added_at = EXCLUDED.added_at,
+              deleted_at = NULL
 `
 
 type UpsertMemberParams struct {
-	OrganizationID int64
-	UserID         int64
-	TeamID         pgtype.Int8
-	AddedAt        pgtype.Timestamptz
+	ID      int64
+	UserID  int64
+	TeamID  pgtype.Int8
+	AddedAt pgtype.Timestamptz
 }
 
 func (q *Queries) UpsertMember(ctx context.Context, arg UpsertMemberParams) error {
 	_, err := q.db.Exec(ctx, upsertMember,
-		arg.OrganizationID,
+		arg.ID,
 		arg.UserID,
 		arg.TeamID,
 		arg.AddedAt,

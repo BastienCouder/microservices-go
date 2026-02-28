@@ -18,7 +18,10 @@ type User struct {
 	Email          string
 	FirstName      string
 	LastName       string
+	Banned         bool
+	BannedAt       *time.Time
 	CreatedAt      time.Time
+	DeletedAt      *time.Time
 }
 
 func (u *User) Validate() error {

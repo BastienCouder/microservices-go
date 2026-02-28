@@ -28,6 +28,7 @@ Idiomatic Go patterns and best practices for building robust, efficient, and mai
 
 - Add integration tests for persistence adapters that use a real database instance.
 - Enforce strict static analysis with `golangci-lint` in CI before merge.
+- Always target the latest stable Go release for new work (toolchain, modules, CI, and lint tooling), and keep versions aligned across local/dev/CI.
 
 ### 1. Simplicity and Clarity
 

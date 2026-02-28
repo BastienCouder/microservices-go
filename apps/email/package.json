@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "email dev --dir ./emails --port 3002",
-    "build": "email export --dir ./emails --outDir ./dist"
+    "build": "email export --dir ./emails --outDir ./dist",
+    "api": "bun run ./server.ts"
   },
   "dependencies": {
     "@react-email/components": "latest",

@@ -22,6 +22,7 @@ Comprehensive Go testing patterns for writing reliable, maintainable tests follo
 - Tests must set required environment variables explicitly (`t.Setenv`) or expect startup/config loading to fail.
 - For repositories/adapters using databases, add integration tests (tagged `integration`) that run against a real DB and verify schema init + critical flows.
 - Keep CI test workflow explicit: unit tests + integration tests as separate steps/jobs.
+- Keep tests and test tooling on the latest stable Go version; align CI/local versions to avoid false failures from outdated binaries.
 
 ## TDD Workflow for Go
 

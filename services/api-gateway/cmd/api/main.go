@@ -19,11 +19,12 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	h, err := httpadapter.NewHandler(
+	h, err := httpadapter.NewHandlerWithGRPC(
 		cfg.UserServiceURL,
 		cfg.AuthServiceURL,
 		cfg.OrganizationsServiceURL,
 		cfg.PermissionServiceURL,
+		cfg.PermissionServiceGRPC,
 		cfg.BillingServiceURL,
 		cfg.NotificationServiceURL,
 		cfg.RateLimitRPM,
@@ -31,6 +32,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("create gateway handler: %v", err)
 	}
+	defer func() {
+		if err := h.Close(); err != nil {
+			log.Printf("close gateway dependencies: %v", err)
+		}
+	}()
 
 	mux := http.NewServeMux()
 	h.Register(mux)

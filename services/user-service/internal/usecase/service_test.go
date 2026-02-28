@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/user-service/internal/domain"
 )
@@ -33,6 +34,37 @@ func (f *fakeRepo) GetByAuthIdentityID(_ context.Context, authIdentityID string)
 		return &clone, nil
 	}
 	return nil, domain.ErrUserNotFound
+}
+
+func (f *fakeRepo) SetBanned(_ context.Context, id int64, banned bool, at time.Time) error {
+	if f.created == nil || f.created.ID != id {
+		return domain.ErrUserNotFound
+	}
+	f.created.Banned = banned
+	if banned {
+		ts := at
+		f.created.BannedAt = &ts
+		return nil
+	}
+	f.created.BannedAt = nil
+	return nil
+}
+
+func (f *fakeRepo) SoftDelete(_ context.Context, id int64, at time.Time) error {
+	if f.created == nil || f.created.ID != id {
+		return domain.ErrUserNotFound
+	}
+	ts := at
+	f.created.DeletedAt = &ts
+	return nil
+}
+
+func (f *fakeRepo) Restore(_ context.Context, id int64) error {
+	if f.created == nil || f.created.ID != id {
+		return domain.ErrUserNotFound
+	}
+	f.created.DeletedAt = nil
+	return nil
 }
 
 func TestCreateUser(t *testing.T) {

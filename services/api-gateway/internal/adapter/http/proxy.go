@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
 )
 
 type Handler struct {
@@ -25,6 +27,7 @@ type Handler struct {
 	notificationProxy  *httputil.ReverseProxy
 	authURL            string
 	userURL            string
+	permissionGRPC     *permissionGRPCClient
 	httpClient         *http.Client
 	rateLimiter        *rateLimiter
 }
@@ -65,6 +68,10 @@ func (l *rateLimiter) Allow(key string) bool {
 }
 
 func NewHandler(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, billingServiceURL, notificationServiceURL string, rateLimitRPM int) (*Handler, error) {
+	return NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, "", billingServiceURL, notificationServiceURL, rateLimitRPM)
+}
+
+func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, permissionServiceGRPCAddr, billingServiceURL, notificationServiceURL string, rateLimitRPM int) (*Handler, error) {
 	userProxy, err := newProxy(userServiceURL)
 	if err != nil {
 		return nil, err
@@ -93,6 +100,10 @@ func NewHandler(userServiceURL, authServiceURL, organizationsServiceURL, permiss
 	if err != nil {
 		return nil, err
 	}
+	permissionGRPC, err := newPermissionGRPCClient(permissionServiceGRPCAddr)
+	if err != nil {
+		return nil, err
+	}
 
 	return &Handler{
 		userProxy:          userProxy,
@@ -103,9 +114,17 @@ func NewHandler(userServiceURL, authServiceURL, organizationsServiceURL, permiss
 		notificationProxy:  notificationProxy,
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
+		permissionGRPC:     permissionGRPC,
 		httpClient:         &http.Client{},
 		rateLimiter:        limiter,
 	}, nil
+}
+
+func (h *Handler) Close() error {
+	if h == nil || h.permissionGRPC == nil {
+		return nil
+	}
+	return h.permissionGRPC.Close()
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -130,6 +149,9 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 		h.authProxy.ServeHTTP(w, r)
 		return
 	case r.URL.Path == "/users" || strings.HasPrefix(r.URL.Path, "/users/"):
+		h.withAuth(h.userProxy).ServeHTTP(w, r)
+		return
+	case r.URL.Path == "/admin/users" || strings.HasPrefix(r.URL.Path, "/admin/users/"):
 		h.withAuth(h.userProxy).ServeHTTP(w, r)
 		return
 	case r.URL.Path == "/organizations" || strings.HasPrefix(r.URL.Path, "/organizations/"):
@@ -203,6 +225,38 @@ func (h *Handler) withAuth(next http.Handler) http.Handler {
 			return
 		}
 
+		if isAdminUsersRoute(r2) {
+			orgID, err := organizationIDFromHeader(r2.Header.Get("X-Organization-ID"))
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+				return
+			}
+
+			userID, err := strconv.ParseInt(r2.Header.Get("X-Authenticated-User-ID"), 10, 64)
+			if err != nil || userID <= 0 {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusUnauthorized)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "missing authenticated user"})
+				return
+			}
+
+			allowed, err := h.checkPermission(r.Context(), userID, orgID, "admin", "users")
+			if err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadGateway)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "permission service unavailable"})
+				return
+			}
+			if !allowed {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusForbidden)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "forbidden"})
+				return
+			}
+		}
+
 		next.ServeHTTP(w, r2)
 	})
 }
@@ -274,6 +328,38 @@ func requiresResolvedUserID(r *http.Request) bool {
 		return false
 	}
 	return true
+}
+
+func isAdminUsersRoute(r *http.Request) bool {
+	return r.URL.Path == "/admin/users" || strings.HasPrefix(r.URL.Path, "/admin/users/")
+}
+
+func organizationIDFromHeader(raw string) (int64, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return 0, errors.New("missing X-Organization-ID header")
+	}
+	id, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, errors.New("invalid X-Organization-ID header")
+	}
+	return id, nil
+}
+
+func (h *Handler) checkPermission(ctx context.Context, userID, organizationID int64, action, resource string) (bool, error) {
+	if h.permissionGRPC == nil {
+		return false, errors.New("permission grpc client is not configured")
+	}
+	resp, err := h.permissionGRPC.Check(ctx, &permissionv1.CheckRequest{
+		OrganizationId: organizationID,
+		UserId:         userID,
+		Action:         action,
+		Resource:       resource,
+	})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetAllowed(), nil
 }
 
 func clientIP(r *http.Request) string {

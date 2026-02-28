@@ -1,6 +1,7 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,21 +12,31 @@ import (
 )
 
 type Handler struct {
-	svc *usecase.Service
+	svc        *usecase.Service
+	readyCheck func(context.Context) error
 }
 
-func NewHandler(svc *usecase.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *usecase.Service, readyCheck func(context.Context) error) *Handler {
+	return &Handler{svc: svc, readyCheck: readyCheck}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
+	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /notifications/send", h.send)
 	mux.HandleFunc("GET /notifications", h.list)
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "notification-service"})
+}
+
+func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "notification-service"})
+		return
+	}
+	writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "notification-service"})
 }
 
 type sendNotificationRequest struct {

@@ -34,7 +34,7 @@ func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	if err != nil {
 		return fmt.Errorf("insert user: %w", err)
 	}
-	user.ID = created.ID
+	*user = *toDomainUserFromCreateRow(created)
 	return nil
 }
 
@@ -46,7 +46,7 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.User, error
 		}
 		return nil, fmt.Errorf("query user by id: %w", err)
 	}
-	return toDomainUser(user), nil
+	return toDomainUserFromGetByIDRow(user), nil
 }
 
 func (r *Repository) GetByAuthIdentityID(ctx context.Context, authIdentityID string) (*domain.User, error) {
@@ -57,17 +57,88 @@ func (r *Repository) GetByAuthIdentityID(ctx context.Context, authIdentityID str
 		}
 		return nil, fmt.Errorf("query user by auth identity id: %w", err)
 	}
-	return toDomainUser(user), nil
+	return toDomainUserFromGetByAuthIdentityIDRow(user), nil
 }
 
-func toDomainUser(user sqlc.User) *domain.User {
+func (r *Repository) SetBanned(ctx context.Context, id int64, banned bool, at time.Time) error {
+	rows, err := r.queries.SetUserBanned(ctx, sqlc.SetUserBannedParams{
+		ID:       id,
+		Banned:   banned,
+		BannedAt: toPgNullableTimestamptz(at),
+	})
+	if err != nil {
+		return fmt.Errorf("set user banned: %w", err)
+	}
+	if rows == 0 {
+		return domain.ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *Repository) SoftDelete(ctx context.Context, id int64, at time.Time) error {
+	rows, err := r.queries.SoftDeleteUser(ctx, sqlc.SoftDeleteUserParams{
+		ID:        id,
+		DeletedAt: toPgTimestamptz(at),
+	})
+	if err != nil {
+		return fmt.Errorf("soft delete user: %w", err)
+	}
+	if rows == 0 {
+		return domain.ErrUserNotFound
+	}
+	return nil
+}
+
+func (r *Repository) Restore(ctx context.Context, id int64) error {
+	rows, err := r.queries.RestoreUser(ctx, id)
+	if err != nil {
+		return fmt.Errorf("restore user: %w", err)
+	}
+	if rows == 0 {
+		return domain.ErrUserNotFound
+	}
+	return nil
+}
+
+func toDomainUserFromCreateRow(user sqlc.CreateUserRow) *domain.User {
 	return &domain.User{
 		ID:             user.ID,
 		AuthIdentityID: user.AuthIdentityID,
 		Email:          user.Email,
 		FirstName:      user.FirstName,
 		LastName:       user.LastName,
+		Banned:         user.Banned,
+		BannedAt:       fromPgNullableTimestamptz(user.BannedAt),
 		CreatedAt:      fromPgTimestamptz(user.CreatedAt),
+		DeletedAt:      fromPgNullableTimestamptz(user.DeletedAt),
+	}
+}
+
+func toDomainUserFromGetByIDRow(user sqlc.GetUserByIDRow) *domain.User {
+	return &domain.User{
+		ID:             user.ID,
+		AuthIdentityID: user.AuthIdentityID,
+		Email:          user.Email,
+		FirstName:      user.FirstName,
+		LastName:       user.LastName,
+		Banned:         user.Banned,
+		BannedAt:       fromPgNullableTimestamptz(user.BannedAt),
+		CreatedAt:      fromPgTimestamptz(user.CreatedAt),
+		DeletedAt:      fromPgNullableTimestamptz(user.DeletedAt),
+	}
+}
+
+func toDomainUserFromGetByAuthIdentityIDRow(user sqlc.GetUserByAuthIdentityIDRow) *domain.User {
+	return &domain.User{
+		ID:             user.ID,
+		AuthIdentityID: user.AuthIdentityID,
+		Email:          user.Email,
+		FirstName:      user.FirstName,
+		LastName:       user.LastName,
+		Banned:         user.Banned,
+		BannedAt:       fromPgNullableTimestamptz(user.BannedAt),
+		CreatedAt:      fromPgTimestamptz(user.CreatedAt),
+		DeletedAt:      fromPgNullableTimestamptz(user.DeletedAt),
 	}
 }
 
@@ -75,9 +146,24 @@ func toPgTimestamptz(value time.Time) pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: value, Valid: true}
 }
 
+func toPgNullableTimestamptz(value time.Time) pgtype.Timestamptz {
+	if value.IsZero() {
+		return pgtype.Timestamptz{}
+	}
+	return toPgTimestamptz(value)
+}
+
 func fromPgTimestamptz(value pgtype.Timestamptz) time.Time {
 	if !value.Valid {
 		return time.Time{}
 	}
 	return value.Time
+}
+
+func fromPgNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	t := value.Time
+	return &t
 }

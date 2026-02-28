@@ -3,6 +3,7 @@ services:
     build:
       dockerfile: apps/web/Dockerfile
     image: microservices-go/web:prod
+    restart: unless-stopped
     ports:
       - "3000:80"
 
@@ -10,8 +11,19 @@ services:
     build:
       dockerfile: apps/doc/Dockerfile
     image: microservices-go/doc:prod
+    restart: unless-stopped
     ports:
       - "3001:80"
+
+  email:
+    build:
+      dockerfile: apps/email/Dockerfile
+    image: microservices-go/email:prod
+    restart: unless-stopped
+    environment:
+      EMAIL_API_PORT: "3002"
+    ports:
+      - "3002:3002"
 
   mcp-server:
     build:
@@ -19,6 +31,7 @@ services:
       args:
         SERVICE_PATH: ./services/mcp-server/cmd/server
     image: microservices-go/mcp-server:prod
+    restart: unless-stopped
     command: ["--transport", "http", "--http-addr", ":8090"]
     ports:
       - "8090:8090"
@@ -29,12 +42,14 @@ services:
       args:
         SERVICE_PATH: ./services/api-gateway/cmd/api
     image: microservices-go/api-gateway:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8080
       USER_SERVICE_URL: http://user-service:8081
       AUTH_SERVICE_URL: http://auth-service:8083
       ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
       PERMISSION_SERVICE_URL: http://permission-service:8085
+      PERMISSION_SERVICE_GRPC_ADDR: permission-service:9085
       BILLING_SERVICE_URL: http://billing-service:8086
       NOTIFICATION_SERVICE_URL: http://notification-service:8087
       RATE_LIMIT_RPM: "120"
@@ -47,6 +62,7 @@ services:
       args:
         SERVICE_PATH: ./services/auth-service/cmd/api
     image: microservices-go/auth-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8083
       KRATOS_PUBLIC_URL: http://kratos:4433
@@ -60,6 +76,7 @@ services:
       args:
         SERVICE_PATH: ./services/user-service/cmd/api
     image: microservices-go/user-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8081
       USER_DB_HOST: postgres
@@ -72,6 +89,12 @@ services:
       - usersvc_db_password
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   user-migrate:
     build:
@@ -95,6 +118,7 @@ services:
       args:
         SERVICE_PATH: ./services/organizations-service/cmd/api
     image: microservices-go/organizations-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8084
       ORG_DB_HOST: postgres
@@ -107,6 +131,12 @@ services:
       - orgsvc_db_password
     ports:
       - "8084:8084"
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   organizations-migrate:
     build:
@@ -130,8 +160,10 @@ services:
       args:
         SERVICE_PATH: ./services/permission-service/cmd/api
     image: microservices-go/permission-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8085
+      GRPC_ADDR: :9085
       PERMISSION_DB_HOST: postgres
       PERMISSION_DB_PORT: "5432"
       PERMISSION_DB_USER: permsvc
@@ -143,6 +175,12 @@ services:
       - permsvc_db_password
     ports:
       - "8085:8085"
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   permission-migrate:
     build:
@@ -166,6 +204,7 @@ services:
       args:
         SERVICE_PATH: ./services/billing-service/cmd/api
     image: microservices-go/billing-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8086
       BILLING_DB_HOST: postgres
@@ -178,6 +217,12 @@ services:
       - billsvc_db_password
     ports:
       - "8086:8086"
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   billing-migrate:
     build:
@@ -201,6 +246,7 @@ services:
       args:
         SERVICE_PATH: ./services/notification-service/cmd/api
     image: microservices-go/notification-service:prod
+    restart: unless-stopped
     environment:
       HTTP_ADDR: :8087
       NOTIFICATION_DB_HOST: postgres
@@ -209,10 +255,20 @@ services:
       NOTIFICATION_DB_NAME: notifsvc
       NOTIFICATION_DB_SSLMODE: disable
       NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
+      EMAIL_RENDERER_URL: http://email:3002
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      RESEND_FROM_EMAIL: noreply@example.com
     secrets:
       - notifsvc_db_password
+      - resend_api_key
     ports:
       - "8087:8087"
+    healthcheck:
+      test: ["CMD", "/app/service", "healthcheck"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
 
   notification-migrate:
     build:
@@ -232,6 +288,7 @@ services:
 
   redis:
     image: redis:8.4.0-alpine
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
@@ -246,6 +303,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:4.2.3-management-alpine
+    restart: unless-stopped
     ports:
       - "5672:5672"
       - "15672:15672"
@@ -262,6 +320,7 @@ services:
 
   postgres:
     image: postgres:18.1-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
@@ -280,17 +339,40 @@ services:
 
   kratos-migrate:
     image: oryd/kratos:v25.4.0
-    command: migrate sql up -e --yes -c /etc/config/kratos/kratos.yml
+    command:
+      - sh
+      - -c
+      - |
+        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
+        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
+        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
+        kratos migrate sql up -e --yes -c /etc/config/kratos/kratos.yml
     environment:
       DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+    secrets:
+      - resend_smtp_connection_uri
+      - google_oidc_client_id
+      - google_oidc_client_secret
     volumes:
       - ./deployments/kratos:/etc/config/kratos:ro
 
   kratos:
     image: oryd/kratos:v25.4.0
-    command: serve -c /etc/config/kratos/kratos.yml
+    restart: unless-stopped
+    command:
+      - sh
+      - -c
+      - |
+        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
+        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
+        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
+        kratos serve -c /etc/config/kratos/kratos.yml
     environment:
       DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+    secrets:
+      - resend_smtp_connection_uri
+      - google_oidc_client_id
+      - google_oidc_client_secret
     ports:
       - "4433:4433"
       - "4434:4434"
@@ -321,3 +403,11 @@ secrets:
     file: ./deployments/secrets/billsvc_db_password.txt
   notifsvc_db_password:
     file: ./deployments/secrets/notifsvc_db_password.txt
+  resend_api_key:
+    file: ./deployments/secrets/resend_api_key.txt
+  resend_smtp_connection_uri:
+    file: ./deployments/secrets/resend_smtp_connection_uri.txt
+  google_oidc_client_id:
+    file: ./deployments/secrets/google_oidc_client_id.txt
+  google_oidc_client_secret:
+    file: ./deployments/secrets/google_oidc_client_secret.txt

@@ -19,6 +19,7 @@ type Organization struct {
 	Name        string
 	OwnerUserID int64
 	CreatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
 }
 
 type OrganizationMember struct {
@@ -26,6 +27,7 @@ type OrganizationMember struct {
 	UserID         int64
 	TeamID         pgtype.Int8
 	AddedAt        pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
 }
 
 type Team struct {
@@ -33,4 +35,5 @@ type Team struct {
 	OrganizationID int64
 	Name           string
 	CreatedAt      pgtype.Timestamptz
+	DeletedAt      pgtype.Timestamptz
 }

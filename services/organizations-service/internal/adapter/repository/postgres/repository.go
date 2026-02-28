@@ -58,14 +58,15 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Organizatio
 		Name:            org.Name,
 		OwnerIdentityID: org.OwnerUserID,
 		CreatedAt:       fromPgTimestamptz(org.CreatedAt),
+		DeletedAt:       fromPgNullableTimestamptz(org.DeletedAt),
 	}, nil
 }
 
 func (r *Repository) CreateTeam(ctx context.Context, team *domain.Team) error {
 	created, err := r.queries.CreateTeam(ctx, sqlc.CreateTeamParams{
-		OrganizationID: team.OrganizationID,
-		Name:           team.Name,
-		CreatedAt:      toPgTimestamptz(team.CreatedAt),
+		ID:        team.OrganizationID,
+		Name:      team.Name,
+		CreatedAt: toPgTimestamptz(team.CreatedAt),
 	})
 	if err != nil {
 		if isFKViolation(err) {
@@ -95,6 +96,7 @@ func (r *Repository) ListTeams(ctx context.Context, organizationID int64) ([]dom
 			OrganizationID: row.OrganizationID,
 			Name:           row.Name,
 			CreatedAt:      fromPgTimestamptz(row.CreatedAt),
+			DeletedAt:      fromPgNullableTimestamptz(row.DeletedAt),
 		})
 	}
 	return teams, nil
@@ -109,10 +111,10 @@ func (r *Repository) UpsertMember(ctx context.Context, member *domain.Member) er
 
 	qtx := r.queries.WithTx(tx)
 	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
-		OrganizationID: member.OrganizationID,
-		UserID:         member.UserID,
-		TeamID:         nullableTeamID(member.TeamID),
-		AddedAt:        toPgTimestamptz(member.AddedAt),
+		ID:      member.OrganizationID,
+		UserID:  member.UserID,
+		TeamID:  nullableTeamID(member.TeamID),
+		AddedAt: toPgTimestamptz(member.AddedAt),
 	}); err != nil {
 		if isFKViolation(err) {
 			if member.TeamID > 0 {
@@ -177,6 +179,7 @@ func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]d
 			return nil, fmt.Errorf("scan member: %w", err)
 		}
 		member.Roles = append([]string(nil), roles...)
+		member.DeletedAt = nil
 		members = append(members, member)
 	}
 	if err := rows.Err(); err != nil {
@@ -225,6 +228,7 @@ func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int6
 		UserID:         memberRow.UserID,
 		TeamID:         memberRow.TeamID,
 		AddedAt:        fromPgTimestamptz(memberRow.AddedAt),
+		DeletedAt:      fromPgNullableTimestamptz(memberRow.DeletedAt),
 		Roles:          append([]string(nil), roles...),
 	}, nil
 }
@@ -245,6 +249,14 @@ func fromPgTimestamptz(value pgtype.Timestamptz) time.Time {
 		return time.Time{}
 	}
 	return value.Time
+}
+
+func fromPgNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
+	if !value.Valid {
+		return nil
+	}
+	t := value.Time
+	return &t
 }
 
 func isFKViolation(err error) bool {

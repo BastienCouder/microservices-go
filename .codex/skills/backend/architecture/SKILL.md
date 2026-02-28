@@ -977,8 +977,6 @@ func main() {
 | Tests assertions        | testify/assert + testify/require           | v1.9+ |
 | DB SQL                  | jackc/pgx/v5 (postgres) ou database/sql    | v5 |
 | Rate limiting           | golang.org/x/time/rate                     | latest |
-| Microservices framework | zeromicro/go-zero (optionnel)              | v1.7+ |
-
 ---
 
 ## 20. RESSOURCES

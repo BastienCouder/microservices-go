@@ -33,6 +33,22 @@ selfservice:
   methods:
     password:
       enabled: true
+    code:
+      enabled: true
+      passwordless_enabled: true
+    oidc:
+      enabled: true
+      config:
+        providers:
+          - id: google
+            provider: google
+            client_id: ${KRATOS_OIDC_GOOGLE_CLIENT_ID}
+            client_secret: ${KRATOS_OIDC_GOOGLE_CLIENT_SECRET}
+            mapper_url: file:///etc/config/kratos/google.jsonnet
+            scope:
+              - openid
+              - profile
+              - email
 
   flows:
     error:
@@ -63,6 +79,10 @@ selfservice:
 log:
   level: info
   format: text
+
+courier:
+  smtp:
+    connection_uri: ${KRATOS_SMTP_CONNECTION_URI}
 
 secrets:
   cookie:
