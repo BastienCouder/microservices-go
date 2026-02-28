@@ -1,0 +1,75 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - "services/**"
+      - "go.work"
+      - "go.work.sum"
+      - "go.mod"
+      - ".golangci.yml"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "services/**"
+      - "go.work"
+      - "go.work.sum"
+      - "go.mod"
+      - ".golangci.yml"
+      - ".github/workflows/backend-ci.yml"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: golangci-lint (strict)
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --config .golangci.yml
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: Unit tests
+        run: go test ./services/...
+
+  organizations-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.1-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: Prepare org database
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d postgres -c "CREATE ROLE orgsvc LOGIN PASSWORD 'orgsvc';" || true
+          psql -h localhost -U postgres -d postgres -c "CREATE DATABASE orgsvc OWNER orgsvc;" || true
+      - name: Organizations repository integration tests
+        env:
+          ORG_TEST_DATABASE_URL: postgres://orgsvc:orgsvc@localhost:5432/orgsvc?sslmode=disable
+        run: go test -tags=integration ./services/organizations-service/internal/adapter/repository/postgres

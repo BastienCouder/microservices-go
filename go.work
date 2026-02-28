@@ -1,0 +1,13 @@
+go 1.25.7
+
+use (
+	.
+	./services/api-gateway
+	./services/auth-service
+	./services/user-service
+	./services/organizations-service
+	./services/permission-service
+	./services/billing-service
+	./services/notification-service
+	./services/mcp-server
+)

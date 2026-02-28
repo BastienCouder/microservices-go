@@ -1,0 +1,14 @@
+version: "2"
+sql:
+  - engine: postgresql
+    schema:
+      - internal/adapter/repository/postgres/migrations/sql/*.up.sql
+    queries:
+      - db/query
+    gen:
+      go:
+        package: sqlc
+        out: internal/adapter/repository/postgres/sqlc
+        sql_package: pgx/v5
+        emit_interface: true
+        emit_json_tags: false

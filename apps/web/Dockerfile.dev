@@ -1,0 +1,8 @@
+FROM oven/bun:1-alpine AS dev
+
+WORKDIR /app
+
+COPY apps/web/package.json apps/web/bun.lock ./
+RUN bun install --frozen-lockfile
+
+CMD ["bun", "run", "dev", "--hostname", "0.0.0.0", "--port", "3000"]

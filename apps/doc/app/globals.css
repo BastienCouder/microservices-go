@@ -1,0 +1,29 @@
+:root {
+  --bg: #f8fafc;
+  --fg: #0f172a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: radial-gradient(circle at top, #dbeafe, var(--bg));
+  color: var(--fg);
+  font-family: "Space Grotesk", "Segoe UI", sans-serif;
+}
+
+.landing {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  gap: 1rem;
+  text-align: center;
+  padding: 2rem;
+}
+
+.landing a {
+  color: #0f172a;
+  font-weight: 700;
+}

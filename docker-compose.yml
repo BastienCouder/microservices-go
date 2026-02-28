@@ -1,0 +1,323 @@
+services:
+  web:
+    build:
+      dockerfile: apps/web/Dockerfile
+    image: microservices-go/web:prod
+    ports:
+      - "3000:80"
+
+  doc:
+    build:
+      dockerfile: apps/doc/Dockerfile
+    image: microservices-go/doc:prod
+    ports:
+      - "3001:80"
+
+  mcp-server:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/mcp-server/cmd/server
+    image: microservices-go/mcp-server:prod
+    command: ["--transport", "http", "--http-addr", ":8090"]
+    ports:
+      - "8090:8090"
+
+  api-gateway:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/api-gateway/cmd/api
+    image: microservices-go/api-gateway:prod
+    environment:
+      HTTP_ADDR: :8080
+      USER_SERVICE_URL: http://user-service:8081
+      AUTH_SERVICE_URL: http://auth-service:8083
+      ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
+      PERMISSION_SERVICE_URL: http://permission-service:8085
+      BILLING_SERVICE_URL: http://billing-service:8086
+      NOTIFICATION_SERVICE_URL: http://notification-service:8087
+      RATE_LIMIT_RPM: "120"
+    ports:
+      - "8080:8080"
+
+  auth-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/auth-service/cmd/api
+    image: microservices-go/auth-service:prod
+    environment:
+      HTTP_ADDR: :8083
+      KRATOS_PUBLIC_URL: http://kratos:4433
+      ALLOWED_ORIGIN: http://localhost:3000
+    ports:
+      - "8083:8083"
+
+  user-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/user-service/cmd/api
+    image: microservices-go/user-service:prod
+    environment:
+      HTTP_ADDR: :8081
+      USER_DB_HOST: postgres
+      USER_DB_PORT: "5432"
+      USER_DB_USER: usersvc
+      USER_DB_NAME: usersvc
+      USER_DB_SSLMODE: disable
+      USER_DB_PASSWORD_FILE: /run/secrets/usersvc_db_password
+    secrets:
+      - usersvc_db_password
+    ports:
+      - "8081:8081"
+
+  user-migrate:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/user-service/cmd/migrate
+    image: microservices-go/user-migrate:prod
+    environment:
+      USER_DB_HOST: postgres
+      USER_DB_PORT: "5432"
+      USER_DB_USER: usersvc
+      USER_DB_NAME: usersvc
+      USER_DB_SSLMODE: disable
+      USER_DB_PASSWORD_FILE: /run/secrets/usersvc_db_password
+    secrets:
+      - usersvc_db_password
+
+  organizations-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/organizations-service/cmd/api
+    image: microservices-go/organizations-service:prod
+    environment:
+      HTTP_ADDR: :8084
+      ORG_DB_HOST: postgres
+      ORG_DB_PORT: "5432"
+      ORG_DB_USER: orgsvc
+      ORG_DB_NAME: orgsvc
+      ORG_DB_SSLMODE: disable
+      ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+    secrets:
+      - orgsvc_db_password
+    ports:
+      - "8084:8084"
+
+  organizations-migrate:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/organizations-service/cmd/migrate
+    image: microservices-go/organizations-migrate:prod
+    environment:
+      ORG_DB_HOST: postgres
+      ORG_DB_PORT: "5432"
+      ORG_DB_USER: orgsvc
+      ORG_DB_NAME: orgsvc
+      ORG_DB_SSLMODE: disable
+      ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+    secrets:
+      - orgsvc_db_password
+
+  permission-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/permission-service/cmd/api
+    image: microservices-go/permission-service:prod
+    environment:
+      HTTP_ADDR: :8085
+      PERMISSION_DB_HOST: postgres
+      PERMISSION_DB_PORT: "5432"
+      PERMISSION_DB_USER: permsvc
+      PERMISSION_DB_NAME: permsvc
+      PERMISSION_DB_SSLMODE: disable
+      PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
+      ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
+    secrets:
+      - permsvc_db_password
+    ports:
+      - "8085:8085"
+
+  permission-migrate:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/permission-service/cmd/migrate
+    image: microservices-go/permission-migrate:prod
+    environment:
+      PERMISSION_DB_HOST: postgres
+      PERMISSION_DB_PORT: "5432"
+      PERMISSION_DB_USER: permsvc
+      PERMISSION_DB_NAME: permsvc
+      PERMISSION_DB_SSLMODE: disable
+      PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
+    secrets:
+      - permsvc_db_password
+
+  billing-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/billing-service/cmd/api
+    image: microservices-go/billing-service:prod
+    environment:
+      HTTP_ADDR: :8086
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: "5432"
+      BILLING_DB_USER: billsvc
+      BILLING_DB_NAME: billsvc
+      BILLING_DB_SSLMODE: disable
+      BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
+    secrets:
+      - billsvc_db_password
+    ports:
+      - "8086:8086"
+
+  billing-migrate:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/billing-service/cmd/migrate
+    image: microservices-go/billing-migrate:prod
+    environment:
+      BILLING_DB_HOST: postgres
+      BILLING_DB_PORT: "5432"
+      BILLING_DB_USER: billsvc
+      BILLING_DB_NAME: billsvc
+      BILLING_DB_SSLMODE: disable
+      BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
+    secrets:
+      - billsvc_db_password
+
+  notification-service:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/notification-service/cmd/api
+    image: microservices-go/notification-service:prod
+    environment:
+      HTTP_ADDR: :8087
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: "5432"
+      NOTIFICATION_DB_USER: notifsvc
+      NOTIFICATION_DB_NAME: notifsvc
+      NOTIFICATION_DB_SSLMODE: disable
+      NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
+    secrets:
+      - notifsvc_db_password
+    ports:
+      - "8087:8087"
+
+  notification-migrate:
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: ./services/notification-service/cmd/migrate
+    image: microservices-go/notification-migrate:prod
+    environment:
+      NOTIFICATION_DB_HOST: postgres
+      NOTIFICATION_DB_PORT: "5432"
+      NOTIFICATION_DB_USER: notifsvc
+      NOTIFICATION_DB_NAME: notifsvc
+      NOTIFICATION_DB_SSLMODE: disable
+      NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
+    secrets:
+      - notifsvc_db_password
+
+  redis:
+    image: redis:8.4.0-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
+  rabbitmq:
+    image: rabbitmq:4.2.3-management-alpine
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - ./deployments/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+      - ./deployments/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  postgres:
+    image: postgres:18.1-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      POSTGRES_DB: postgres
+    secrets:
+      - postgres_superuser_password
+    volumes:
+      - ./deployments/postgres/init-multiple-databases.sql:/docker-entrypoint-initdb.d/init-multiple-databases.sql:ro
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  kratos-migrate:
+    image: oryd/kratos:v25.4.0
+    command: migrate sql up -e --yes -c /etc/config/kratos/kratos.yml
+    environment:
+      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+    volumes:
+      - ./deployments/kratos:/etc/config/kratos:ro
+
+  kratos:
+    image: oryd/kratos:v25.4.0
+    command: serve -c /etc/config/kratos/kratos.yml
+    environment:
+      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+    ports:
+      - "4433:4433"
+      - "4434:4434"
+    volumes:
+      - ./deployments/kratos:/etc/config/kratos:ro
+    healthcheck:
+      test: ["CMD", "kratos", "health", "ready", "--address", "http://127.0.0.1:4434"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  postgres-data:
+
+secrets:
+  postgres_superuser_password:
+    file: ./deployments/secrets/postgres_superuser_password.txt
+  usersvc_db_password:
+    file: ./deployments/secrets/usersvc_db_password.txt
+  orgsvc_db_password:
+    file: ./deployments/secrets/orgsvc_db_password.txt
+  permsvc_db_password:
+    file: ./deployments/secrets/permsvc_db_password.txt
+  billsvc_db_password:
+    file: ./deployments/secrets/billsvc_db_password.txt
+  notifsvc_db_password:
+    file: ./deployments/secrets/notifsvc_db_password.txt

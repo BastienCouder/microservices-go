@@ -1,0 +1,57 @@
+{
+  "vhosts": [
+    {"name": "/"}
+  ],
+  "exchanges": [
+    {
+      "name": "microservices.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "user.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "order.events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
+      "name": "dead.letter",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    }
+  ],
+  "bindings": [
+    {
+      "source": "microservices.events",
+      "vhost": "/",
+      "destination": "user.events",
+      "destination_type": "queue",
+      "routing_key": "user.*",
+      "arguments": {}
+    },
+    {
+      "source": "microservices.events",
+      "vhost": "/",
+      "destination": "order.events",
+      "destination_type": "queue",
+      "routing_key": "order.*",
+      "arguments": {}
+    }
+  ]
+}

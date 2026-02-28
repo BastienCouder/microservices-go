@@ -1,0 +1,16 @@
+.git
+.gitignore
+.agents
+.codex
+.claude
+.windsurf
+deployments
+tmp
+*.log
+**/node_modules
+apps/**/.next
+apps/**/.docusaurus
+apps/**/build
+apps/**/out
+apps/**/.source
+secrets

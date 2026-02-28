@@ -1,0 +1,11 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+cmd = "go build -buildvcs=false -o ./tmp/main ./cmd/server"
+bin = "./tmp/main --transport http --http-addr :8090"
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor"]
+
+[log]
+time = true

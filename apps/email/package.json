@@ -1,0 +1,22 @@
+{
+  "name": "email",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "email dev --dir ./emails --port 3002",
+    "build": "email export --dir ./emails --outDir ./dist"
+  },
+  "dependencies": {
+    "@react-email/components": "latest",
+    "@react-email/render": "latest",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.0",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.0",
+    "react-email": "latest",
+    "typescript": "5.8.3"
+  }
+}
