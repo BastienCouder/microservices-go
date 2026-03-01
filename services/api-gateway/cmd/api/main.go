@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	httpadapter "github.com/bastiencouder/microservices-go/services/api-gateway/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/api-gateway/internal/config"
 )
@@ -39,6 +41,7 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
 	server := &http.Server{

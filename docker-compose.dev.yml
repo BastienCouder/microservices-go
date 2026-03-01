@@ -1,12 +1,13 @@
 services:
   web:
+    profiles: ["frontend"]
     build:
       dockerfile: apps/web/Dockerfile.dev
     image: microservices-go/web:dev
+    pull_policy: never
     restart: unless-stopped
     command: ["sh", "-c", "bun install --frozen-lockfile && bun run dev --hostname 0.0.0.0 --port 3000"]
     environment:
-      NEXT_PUBLIC_KRATOS_URL: http://localhost:4433
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
     volumes:
       - ./apps/web:/app
@@ -15,9 +16,11 @@ services:
       - "3000:3000"
 
   doc:
+    profiles: ["doc"]
     build:
       dockerfile: apps/doc/Dockerfile.dev
     image: microservices-go/doc:dev
+    pull_policy: never
     restart: unless-stopped
     command: ["sh", "-c", "bun install && bun run dev --hostname 0.0.0.0 --port 3001"]
     volumes:
@@ -27,9 +30,11 @@ services:
       - "3001:3001"
 
   email:
+    profiles: ["email"]
     build:
       dockerfile: apps/email/Dockerfile.dev
     image: microservices-go/email:dev
+    pull_policy: never
     restart: unless-stopped
     command: ["sh", "-c", "bun install && bun run api"]
     environment:
@@ -41,9 +46,11 @@ services:
       - "3002:3002"
 
   mcp-server:
+    profiles: ["mcp"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/mcp-server:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/mcp-server
     command: ["air", "-c", ".air.toml"]
@@ -55,9 +62,11 @@ services:
       - "8090:8090"
 
   api-gateway:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/api-gateway:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/api-gateway
     command: ["air", "-c", ".air.toml"]
@@ -79,15 +88,18 @@ services:
       - "8080:8080"
 
   auth-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/auth-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/auth-service
     command: ["air", "-c", ".air.toml"]
     environment:
       HTTP_ADDR: :8083
       KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_BROWSER_URL: http://localhost:4433
       ALLOWED_ORIGIN: http://localhost:3000
     volumes:
       - ./:/workspace
@@ -97,9 +109,11 @@ services:
       - "8083:8083"
 
   user-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/user-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/user-service
     command: ["air", "-c", ".air.toml"]
@@ -121,9 +135,11 @@ services:
       - "8081:8081"
 
   user-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/user-migrate:dev
+    pull_policy: never
     working_dir: /workspace/services/user-service
     command: ["go", "run", "./cmd/migrate"]
     environment:
@@ -141,9 +157,11 @@ services:
       - go-build-cache:/root/.cache/go-build
 
   organizations-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/organizations-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/organizations-service
     command: ["air", "-c", ".air.toml"]
@@ -165,9 +183,11 @@ services:
       - "8084:8084"
 
   organizations-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/organizations-migrate:dev
+    pull_policy: never
     working_dir: /workspace/services/organizations-service
     command: ["go", "run", "./cmd/migrate"]
     environment:
@@ -185,9 +205,11 @@ services:
       - go-build-cache:/root/.cache/go-build
 
   permission-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/permission-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/permission-service
     command: ["air", "-c", ".air.toml"]
@@ -211,9 +233,11 @@ services:
       - "8085:8085"
 
   permission-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/permission-migrate:dev
+    pull_policy: never
     working_dir: /workspace/services/permission-service
     command: ["go", "run", "./cmd/migrate"]
     environment:
@@ -231,9 +255,11 @@ services:
       - go-build-cache:/root/.cache/go-build
 
   billing-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/billing-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/billing-service
     command: ["air", "-c", ".air.toml"]
@@ -255,9 +281,11 @@ services:
       - "8086:8086"
 
   billing-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/billing-migrate:dev
+    pull_policy: never
     working_dir: /workspace/services/billing-service
     command: ["go", "run", "./cmd/migrate"]
     environment:
@@ -275,9 +303,11 @@ services:
       - go-build-cache:/root/.cache/go-build
 
   notification-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/notification-service:dev
+    pull_policy: never
     restart: unless-stopped
     working_dir: /workspace/services/notification-service
     command: ["air", "-c", ".air.toml"]
@@ -303,9 +333,11 @@ services:
       - "8087:8087"
 
   notification-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile.dev
     image: microservices-go/notification-migrate:dev
+    pull_policy: never
     working_dir: /workspace/services/notification-service
     command: ["go", "run", "./cmd/migrate"]
     environment:
@@ -322,7 +354,56 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
 
+  loki:
+    profiles: ["monitoring"]
+    image: grafana/loki:3.0.0
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./deployments/loki/loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+
+  promtail:
+    profiles: ["monitoring"]
+    image: grafana/promtail:3.0.0
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail/config.yaml"]
+    volumes:
+      - ./deployments/loki/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.0.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/loki/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3010:3000"
+
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.3.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
   redis:
+    profiles: ["backend"]
     image: redis:8.4.0-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -332,6 +413,7 @@ services:
       - redis-data:/data
 
   rabbitmq:
+    profiles: ["backend"]
     image: rabbitmq:4.2.3-management-alpine
     restart: unless-stopped
     ports:
@@ -349,6 +431,7 @@ services:
       start_period: 10s
 
   postgres:
+    profiles: ["backend"]
     image: postgres:18.1-alpine
     restart: unless-stopped
     environment:
@@ -368,18 +451,18 @@ services:
       start_period: 10s
 
   kratos-migrate:
+    profiles: ["migrations"]
     image: oryd/kratos:v25.4.0
-    command:
-      - sh
-      - -c
-      - |
-        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
-        kratos migrate sql up -e --yes -c /etc/config/kratos/kratos.yml
+    entrypoint: ["sh", "/etc/config/kratos/migrate.sh"]
     environment:
-      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+      KRATOS_DB_HOST: postgres
+      KRATOS_DB_PORT: "5432"
+      KRATOS_DB_USER: kratos
+      KRATOS_DB_NAME: kratos
+      KRATOS_DB_SSLMODE: disable
+      KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
     secrets:
+      - kratos_db_password
       - resend_smtp_connection_uri
       - google_oidc_client_id
       - google_oidc_client_secret
@@ -387,19 +470,19 @@ services:
       - ./deployments/kratos:/etc/config/kratos:ro
 
   kratos:
+    profiles: ["backend"]
     image: oryd/kratos:v25.4.0
     restart: unless-stopped
-    command:
-      - sh
-      - -c
-      - |
-        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
-        kratos serve -c /etc/config/kratos/kratos.yml --dev --watch-courier
+    entrypoint: ["sh", "/etc/config/kratos/start.sh"]
     environment:
-      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+      KRATOS_DB_HOST: postgres
+      KRATOS_DB_PORT: "5432"
+      KRATOS_DB_USER: kratos
+      KRATOS_DB_NAME: kratos
+      KRATOS_DB_SSLMODE: disable
+      KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
     secrets:
+      - kratos_db_password
       - resend_smtp_connection_uri
       - google_oidc_client_id
       - google_oidc_client_secret
@@ -409,7 +492,7 @@ services:
     volumes:
       - ./deployments/kratos:/etc/config/kratos:ro
     healthcheck:
-      test: ["CMD", "kratos", "health", "ready", "--address", "http://127.0.0.1:4434"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4433/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -419,6 +502,10 @@ volumes:
   redis-data:
   rabbitmq-data:
   postgres-data:
+  loki-data:
+  promtail-positions:
+  grafana-data:
+  prometheus-data:
   go-mod-cache:
   go-build-cache:
   web-node_modules:
@@ -438,6 +525,8 @@ secrets:
     file: ./deployments/secrets/billsvc_db_password.txt
   notifsvc_db_password:
     file: ./deployments/secrets/notifsvc_db_password.txt
+  kratos_db_password:
+    file: ./deployments/secrets/kratos_db_password.txt
   resend_api_key:
     file: ./deployments/secrets/resend_api_key.txt
   resend_smtp_connection_uri:

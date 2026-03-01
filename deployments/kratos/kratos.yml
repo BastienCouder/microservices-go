@@ -1,6 +1,6 @@
 version: v25.4.0
 
-dsn: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable&max_conns=20&max_idle_conns=4
+dsn: ${DSN}
 
 serve:
   public:
@@ -82,7 +82,7 @@ log:
 
 courier:
   smtp:
-    connection_uri: ${KRATOS_SMTP_CONNECTION_URI}
+    connection_uri: smtp://mailhog:1025/?skip_ssl_verify=true
 
 secrets:
   cookie:

@@ -69,6 +69,8 @@ You are an advanced Docker containerization expert with comprehensive, practical
 
 ## Team Conventions (Mandatory)
 
+- Never use `:latest` image tags in Dockerfiles, compose files, or examples.
+- Always pin explicit image versions (preferably exact major.minor.patch) and update regularly to the latest stable release.
 - If `docker-compose.yml` is at repository root and build uses the same root, do not add `build.context: .` explicitly.
 - Do not add `depends_on`; service resilience and retries must be handled in application code.
 - Do not add explicit `networks` when all services live in the same compose file and default networking is sufficient.
@@ -287,7 +289,7 @@ services:
 # Multi-architecture builds
 docker buildx create --name multiarch-builder --use
 docker buildx build --platform linux/amd64,linux/arm64 \
-  -t myapp:latest --push .
+  -t myapp:1.2.3 --push .
 ```
 
 ### Build Cache Optimization

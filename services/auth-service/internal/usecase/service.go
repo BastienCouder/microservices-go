@@ -8,6 +8,10 @@ import (
 
 type KratosClient interface {
 	WhoAmI(ctx context.Context, cookieHeader, sessionToken string) (*domain.Session, int, error)
+	InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error)
+	SubmitFlow(ctx context.Context, mode, flowID string, payload any, cookieHeader string) (domain.RawJSON, []string, int, error)
+	InitLogout(ctx context.Context, cookieHeader string) (*domain.LogoutInitResponse, []string, int, error)
+	CompleteLogout(ctx context.Context, logoutURL, cookieHeader string) ([]string, int, error)
 }
 
 type Service struct {
@@ -20,4 +24,20 @@ func NewService(kratosClient KratosClient) *Service {
 
 func (s *Service) WhoAmI(ctx context.Context, cookieHeader, sessionToken string) (*domain.Session, int, error) {
 	return s.kratosClient.WhoAmI(ctx, cookieHeader, sessionToken)
+}
+
+func (s *Service) InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
+	return s.kratosClient.InitFlow(ctx, mode, cookieHeader)
+}
+
+func (s *Service) SubmitFlow(ctx context.Context, mode, flowID string, payload any, cookieHeader string) (domain.RawJSON, []string, int, error) {
+	return s.kratosClient.SubmitFlow(ctx, mode, flowID, payload, cookieHeader)
+}
+
+func (s *Service) InitLogout(ctx context.Context, cookieHeader string) (*domain.LogoutInitResponse, []string, int, error) {
+	return s.kratosClient.InitLogout(ctx, cookieHeader)
+}
+
+func (s *Service) CompleteLogout(ctx context.Context, logoutURL, cookieHeader string) ([]string, int, error) {
+	return s.kratosClient.CompleteLogout(ctx, logoutURL, cookieHeader)
 }

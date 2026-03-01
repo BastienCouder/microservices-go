@@ -2,9 +2,10 @@ FROM golang:1.26.0-alpine3.23 AS dev
 
 WORKDIR /workspace
 
-RUN apk --no-cache add git && go install github.com/air-verse/air@latest
+RUN apk --no-cache add git && go install github.com/air-verse/air@v1.61.7
 
 COPY go.work go.mod ./
+COPY contracts ./contracts
 COPY services ./services
 
 RUN go work sync

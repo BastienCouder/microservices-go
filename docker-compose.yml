@@ -1,13 +1,17 @@
 services:
   web:
+    profiles: ["frontend"]
     build:
       dockerfile: apps/web/Dockerfile
     image: microservices-go/web:prod
     restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
     ports:
       - "3000:80"
 
   doc:
+    profiles: ["doc"]
     build:
       dockerfile: apps/doc/Dockerfile
     image: microservices-go/doc:prod
@@ -16,6 +20,7 @@ services:
       - "3001:80"
 
   email:
+    profiles: ["email"]
     build:
       dockerfile: apps/email/Dockerfile
     image: microservices-go/email:prod
@@ -26,6 +31,7 @@ services:
       - "3002:3002"
 
   mcp-server:
+    profiles: ["mcp"]
     build:
       dockerfile: Dockerfile
       args:
@@ -37,6 +43,7 @@ services:
       - "8090:8090"
 
   api-gateway:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -57,6 +64,7 @@ services:
       - "8080:8080"
 
   auth-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -66,11 +74,13 @@ services:
     environment:
       HTTP_ADDR: :8083
       KRATOS_PUBLIC_URL: http://kratos:4433
+      KRATOS_BROWSER_URL: http://localhost:4433
       ALLOWED_ORIGIN: http://localhost:3000
     ports:
       - "8083:8083"
 
   user-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -97,6 +107,7 @@ services:
       start_period: 15s
 
   user-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile
       args:
@@ -113,6 +124,7 @@ services:
       - usersvc_db_password
 
   organizations-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -139,6 +151,7 @@ services:
       start_period: 15s
 
   organizations-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile
       args:
@@ -155,6 +168,7 @@ services:
       - orgsvc_db_password
 
   permission-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -183,6 +197,7 @@ services:
       start_period: 15s
 
   permission-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile
       args:
@@ -199,6 +214,7 @@ services:
       - permsvc_db_password
 
   billing-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -225,6 +241,7 @@ services:
       start_period: 15s
 
   billing-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile
       args:
@@ -241,6 +258,7 @@ services:
       - billsvc_db_password
 
   notification-service:
+    profiles: ["backend"]
     build:
       dockerfile: Dockerfile
       args:
@@ -271,6 +289,7 @@ services:
       start_period: 15s
 
   notification-migrate:
+    profiles: ["migrations"]
     build:
       dockerfile: Dockerfile
       args:
@@ -286,7 +305,56 @@ services:
     secrets:
       - notifsvc_db_password
 
+  loki:
+    profiles: ["monitoring"]
+    image: grafana/loki:3.0.0
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/config.yaml"]
+    volumes:
+      - ./deployments/loki/loki-config.yaml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    ports:
+      - "3100:3100"
+
+  promtail:
+    profiles: ["monitoring"]
+    image: grafana/promtail:3.0.0
+    restart: unless-stopped
+    command: ["-config.file=/etc/promtail/config.yaml"]
+    volumes:
+      - ./deployments/loki/promtail-config.yaml:/etc/promtail/config.yaml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail-positions:/tmp
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.0.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./deployments/loki/grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - "3010:3000"
+
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.3.1
+    restart: unless-stopped
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+
   redis:
+    profiles: ["backend", "infra"]
     image: redis:8.4.0-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
@@ -302,6 +370,7 @@ services:
       start_period: 5s
 
   rabbitmq:
+    profiles: ["backend", "infra"]
     image: rabbitmq:4.2.3-management-alpine
     restart: unless-stopped
     ports:
@@ -319,6 +388,7 @@ services:
       start_period: 10s
 
   postgres:
+    profiles: ["backend", "infra"]
     image: postgres:18.1-alpine
     restart: unless-stopped
     environment:
@@ -338,18 +408,18 @@ services:
       start_period: 10s
 
   kratos-migrate:
+    profiles: ["migrations"]
     image: oryd/kratos:v25.4.0
-    command:
-      - sh
-      - -c
-      - |
-        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
-        kratos migrate sql up -e --yes -c /etc/config/kratos/kratos.yml
+    entrypoint: ["sh", "/etc/config/kratos/migrate.sh"]
     environment:
-      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+      KRATOS_DB_HOST: postgres
+      KRATOS_DB_PORT: "5432"
+      KRATOS_DB_USER: kratos
+      KRATOS_DB_NAME: kratos
+      KRATOS_DB_SSLMODE: disable
+      KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
     secrets:
+      - kratos_db_password
       - resend_smtp_connection_uri
       - google_oidc_client_id
       - google_oidc_client_secret
@@ -357,19 +427,19 @@ services:
       - ./deployments/kratos:/etc/config/kratos:ro
 
   kratos:
+    profiles: ["backend", "infra"]
     image: oryd/kratos:v25.4.0
     restart: unless-stopped
-    command:
-      - sh
-      - -c
-      - |
-        export KRATOS_SMTP_CONNECTION_URI="$(cat /run/secrets/resend_smtp_connection_uri)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_ID="$(cat /run/secrets/google_oidc_client_id)";
-        export KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(cat /run/secrets/google_oidc_client_secret)";
-        kratos serve -c /etc/config/kratos/kratos.yml
+    entrypoint: ["sh", "/etc/config/kratos/start-prod.sh"]
     environment:
-      DSN: postgres://kratos:kratos@postgres:5432/kratos?sslmode=disable
+      KRATOS_DB_HOST: postgres
+      KRATOS_DB_PORT: "5432"
+      KRATOS_DB_USER: kratos
+      KRATOS_DB_NAME: kratos
+      KRATOS_DB_SSLMODE: disable
+      KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
     secrets:
+      - kratos_db_password
       - resend_smtp_connection_uri
       - google_oidc_client_id
       - google_oidc_client_secret
@@ -379,7 +449,7 @@ services:
     volumes:
       - ./deployments/kratos:/etc/config/kratos:ro
     healthcheck:
-      test: ["CMD", "kratos", "health", "ready", "--address", "http://127.0.0.1:4434"]
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:4433/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -389,6 +459,10 @@ volumes:
   redis-data:
   rabbitmq-data:
   postgres-data:
+  loki-data:
+  promtail-positions:
+  grafana-data:
+  prometheus-data:
 
 secrets:
   postgres_superuser_password:
@@ -403,6 +477,8 @@ secrets:
     file: ./deployments/secrets/billsvc_db_password.txt
   notifsvc_db_password:
     file: ./deployments/secrets/notifsvc_db_password.txt
+  kratos_db_password:
+    file: ./deployments/secrets/kratos_db_password.txt
   resend_api_key:
     file: ./deployments/secrets/resend_api_key.txt
   resend_smtp_connection_uri:

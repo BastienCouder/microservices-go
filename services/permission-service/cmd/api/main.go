@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
@@ -44,6 +45,7 @@ func main() {
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}

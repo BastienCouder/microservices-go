@@ -10,6 +10,14 @@ allowed-tools: Read, Write, Edit, Glob, Grep
 
 ---
 
+## Team Conventions (Mandatory)
+
+- For each route, always keep a `page.tsx` entrypoint and place route-specific UI parts in a private sibling folder named `_components/`.
+- `_components/` must only contain components scoped to that route segment; shared cross-route components belong in shared component folders.
+- Prefer Server `page.tsx` + Client components in `_components/` when interactivity is needed.
+
+---
+
 ## 1. Server vs Client Components
 
 ### Decision Tree

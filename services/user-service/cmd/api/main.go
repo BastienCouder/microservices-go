@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -37,6 +38,7 @@ func main() {
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /metrics", metricsHandler)
 	h.Register(mux)
 
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
@@ -57,6 +59,13 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
+}
+
+func metricsHandler(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	_, _ = fmt.Fprintln(w, "# HELP service_up Service health indicator.")
+	_, _ = fmt.Fprintln(w, "# TYPE service_up gauge")
+	_, _ = fmt.Fprintln(w, "service_up 1")
 }
 
 func runHealthcheckMode(databaseURL string) (int, bool) {

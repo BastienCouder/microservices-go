@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	httpadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/http"
 	billingrepo "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/repository/postgres"
@@ -37,6 +38,7 @@ func main() {
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
 	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}

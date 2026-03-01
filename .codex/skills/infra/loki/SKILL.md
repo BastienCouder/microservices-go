@@ -17,6 +17,11 @@ Loki is a **horizontally-scalable, highly-available, multi-tenant log aggregatio
 - **Multi-tenant by default** with built-in tenant isolation
 - **Cost-efficient** - Dramatically smaller index and lower operational costs
 
+## Team Conventions (Mandatory)
+
+- Always use the latest stable Loki/Grafana/Promtail versions available at implementation time.
+- Never use `:latest` image tags; pin explicit versions in examples and deployment manifests.
+
 ## Architecture Overview
 
 ### Core Components

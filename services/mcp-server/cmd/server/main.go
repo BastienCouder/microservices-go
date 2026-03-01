@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/bastiencouder/microservices-go/services/mcp-server/internal/tools"
 )
@@ -62,6 +63,7 @@ func run(server *mcp.Server, transport, httpAddr string) error {
 		}, nil)
 		mux := http.NewServeMux()
 		mux.Handle("/mcp", handler)
+		mux.Handle("/metrics", promhttp.Handler())
 		log.Printf("mcp server listening on %s (path /mcp)", httpAddr)
 		return http.ListenAndServe(httpAddr, mux)
 	default:

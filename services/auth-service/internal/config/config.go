@@ -6,9 +6,10 @@ import (
 )
 
 type Config struct {
-	HTTPAddr        string
-	KratosPublicURL string
-	AllowedOrigin   string
+	HTTPAddr         string
+	KratosPublicURL  string
+	KratosBrowserURL string
+	AllowedOrigin    string
 }
 
 func Load() (Config, error) {
@@ -26,11 +27,16 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	kratosBrowserURL, err := requiredEnv("KRATOS_BROWSER_URL")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
-		HTTPAddr:        httpAddr,
-		KratosPublicURL: kratosPublicURL,
-		AllowedOrigin:   allowedOrigin,
+		HTTPAddr:         httpAddr,
+		KratosPublicURL:  kratosPublicURL,
+		KratosBrowserURL: kratosBrowserURL,
+		AllowedOrigin:    allowedOrigin,
 	}, nil
 }
 

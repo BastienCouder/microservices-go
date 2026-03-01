@@ -9,6 +9,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+
 	kratosclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/kratos"
 	httpadapter "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/config"
@@ -23,9 +25,10 @@ func main() {
 
 	kratos := kratosclient.NewClient(cfg.KratosPublicURL)
 	svc := usecase.NewService(kratos)
-	h := httpadapter.NewHandler(svc, cfg.AllowedOrigin)
+	h := httpadapter.NewHandler(svc, cfg.AllowedOrigin, cfg.KratosBrowserURL)
 
 	mux := http.NewServeMux()
+	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
 	server := &http.Server{
