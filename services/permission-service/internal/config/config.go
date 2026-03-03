@@ -8,12 +8,18 @@ import (
 )
 
 type Config struct {
-	HTTPAddr                string
-	GRPCAddr                string
-	DatabaseURL             string
-	OrganizationsServiceURL string
-	InternalJWTSecret       string
-	InternalJWTIssuer       string
+	HTTPAddr                 string
+	GRPCAddr                 string
+	DatabaseURL              string
+	OrganizationsServiceURL  string
+	InternalJWTSecret        string
+	InternalJWTIssuer        string
+	GRPCAllowInsecure        bool
+	GRPCTLSCAFile            string
+	GRPCTLSCertFile          string
+	GRPCTLSKeyFile           string
+	GRPCTLSClientCAFile      string
+	GRPCTLSRequireClientCert bool
 }
 
 func Load() (Config, error) {
@@ -33,7 +39,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -41,13 +47,27 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	grpcAllowInsecure, err := optionalBoolEnv("GRPC_ALLOW_INSECURE", false)
+	if err != nil {
+		return Config{}, err
+	}
+	grpcTLSRequireClientCert, err := optionalBoolEnv("GRPC_TLS_REQUIRE_CLIENT_CERT", false)
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
-		HTTPAddr:                httpAddr,
-		GRPCAddr:                grpcAddr,
-		DatabaseURL:             databaseURL,
-		OrganizationsServiceURL: organizationsServiceURL,
-		InternalJWTSecret:       internalJWTSecret,
-		InternalJWTIssuer:       internalJWTIssuer,
+		HTTPAddr:                 httpAddr,
+		GRPCAddr:                 grpcAddr,
+		DatabaseURL:              databaseURL,
+		OrganizationsServiceURL:  organizationsServiceURL,
+		InternalJWTSecret:        internalJWTSecret,
+		InternalJWTIssuer:        internalJWTIssuer,
+		GRPCAllowInsecure:        grpcAllowInsecure,
+		GRPCTLSCAFile:            optionalEnv("GRPC_TLS_CA_FILE"),
+		GRPCTLSCertFile:          optionalEnv("GRPC_TLS_CERT_FILE"),
+		GRPCTLSKeyFile:           optionalEnv("GRPC_TLS_KEY_FILE"),
+		GRPCTLSClientCAFile:      optionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
+		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
 	}, nil
 }
 
@@ -113,4 +133,23 @@ func requiredEnv(key string) (string, error) {
 		return "", fmt.Errorf("missing required environment variable %s", key)
 	}
 	return value, nil
+}
+
+func optionalEnv(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
+}
+
+func optionalBoolEnv(key string, defaultValue bool) (bool, error) {
+	raw := strings.TrimSpace(os.Getenv(key))
+	if raw == "" {
+		return defaultValue, nil
+	}
+	switch strings.ToLower(raw) {
+	case "1", "true", "yes", "on":
+		return true, nil
+	case "0", "false", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
+	}
 }

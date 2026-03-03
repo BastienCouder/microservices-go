@@ -1,0 +1,520 @@
+package http
+
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"strings"
+
+	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
+)
+
+type Handler struct {
+	svc *usecase.Service
+}
+
+func NewHandler(svc *usecase.Service) *Handler {
+	return &Handler{svc: svc}
+}
+
+func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /health", h.health)
+	mux.HandleFunc("GET /ready", h.ready)
+	mux.HandleFunc("POST /projects", h.createProject)
+	mux.HandleFunc("GET /projects", h.listProjects)
+	mux.HandleFunc("/projects/", h.projectRoutes)
+	mux.HandleFunc("/prompts/", h.promptRoutes)
+	mux.HandleFunc("/competitors/", h.competitorRoutes)
+	mux.HandleFunc("GET /ai-models", h.listModels)
+	mux.HandleFunc("POST /ai-models/seed", h.seedModels)
+}
+
+func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "project-service"})
+}
+
+func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "project-service"})
+}
+
+type createProjectRequest struct {
+	Name             string `json:"name"`
+	Domain           string `json:"domain"`
+	WebsiteURL       string `json:"websiteUrl"`
+	BrandName        string `json:"brandName"`
+	BrandDescription string `json:"brandDescription"`
+	Industry         string `json:"industry"`
+	PrimaryLanguage  string `json:"primaryLanguage"`
+	Country          string `json:"country"`
+}
+
+func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+
+	var req createProjectRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	project, err := h.svc.CreateProject(r.Context(), usecase.CreateProjectInput{
+		UserID:           userID,
+		Name:             req.Name,
+		Domain:           req.Domain,
+		WebsiteURL:       req.WebsiteURL,
+		BrandName:        req.BrandName,
+		BrandDescription: req.BrandDescription,
+		Industry:         req.Industry,
+		PrimaryLanguage:  req.PrimaryLanguage,
+		Country:          req.Country,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+
+	writeSuccess(w, http.StatusCreated, project)
+}
+
+func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+
+	projects, err := h.svc.ListProjects(r.Context(), userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, projects)
+}
+
+func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/projects/")
+	if len(parts) == 0 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	projectID := parts[0]
+
+	switch {
+	case len(parts) == 1 && r.Method == http.MethodGet:
+		h.getProject(w, r, projectID)
+	case len(parts) == 1 && r.Method == http.MethodPatch:
+		h.updateProject(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "activate" && r.Method == http.MethodPost:
+		h.activateProject(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "finalize" && r.Method == http.MethodPost:
+		h.finalizeProject(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodPost:
+		h.addPrompts(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodGet:
+		h.listPrompts(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodPost:
+		h.addCompetitors(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodGet:
+		h.listCompetitors(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodGet:
+		h.listProjectModels(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodPatch:
+		h.replaceProjectModels(w, r, projectID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (h *Handler) promptRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/prompts/")
+	if len(parts) != 1 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	promptID := parts[0]
+
+	switch r.Method {
+	case http.MethodPatch:
+		h.updatePrompt(w, r, promptID)
+	case http.MethodDelete:
+		h.deletePrompt(w, r, promptID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (h *Handler) competitorRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/competitors/")
+	if len(parts) != 1 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	competitorID := parts[0]
+
+	switch r.Method {
+	case http.MethodPatch:
+		h.updateCompetitor(w, r, competitorID)
+	case http.MethodDelete:
+		h.deleteCompetitor(w, r, competitorID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (h *Handler) getProject(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	project, err := h.svc.GetProject(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, project)
+}
+
+type updateProjectRequest struct {
+	Name             *string `json:"name"`
+	Domain           *string `json:"domain"`
+	WebsiteURL       *string `json:"websiteUrl"`
+	BrandName        *string `json:"brandName"`
+	BrandDescription *string `json:"brandDescription"`
+	Industry         *string `json:"industry"`
+}
+
+func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+
+	var req updateProjectRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	project, err := h.svc.UpdateProject(r.Context(), projectID, userID, usecase.UpdateProjectInput{
+		Name:             req.Name,
+		Domain:           req.Domain,
+		WebsiteURL:       req.WebsiteURL,
+		BrandName:        req.BrandName,
+		BrandDescription: req.BrandDescription,
+		Industry:         req.Industry,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, project)
+}
+
+func (h *Handler) activateProject(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	project, err := h.svc.ActivateProject(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, project)
+}
+
+func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	result, err := h.svc.FinalizeProject(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
+type addPromptsRequest struct {
+	Prompts []string `json:"prompts"`
+}
+
+func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	var req addPromptsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	prompts, err := h.svc.AddPrompts(r.Context(), projectID, userID, req.Prompts)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, prompts)
+}
+
+func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	prompts, err := h.svc.ListPrompts(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, prompts)
+}
+
+type updatePromptRequest struct {
+	Text     *string `json:"text"`
+	Intent   *string `json:"intent"`
+	IsActive *bool   `json:"isActive"`
+}
+
+func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	var req updatePromptRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, userID, usecase.UpdatePromptInput{
+		Text:     req.Text,
+		Intent:   req.Intent,
+		IsActive: req.IsActive,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, prompt)
+}
+
+func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	if err := h.svc.DeletePrompt(r.Context(), promptID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+type addCompetitorsRequest struct {
+	Competitors []usecase.AddCompetitorInput `json:"competitors"`
+}
+
+func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	var req addCompetitorsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	competitors, err := h.svc.AddCompetitors(r.Context(), projectID, userID, req.Competitors)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, competitors)
+}
+
+func (h *Handler) listCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	competitors, err := h.svc.ListCompetitors(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, competitors)
+}
+
+type updateCompetitorRequest struct {
+	Name       *string `json:"name"`
+	Domain     *string `json:"domain"`
+	WebsiteURL *string `json:"websiteUrl"`
+	IsActive   *bool   `json:"isActive"`
+}
+
+func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	var req updateCompetitorRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	competitor, err := h.svc.UpdateCompetitor(r.Context(), competitorID, userID, usecase.UpdateCompetitorInput{
+		Name:       req.Name,
+		Domain:     req.Domain,
+		WebsiteURL: req.WebsiteURL,
+		IsActive:   req.IsActive,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, competitor)
+}
+
+func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	if err := h.svc.DeleteCompetitor(r.Context(), competitorID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func (h *Handler) listModels(w http.ResponseWriter, r *http.Request) {
+	onlyActive := true
+	if value := strings.TrimSpace(r.URL.Query().Get("active_only")); value != "" {
+		parsed, err := strconv.ParseBool(value)
+		if err == nil {
+			onlyActive = parsed
+		}
+	}
+	models, err := h.svc.ListModels(r.Context(), onlyActive)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, models)
+}
+
+func (h *Handler) seedModels(w http.ResponseWriter, r *http.Request) {
+	models, err := h.svc.SeedDefaultModels(r.Context())
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, models)
+}
+
+func (h *Handler) listProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	selection, err := h.svc.ListProjectModels(r.Context(), projectID, userID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, selection)
+}
+
+type replaceProjectModelsRequest struct {
+	ModelIDs []string `json:"modelIds"`
+}
+
+func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	var req replaceProjectModelsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	result, err := h.svc.ReplaceProjectModels(r.Context(), projectID, userID, req.ModelIDs)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, usecase.ErrValidation):
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+	case errors.Is(err, usecase.ErrUnauthorized):
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+	case errors.Is(err, usecase.ErrNotFound):
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+	default:
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+	}
+}
+
+func splitPathAfter(path, prefix string) []string {
+	trimmed := strings.Trim(strings.TrimPrefix(path, prefix), "/")
+	if trimmed == "" {
+		return nil
+	}
+	return strings.Split(trimmed, "/")
+}
+
+func authenticatedUserID(r *http.Request) (string, bool) {
+	value := strings.TrimSpace(r.Header.Get("X-Authenticated-User-ID"))
+	if value == "" {
+		value = strings.TrimSpace(r.Header.Get("x-user-id"))
+	}
+	if value == "" {
+		return "", false
+	}
+	return value, true
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(out); err != nil {
+		return err
+	}
+	return nil
+}
+
+func writeSuccess(w http.ResponseWriter, status int, data any) {
+	writeJSON(w, status, map[string]any{"success": true, "data": data})
+}
+
+func writeJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}

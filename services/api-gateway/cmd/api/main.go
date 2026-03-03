@@ -12,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	httpadapter "github.com/bastiencouder/microservices-go/services/api-gateway/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/api-gateway/internal/config"
 )
@@ -22,7 +23,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	h, err := httpadapter.NewHandlerWithGRPC(
+	h, err := httpadapter.NewHandlerWithGRPCAndServices(
 		cfg.UserServiceURL,
 		cfg.AuthServiceURL,
 		cfg.OrganizationsServiceURL,
@@ -30,10 +31,22 @@ func main() {
 		cfg.PermissionServiceGRPC,
 		cfg.BillingServiceURL,
 		cfg.NotificationServiceURL,
+		cfg.ProjectServiceURL,
+		cfg.AnalysisServiceURL,
+		cfg.IAServiceURL,
+		cfg.AttributionServiceURL,
 		cfg.RateLimitRPM,
 		cfg.InternalJWTSecret,
 		cfg.InternalJWTIssuer,
 		cfg.CORSAllowedOrigins,
+		cfg.TrustedProxyCIDRs,
+		grpctls.ClientConfig{
+			AllowInsecure: cfg.PermissionGRPCAllowInsecure,
+			CAFile:        cfg.PermissionGRPCTLSCAFile,
+			CertFile:      cfg.PermissionGRPCTLSCertFile,
+			KeyFile:       cfg.PermissionGRPCTLSKeyFile,
+			ServerName:    cfg.PermissionGRPCTLSServerName,
+		},
 	)
 	if err != nil {
 		log.Fatalf("create gateway handler: %v", err)

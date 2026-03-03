@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package project.v1;
+
+option go_package = "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1;projectv1";
+
+service ProjectService {
+  rpc CheckProjectAccess(CheckProjectAccessRequest) returns (CheckProjectAccessResponse);
+}
+
+message CheckProjectAccessRequest {
+  string project_id = 1;
+  int64 user_id = 2;
+}
+
+message CheckProjectAccessResponse {
+  bool allowed = 1;
+  bool exists = 2;
+  string reason = 3;
+}

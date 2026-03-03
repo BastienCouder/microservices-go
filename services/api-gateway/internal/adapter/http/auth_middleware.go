@@ -40,6 +40,27 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			writeJSONError(w, http.StatusUnauthorized, "user profile required")
 			return
 		}
+		if denyReason, enforce := enforceSelfScopedUserRoute(r2, identityID, claims.UserID); enforce {
+			if denyReason != "" {
+				writeJSONError(w, http.StatusForbidden, "forbidden")
+				auditSecurityEvent("user_scope_check", map[string]any{
+					"path":        r2.URL.Path,
+					"method":      r2.Method,
+					"identity_id": identityID,
+					"user_id":     claims.UserID,
+					"result":      "denied",
+					"reason":      denyReason,
+				})
+				return
+			}
+			auditSecurityEvent("user_scope_check", map[string]any{
+				"path":        r2.URL.Path,
+				"method":      r2.Method,
+				"identity_id": identityID,
+				"user_id":     claims.UserID,
+				"result":      "allowed",
+			})
+		}
 
 		if isAdminUsersRoute(r2) {
 			orgID, userID, ok := orgAndUserIDsFromRequest(w, r2)

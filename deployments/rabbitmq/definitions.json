@@ -29,6 +29,13 @@
       "arguments": {}
     },
     {
+      "name": "project.finalize",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
+    },
+    {
       "name": "dead.letter",
       "vhost": "/",
       "durable": true,
@@ -51,6 +58,14 @@
       "destination": "order.events",
       "destination_type": "queue",
       "routing_key": "order.*",
+      "arguments": {}
+    },
+    {
+      "source": "microservices.events",
+      "vhost": "/",
+      "destination": "project.finalize",
+      "destination_type": "queue",
+      "routing_key": "project.finalized",
       "arguments": {}
     }
   ]

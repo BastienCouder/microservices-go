@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
+	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	organizationsclient "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/client/organizations"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/http"
@@ -58,9 +59,18 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    64 << 10, // 64 KiB
 	}
-	grpcServer := grpc.NewServer(
-		grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")),
-	)
+	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
+		AllowInsecure:     cfg.GRPCAllowInsecure,
+		CertFile:          cfg.GRPCTLSCertFile,
+		KeyFile:           cfg.GRPCTLSKeyFile,
+		ClientCAFile:      cfg.GRPCTLSClientCAFile,
+		RequireClientCert: cfg.GRPCTLSRequireClientCert,
+	})
+	if err != nil {
+		log.Fatalf("configure grpc tls: %v", err)
+	}
+	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")))
+	grpcServer := grpc.NewServer(grpcServerOptions...)
 	permissionv1.RegisterPermissionServiceServer(grpcServer, g)
 
 	grpcListener, err := net.Listen("tcp", cfg.GRPCAddr)

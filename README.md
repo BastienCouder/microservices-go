@@ -1,6 +1,6 @@
 # microservices-go
 
-Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, organisations, permissions, billing et notifications.
+Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, organisations, permissions, billing, notifications, project/analysis/ia et attribution.
 
 ## Services
 
@@ -11,6 +11,10 @@ Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, o
 - `services/permission-service`: vérification RBAC (PostgreSQL).
 - `services/billing-service`: plans et quotas (PostgreSQL).
 - `services/notification-service`: envoi/listing notifications (PostgreSQL).
+- `services/project-service`: gestion des projets, prompts, concurrents, modèles IA.
+- `services/analysis-service`: orchestration des runs d’analyse, dashboard, perception, alertes.
+- `services/ia-service`: exécution IA et extraction de marque (sans LangGraph).
+- `services/attribution-service`: métriques de funnel IA (visits/signups/trials/paid/revenue) liées aux projets.
 - `services/mcp-server`: outils MCP backend.
 - `apps/web`: frontend Next.js.
 - `apps/doc`: documentation.
@@ -31,6 +35,10 @@ Services exposés:
 - Permission: `http://localhost:8085`
 - Billing: `http://localhost:8086`
 - Notification: `http://localhost:8087`
+- Project: `http://localhost:8088`
+- Analysis: `http://localhost:8089`
+- IA: `http://localhost:8091`
+- Attribution: `http://localhost:8092`
 - Kratos public: `http://localhost:4433`
 - Kratos admin: `http://localhost:4434`
 - RabbitMQ UI: `http://localhost:15672`
@@ -60,6 +68,13 @@ Services exposés:
 - `GET /billing/quotas/{organization_id}`
 - `POST /notifications/send`
 - `GET /notifications?limit=20`
+- `POST /projects`
+- `GET /projects`
+- `POST /analysis/projects/{project_id}/analyze`
+- `GET /analysis/projects/{project_id}/dashboard`
+- `POST /ai/execute`
+- `POST /attribution/projects/{project_id}/events`
+- `GET /attribution/projects/{project_id}/funnel`
 
 ## Parcours auth → app → permissions (dev)
 
@@ -110,7 +125,7 @@ En Docker (recommandé):
 ```bash
 docker compose run --rm organizations-migrate
 # ou en dev
-docker compose -f docker-compose.yml -f docker-compose.override.yml run --rm organizations-migrate
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm organizations-migrate
 docker compose run --rm user-migrate
 ```
 
@@ -120,6 +135,9 @@ Autres services (ORM migrations):
 docker compose run --rm permission-migrate
 docker compose run --rm billing-migrate
 docker compose run --rm notification-migrate
+docker compose run --rm project-migrate
+docker compose run --rm analysis-migrate
+docker compose run --rm attribution-migrate
 ```
 
 ## CI
@@ -147,5 +165,5 @@ bun run dev
 Ou via Docker dev:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.override.yml up email
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up email
 ```

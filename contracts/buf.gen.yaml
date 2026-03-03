@@ -1,0 +1,12 @@
+version: v1
+plugins:
+  - plugin: buf.build/protocolbuffers/go:v1.36.10
+    out: .
+    opt:
+      - paths=import
+      - module=github.com/bastiencouder/microservices-go/contracts
+  - plugin: buf.build/grpc/go:v1.5.1
+    out: .
+    opt:
+      - paths=import
+      - module=github.com/bastiencouder/microservices-go/contracts

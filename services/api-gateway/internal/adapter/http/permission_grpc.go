@@ -6,8 +6,8 @@ import (
 	"time"
 
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
+	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -16,17 +16,21 @@ type permissionGRPCClient struct {
 	client permissionv1.PermissionServiceClient
 }
 
-func newPermissionGRPCClient(target string) (*permissionGRPCClient, error) {
+func newPermissionGRPCClient(target string, tlsConfig grpctls.ClientConfig) (*permissionGRPCClient, error) {
 	if target == "" {
 		return nil, nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+	dialOptions, err := grpctls.ClientDialOptions(tlsConfig)
+	if err != nil {
+		return nil, fmt.Errorf("configure permission grpc tls: %w", err)
+	}
+	dialOptions = append(dialOptions, grpc.WithBlock())
 	conn, err := grpc.DialContext(
 		ctx,
 		target,
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithBlock(),
+		dialOptions...,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dial permission grpc: %w", err)

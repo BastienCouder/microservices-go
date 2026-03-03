@@ -20,7 +20,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 	})
 	userHandler := h.withAuth(h.userProxy, "user-service", "users")
 
-	return []routeEntry{
+	routes := []routeEntry{
 		{
 			match: func(r *http.Request) bool { return isHealthRequest(r) },
 			handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -34,7 +34,13 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions")},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing")},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications")},
+		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects")},
+		{match: matchPathPrefix("/analysis"), handler: h.withAuth(h.analysisProxy, "analysis-service", "analysis")},
+		{match: matchPathPrefix("/ai"), handler: h.withAuth(h.iaProxy, "ia-service", "ia")},
+		{match: matchPathPrefix("/attribution"), handler: h.withAuth(h.attributionProxy, "attribution-service", "attribution")},
 	}
+
+	return routes
 }
 
 func matchPathPrefix(base string) func(*http.Request) bool {

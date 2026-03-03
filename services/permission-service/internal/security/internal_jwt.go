@@ -1,9 +1,6 @@
 package security
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	internaljwt "github.com/bastiencouder/microservices-go/contracts/pkg/internaljwt"
 )
 
 type internalTokenClaims struct {
@@ -49,6 +48,9 @@ func NewInternalAuthMiddleware(secret, issuer, audience string) func(http.Handle
 
 			r2 := r.Clone(r.Context())
 			r2.Header = r.Header.Clone()
+			r2.Header.Del("X-Authenticated-Identity-ID")
+			r2.Header.Del("X-Authenticated-User-ID")
+			r2.Header.Del("X-Organization-ID")
 			if claims.IdentityID != "" {
 				r2.Header.Set("X-Authenticated-Identity-ID", claims.IdentityID)
 			}
@@ -87,53 +89,15 @@ func isPublicPath(path string) bool {
 }
 
 func verifyInternalJWT(token, secret, expectedIssuer, expectedAudience string) (internalTokenClaims, error) {
-	var claims internalTokenClaims
-	parts := splitJWT(token)
-	if len(parts) != 3 {
-		return claims, fmt.Errorf("invalid jwt format")
-	}
-	unsigned := parts[0] + "." + parts[1]
-	mac := hmac.New(sha256.New, []byte(secret))
-	if _, err := mac.Write([]byte(unsigned)); err != nil {
-		return claims, err
-	}
-	expectedSig := mac.Sum(nil)
-	actualSig, err := base64.RawURLEncoding.DecodeString(parts[2])
+	verified, err := internaljwt.VerifyHS256(token, secret, expectedIssuer, expectedAudience)
 	if err != nil {
-		return claims, fmt.Errorf("invalid jwt signature encoding")
+		return internalTokenClaims{}, fmt.Errorf("invalid internal authorization: %w", err)
 	}
-	if !hmac.Equal(actualSig, expectedSig) {
-		return claims, fmt.Errorf("invalid jwt signature")
-	}
-	payloadBytes, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return claims, fmt.Errorf("invalid jwt payload encoding")
-	}
-	if err := json.Unmarshal(payloadBytes, &claims); err != nil {
-		return claims, fmt.Errorf("invalid jwt payload")
-	}
-	now := time.Now().UTC().Unix()
-	if claims.ExpiresAt < now {
-		return claims, fmt.Errorf("jwt expired")
-	}
-	if claims.Issuer != expectedIssuer {
-		return claims, fmt.Errorf("invalid jwt issuer")
-	}
-	if claims.Audience != expectedAudience {
-		return claims, fmt.Errorf("invalid jwt audience")
-	}
-	return claims, nil
-}
-
-func splitJWT(token string) []string {
-	parts := make([]string, 0, 3)
-	start := 0
-	for i := 0; i < len(token); i++ {
-		if token[i] == '.' {
-			parts = append(parts, token[start:i])
-			start = i + 1
-		}
-	}
-	parts = append(parts, token[start:])
-	return parts
+	return internalTokenClaims{
+		Issuer:       expectedIssuer,
+		Audience:     expectedAudience,
+		IdentityID:   verified.IdentityID,
+		UserID:       verified.UserID,
+		Organization: verified.OrganizationID,
+	}, nil
 }

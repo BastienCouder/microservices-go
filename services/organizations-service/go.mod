@@ -5,6 +5,7 @@ go 1.25.7
 require github.com/jackc/pgx/v5 v5.7.6
 
 require (
+	github.com/bastiencouder/microservices-go/contracts v0.0.0
 	github.com/Masterminds/squirrel v1.5.4
 	github.com/golang-migrate/migrate/v4 v4.19.0
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -16,3 +17,5 @@ require (
 	golang.org/x/sync v0.13.0 // indirect
 	golang.org/x/text v0.24.0 // indirect
 )
+
+replace github.com/bastiencouder/microservices-go/contracts => ../../contracts

@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 )
 
 type Handler struct {
@@ -17,6 +19,10 @@ type Handler struct {
 	permissionProxy    *httputil.ReverseProxy
 	billingProxy       *httputil.ReverseProxy
 	notificationProxy  *httputil.ReverseProxy
+	projectProxy       *httputil.ReverseProxy
+	analysisProxy      *httputil.ReverseProxy
+	iaProxy            *httputil.ReverseProxy
+	attributionProxy   *httputil.ReverseProxy
 	routes             []routeEntry
 	authURL            string
 	userURL            string
@@ -32,13 +38,56 @@ type Handler struct {
 	internalJWTSecret  string
 	internalJWTIssuer  string
 	corsAllowedOrigins map[string]struct{}
+	trustedProxyNets   []*net.IPNet
 }
 
 func NewHandler(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, billingServiceURL, notificationServiceURL string, rateLimitRPM int, internalJWTSecret, internalJWTIssuer string) (*Handler, error) {
-	return NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, "", billingServiceURL, notificationServiceURL, rateLimitRPM, internalJWTSecret, internalJWTIssuer, nil)
+	return NewHandlerWithGRPC(
+		userServiceURL,
+		authServiceURL,
+		organizationsServiceURL,
+		permissionServiceURL,
+		"",
+		billingServiceURL,
+		notificationServiceURL,
+		rateLimitRPM,
+		internalJWTSecret,
+		internalJWTIssuer,
+		nil,
+		nil,
+		grpctls.ClientConfig{AllowInsecure: true},
+	)
 }
 
-func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, permissionServiceGRPCAddr, billingServiceURL, notificationServiceURL string, rateLimitRPM int, internalJWTSecret, internalJWTIssuer string, corsAllowedOrigins []string) (*Handler, error) {
+func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, permissionServiceGRPCAddr, billingServiceURL, notificationServiceURL string, rateLimitRPM int, internalJWTSecret, internalJWTIssuer string, corsAllowedOrigins, trustedProxyCIDRs []string, permissionGRPCTLS grpctls.ClientConfig) (*Handler, error) {
+	return NewHandlerWithGRPCAndServices(
+		userServiceURL,
+		authServiceURL,
+		organizationsServiceURL,
+		permissionServiceURL,
+		permissionServiceGRPCAddr,
+		billingServiceURL,
+		notificationServiceURL,
+		permissionServiceURL,
+		permissionServiceURL,
+		permissionServiceURL,
+		permissionServiceURL,
+		rateLimitRPM,
+		internalJWTSecret,
+		internalJWTIssuer,
+		corsAllowedOrigins,
+		trustedProxyCIDRs,
+		permissionGRPCTLS,
+	)
+}
+
+func NewHandlerWithGRPCAndServices(
+	userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, permissionServiceGRPCAddr, billingServiceURL, notificationServiceURL, projectServiceURL, analysisServiceURL, iaServiceURL, attributionServiceURL string,
+	rateLimitRPM int,
+	internalJWTSecret, internalJWTIssuer string,
+	corsAllowedOrigins, trustedProxyCIDRs []string,
+	permissionGRPCTLS grpctls.ClientConfig,
+) (*Handler, error) {
 	userProxy, err := newProxy(userServiceURL)
 	if err != nil {
 		return nil, err
@@ -63,11 +112,27 @@ func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL,
 	if err != nil {
 		return nil, err
 	}
+	projectProxy, err := newProxy(projectServiceURL)
+	if err != nil {
+		return nil, err
+	}
+	analysisProxy, err := newProxy(analysisServiceURL)
+	if err != nil {
+		return nil, err
+	}
+	iaProxy, err := newProxy(iaServiceURL)
+	if err != nil {
+		return nil, err
+	}
+	attributionProxy, err := newProxy(attributionServiceURL)
+	if err != nil {
+		return nil, err
+	}
 	limiter, err := newRateLimiter(rateLimitRPM, time.Minute)
 	if err != nil {
 		return nil, err
 	}
-	permissionGRPC, err := newPermissionGRPCClient(permissionServiceGRPCAddr)
+	permissionGRPC, err := newPermissionGRPCClient(permissionServiceGRPCAddr, permissionGRPCTLS)
 	if err != nil {
 		return nil, err
 	}
@@ -115,6 +180,10 @@ func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL,
 		}
 		allowedOriginSet[trimmed] = struct{}{}
 	}
+	trustedProxyNets, err := parseTrustedProxyCIDRs(trustedProxyCIDRs)
+	if err != nil {
+		return nil, err
+	}
 
 	h := &Handler{
 		userProxy:          userProxy,
@@ -123,6 +192,10 @@ func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL,
 		permissionProxy:    permissionProxy,
 		billingProxy:       billingProxy,
 		notificationProxy:  notificationProxy,
+		projectProxy:       projectProxy,
+		analysisProxy:      analysisProxy,
+		iaProxy:            iaProxy,
+		attributionProxy:   attributionProxy,
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
 		permissionGRPC:     permissionGRPC,
@@ -140,9 +213,29 @@ func NewHandlerWithGRPC(userServiceURL, authServiceURL, organizationsServiceURL,
 		internalJWTSecret:  internalJWTSecret,
 		internalJWTIssuer:  internalJWTIssuer,
 		corsAllowedOrigins: allowedOriginSet,
+		trustedProxyNets:   trustedProxyNets,
 	}
 	h.routes = h.buildRoutes()
 	return h, nil
+}
+
+func parseTrustedProxyCIDRs(cidrs []string) ([]*net.IPNet, error) {
+	if len(cidrs) == 0 {
+		return nil, nil
+	}
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, cidr := range cidrs {
+		value := strings.TrimSpace(cidr)
+		if value == "" {
+			continue
+		}
+		_, network, err := net.ParseCIDR(value)
+		if err != nil {
+			return nil, err
+		}
+		nets = append(nets, network)
+	}
+	return nets, nil
 }
 
 func (h *Handler) Close() error {

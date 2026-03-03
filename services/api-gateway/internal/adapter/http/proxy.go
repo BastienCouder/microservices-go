@@ -14,7 +14,7 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !isHealthRequest(r) && !h.rateLimiter.Allow(clientIP(r)) {
+	if !isHealthRequest(r) && !h.rateLimiter.Allow(h.clientIP(r)) {
 		writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded")
 		return
 	}
