@@ -260,11 +260,243 @@ func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int6
 	}, nil
 }
 
+func (r *Repository) CreateInvitation(ctx context.Context, invitation *domain.Invitation) error {
+	created, err := r.queries.CreateInvitation(ctx, sqlc.CreateInvitationParams{
+		OrganizationID:  invitation.OrganizationID,
+		Email:           invitation.Email,
+		Role:            invitation.Role,
+		Token:           invitation.Token,
+		Message:         invitation.Message,
+		InvitedByUserID: invitation.InvitedByUserID,
+		CreatedAt:       toPgTimestamptz(invitation.CreatedAt),
+		ExpiresAt:       toPgNullableTimestamptz(invitation.ExpiresAt),
+	})
+	if err != nil {
+		if isFKViolation(err) {
+			return domain.ErrOrganizationNotFound
+		}
+		return fmt.Errorf("create invitation: %w", err)
+	}
+	mapped := mapInvitation(created)
+	*invitation = mapped
+	return nil
+}
+
+func (r *Repository) ListInvitations(ctx context.Context, organizationID int64) ([]domain.Invitation, error) {
+	if _, err := r.GetByID(ctx, organizationID); err != nil {
+		return nil, err
+	}
+
+	rows, err := r.queries.ListInvitationsByOrganization(ctx, organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list invitations: %w", err)
+	}
+
+	invitations := make([]domain.Invitation, 0, len(rows))
+	for _, row := range rows {
+		invitations = append(invitations, mapInvitation(row))
+	}
+	return invitations, nil
+}
+
+func (r *Repository) GetInvitationByID(ctx context.Context, organizationID, invitationID int64) (*domain.Invitation, error) {
+	row, err := r.queries.GetInvitationByID(ctx, sqlc.GetInvitationByIDParams{
+		OrganizationID: organizationID,
+		ID:             invitationID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInvitationNotFound
+		}
+		return nil, fmt.Errorf("get invitation: %w", err)
+	}
+	invitation := mapInvitation(row)
+	return &invitation, nil
+}
+
+func (r *Repository) UpdateInvitation(ctx context.Context, invitation *domain.Invitation) (*domain.Invitation, error) {
+	current, err := r.queries.GetInvitationByID(ctx, sqlc.GetInvitationByIDParams{
+		OrganizationID: invitation.OrganizationID,
+		ID:             invitation.ID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInvitationNotFound
+		}
+		return nil, fmt.Errorf("get invitation before update: %w", err)
+	}
+	if domain.InvitationStatus(current.Status) != domain.InvitationStatusPending {
+		return nil, domain.ErrInvitationAlreadyHandled
+	}
+
+	row, err := r.queries.UpdateInvitationByID(ctx, sqlc.UpdateInvitationByIDParams{
+		OrganizationID: invitation.OrganizationID,
+		ID:             invitation.ID,
+		Email:          invitation.Email,
+		Role:           invitation.Role,
+		Message:        invitation.Message,
+		ExpiresAt:      toPgNullableTimestamptz(invitation.ExpiresAt),
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInvitationNotFound
+		}
+		return nil, fmt.Errorf("update invitation: %w", err)
+	}
+	updated := mapInvitation(row)
+	return &updated, nil
+}
+
+func (r *Repository) DeleteInvitation(ctx context.Context, organizationID, invitationID int64) error {
+	rowsAffected, err := r.queries.RevokeInvitationByID(ctx, sqlc.RevokeInvitationByIDParams{
+		OrganizationID: organizationID,
+		ID:             invitationID,
+		DeletedAt:      toPgTimestamptz(time.Now().UTC()),
+	})
+	if err != nil {
+		return fmt.Errorf("revoke invitation: %w", err)
+	}
+	if rowsAffected == 0 {
+		return domain.ErrInvitationNotFound
+	}
+	return nil
+}
+
+func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, userID int64, acceptedAt time.Time) (*domain.Invitation, *domain.Member, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("begin accept invitation transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := r.queries.WithTx(tx)
+	invitationRow, err := qtx.GetInvitationByTokenForUpdate(ctx, token)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil, domain.ErrInvitationNotFound
+		}
+		return nil, nil, fmt.Errorf("get invitation by token: %w", err)
+	}
+	invitation := mapInvitation(invitationRow)
+	if invitation.Status != domain.InvitationStatusPending {
+		return nil, nil, domain.ErrInvitationAlreadyHandled
+	}
+	if isInvitationExpired(invitation, acceptedAt) {
+		return nil, nil, domain.ErrInvitationExpired
+	}
+
+	updatedRow, err := qtx.MarkInvitationAccepted(ctx, sqlc.MarkInvitationAcceptedParams{
+		ID:               invitation.ID,
+		AcceptedByUserID: userID,
+		RespondedAt:      toPgTimestamptz(acceptedAt.UTC()),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("mark invitation accepted: %w", err)
+	}
+
+	addedAt := acceptedAt.UTC()
+	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
+		ID:      invitation.OrganizationID,
+		UserID:  userID,
+		TeamID:  pgtype.Int8{},
+		AddedAt: toPgTimestamptz(addedAt),
+	}); err != nil {
+		if isFKViolation(err) {
+			return nil, nil, domain.ErrOrganizationNotFound
+		}
+		return nil, nil, fmt.Errorf("upsert invited member: %w", err)
+	}
+	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
+		OrganizationID: invitation.OrganizationID,
+		UserID:         userID,
+		Role:           invitation.Role,
+	}); err != nil {
+		return nil, nil, fmt.Errorf("insert invited member role: %w", err)
+	}
+
+	memberRow, err := qtx.GetMemberByOrgAndUser(ctx, sqlc.GetMemberByOrgAndUserParams{
+		OrganizationID: invitation.OrganizationID,
+		UserID:         userID,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("get invited member: %w", err)
+	}
+	roles, err := qtx.ListMemberRolesByOrgAndUser(ctx, sqlc.ListMemberRolesByOrgAndUserParams{
+		OrganizationID: invitation.OrganizationID,
+		UserID:         userID,
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("list invited member roles: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, fmt.Errorf("commit accept invitation transaction: %w", err)
+	}
+
+	updatedInvitation := mapInvitation(updatedRow)
+	member := &domain.Member{
+		OrganizationID: memberRow.OrganizationID,
+		UserID:         memberRow.UserID,
+		TeamID:         memberRow.TeamID,
+		AddedAt:        fromPgTimestamptz(memberRow.AddedAt),
+		DeletedAt:      fromPgNullableTimestamptz(memberRow.DeletedAt),
+		Roles:          append([]string(nil), roles...),
+	}
+	return &updatedInvitation, member, nil
+}
+
+func (r *Repository) RefuseInvitationByToken(ctx context.Context, token string, userID int64, refusedAt time.Time) (*domain.Invitation, error) {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin refuse invitation transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := r.queries.WithTx(tx)
+	invitationRow, err := qtx.GetInvitationByTokenForUpdate(ctx, token)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInvitationNotFound
+		}
+		return nil, fmt.Errorf("get invitation by token: %w", err)
+	}
+	invitation := mapInvitation(invitationRow)
+	if invitation.Status != domain.InvitationStatusPending {
+		return nil, domain.ErrInvitationAlreadyHandled
+	}
+	if isInvitationExpired(invitation, refusedAt) {
+		return nil, domain.ErrInvitationExpired
+	}
+
+	updatedRow, err := qtx.MarkInvitationRefused(ctx, sqlc.MarkInvitationRefusedParams{
+		ID:               invitation.ID,
+		AcceptedByUserID: userID,
+		RespondedAt:      toPgTimestamptz(refusedAt.UTC()),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("mark invitation refused: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit refuse invitation transaction: %w", err)
+	}
+
+	updated := mapInvitation(updatedRow)
+	return &updated, nil
+}
+
 func nullableTeamID(teamID int64) pgtype.Int8 {
 	if teamID <= 0 {
 		return pgtype.Int8{}
 	}
 	return pgtype.Int8{Int64: teamID, Valid: true}
+}
+
+func toPgNullableTimestamptz(value *time.Time) pgtype.Timestamptz {
+	if value == nil {
+		return pgtype.Timestamptz{}
+	}
+	return pgtype.Timestamptz{Time: value.UTC(), Valid: true}
 }
 
 func toPgTimestamptz(value time.Time) pgtype.Timestamptz {
@@ -284,6 +516,28 @@ func fromPgNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
 	}
 	t := value.Time
 	return &t
+}
+
+func mapInvitation(row sqlc.OrganizationInvitation) domain.Invitation {
+	return domain.Invitation{
+		ID:               row.ID,
+		OrganizationID:   row.OrganizationID,
+		Email:            row.Email,
+		Role:             row.Role,
+		Token:            row.Token,
+		Message:          row.Message,
+		Status:           domain.InvitationStatus(row.Status),
+		InvitedByUserID:  row.InvitedByUserID,
+		AcceptedByUserID: row.AcceptedByUserID,
+		CreatedAt:        fromPgTimestamptz(row.CreatedAt),
+		ExpiresAt:        fromPgNullableTimestamptz(row.ExpiresAt),
+		RespondedAt:      fromPgNullableTimestamptz(row.RespondedAt),
+		DeletedAt:        fromPgNullableTimestamptz(row.DeletedAt),
+	}
+}
+
+func isInvitationExpired(invitation domain.Invitation, now time.Time) bool {
+	return invitation.ExpiresAt != nil && !invitation.ExpiresAt.After(now.UTC())
 }
 
 func isFKViolation(err error) bool {

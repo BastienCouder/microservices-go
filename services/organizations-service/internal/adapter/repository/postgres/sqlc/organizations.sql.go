@@ -36,6 +36,69 @@ func (q *Queries) CreateOrganization(ctx context.Context, arg CreateOrganization
 	return i, err
 }
 
+const createInvitation = `-- name: CreateInvitation :one
+INSERT INTO organization_invitations (
+  organization_id,
+  email,
+  role,
+  token,
+  message,
+  status,
+  invited_by_user_id,
+  accepted_by_user_id,
+  created_at,
+  expires_at,
+  responded_at,
+  deleted_at
+)
+SELECT o.id, $2, $3, $4, $5, 'pending', $6, 0, $7, $8, NULL, NULL
+FROM organizations o
+WHERE o.id = $1
+  AND o.deleted_at IS NULL
+RETURNING id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+`
+
+type CreateInvitationParams struct {
+	OrganizationID  int64
+	Email           string
+	Role            string
+	Token           string
+	Message         string
+	InvitedByUserID int64
+	CreatedAt       pgtype.Timestamptz
+	ExpiresAt       pgtype.Timestamptz
+}
+
+func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationParams) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, createInvitation,
+		arg.OrganizationID,
+		arg.Email,
+		arg.Role,
+		arg.Token,
+		arg.Message,
+		arg.InvitedByUserID,
+		arg.CreatedAt,
+		arg.ExpiresAt,
+	)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const createTeam = `-- name: CreateTeam :one
 INSERT INTO teams (organization_id, name, created_at, deleted_at)
 SELECT o.id, $2, $3, NULL
@@ -93,6 +156,69 @@ func (q *Queries) GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgA
 		&i.UserID,
 		&i.TeamID,
 		&i.AddedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getInvitationByID = `-- name: GetInvitationByID :one
+SELECT id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+FROM organization_invitations
+WHERE organization_id = $1
+  AND id = $2
+  AND deleted_at IS NULL
+`
+
+type GetInvitationByIDParams struct {
+	OrganizationID int64
+	ID             int64
+}
+
+func (q *Queries) GetInvitationByID(ctx context.Context, arg GetInvitationByIDParams) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, getInvitationByID, arg.OrganizationID, arg.ID)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const getInvitationByTokenForUpdate = `-- name: GetInvitationByTokenForUpdate :one
+SELECT id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+FROM organization_invitations
+WHERE token = $1
+  AND deleted_at IS NULL
+FOR UPDATE
+`
+
+func (q *Queries) GetInvitationByTokenForUpdate(ctx context.Context, token string) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, getInvitationByTokenForUpdate, token)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
 		&i.DeletedAt,
 	)
 	return i, err
@@ -182,6 +308,48 @@ func (q *Queries) ListMemberRolesByOrgAndUser(ctx context.Context, arg ListMembe
 	return items, nil
 }
 
+const listInvitationsByOrganization = `-- name: ListInvitationsByOrganization :many
+SELECT id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+FROM organization_invitations
+WHERE organization_id = $1
+  AND deleted_at IS NULL
+ORDER BY id DESC
+`
+
+func (q *Queries) ListInvitationsByOrganization(ctx context.Context, organizationID int64) ([]OrganizationInvitation, error) {
+	rows, err := q.db.Query(ctx, listInvitationsByOrganization, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OrganizationInvitation
+	for rows.Next() {
+		var i OrganizationInvitation
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrganizationID,
+			&i.Email,
+			&i.Role,
+			&i.Token,
+			&i.Message,
+			&i.Status,
+			&i.InvitedByUserID,
+			&i.AcceptedByUserID,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+			&i.RespondedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTeamsByOrganization = `-- name: ListTeamsByOrganization :many
 SELECT id, organization_id, name, created_at, deleted_at
 FROM teams
@@ -214,6 +382,154 @@ func (q *Queries) ListTeamsByOrganization(ctx context.Context, organizationID in
 		return nil, err
 	}
 	return items, nil
+}
+
+const markInvitationAccepted = `-- name: MarkInvitationAccepted :one
+UPDATE organization_invitations
+SET status = 'accepted',
+    accepted_by_user_id = $2,
+    responded_at = $3
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+`
+
+type MarkInvitationAcceptedParams struct {
+	ID               int64
+	AcceptedByUserID int64
+	RespondedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, markInvitationAccepted, arg.ID, arg.AcceptedByUserID, arg.RespondedAt)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const markInvitationRefused = `-- name: MarkInvitationRefused :one
+UPDATE organization_invitations
+SET status = 'refused',
+    accepted_by_user_id = $2,
+    responded_at = $3
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+`
+
+type MarkInvitationRefusedParams struct {
+	ID               int64
+	AcceptedByUserID int64
+	RespondedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) MarkInvitationRefused(ctx context.Context, arg MarkInvitationRefusedParams) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, markInvitationRefused, arg.ID, arg.AcceptedByUserID, arg.RespondedAt)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const revokeInvitationByID = `-- name: RevokeInvitationByID :execrows
+UPDATE organization_invitations
+SET status = 'revoked',
+    deleted_at = $3,
+    responded_at = COALESCE(responded_at, $3)
+WHERE organization_id = $1
+  AND id = $2
+  AND deleted_at IS NULL
+`
+
+type RevokeInvitationByIDParams struct {
+	OrganizationID int64
+	ID             int64
+	DeletedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) RevokeInvitationByID(ctx context.Context, arg RevokeInvitationByIDParams) (int64, error) {
+	result, err := q.db.Exec(ctx, revokeInvitationByID, arg.OrganizationID, arg.ID, arg.DeletedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const updateInvitationByID = `-- name: UpdateInvitationByID :one
+UPDATE organization_invitations
+SET email = $3,
+    role = $4,
+    message = $5,
+    expires_at = $6
+WHERE organization_id = $1
+  AND id = $2
+  AND status = 'pending'
+  AND deleted_at IS NULL
+RETURNING id, organization_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+`
+
+type UpdateInvitationByIDParams struct {
+	OrganizationID int64
+	ID             int64
+	Email          string
+	Role           string
+	Message        string
+	ExpiresAt      pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateInvitationByID(ctx context.Context, arg UpdateInvitationByIDParams) (OrganizationInvitation, error) {
+	row := q.db.QueryRow(ctx, updateInvitationByID,
+		arg.OrganizationID,
+		arg.ID,
+		arg.Email,
+		arg.Role,
+		arg.Message,
+		arg.ExpiresAt,
+	)
+	var i OrganizationInvitation
+	err := row.Scan(
+		&i.ID,
+		&i.OrganizationID,
+		&i.Email,
+		&i.Role,
+		&i.Token,
+		&i.Message,
+		&i.Status,
+		&i.InvitedByUserID,
+		&i.AcceptedByUserID,
+		&i.CreatedAt,
+		&i.ExpiresAt,
+		&i.RespondedAt,
+		&i.DeletedAt,
+	)
+	return i, err
 }
 
 const upsertMember = `-- name: UpsertMember :exec

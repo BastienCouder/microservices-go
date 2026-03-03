@@ -38,6 +38,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/users"), handler: userHandler},
 		{match: matchPathPrefix("/admin/users"), handler: userHandler},
 		{match: matchPathPrefix("/organizations"), handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations")},
+		{match: matchPathPrefix("/invitations"), handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations")},
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions")},
 		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing")},

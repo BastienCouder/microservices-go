@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -115,4 +117,158 @@ func (s *Service) AssignRole(ctx context.Context, organizationID, userID int64, 
 		return nil, fmt.Errorf("assign role: %w", err)
 	}
 	return member, nil
+}
+
+func (s *Service) CreateInvitation(
+	ctx context.Context,
+	organizationID, invitedByUserID int64,
+	email, role, message string,
+	expiresAt *time.Time,
+) (*domain.Invitation, error) {
+	normalizedEmail, err := domain.NormalizeInvitationEmail(email)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizedRole := "member"
+	if strings.TrimSpace(role) != "" {
+		normalizedRole, err = domain.NormalizeRole(role)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
+		}
+	}
+
+	token, err := generateSecureTokenHex(24)
+	if err != nil {
+		return nil, fmt.Errorf("generate invitation token: %w", err)
+	}
+
+	now := s.now().UTC()
+	invitation := &domain.Invitation{
+		OrganizationID:  organizationID,
+		Email:           normalizedEmail,
+		Role:            normalizedRole,
+		Token:           token,
+		Message:         strings.TrimSpace(message),
+		Status:          domain.InvitationStatusPending,
+		InvitedByUserID: invitedByUserID,
+		CreatedAt:       now,
+		ExpiresAt:       copyTimePtrUTC(expiresAt),
+	}
+	if err := invitation.ValidateForCreate(); err != nil {
+		return nil, err
+	}
+
+	if err := s.repo.CreateInvitation(ctx, invitation); err != nil {
+		return nil, fmt.Errorf("create invitation: %w", err)
+	}
+	return invitation, nil
+}
+
+func (s *Service) ListInvitations(ctx context.Context, organizationID int64) ([]domain.Invitation, error) {
+	if organizationID <= 0 {
+		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidInvitation)
+	}
+	invitations, err := s.repo.ListInvitations(ctx, organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list invitations: %w", err)
+	}
+	return invitations, nil
+}
+
+func (s *Service) GetInvitation(ctx context.Context, organizationID, invitationID int64) (*domain.Invitation, error) {
+	if organizationID <= 0 || invitationID <= 0 {
+		return nil, fmt.Errorf("%w: invalid organization or invitation id", domain.ErrInvalidInvitation)
+	}
+	invitation, err := s.repo.GetInvitationByID(ctx, organizationID, invitationID)
+	if err != nil {
+		return nil, fmt.Errorf("get invitation: %w", err)
+	}
+	return invitation, nil
+}
+
+func (s *Service) UpdateInvitation(
+	ctx context.Context,
+	organizationID, invitationID int64,
+	email, role, message string,
+	expiresAt *time.Time,
+) (*domain.Invitation, error) {
+	if organizationID <= 0 || invitationID <= 0 {
+		return nil, fmt.Errorf("%w: invalid organization or invitation id", domain.ErrInvalidInvitation)
+	}
+	normalizedEmail, err := domain.NormalizeInvitationEmail(email)
+	if err != nil {
+		return nil, err
+	}
+	normalizedRole, err := domain.NormalizeRole(role)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
+	}
+
+	invitation := &domain.Invitation{
+		ID:             invitationID,
+		OrganizationID: organizationID,
+		Email:          normalizedEmail,
+		Role:           normalizedRole,
+		Message:        strings.TrimSpace(message),
+		ExpiresAt:      copyTimePtrUTC(expiresAt),
+	}
+	updated, err := s.repo.UpdateInvitation(ctx, invitation)
+	if err != nil {
+		return nil, fmt.Errorf("update invitation: %w", err)
+	}
+	return updated, nil
+}
+
+func (s *Service) DeleteInvitation(ctx context.Context, organizationID, invitationID int64) error {
+	if organizationID <= 0 || invitationID <= 0 {
+		return fmt.Errorf("%w: invalid organization or invitation id", domain.ErrInvalidInvitation)
+	}
+	if err := s.repo.DeleteInvitation(ctx, organizationID, invitationID); err != nil {
+		return fmt.Errorf("delete invitation: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int64) (*domain.Invitation, *domain.Member, error) {
+	trimmedToken := strings.TrimSpace(token)
+	if trimmedToken == "" || userID <= 0 {
+		return nil, nil, fmt.Errorf("%w: token and user id are required", domain.ErrInvalidInvitation)
+	}
+	invitation, member, err := s.repo.AcceptInvitationByToken(ctx, trimmedToken, userID, s.now().UTC())
+	if err != nil {
+		return nil, nil, fmt.Errorf("accept invitation: %w", err)
+	}
+	return invitation, member, nil
+}
+
+func (s *Service) RefuseInvitation(ctx context.Context, token string, userID int64) (*domain.Invitation, error) {
+	trimmedToken := strings.TrimSpace(token)
+	if trimmedToken == "" || userID <= 0 {
+		return nil, fmt.Errorf("%w: token and user id are required", domain.ErrInvalidInvitation)
+	}
+	invitation, err := s.repo.RefuseInvitationByToken(ctx, trimmedToken, userID, s.now().UTC())
+	if err != nil {
+		return nil, fmt.Errorf("refuse invitation: %w", err)
+	}
+	return invitation, nil
+}
+
+func copyTimePtrUTC(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	clone := value.UTC()
+	return &clone
+}
+
+func generateSecureTokenHex(size int) (string, error) {
+	if size <= 0 {
+		return "", fmt.Errorf("invalid token size")
+	}
+	buf := make([]byte, size)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(buf), nil
 }

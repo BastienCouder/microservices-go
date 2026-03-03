@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 )
@@ -12,8 +13,11 @@ type fakeRepo struct {
 	organizations map[int64]*domain.Organization
 	teams         map[int64][]domain.Team
 	members       map[[2]int64]domain.Member
+	invitations   map[int64]domain.Invitation
+	tokenIndex    map[string]int64
 	nextOrgID     int64
 	nextTeamID    int64
+	nextInviteID  int64
 }
 
 func newFakeRepo() *fakeRepo {
@@ -21,8 +25,11 @@ func newFakeRepo() *fakeRepo {
 		organizations: make(map[int64]*domain.Organization),
 		teams:         make(map[int64][]domain.Team),
 		members:       make(map[[2]int64]domain.Member),
+		invitations:   make(map[int64]domain.Invitation),
+		tokenIndex:    make(map[string]int64),
 		nextOrgID:     1,
 		nextTeamID:    1,
+		nextInviteID:  1,
 	}
 }
 
@@ -117,6 +124,151 @@ func (f *fakeRepo) AssignRole(_ context.Context, organizationID, userID int64, r
 	clone := member
 	clone.Roles = append([]string(nil), member.Roles...)
 	return &clone, nil
+}
+
+func (f *fakeRepo) CreateInvitation(_ context.Context, invitation *domain.Invitation) error {
+	if _, ok := f.organizations[invitation.OrganizationID]; !ok {
+		return domain.ErrOrganizationNotFound
+	}
+	invitation.ID = f.nextInviteID
+	f.nextInviteID++
+	clone := cloneInvitation(*invitation)
+	f.invitations[clone.ID] = clone
+	f.tokenIndex[clone.Token] = clone.ID
+	return nil
+}
+
+func (f *fakeRepo) ListInvitations(_ context.Context, organizationID int64) ([]domain.Invitation, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	out := make([]domain.Invitation, 0)
+	for _, invitation := range f.invitations {
+		if invitation.OrganizationID != organizationID || invitation.DeletedAt != nil {
+			continue
+		}
+		out = append(out, cloneInvitation(invitation))
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) GetInvitationByID(_ context.Context, organizationID, invitationID int64) (*domain.Invitation, error) {
+	invitation, ok := f.invitations[invitationID]
+	if !ok || invitation.OrganizationID != organizationID || invitation.DeletedAt != nil {
+		return nil, domain.ErrInvitationNotFound
+	}
+	clone := cloneInvitation(invitation)
+	return &clone, nil
+}
+
+func (f *fakeRepo) UpdateInvitation(_ context.Context, invitation *domain.Invitation) (*domain.Invitation, error) {
+	current, ok := f.invitations[invitation.ID]
+	if !ok || current.OrganizationID != invitation.OrganizationID || current.DeletedAt != nil {
+		return nil, domain.ErrInvitationNotFound
+	}
+	if current.Status != domain.InvitationStatusPending {
+		return nil, domain.ErrInvitationAlreadyHandled
+	}
+	current.Email = invitation.Email
+	current.Role = invitation.Role
+	current.Message = invitation.Message
+	current.ExpiresAt = cloneTimePtr(invitation.ExpiresAt)
+	f.invitations[invitation.ID] = current
+	clone := cloneInvitation(current)
+	return &clone, nil
+}
+
+func (f *fakeRepo) DeleteInvitation(_ context.Context, organizationID, invitationID int64) error {
+	current, ok := f.invitations[invitationID]
+	if !ok || current.OrganizationID != organizationID || current.DeletedAt != nil {
+		return domain.ErrInvitationNotFound
+	}
+	now := time.Now().UTC()
+	current.Status = domain.InvitationStatusRevoked
+	current.DeletedAt = &now
+	current.RespondedAt = &now
+	f.invitations[invitationID] = current
+	return nil
+}
+
+func (f *fakeRepo) AcceptInvitationByToken(_ context.Context, token string, userID int64, acceptedAt time.Time) (*domain.Invitation, *domain.Member, error) {
+	id, ok := f.tokenIndex[token]
+	if !ok {
+		return nil, nil, domain.ErrInvitationNotFound
+	}
+	invitation, ok := f.invitations[id]
+	if !ok || invitation.DeletedAt != nil {
+		return nil, nil, domain.ErrInvitationNotFound
+	}
+	if invitation.Status != domain.InvitationStatusPending {
+		return nil, nil, domain.ErrInvitationAlreadyHandled
+	}
+	if invitation.ExpiresAt != nil && !invitation.ExpiresAt.After(acceptedAt) {
+		return nil, nil, domain.ErrInvitationExpired
+	}
+	if _, ok := f.organizations[invitation.OrganizationID]; !ok {
+		return nil, nil, domain.ErrOrganizationNotFound
+	}
+
+	actedAt := acceptedAt.UTC()
+	invitation.Status = domain.InvitationStatusAccepted
+	invitation.AcceptedByUserID = userID
+	invitation.RespondedAt = &actedAt
+	f.invitations[id] = invitation
+
+	member := domain.Member{
+		OrganizationID: invitation.OrganizationID,
+		UserID:         userID,
+		TeamID:         0,
+		Roles:          []string{invitation.Role},
+		AddedAt:        actedAt,
+	}
+	key := [2]int64{member.OrganizationID, member.UserID}
+	f.members[key] = member
+
+	invitationClone := cloneInvitation(invitation)
+	memberClone := member
+	memberClone.Roles = append([]string(nil), member.Roles...)
+	return &invitationClone, &memberClone, nil
+}
+
+func (f *fakeRepo) RefuseInvitationByToken(_ context.Context, token string, userID int64, refusedAt time.Time) (*domain.Invitation, error) {
+	id, ok := f.tokenIndex[token]
+	if !ok {
+		return nil, domain.ErrInvitationNotFound
+	}
+	invitation, ok := f.invitations[id]
+	if !ok || invitation.DeletedAt != nil {
+		return nil, domain.ErrInvitationNotFound
+	}
+	if invitation.Status != domain.InvitationStatusPending {
+		return nil, domain.ErrInvitationAlreadyHandled
+	}
+	if invitation.ExpiresAt != nil && !invitation.ExpiresAt.After(refusedAt) {
+		return nil, domain.ErrInvitationExpired
+	}
+	actedAt := refusedAt.UTC()
+	invitation.Status = domain.InvitationStatusRefused
+	invitation.AcceptedByUserID = userID
+	invitation.RespondedAt = &actedAt
+	f.invitations[id] = invitation
+	clone := cloneInvitation(invitation)
+	return &clone, nil
+}
+
+func cloneInvitation(value domain.Invitation) domain.Invitation {
+	value.ExpiresAt = cloneTimePtr(value.ExpiresAt)
+	value.RespondedAt = cloneTimePtr(value.RespondedAt)
+	value.DeletedAt = cloneTimePtr(value.DeletedAt)
+	return value
+}
+
+func cloneTimePtr(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }
 
 func TestCreateOrganization(t *testing.T) {

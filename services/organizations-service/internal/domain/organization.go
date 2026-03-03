@@ -3,19 +3,24 @@ package domain
 import (
 	"errors"
 	"fmt"
+	"net/mail"
 	"slices"
 	"strings"
 	"time"
 )
 
 var (
-	ErrOrganizationNotFound = errors.New("organization not found")
-	ErrInvalidOrganization  = errors.New("invalid organization")
-	ErrTeamNotFound         = errors.New("team not found")
-	ErrInvalidTeam          = errors.New("invalid team")
-	ErrMemberNotFound       = errors.New("member not found")
-	ErrInvalidMember        = errors.New("invalid member")
-	ErrInvalidRole          = errors.New("invalid role")
+	ErrOrganizationNotFound    = errors.New("organization not found")
+	ErrInvalidOrganization     = errors.New("invalid organization")
+	ErrTeamNotFound            = errors.New("team not found")
+	ErrInvalidTeam             = errors.New("invalid team")
+	ErrMemberNotFound          = errors.New("member not found")
+	ErrInvalidMember           = errors.New("invalid member")
+	ErrInvalidRole             = errors.New("invalid role")
+	ErrInvitationNotFound      = errors.New("invitation not found")
+	ErrInvalidInvitation       = errors.New("invalid invitation")
+	ErrInvitationExpired       = errors.New("invitation expired")
+	ErrInvitationAlreadyHandled = errors.New("invitation already handled")
 )
 
 type Organization struct {
@@ -89,4 +94,65 @@ func AddRole(roles []string, role string) []string {
 		return roles
 	}
 	return append(roles, role)
+}
+
+type InvitationStatus string
+
+const (
+	InvitationStatusPending  InvitationStatus = "pending"
+	InvitationStatusAccepted InvitationStatus = "accepted"
+	InvitationStatusRefused  InvitationStatus = "refused"
+	InvitationStatusRevoked  InvitationStatus = "revoked"
+)
+
+type Invitation struct {
+	ID               int64
+	OrganizationID   int64
+	Email            string
+	Role             string
+	Token            string
+	Message          string
+	Status           InvitationStatus
+	InvitedByUserID  int64
+	AcceptedByUserID int64
+	CreatedAt        time.Time
+	ExpiresAt        *time.Time
+	RespondedAt      *time.Time
+	DeletedAt        *time.Time
+}
+
+func NormalizeInvitationEmail(raw string) (string, error) {
+	email := strings.ToLower(strings.TrimSpace(raw))
+	if email == "" {
+		return "", fmt.Errorf("%w: email is required", ErrInvalidInvitation)
+	}
+	if _, err := mail.ParseAddress(email); err != nil {
+		return "", fmt.Errorf("%w: invalid email", ErrInvalidInvitation)
+	}
+	return email, nil
+}
+
+func (i *Invitation) ValidateForCreate() error {
+	if i.OrganizationID <= 0 {
+		return fmt.Errorf("%w: organization id must be positive", ErrInvalidInvitation)
+	}
+	if i.InvitedByUserID <= 0 {
+		return fmt.Errorf("%w: inviter user id must be positive", ErrInvalidInvitation)
+	}
+	if strings.TrimSpace(i.Token) == "" {
+		return fmt.Errorf("%w: token is required", ErrInvalidInvitation)
+	}
+	if _, err := NormalizeInvitationEmail(i.Email); err != nil {
+		return err
+	}
+	if _, err := NormalizeRole(i.Role); err != nil {
+		return fmt.Errorf("%w: %v", ErrInvalidInvitation, err)
+	}
+	if i.Status != InvitationStatusPending {
+		return fmt.Errorf("%w: status must be pending on create", ErrInvalidInvitation)
+	}
+	if i.ExpiresAt != nil && !i.ExpiresAt.After(i.CreatedAt) {
+		return fmt.Errorf("%w: expiration must be in the future", ErrInvalidInvitation)
+	}
+	return nil
 }

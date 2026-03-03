@@ -240,6 +240,71 @@ func TestGatewayRateLimit(t *testing.T) {
 	}
 }
 
+func TestGatewayInvitationsAcceptDoesNotRequireOrganizationHeader(t *testing.T) {
+	var invitationCalls int32
+
+	organizationsUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/invitations/token-123/accept" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		atomic.AddInt32(&invitationCalls, 1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"accepted"}`))
+	}))
+	defer organizationsUpstream.Close()
+
+	userUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/users/by-auth/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":42}`))
+	}))
+	defer userUpstream.Close()
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/validate" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"identity_id":"kratos-id-42"}`))
+	}))
+	defer authUpstream.Close()
+
+	h, err := NewHandler(
+		userUpstream.URL,
+		authUpstream.URL,
+		organizationsUpstream.URL,
+		organizationsUpstream.URL,
+		organizationsUpstream.URL,
+		organizationsUpstream.URL,
+		100,
+		"test-secret",
+		"api-gateway",
+	)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/invitations/token-123/accept", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if atomic.LoadInt32(&invitationCalls) != 1 {
+		t.Fatalf("expected organizations upstream to be called once")
+	}
+}
+
 func TestGatewayAdminUsersForbiddenWithoutAdminRole(t *testing.T) {
 	var adminUpstreamCalls int32
 

@@ -14,6 +14,22 @@ type MemberRole struct {
 	Role           string
 }
 
+type OrganizationInvitation struct {
+	ID               int64
+	OrganizationID   int64
+	Email            string
+	Role             string
+	Token            string
+	Message          string
+	Status           string
+	InvitedByUserID  int64
+	AcceptedByUserID int64
+	CreatedAt        pgtype.Timestamptz
+	ExpiresAt        pgtype.Timestamptz
+	RespondedAt      pgtype.Timestamptz
+	DeletedAt        pgtype.Timestamptz
+}
+
 type Organization struct {
 	ID          int64
 	Name        string

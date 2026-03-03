@@ -28,6 +28,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /organizations", h.createOrganization)
 	mux.HandleFunc("/organizations/", h.organizationRoutes)
+	mux.HandleFunc("/invitations/", h.invitationRoutes)
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
@@ -91,6 +92,36 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 1 && r.Method == http.MethodGet:
 		h.getOrganizationByID(w, r, organizationID)
 		return
+	case len(parts) == 2 && parts[1] == "invitations" && r.Method == http.MethodPost:
+		h.createInvitation(w, r, organizationID)
+		return
+	case len(parts) == 2 && parts[1] == "invitations" && r.Method == http.MethodGet:
+		h.listInvitations(w, r, organizationID)
+		return
+	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodGet:
+		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || invitationID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			return
+		}
+		h.getInvitationByID(w, r, organizationID, invitationID)
+		return
+	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodPut:
+		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || invitationID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			return
+		}
+		h.updateInvitation(w, r, organizationID, invitationID)
+		return
+	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodDelete:
+		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || invitationID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			return
+		}
+		h.deleteInvitation(w, r, organizationID, invitationID)
+		return
 	case len(parts) == 2 && parts[1] == "teams" && r.Method == http.MethodPost:
 		h.createTeam(w, r, organizationID)
 		return
@@ -110,6 +141,27 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.assignRole(w, r, organizationID, userID)
+		return
+	default:
+		http.NotFound(w, r)
+		return
+	}
+}
+
+func (h *Handler) invitationRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/invitations/"), "/"), "/")
+	if len(parts) != 2 || strings.TrimSpace(parts[0]) == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	token := strings.TrimSpace(parts[0])
+	switch {
+	case parts[1] == "accept" && r.Method == http.MethodPost:
+		h.acceptInvitation(w, r, token)
+		return
+	case parts[1] == "refuse" && r.Method == http.MethodPost:
+		h.refuseInvitation(w, r, token)
 		return
 	default:
 		http.NotFound(w, r)
@@ -205,6 +257,204 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request, organizati
 	writeJSON(w, http.StatusOK, members)
 }
 
+type createInvitationRequest struct {
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	Message   string `json:"message"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request, organizationID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	var req createInvitationRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	expiresAt, err := parseOptionalRFC3339(req.ExpiresAt)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid expires_at format"})
+		return
+	}
+
+	invitation, err := h.svc.CreateInvitation(r.Context(), organizationID, authUserID, req.Email, req.Role, req.Message, expiresAt)
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_invitation_create", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         authUserID,
+			"email":           req.Email,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_invitation_create", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         authUserID,
+		"invitation_id":   invitation.ID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusCreated, invitation)
+}
+
+func (h *Handler) listInvitations(w http.ResponseWriter, r *http.Request, organizationID int64) {
+	invitations, err := h.svc.ListInvitations(r.Context(), organizationID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, invitations)
+}
+
+func (h *Handler) getInvitationByID(w http.ResponseWriter, r *http.Request, organizationID, invitationID int64) {
+	invitation, err := h.svc.GetInvitation(r.Context(), organizationID, invitationID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, invitation)
+}
+
+type updateInvitationRequest struct {
+	Email     string `json:"email"`
+	Role      string `json:"role"`
+	Message   string `json:"message"`
+	ExpiresAt string `json:"expires_at"`
+}
+
+func (h *Handler) updateInvitation(w http.ResponseWriter, r *http.Request, organizationID, invitationID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	var req updateInvitationRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+	expiresAt, err := parseOptionalRFC3339(req.ExpiresAt)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid expires_at format"})
+		return
+	}
+
+	invitation, err := h.svc.UpdateInvitation(
+		r.Context(),
+		organizationID,
+		invitationID,
+		req.Email,
+		req.Role,
+		req.Message,
+		expiresAt,
+	)
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_invitation_update", map[string]any{
+			"organization_id": organizationID,
+			"invitation_id":   invitationID,
+			"user_id":         authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_invitation_update", map[string]any{
+		"organization_id": organizationID,
+		"invitation_id":   invitationID,
+		"user_id":         authUserID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusOK, invitation)
+}
+
+func (h *Handler) deleteInvitation(w http.ResponseWriter, r *http.Request, organizationID, invitationID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	if err := h.svc.DeleteInvitation(r.Context(), organizationID, invitationID); err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_invitation_delete", map[string]any{
+			"organization_id": organizationID,
+			"invitation_id":   invitationID,
+			"user_id":         authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_invitation_delete", map[string]any{
+		"organization_id": organizationID,
+		"invitation_id":   invitationID,
+		"user_id":         authUserID,
+		"result":          "success",
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) acceptInvitation(w http.ResponseWriter, r *http.Request, token string) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	invitation, member, err := h.svc.AcceptInvitation(r.Context(), token, authUserID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_invitation_accept", map[string]any{
+			"user_id": authUserID,
+			"result":  "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_invitation_accept", map[string]any{
+		"organization_id": invitation.OrganizationID,
+		"invitation_id":   invitation.ID,
+		"user_id":         authUserID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"invitation": invitation,
+		"member":     member,
+	})
+}
+
+func (h *Handler) refuseInvitation(w http.ResponseWriter, r *http.Request, token string) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	invitation, err := h.svc.RefuseInvitation(r.Context(), token, authUserID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_invitation_refuse", map[string]any{
+			"user_id": authUserID,
+			"result":  "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_invitation_refuse", map[string]any{
+		"organization_id": invitation.OrganizationID,
+		"invitation_id":   invitation.ID,
+		"user_id":         authUserID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusOK, invitation)
+}
+
 type assignRoleRequest struct {
 	Role string `json:"role"`
 }
@@ -252,12 +502,17 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrInvalidOrganization),
 		errors.Is(err, domain.ErrInvalidTeam),
 		errors.Is(err, domain.ErrInvalidMember),
-		errors.Is(err, domain.ErrInvalidRole):
+		errors.Is(err, domain.ErrInvalidRole),
+		errors.Is(err, domain.ErrInvalidInvitation):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	case errors.Is(err, domain.ErrOrganizationNotFound),
 		errors.Is(err, domain.ErrTeamNotFound),
-		errors.Is(err, domain.ErrMemberNotFound):
+		errors.Is(err, domain.ErrMemberNotFound),
+		errors.Is(err, domain.ErrInvitationNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+	case errors.Is(err, domain.ErrInvitationExpired),
+		errors.Is(err, domain.ErrInvitationAlreadyHandled):
+		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}
@@ -279,6 +534,19 @@ func authenticatedUserID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func parseOptionalRFC3339(raw string) (*time.Time, error) {
+	value := strings.TrimSpace(raw)
+	if value == "" {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return nil, err
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
 }
 
 func auditSecurityEvent(event string, fields map[string]any) {
