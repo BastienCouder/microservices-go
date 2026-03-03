@@ -1,3 +1,11 @@
+FROM golang:1.26.0-alpine3.23 AS dev
+
+WORKDIR /workspace
+
+RUN apk --no-cache add git && go install github.com/air-verse/air@v1.61.7
+
+CMD ["air", "-v"]
+
 FROM golang:1.26.0-alpine3.23 AS builder
 
 ARG SERVICE_PATH

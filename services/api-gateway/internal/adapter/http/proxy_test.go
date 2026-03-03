@@ -20,7 +20,7 @@ func TestGatewayHealth(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	h, err := NewHandler(upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, 100)
+	h, err := NewHandler(upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, 100, "test-secret", "api-gateway")
 	if err != nil {
 		t.Fatalf("new handler: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestGatewayProtectsUsersWhenUnauthorized(t *testing.T) {
 	}))
 	defer authUpstream.Close()
 
-	h, err := NewHandler(userUpstream.URL, authUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, 100)
+	h, err := NewHandler(userUpstream.URL, authUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, 100, "test-secret", "api-gateway")
 	if err != nil {
 		t.Fatalf("new handler: %v", err)
 	}
@@ -92,7 +92,7 @@ func TestGatewayProxyAuth(t *testing.T) {
 	}))
 	defer authUpstream.Close()
 
-	h, err := NewHandler(authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, 100)
+	h, err := NewHandler(authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, authUpstream.URL, 100, "test-secret", "api-gateway")
 	if err != nil {
 		t.Fatalf("new handler: %v", err)
 	}
@@ -116,7 +116,7 @@ func TestGatewayRateLimit(t *testing.T) {
 	}))
 	defer upstream.Close()
 
-	h, err := NewHandler(upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, 1)
+	h, err := NewHandler(upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, 1, "test-secret", "api-gateway")
 	if err != nil {
 		t.Fatalf("new handler: %v", err)
 	}
@@ -191,6 +191,9 @@ func TestGatewayAdminUsersForbiddenWithoutAdminRole(t *testing.T) {
 		userUpstream.URL,
 		userUpstream.URL,
 		100,
+		"test-secret",
+		"api-gateway",
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("new handler: %v", err)

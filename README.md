@@ -35,6 +35,7 @@ Services exposés:
 - Kratos admin: `http://localhost:4434`
 - RabbitMQ UI: `http://localhost:15672`
 - Web: `http://localhost:3000`
+- App (SPA): `http://localhost:19020`
 - Doc: `http://localhost:3001`
 - Email preview: `http://localhost:3002`
 
@@ -44,6 +45,7 @@ Services exposés:
 - `GET /auth/validate`
 - `GET /auth/me`
 - `POST /users`
+- `GET /users/me`
 - `GET /users/{id}`
 - `GET /users/by-auth/{auth_identity_id}`
 - `POST /organizations`
@@ -58,6 +60,14 @@ Services exposés:
 - `GET /billing/quotas/{organization_id}`
 - `POST /notifications/send`
 - `GET /notifications?limit=20`
+
+## Parcours auth → app → permissions (dev)
+
+1) Se connecter sur `http://localhost:3000/auth` (Kratos via `auth-service`/Gateway).
+2) Ouvrir `http://localhost:19020` (SPA) :
+   - si nécessaire, créer le profil user (`POST /users`),
+   - créer une organisation (le créateur est automatiquement ajouté comme `owner`),
+   - tester les endpoints protégés (ex: création d’équipe) et `POST /permissions/check`.
 
 ## Tests et qualité
 
@@ -100,7 +110,7 @@ En Docker (recommandé):
 ```bash
 docker compose run --rm organizations-migrate
 # ou en dev
-docker compose -f docker-compose.dev.yml run --rm organizations-migrate
+docker compose -f docker-compose.yml -f docker-compose.override.yml run --rm organizations-migrate
 docker compose run --rm user-migrate
 ```
 
@@ -137,5 +147,5 @@ bun run dev
 Ou via Docker dev:
 
 ```bash
-docker compose -f docker-compose.dev.yml up email
+docker compose -f docker-compose.yml -f docker-compose.override.yml up email
 ```

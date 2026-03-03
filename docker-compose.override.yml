@@ -1,0 +1,219 @@
+services:
+  web:
+    build:
+      target: dev
+    image: microservices-go/web:dev
+    pull_policy: never
+    command: ["sh", "-c", "bun install --frozen-lockfile && bun run dev --hostname 0.0.0.0 --port 3000"]
+    volumes:
+      - ./apps/web:/app
+      - web-node_modules:/app/node_modules
+    ports:
+      - "3000:3000"
+
+  app:
+    build:
+      target: dev
+    image: microservices-go/app:dev
+    pull_policy: never
+    command: ["sh", "-c", "bun install --frozen-lockfile && bun run dev --host 0.0.0.0 --port 5173"]
+    volumes:
+      - ./apps/app:/app
+      - app-node_modules:/app/node_modules
+    ports:
+      - "19020:5173"
+
+  doc:
+    build:
+      target: dev
+    image: microservices-go/doc:dev
+    pull_policy: never
+    command: ["sh", "-c", "bun install && bun run dev --hostname 0.0.0.0 --port 3001"]
+    volumes:
+      - ./apps/doc:/app
+      - doc-node_modules:/app/node_modules
+    ports:
+      - "3001:3001"
+
+  email:
+    build:
+      target: dev
+    image: microservices-go/email:dev
+    pull_policy: never
+    command: ["sh", "-c", "bun install && bun run api"]
+    volumes:
+      - ./apps/email:/app
+      - email-node_modules:/app/node_modules
+
+  mcp-server:
+    build:
+      target: dev
+    image: microservices-go/mcp-server:dev
+    pull_policy: never
+    working_dir: /workspace/services/mcp-server
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  api-gateway:
+    build:
+      target: dev
+    image: microservices-go/api-gateway:dev
+    pull_policy: never
+    working_dir: /workspace/services/api-gateway
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  auth-service:
+    build:
+      target: dev
+    image: microservices-go/auth-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/auth-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  user-service:
+    build:
+      target: dev
+    image: microservices-go/user-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/user-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  user-migrate:
+    build:
+      target: dev
+    image: microservices-go/user-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/user-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  organizations-service:
+    build:
+      target: dev
+    image: microservices-go/organizations-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/organizations-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  organizations-migrate:
+    build:
+      target: dev
+    image: microservices-go/organizations-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/organizations-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  permission-service:
+    build:
+      target: dev
+    image: microservices-go/permission-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/permission-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  permission-migrate:
+    build:
+      target: dev
+    image: microservices-go/permission-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/permission-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  billing-service:
+    build:
+      target: dev
+    image: microservices-go/billing-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/billing-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  billing-migrate:
+    build:
+      target: dev
+    image: microservices-go/billing-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/billing-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  notification-service:
+    build:
+      target: dev
+    image: microservices-go/notification-service:dev
+    pull_policy: never
+    working_dir: /workspace/services/notification-service
+    command: ["air", "-c", ".air.toml"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  notification-migrate:
+    build:
+      target: dev
+    image: microservices-go/notification-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/notification-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
+  kratos:
+    entrypoint: ["sh", "/etc/config/kratos/start.sh"]
+
+  prometheus:
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+
+volumes:
+  go-mod-cache:
+  go-build-cache:
+  web-node_modules:
+  doc-node_modules:
+  email-node_modules:
+  app-node_modules:

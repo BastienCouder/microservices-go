@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	httpadapter "github.com/bastiencouder/microservices-go/services/user-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/user-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/user-service/internal/config"
+	"github.com/bastiencouder/microservices-go/services/user-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/user-service/internal/usecase"
 )
 
@@ -41,11 +43,20 @@ func main() {
 	mux.HandleFunc("GET /metrics", metricsHandler)
 	h.Register(mux)
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	handler := security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "user-service")(mux)
+	server := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10, // 64 KiB
+	}
 
 	go func() {
 		log.Printf("user-service listening on %s", cfg.HTTPAddr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen error: %v", err)
 		}
 	}()

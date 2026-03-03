@@ -31,13 +31,40 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func (r *Repository) Create(ctx context.Context, organization *domain.Organization) error {
-	created, err := r.queries.CreateOrganization(ctx, sqlc.CreateOrganizationParams{
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin create organization transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	qtx := r.queries.WithTx(tx)
+	created, err := qtx.CreateOrganization(ctx, sqlc.CreateOrganizationParams{
 		Name:        organization.Name,
 		OwnerUserID: organization.OwnerIdentityID,
 		CreatedAt:   toPgTimestamptz(organization.CreatedAt),
 	})
 	if err != nil {
 		return fmt.Errorf("insert organization: %w", err)
+	}
+
+	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
+		ID:      created.ID,
+		UserID:  organization.OwnerIdentityID,
+		TeamID:  pgtype.Int8{},
+		AddedAt: toPgTimestamptz(organization.CreatedAt),
+	}); err != nil {
+		return fmt.Errorf("insert owner membership: %w", err)
+	}
+	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
+		OrganizationID: created.ID,
+		UserID:         organization.OwnerIdentityID,
+		Role:           "owner",
+	}); err != nil {
+		return fmt.Errorf("insert owner role: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit create organization transaction: %w", err)
 	}
 
 	organization.ID = created.ID

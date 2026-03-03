@@ -48,6 +48,7 @@ type sendNotificationRequest struct {
 
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	var req sendNotificationRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -69,6 +70,7 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	limitStr := r.URL.Query().Get("limit")
 	limit := 20
+	const maxLimit = 100
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil || parsed <= 0 {
@@ -76,6 +78,9 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		limit = parsed
+	}
+	if limit > maxLimit {
+		limit = maxLimit
 	}
 
 	notifications, err := h.svc.List(r.Context(), limit)

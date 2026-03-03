@@ -1,7 +1,7 @@
 .PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev up-front up-doc up-email up-mcp up-backend up-infra up-monitoring up-migrations up-full up-dev-front up-dev-backend up-dev-infra up-dev-monitoring up-dev-migrations up-dev-min up-dev-full clean-dev-go-cache reset-dev-backend
 
-COMPOSE_PROD = docker compose -p microservices-go-prod
-COMPOSE_DEV = docker compose -p microservices-go-dev -f docker-compose.dev.yml
+COMPOSE_PROD = docker compose -p microservices-go-prod -f docker-compose.yml
+COMPOSE_DEV = docker compose -p microservices-go-dev -f docker-compose.yml -f docker-compose.override.yml
 
 PROFILES_PROD_ALL = --profile frontend --profile doc --profile email --profile mcp --profile backend --profile infra --profile monitoring
 PROFILES_DEV_ALL = --profile frontend --profile doc --profile email --profile mcp --profile backend --profile monitoring
@@ -64,31 +64,31 @@ migrate-organizations-docker:
 	docker compose run --rm organizations-migrate
 
 migrate-organizations-docker-dev:
-	docker compose -f docker-compose.dev.yml run --rm organizations-migrate
+	$(COMPOSE_DEV) run --rm organizations-migrate
 
 migrate-user-docker:
 	docker compose run --rm user-migrate
 
 migrate-user-docker-dev:
-	docker compose -f docker-compose.dev.yml run --rm user-migrate
+	$(COMPOSE_DEV) run --rm user-migrate
 
 migrate-permission-docker:
 	docker compose run --rm permission-migrate
 
 migrate-permission-docker-dev:
-	docker compose -f docker-compose.dev.yml run --rm permission-migrate
+	$(COMPOSE_DEV) run --rm permission-migrate
 
 migrate-billing-docker:
 	docker compose run --rm billing-migrate
 
 migrate-billing-docker-dev:
-	docker compose -f docker-compose.dev.yml run --rm billing-migrate
+	$(COMPOSE_DEV) run --rm billing-migrate
 
 migrate-notification-docker:
 	docker compose run --rm notification-migrate
 
 migrate-notification-docker-dev:
-	docker compose -f docker-compose.dev.yml run --rm notification-migrate
+	$(COMPOSE_DEV) run --rm notification-migrate
 
 sqlc-generate-organizations:
 	docker run --rm -v $$(pwd):/src -w /src/services/organizations-service sqlc/sqlc:latest generate

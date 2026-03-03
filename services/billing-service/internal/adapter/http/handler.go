@@ -49,6 +49,7 @@ type upsertSubscriptionRequest struct {
 
 func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 	var req upsertSubscriptionRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return

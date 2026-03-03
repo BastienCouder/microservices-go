@@ -1,11 +1,37 @@
-FROM oven/bun:1-alpine AS builder
+FROM oven/bun:1.2.8-alpine AS dev
 
 WORKDIR /app
+
 COPY apps/web/package.json apps/web/bun.lock ./
 RUN bun install --frozen-lockfile
 
-COPY apps/web .
-RUN bun run build
+CMD ["bun", "run", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
 
-FROM nginx:1.29-alpine AS runtime
-COPY --from=builder /app/out/ /usr/share/nginx/html/
+FROM oven/bun:1.2.8-alpine AS builder
+
+WORKDIR /app
+
+ARG NEXT_PUBLIC_API_GATEWAY_URL
+ARG NEXT_PUBLIC_APP_URL
+
+COPY apps/web/package.json apps/web/bun.lock ./
+RUN bun install --frozen-lockfile
+
+COPY apps/web ./
+RUN NEXT_PUBLIC_API_GATEWAY_URL="${NEXT_PUBLIC_API_GATEWAY_URL}" \
+    NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL}" \
+    bun run build
+
+FROM nginx:1.27.4-alpine AS runtime
+
+COPY apps/web/nginx/default.conf /etc/nginx/conf.d/default.conf
+COPY --from=builder /app/out /usr/share/nginx/html
+
+RUN chown -R nginx:nginx /usr/share/nginx/html \
+    && chown -R nginx:nginx /var/cache/nginx \
+    && chown -R nginx:nginx /var/log/nginx \
+    && touch /var/run/nginx.pid \
+    && chown nginx:nginx /var/run/nginx.pid
+
+USER nginx
+CMD ["nginx", "-g", "daemon off;"]

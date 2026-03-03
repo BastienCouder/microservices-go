@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
@@ -16,6 +17,9 @@ type Config struct {
 	BillingServiceURL       string
 	NotificationServiceURL  string
 	RateLimitRPM            int
+	InternalJWTSecret       string
+	InternalJWTIssuer       string
+	CORSAllowedOrigins      []string
 }
 
 func Load() (Config, error) {
@@ -62,6 +66,19 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	if err != nil {
+		return Config{}, err
+	}
+	internalJWTIssuer, err := requiredEnv("INTERNAL_JWT_ISSUER")
+	if err != nil {
+		return Config{}, err
+	}
+
+	corsAllowedOrigins, err := requiredCSVEnv("CORS_ALLOWED_ORIGINS")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:                httpAddr,
@@ -73,6 +90,9 @@ func Load() (Config, error) {
 		BillingServiceURL:       billingServiceURL,
 		NotificationServiceURL:  notificationServiceURL,
 		RateLimitRPM:            rateLimitRPM,
+		InternalJWTSecret:       internalJWTSecret,
+		InternalJWTIssuer:       internalJWTIssuer,
+		CORSAllowedOrigins:      corsAllowedOrigins,
 	}, nil
 }
 
@@ -94,4 +114,23 @@ func requiredPositiveIntEnv(key string) (int, error) {
 		return 0, fmt.Errorf("invalid required environment variable %s: must be a positive integer", key)
 	}
 	return parsed, nil
+}
+
+func requiredCSVEnv(key string) ([]string, error) {
+	raw, err := requiredEnv(key)
+	if err != nil {
+		return nil, err
+	}
+	parts := make([]string, 0)
+	for _, part := range strings.Split(raw, ",") {
+		trimmed := strings.TrimSpace(part)
+		if trimmed == "" {
+			continue
+		}
+		parts = append(parts, trimmed)
+	}
+	if len(parts) == 0 {
+		return nil, fmt.Errorf("invalid required environment variable %s: must contain at least one origin", key)
+	}
+	return parts, nil
 }

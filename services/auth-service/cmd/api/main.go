@@ -14,6 +14,7 @@ import (
 	kratosclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/kratos"
 	httpadapter "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/config"
+	"github.com/bastiencouder/microservices-go/services/auth-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/usecase"
 )
 
@@ -32,11 +33,13 @@ func main() {
 	h.Register(mux)
 
 	server := &http.Server{
-		Addr:         cfg.HTTPAddr,
-		Handler:      mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              cfg.HTTPAddr,
+		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "auth-service")(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10, // 64 KiB
 	}
 
 	go func() {

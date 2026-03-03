@@ -20,6 +20,7 @@ import (
 	httpadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/http"
 	permissionrepo "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/config"
+	"github.com/bastiencouder/microservices-go/services/permission-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/usecase"
 )
 
@@ -48,8 +49,18 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
-	grpcServer := grpc.NewServer()
+	server := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10, // 64 KiB
+	}
+	grpcServer := grpc.NewServer(
+		grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")),
+	)
 	permissionv1.RegisterPermissionServiceServer(grpcServer, g)
 
 	grpcListener, err := net.Listen("tcp", cfg.GRPCAddr)

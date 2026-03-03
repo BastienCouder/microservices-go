@@ -3,12 +3,28 @@ services:
     profiles: ["frontend"]
     build:
       dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
+        NEXT_PUBLIC_APP_URL: http://localhost:19020
     image: microservices-go/web:prod
     restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
+      NEXT_PUBLIC_APP_URL: http://localhost:19020
     ports:
-      - "3000:80"
+      - "3000:8080"
+
+  app:
+    profiles: ["frontend"]
+    build:
+      dockerfile: apps/app/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+        VITE_WEB_AUTH_URL: http://localhost:3000/auth
+    image: microservices-go/app:prod
+    restart: unless-stopped
+    ports:
+      - "19020:8080"
 
   doc:
     profiles: ["doc"]
@@ -17,7 +33,7 @@ services:
     image: microservices-go/doc:prod
     restart: unless-stopped
     ports:
-      - "3001:80"
+      - "3001:8080"
 
   email:
     profiles: ["email"]
@@ -60,6 +76,9 @@ services:
       BILLING_SERVICE_URL: http://billing-service:8086
       NOTIFICATION_SERVICE_URL: http://notification-service:8087
       RATE_LIMIT_RPM: "120"
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:19020
     ports:
       - "8080:8080"
 
@@ -76,6 +95,8 @@ services:
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_BROWSER_URL: http://localhost:4433
       ALLOWED_ORIGIN: http://localhost:3000
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     ports:
       - "8083:8083"
 
@@ -95,6 +116,8 @@ services:
       USER_DB_NAME: usersvc
       USER_DB_SSLMODE: disable
       USER_DB_PASSWORD_FILE: /run/secrets/usersvc_db_password
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - usersvc_db_password
     ports:
@@ -139,6 +162,8 @@ services:
       ORG_DB_NAME: orgsvc
       ORG_DB_SSLMODE: disable
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - orgsvc_db_password
     ports:
@@ -185,6 +210,8 @@ services:
       PERMISSION_DB_SSLMODE: disable
       PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
       ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - permsvc_db_password
     ports:
@@ -229,6 +256,8 @@ services:
       BILLING_DB_NAME: billsvc
       BILLING_DB_SSLMODE: disable
       BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - billsvc_db_password
     ports:
@@ -276,6 +305,8 @@ services:
       EMAIL_RENDERER_URL: http://email:3002
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       RESEND_FROM_EMAIL: noreply@example.com
+      INTERNAL_JWT_SECRET: change-me-prod-internal-jwt
+      INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - notifsvc_db_password
       - resend_api_key

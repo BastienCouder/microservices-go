@@ -15,6 +15,7 @@ import (
 	httpadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/http"
 	billingrepo "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/config"
+	"github.com/bastiencouder/microservices-go/services/billing-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/usecase"
 )
 
@@ -41,7 +42,15 @@ func main() {
 	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
-	server := &http.Server{Addr: cfg.HTTPAddr, Handler: mux, ReadTimeout: 5 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 60 * time.Second}
+	server := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "billing-service")(mux),
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10, // 64 KiB
+	}
 
 	go func() {
 		log.Printf("billing-service listening on %s", cfg.HTTPAddr)

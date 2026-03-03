@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
@@ -57,6 +59,7 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createOrganizationRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -129,6 +132,7 @@ type createTeamRequest struct {
 
 func (h *Handler) createTeam(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	var req createTeamRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -165,6 +169,7 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organization
 	}
 
 	var req addMemberRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -174,8 +179,20 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organization
 	member, err := h.svc.AddMember(r.Context(), organizationID, authUserID, req.TeamID)
 	if err != nil {
 		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_member_add", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         authUserID,
+			"team_id":         req.TeamID,
+			"result":          "error",
+		})
 		return
 	}
+	auditSecurityEvent("organization_member_add", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         authUserID,
+		"team_id":         req.TeamID,
+		"result":          "success",
+	})
 	writeJSON(w, http.StatusCreated, member)
 }
 
@@ -204,6 +221,7 @@ func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizatio
 	}
 
 	var req assignRoleRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -212,8 +230,20 @@ func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizatio
 	member, err := h.svc.AssignRole(r.Context(), organizationID, userID, req.Role)
 	if err != nil {
 		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_role_assign", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         userID,
+			"role":            req.Role,
+			"result":          "error",
+		})
 		return
 	}
+	auditSecurityEvent("organization_role_assign", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         userID,
+		"role":            req.Role,
+		"result":          "success",
+	})
 	writeJSON(w, http.StatusOK, member)
 }
 
@@ -249,4 +279,21 @@ func authenticatedUserID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func auditSecurityEvent(event string, fields map[string]any) {
+	payload := map[string]any{
+		"event":     event,
+		"component": "organizations-service",
+		"ts":        time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	for k, v := range fields {
+		payload[k] = v
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("audit event=%s marshal_error=%v", event, err)
+		return
+	}
+	log.Printf("audit %s", string(raw))
 }

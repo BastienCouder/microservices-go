@@ -13,6 +13,8 @@ type Config struct {
 	EmailRendererURL string
 	ResendAPIKey     string
 	ResendFromEmail  string
+	InternalJWTSecret string
+	InternalJWTIssuer string
 }
 
 func Load() (Config, error) {
@@ -36,12 +38,22 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	if err != nil {
+		return Config{}, err
+	}
+	internalJWTIssuer, err := requiredEnv("INTERNAL_JWT_ISSUER")
+	if err != nil {
+		return Config{}, err
+	}
 	return Config{
 		HTTPAddr:         httpAddr,
 		DatabaseURL:      databaseURL,
 		EmailRendererURL: emailRendererURL,
 		ResendAPIKey:     resendAPIKey,
 		ResendFromEmail:  resendFromEmail,
+		InternalJWTSecret: internalJWTSecret,
+		InternalJWTIssuer: internalJWTIssuer,
 	}, nil
 }
 

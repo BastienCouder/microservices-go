@@ -25,6 +25,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /users", h.createUser)
+	mux.HandleFunc("GET /users/me", h.me)
 	mux.HandleFunc("GET /users/", h.getUserByID)
 	mux.HandleFunc("GET /users/by-auth/", h.getUserByAuthIdentityID)
 	mux.HandleFunc("POST /admin/users/", h.adminUserAction)
@@ -56,6 +57,7 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req createUserRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -78,6 +80,26 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, user)
+}
+
+func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
+	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
+	if authIdentityID == "" {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated identity"})
+		return
+	}
+
+	user, err := h.svc.GetUserByAuthIdentityID(r.Context(), authIdentityID)
+	if err != nil {
+		if errors.Is(err, domain.ErrUserNotFound) {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
 }
 
 func (h *Handler) getUserByID(w http.ResponseWriter, r *http.Request) {

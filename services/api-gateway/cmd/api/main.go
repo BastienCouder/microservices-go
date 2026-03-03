@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -30,6 +31,9 @@ func main() {
 		cfg.BillingServiceURL,
 		cfg.NotificationServiceURL,
 		cfg.RateLimitRPM,
+		cfg.InternalJWTSecret,
+		cfg.InternalJWTIssuer,
+		cfg.CORSAllowedOrigins,
 	)
 	if err != nil {
 		log.Fatalf("create gateway handler: %v", err)
@@ -45,16 +49,18 @@ func main() {
 	h.Register(mux)
 
 	server := &http.Server{
-		Addr:         cfg.HTTPAddr,
-		Handler:      mux,
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+		Addr:              cfg.HTTPAddr,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       5 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       60 * time.Second,
+		MaxHeaderBytes:    64 << 10, // 64 KiB
 	}
 
 	go func() {
 		log.Printf("api-gateway listening on %s", cfg.HTTPAddr)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Fatalf("listen error: %v", err)
 		}
 	}()

@@ -10,6 +10,8 @@ type Config struct {
 	KratosPublicURL  string
 	KratosBrowserURL string
 	AllowedOrigin    string
+	InternalJWTSecret string
+	InternalJWTIssuer string
 }
 
 func Load() (Config, error) {
@@ -31,12 +33,22 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	if err != nil {
+		return Config{}, err
+	}
+	internalJWTIssuer, err := requiredEnv("INTERNAL_JWT_ISSUER")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:         httpAddr,
 		KratosPublicURL:  kratosPublicURL,
 		KratosBrowserURL: kratosBrowserURL,
 		AllowedOrigin:    allowedOrigin,
+		InternalJWTSecret: internalJWTSecret,
+		InternalJWTIssuer: internalJWTIssuer,
 	}, nil
 }
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/domain"
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/usecase"
@@ -45,6 +47,7 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 		Action         string `json:"action"`
 		Resource       string `json:"resource"`
 	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // SEC-003: 1 MiB body limit
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
@@ -65,12 +68,19 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPermissionCheck) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "invalid"})
 			return
 		}
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "error"})
 		return
 	}
 
+	if result.Allowed {
+		auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "allowed"})
+	} else {
+		auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "denied"})
+	}
 	writeJSON(w, http.StatusOK, result)
 }
 
@@ -90,4 +100,21 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+func auditSecurityEvent(event string, fields map[string]any) {
+	payload := map[string]any{
+		"event":     event,
+		"component": "permission-service",
+		"ts":        time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	for k, v := range fields {
+		payload[k] = v
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		log.Printf("audit event=%s marshal_error=%v", event, err)
+		return
+	}
+	log.Printf("audit %s", string(raw))
 }
