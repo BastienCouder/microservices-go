@@ -1,0 +1,8 @@
+config:
+  clients:
+    - url: http://loki-gateway/loki/api/v1/push
+  snippets:
+    extraScrapeConfigs: |
+      - job_name: kubernetes-pods
+        kubernetes_sd_configs:
+          - role: pod

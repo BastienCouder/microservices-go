@@ -1,0 +1,22 @@
+auth:
+  username: admin
+  existingPasswordSecret: infra-secrets
+  existingSecretPasswordKey: rabbitmq_password
+clustering:
+  enabled: false
+persistence:
+  enabled: true
+  size: 8Gi
+extraConfigurationExistingConfigMap: rabbitmq-extra-conf
+loadDefinition:
+  enabled: true
+  existingConfigmap: rabbitmq-definitions
+service:
+  type: ClusterIP
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi

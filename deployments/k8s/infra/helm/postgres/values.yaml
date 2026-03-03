@@ -1,0 +1,15 @@
+auth:
+  existingSecret: infra-secrets
+  secretKeys:
+    adminPasswordKey: postgres_superuser_password
+primary:
+  persistence:
+    enabled: true
+    size: 20Gi
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1
+      memory: 2Gi

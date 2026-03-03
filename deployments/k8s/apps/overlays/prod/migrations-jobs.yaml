@@ -1,0 +1,170 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kratos-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+        - name: kratos-config
+          secret:
+            secretName: kratos-config-secret
+            defaultMode: 0555
+      containers:
+        - name: kratos-migrate
+          image: oryd/kratos:v25.4.0
+          command: ["sh", "/etc/config/kratos/migrate.sh"]
+          envFrom:
+            - configMapRef:
+                name: kratos-config
+          env:
+            - name: KRATOS_DB_PASSWORD_FILE
+              value: /run/secrets/kratos_db_password
+            - name: KRATOS_OIDC_GOOGLE_CLIENT_ID_FILE
+              value: /run/secrets/google_oidc_client_id
+            - name: KRATOS_OIDC_GOOGLE_CLIENT_SECRET_FILE
+              value: /run/secrets/google_oidc_client_secret
+            - name: KRATOS_SMTP_CONNECTION_URI_FILE
+              value: /run/secrets/resend_smtp_connection_uri
+            - name: KRATOS_COOKIE_SECRET_FILE
+              value: /run/secrets/kratos_cookie_secret
+            - name: KRATOS_CIPHER_SECRET_FILE
+              value: /run/secrets/kratos_cipher_secret
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: kratos-config
+              mountPath: /etc/config/kratos
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: user-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+      containers:
+        - name: user-migrate
+          image: microservices-go/user-migrate:prod
+          envFrom:
+            - configMapRef:
+                name: user-service-config
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: organizations-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+      containers:
+        - name: organizations-migrate
+          image: microservices-go/organizations-migrate:prod
+          envFrom:
+            - configMapRef:
+                name: organizations-service-config
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: permission-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+      containers:
+        - name: permission-migrate
+          image: microservices-go/permission-migrate:prod
+          envFrom:
+            - configMapRef:
+                name: permission-service-config
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: billing-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+      containers:
+        - name: billing-migrate
+          image: microservices-go/billing-migrate:prod
+          envFrom:
+            - configMapRef:
+                name: billing-service-config
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: notification-migrate
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+      containers:
+        - name: notification-migrate
+          image: microservices-go/notification-migrate:prod
+          envFrom:
+            - configMapRef:
+                name: notification-service-config
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true

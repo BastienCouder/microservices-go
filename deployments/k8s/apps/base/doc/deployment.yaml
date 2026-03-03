@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: doc
+  labels:
+    app: doc
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: doc
+  template:
+    metadata:
+      labels:
+        app: doc
+    spec:
+      serviceAccountName: doc
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: doc
+          image: microservices-go/doc:prod
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          envFrom:
+            - configMapRef:
+                name: doc-config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]

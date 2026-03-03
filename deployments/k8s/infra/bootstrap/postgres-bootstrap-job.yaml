@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-bootstrap
+spec:
+  backoffLimit: 4
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      volumes:
+        - name: bootstrap-script
+          configMap:
+            name: postgres-bootstrap-script
+            defaultMode: 0555
+        - name: infra-secrets
+          secret:
+            secretName: infra-secrets
+      containers:
+        - name: bootstrap
+          image: postgres:18.1-alpine
+          command: ["/bin/bash", "/opt/bootstrap/postgres-bootstrap.sh"]
+          volumeMounts:
+            - name: bootstrap-script
+              mountPath: /opt/bootstrap
+              readOnly: true
+            - name: infra-secrets
+              mountPath: /run/secrets
+              readOnly: true

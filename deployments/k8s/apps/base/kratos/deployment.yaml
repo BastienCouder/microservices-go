@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kratos
+  labels:
+    app: kratos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kratos
+  template:
+    metadata:
+      labels:
+        app: kratos
+    spec:
+      serviceAccountName: kratos
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: app-secrets
+          secret:
+            secretName: app-secrets
+        - name: kratos-config
+          secret:
+            secretName: kratos-config-secret
+            defaultMode: 0555
+      containers:
+        - name: kratos
+          image: oryd/kratos:v25.4.0
+          imagePullPolicy: IfNotPresent
+          command: ["sh", "/etc/config/kratos/start.sh"]
+          ports:
+            - containerPort: 4433
+              name: public
+            - containerPort: 4434
+              name: admin
+          envFrom:
+            - configMapRef:
+                name: kratos-config
+          env:
+            - name: KRATOS_DB_PASSWORD_FILE
+              value: /run/secrets/kratos_db_password
+            - name: KRATOS_OIDC_GOOGLE_CLIENT_ID_FILE
+              value: /run/secrets/google_oidc_client_id
+            - name: KRATOS_OIDC_GOOGLE_CLIENT_SECRET_FILE
+              value: /run/secrets/google_oidc_client_secret
+            - name: KRATOS_SMTP_CONNECTION_URI_FILE
+              value: /run/secrets/resend_smtp_connection_uri
+            - name: KRATOS_COOKIE_SECRET_FILE
+              value: /run/secrets/kratos_cookie_secret
+            - name: KRATOS_CIPHER_SECRET_FILE
+              value: /run/secrets/kratos_cipher_secret
+          volumeMounts:
+            - name: app-secrets
+              mountPath: /run/secrets
+              readOnly: true
+            - name: kratos-config
+              mountPath: /etc/config/kratos
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: public
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health/alive
+              port: public
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
