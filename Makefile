@@ -1,4 +1,4 @@
-.PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth run-project run-analysis run-ia run-attribution migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification migrate-project migrate-analysis migrate-attribution sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev up-front up-doc up-email up-mcp up-backend up-infra up-monitoring up-migrations up-full up-dev-front up-dev-backend up-dev-infra up-dev-monitoring up-dev-migrations up-dev-min up-dev-full clean-dev-go-cache reset-dev-backend
+.PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth run-project run-analysis run-ia run-attribution migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification migrate-project migrate-analysis migrate-attribution sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev up-front up-doc up-email up-mcp up-backend up-infra up-backup up-monitoring up-migrations up-full up-dev-front up-dev-backend up-dev-infra up-dev-monitoring up-dev-migrations up-dev-min up-dev-full clean-dev-go-cache reset-dev-backend
 .PHONY: up-backend-sequential
 
 COMPOSE_PROD = docker compose -p microservices-go-prod -f docker-compose.yml
@@ -237,6 +237,9 @@ up-backend-sequential:
 
 up-infra:
 	$(COMPOSE_PROD) --profile infra up -d
+
+up-backup:
+	$(COMPOSE_PROD) --profile infra --profile backup up -d postgres postgres-backup-r2
 
 up-monitoring:
 	$(COMPOSE_PROD) --profile monitoring up -d

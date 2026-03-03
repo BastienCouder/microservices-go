@@ -18,3 +18,8 @@ Run in this order:
 ```bash
 kubectl kustomize deployments/k8s/apps/overlays/prod | kubectl apply --dry-run=server -f -
 ```
+
+## DNS Cloudflare
+
+Cette overlay inclut des annotations `external-dns` sur l’Ingress.
+Avant apply, remplacer les hosts `*.example.com` par vos domaines.

@@ -1,0 +1,22 @@
+provider: cloudflare
+
+env:
+  - name: CF_API_TOKEN
+    valueFrom:
+      secretKeyRef:
+        name: infra-secrets
+        key: cloudflare_api_token
+
+sources:
+  - ingress
+
+policy: sync
+registry: txt
+txtOwnerId: microservices-go-prod
+txtPrefix: msgo-
+
+domainFilters:
+  - example.com
+
+extraArgs:
+  - --cloudflare-proxied

@@ -648,6 +648,31 @@ services:
       retries: 5
       start_period: 10s
 
+  postgres-backup-r2:
+    profiles: ["infra", "backup"]
+    image: postgres:18.1-alpine
+    restart: unless-stopped
+    entrypoint: ["sh", "/opt/backups/postgres-r2-backup.sh"]
+    environment:
+      BACKUP_POSTGRES_HOST: postgres
+      BACKUP_POSTGRES_PORT: "5432"
+      BACKUP_POSTGRES_USER: postgres
+      BACKUP_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      BACKUP_INTERVAL_SECONDS: "86400"
+      R2_BUCKET: ${R2_BUCKET:?R2_BUCKET must be set}
+      R2_PREFIX: postgres
+      R2_REGION: auto
+      R2_ACCOUNT_ID_FILE: /run/secrets/r2_account_id
+      R2_ACCESS_KEY_ID_FILE: /run/secrets/r2_access_key_id
+      R2_SECRET_ACCESS_KEY_FILE: /run/secrets/r2_secret_access_key
+    secrets:
+      - postgres_superuser_password
+      - r2_account_id
+      - r2_access_key_id
+      - r2_secret_access_key
+    volumes:
+      - ./deployments/backups/postgres-r2-backup.sh:/opt/backups/postgres-r2-backup.sh:ro
+
   kratos-migrate:
     profiles: ["migrations"]
     image: oryd/kratos:v25.4.0
@@ -758,3 +783,9 @@ secrets:
     file: ./deployments/secrets/stripe_price_pro_yearly.txt
   stripe_price_correction_credits:
     file: ./deployments/secrets/stripe_price_correction_credits.txt
+  r2_account_id:
+    file: ./deployments/secrets/r2_account_id.txt
+  r2_access_key_id:
+    file: ./deployments/secrets/r2_access_key_id.txt
+  r2_secret_access_key:
+    file: ./deployments/secrets/r2_secret_access_key.txt

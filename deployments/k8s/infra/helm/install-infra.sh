@@ -6,6 +6,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx >/dev/null 2>&1 || true
 helm repo add jetstack https://charts.jetstack.io >/dev/null 2>&1 || true
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns >/dev/null 2>&1 || true
 helm repo update
 
 kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
@@ -22,6 +23,7 @@ kubectl -n msgo-infra create secret generic infra-secrets \
   --from-file=kratos_db_password="${ROOT_DIR}/../../apps/overlays/prod/secrets/kratos_db_password" \
   --from-file=rabbitmq_password="${ROOT_DIR}/../../apps/overlays/prod/secrets/rabbitmq_password" \
   --from-file=redis_password="${ROOT_DIR}/../../apps/overlays/prod/secrets/redis_password" \
+  --from-file=cloudflare_api_token="${ROOT_DIR}/../../apps/overlays/prod/secrets/cloudflare_api_token" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl -n msgo-infra create configmap rabbitmq-definitions \
@@ -52,3 +54,7 @@ helm upgrade --install redis bitnami/redis \
 helm upgrade --install rabbitmq bitnami/rabbitmq \
   --namespace msgo-infra \
   --values "${ROOT_DIR}/rabbitmq/values.yaml"
+
+helm upgrade --install external-dns external-dns/external-dns \
+  --namespace msgo-infra \
+  --values "${ROOT_DIR}/external-dns/values.yaml"

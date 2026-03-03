@@ -167,3 +167,39 @@ Ou via Docker dev:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up email
 ```
+
+## Cloudflare DNS (Kubernetes)
+
+L’overlay prod est maintenant compatible Cloudflare via `external-dns`.
+
+1. Créer un token Cloudflare avec permissions DNS (`Zone:DNS:Edit`, `Zone:Zone:Read`).
+2. Renseigner `deployments/k8s/apps/overlays/prod/secrets/cloudflare_api_token`.
+3. Ajuster vos domaines:
+   - `deployments/k8s/apps/overlays/prod/ingress.yaml`
+   - `deployments/k8s/infra/helm/external-dns/values.yaml` (`domainFilters`)
+4. Installer l’infra:
+
+```bash
+deployments/k8s/infra/helm/install-infra.sh
+```
+
+## Backup PostgreSQL vers Cloudflare R2 (Docker)
+
+Un service `postgres-backup-r2` exécute un `pg_dumpall`, compresse en `gzip`, puis envoie sur R2 (API S3).
+
+Secrets Docker à remplir:
+
+- `deployments/secrets/r2_account_id.txt`
+- `deployments/secrets/r2_access_key_id.txt`
+- `deployments/secrets/r2_secret_access_key.txt`
+
+Lancement:
+
+```bash
+R2_BUCKET=your-r2-bucket docker compose --profile infra --profile backup up -d postgres postgres-backup-r2
+```
+
+Réglages:
+
+- intervalle: `BACKUP_INTERVAL_SECONDS` (par défaut dans compose: `86400`)
+- préfixe objet: `R2_PREFIX` (par défaut dans compose: `postgres`)

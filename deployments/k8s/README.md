@@ -39,5 +39,6 @@ Required files:
 - `kratos_cipher_secret`
 - `rabbitmq_password`
 - `redis_password`
+- `cloudflare_api_token`
 
 Do not commit these files.

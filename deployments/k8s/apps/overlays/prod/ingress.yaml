@@ -4,6 +4,8 @@ metadata:
   name: apps-ingress
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    external-dns.alpha.kubernetes.io/hostname: api.example.com,web.example.com,app.example.com,doc.example.com,kratos.example.com
+    external-dns.alpha.kubernetes.io/cloudflare-proxied: "true"
 spec:
   ingressClassName: nginx
   tls:
