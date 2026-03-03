@@ -1,0 +1,15 @@
+ALTER TABLE billing_subscriptions
+  ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS stripe_price_id TEXT NOT NULL DEFAULT '',
+  ADD COLUMN IF NOT EXISTS billing_cycle TEXT NOT NULL DEFAULT 'monthly',
+  ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active',
+  ADD COLUMN IF NOT EXISTS cancel_at_period_end BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS current_period_end TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS correction_credits INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS billing_stripe_webhook_events (
+  event_id TEXT PRIMARY KEY,
+  event_type TEXT NOT NULL,
+  processed_at TIMESTAMPTZ NOT NULL
+);

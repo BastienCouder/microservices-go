@@ -10,6 +10,7 @@ import (
 
 type Querier interface {
 	GetSubscriptionByOrganizationID(ctx context.Context, organizationID int64) (BillingSubscription, error)
+	RecordStripeWebhookEvent(ctx context.Context, arg RecordStripeWebhookEventParams) (int64, error)
 	UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) error
 }
 

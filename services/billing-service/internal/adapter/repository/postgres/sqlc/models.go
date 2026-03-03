@@ -9,9 +9,23 @@ import (
 )
 
 type BillingSubscription struct {
-	OrganizationID int64
-	Plan           string
-	Seats          int32
-	MonthlyQuota   int32
-	UpdatedAt      pgtype.Timestamptz
+	OrganizationID       int64
+	Plan                 string
+	Seats                int32
+	MonthlyQuota         int32
+	StripeCustomerID     string
+	StripeSubscriptionID string
+	StripePriceID        string
+	BillingCycle         string
+	Status               string
+	CancelAtPeriodEnd    bool
+	CurrentPeriodEnd     pgtype.Timestamptz
+	CorrectionCredits    int32
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type BillingStripeWebhookEvent struct {
+	EventID     string
+	EventType   string
+	ProcessedAt pgtype.Timestamptz
 }

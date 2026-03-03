@@ -12,7 +12,20 @@ import (
 )
 
 const getSubscriptionByOrganizationID = `-- name: GetSubscriptionByOrganizationID :one
-SELECT organization_id, plan, seats, monthly_quota, updated_at
+SELECT
+  organization_id,
+  plan,
+  seats,
+  monthly_quota,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_price_id,
+  billing_cycle,
+  status,
+  cancel_at_period_end,
+  current_period_end,
+  correction_credits,
+  updated_at
 FROM billing_subscriptions
 WHERE organization_id = $1
 `
@@ -25,28 +38,86 @@ func (q *Queries) GetSubscriptionByOrganizationID(ctx context.Context, organizat
 		&i.Plan,
 		&i.Seats,
 		&i.MonthlyQuota,
+		&i.StripeCustomerID,
+		&i.StripeSubscriptionID,
+		&i.StripePriceID,
+		&i.BillingCycle,
+		&i.Status,
+		&i.CancelAtPeriodEnd,
+		&i.CurrentPeriodEnd,
+		&i.CorrectionCredits,
 		&i.UpdatedAt,
 	)
 	return i, err
 }
 
+const recordStripeWebhookEvent = `-- name: RecordStripeWebhookEvent :execrows
+INSERT INTO billing_stripe_webhook_events (event_id, event_type, processed_at)
+VALUES ($1, $2, $3)
+ON CONFLICT (event_id) DO NOTHING
+`
+
+type RecordStripeWebhookEventParams struct {
+	EventID     string
+	EventType   string
+	ProcessedAt pgtype.Timestamptz
+}
+
+func (q *Queries) RecordStripeWebhookEvent(ctx context.Context, arg RecordStripeWebhookEventParams) (int64, error) {
+	result, err := q.db.Exec(ctx, recordStripeWebhookEvent, arg.EventID, arg.EventType, arg.ProcessedAt)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const upsertSubscription = `-- name: UpsertSubscription :exec
-INSERT INTO billing_subscriptions (organization_id, plan, seats, monthly_quota, updated_at)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO billing_subscriptions (
+  organization_id,
+  plan,
+  seats,
+  monthly_quota,
+  stripe_customer_id,
+  stripe_subscription_id,
+  stripe_price_id,
+  billing_cycle,
+  status,
+  cancel_at_period_end,
+  current_period_end,
+  correction_credits,
+  updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 ON CONFLICT (organization_id)
 DO UPDATE SET
   plan = EXCLUDED.plan,
   seats = EXCLUDED.seats,
   monthly_quota = EXCLUDED.monthly_quota,
+  stripe_customer_id = EXCLUDED.stripe_customer_id,
+  stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+  stripe_price_id = EXCLUDED.stripe_price_id,
+  billing_cycle = EXCLUDED.billing_cycle,
+  status = EXCLUDED.status,
+  cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+  current_period_end = EXCLUDED.current_period_end,
+  correction_credits = EXCLUDED.correction_credits,
   updated_at = EXCLUDED.updated_at
 `
 
 type UpsertSubscriptionParams struct {
-	OrganizationID int64
-	Plan           string
-	Seats          int32
-	MonthlyQuota   int32
-	UpdatedAt      pgtype.Timestamptz
+	OrganizationID       int64
+	Plan                 string
+	Seats                int32
+	MonthlyQuota         int32
+	StripeCustomerID     string
+	StripeSubscriptionID string
+	StripePriceID        string
+	BillingCycle         string
+	Status               string
+	CancelAtPeriodEnd    bool
+	CurrentPeriodEnd     pgtype.Timestamptz
+	CorrectionCredits    int32
+	UpdatedAt            pgtype.Timestamptz
 }
 
 func (q *Queries) UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) error {
@@ -55,6 +126,14 @@ func (q *Queries) UpsertSubscription(ctx context.Context, arg UpsertSubscription
 		arg.Plan,
 		arg.Seats,
 		arg.MonthlyQuota,
+		arg.StripeCustomerID,
+		arg.StripeSubscriptionID,
+		arg.StripePriceID,
+		arg.BillingCycle,
+		arg.Status,
+		arg.CancelAtPeriodEnd,
+		arg.CurrentPeriodEnd,
+		arg.CorrectionCredits,
 		arg.UpdatedAt,
 	)
 	return err

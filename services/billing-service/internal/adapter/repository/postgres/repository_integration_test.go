@@ -42,12 +42,17 @@ func TestRepositoryIntegration_UpsertAndGetSubscription(t *testing.T) {
 	if _, err := db.Exec(ctx, `TRUNCATE TABLE billing_subscriptions RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate billing_subscriptions table: %v", err)
 	}
+	if _, err := db.Exec(ctx, `TRUNCATE TABLE billing_stripe_webhook_events`); err != nil {
+		t.Fatalf("truncate billing_stripe_webhook_events table: %v", err)
+	}
 
 	subscription := &domain.Subscription{
 		OrganizationID: 99,
 		Plan:           "pro",
 		Seats:          25,
 		MonthlyQuota:   50000,
+		BillingCycle:   domain.BillingCycleMonthly,
+		Status:         domain.SubscriptionStatusActive,
 		UpdatedAt:      time.Now().UTC(),
 	}
 	if err := repo.Upsert(ctx, subscription); err != nil {
@@ -61,9 +66,28 @@ func TestRepositoryIntegration_UpsertAndGetSubscription(t *testing.T) {
 	if stored.Plan != "pro" || stored.Seats != 25 || stored.MonthlyQuota != 50000 {
 		t.Fatalf("unexpected subscription data: %+v", stored)
 	}
+	if stored.BillingCycle != domain.BillingCycleMonthly || stored.Status != domain.SubscriptionStatusActive {
+		t.Fatalf("unexpected stripe billing metadata: %+v", stored)
+	}
 
 	_, err = repo.GetByOrganizationID(ctx, 424242)
 	if !errors.Is(err, domain.ErrSubscriptionMissing) {
 		t.Fatalf("expected ErrSubscriptionMissing, got %v", err)
+	}
+
+	firstInsert, err := repo.RecordStripeWebhookEvent(ctx, "evt_test_1", "checkout.session.completed", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("record first stripe webhook event: %v", err)
+	}
+	if !firstInsert {
+		t.Fatalf("expected first webhook insert to be true")
+	}
+
+	secondInsert, err := repo.RecordStripeWebhookEvent(ctx, "evt_test_1", "checkout.session.completed", time.Now().UTC())
+	if err != nil {
+		t.Fatalf("record duplicate stripe webhook event: %v", err)
+	}
+	if secondInsert {
+		t.Fatalf("expected duplicate webhook insert to be false")
 	}
 }

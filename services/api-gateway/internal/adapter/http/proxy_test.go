@@ -111,6 +111,105 @@ func TestGatewayProxyAuth(t *testing.T) {
 	}
 }
 
+func TestGatewayBillingStripeWebhookIsPublic(t *testing.T) {
+	var upstreamAuthz string
+
+	billingUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/billing/stripe/webhook" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		upstreamAuthz = r.Header.Get("Authorization")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer billingUpstream.Close()
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/validate" {
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer authUpstream.Close()
+
+	h, err := NewHandler(
+		billingUpstream.URL,
+		authUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		100,
+		"test-secret",
+		"api-gateway",
+	)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/stripe/webhook", strings.NewReader(`{"id":"evt_1"}`))
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if !strings.HasPrefix(upstreamAuthz, "Bearer ") {
+		t.Fatalf("expected internal bearer token, got %q", upstreamAuthz)
+	}
+}
+
+func TestGatewayBillingStripeWebhookRateLimited(t *testing.T) {
+	billingUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	}))
+	defer billingUpstream.Close()
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"unauthorized"}`))
+	}))
+	defer authUpstream.Close()
+
+	h, err := NewHandler(
+		billingUpstream.URL,
+		authUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		billingUpstream.URL,
+		1,
+		"test-secret",
+		"api-gateway",
+	)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req1 := httptest.NewRequest(http.MethodPost, "/billing/stripe/webhook", strings.NewReader(`{"id":"evt_1"}`))
+	rec1 := httptest.NewRecorder()
+	mux.ServeHTTP(rec1, req1)
+	if rec1.Code != http.StatusOK {
+		t.Fatalf("first webhook should pass, got %d body=%s", rec1.Code, rec1.Body.String())
+	}
+
+	req2 := httptest.NewRequest(http.MethodPost, "/billing/stripe/webhook", strings.NewReader(`{"id":"evt_2"}`))
+	rec2 := httptest.NewRecorder()
+	mux.ServeHTTP(rec2, req2)
+	if rec2.Code != http.StatusTooManyRequests {
+		t.Fatalf("second webhook should be rate limited, got %d body=%s", rec2.Code, rec2.Body.String())
+	}
+}
+
 func TestGatewayRateLimit(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)

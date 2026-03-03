@@ -19,6 +19,8 @@ Master Stripe payment processing integration for robust, PCI-compliant payment f
 
 ## Core Concepts
 
+- Use the latest stable stripe version and matching stable tooling versions.
+
 ### 1. Payment Flows
 
 **Checkout Sessions**

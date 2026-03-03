@@ -264,8 +264,33 @@ services:
       BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
       INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
       INTERNAL_JWT_ISSUER: api-gateway
+      STRIPE_ENABLED: ${STRIPE_ENABLED:-false}
+      STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
+      STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
+      STRIPE_CHECKOUT_SUCCESS_URL_FILE: /run/secrets/stripe_checkout_success_url
+      STRIPE_CHECKOUT_CANCEL_URL_FILE: /run/secrets/stripe_checkout_cancel_url
+      STRIPE_CUSTOMER_PORTAL_RETURN_URL_FILE: /run/secrets/stripe_customer_portal_return_url
+      STRIPE_PRICE_STARTER_MONTHLY_FILE: /run/secrets/stripe_price_starter_monthly
+      STRIPE_PRICE_STARTER_YEARLY_FILE: /run/secrets/stripe_price_starter_yearly
+      STRIPE_PRICE_GROWTH_MONTHLY_FILE: /run/secrets/stripe_price_growth_monthly
+      STRIPE_PRICE_GROWTH_YEARLY_FILE: /run/secrets/stripe_price_growth_yearly
+      STRIPE_PRICE_PRO_MONTHLY_FILE: /run/secrets/stripe_price_pro_monthly
+      STRIPE_PRICE_PRO_YEARLY_FILE: /run/secrets/stripe_price_pro_yearly
+      STRIPE_PRICE_CORRECTION_CREDITS_FILE: /run/secrets/stripe_price_correction_credits
     secrets:
       - billsvc_db_password
+      - stripe_secret_key
+      - stripe_webhook_secret
+      - stripe_checkout_success_url
+      - stripe_checkout_cancel_url
+      - stripe_customer_portal_return_url
+      - stripe_price_starter_monthly
+      - stripe_price_starter_yearly
+      - stripe_price_growth_monthly
+      - stripe_price_growth_yearly
+      - stripe_price_pro_monthly
+      - stripe_price_pro_yearly
+      - stripe_price_correction_credits
     ports:
       - "8086:8086"
     healthcheck:
@@ -709,3 +734,27 @@ secrets:
     file: ./deployments/secrets/google_oidc_client_id.txt
   google_oidc_client_secret:
     file: ./deployments/secrets/google_oidc_client_secret.txt
+  stripe_secret_key:
+    file: ./deployments/secrets/stripe_secret_key.txt
+  stripe_webhook_secret:
+    file: ./deployments/secrets/stripe_webhook_secret.txt
+  stripe_checkout_success_url:
+    file: ./deployments/secrets/stripe_checkout_success_url.txt
+  stripe_checkout_cancel_url:
+    file: ./deployments/secrets/stripe_checkout_cancel_url.txt
+  stripe_customer_portal_return_url:
+    file: ./deployments/secrets/stripe_customer_portal_return_url.txt
+  stripe_price_starter_monthly:
+    file: ./deployments/secrets/stripe_price_starter_monthly.txt
+  stripe_price_starter_yearly:
+    file: ./deployments/secrets/stripe_price_starter_yearly.txt
+  stripe_price_growth_monthly:
+    file: ./deployments/secrets/stripe_price_growth_monthly.txt
+  stripe_price_growth_yearly:
+    file: ./deployments/secrets/stripe_price_growth_yearly.txt
+  stripe_price_pro_monthly:
+    file: ./deployments/secrets/stripe_price_pro_monthly.txt
+  stripe_price_pro_yearly:
+    file: ./deployments/secrets/stripe_price_pro_yearly.txt
+  stripe_price_correction_credits:
+    file: ./deployments/secrets/stripe_price_correction_credits.txt

@@ -14,11 +14,18 @@ func isHealthRequest(r *http.Request) bool {
 	return r.Method == http.MethodGet && r.URL.Path == "/health"
 }
 
+func isBillingStripeWebhookRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/billing/stripe/webhook"
+}
+
 func (h *Handler) buildRoutes() []routeEntry {
 	authHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.authProxy, "auth-service", internalTokenClaims{})
 	})
 	userHandler := h.withAuth(h.userProxy, "user-service", "users")
+	billingStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.serveProxyWithInternalAuth(w, r, h.billingProxy, "billing-service", internalTokenClaims{})
+	})
 
 	routes := []routeEntry{
 		{
@@ -32,6 +39,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/admin/users"), handler: userHandler},
 		{match: matchPathPrefix("/organizations"), handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations")},
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions")},
+		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing")},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications")},
 		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects")},

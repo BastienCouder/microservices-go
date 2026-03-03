@@ -14,6 +14,7 @@ import (
 
 	httpadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/http"
 	billingrepo "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/repository/postgres"
+	stripeadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/stripe"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/usecase"
@@ -36,6 +37,23 @@ func main() {
 
 	repo := billingrepo.NewRepository(db)
 	svc := usecase.NewService(repo)
+	if cfg.Stripe.Enabled {
+		svc.EnableStripe(
+			stripeadapter.NewClient(cfg.Stripe.SecretKey, cfg.Stripe.WebhookSecret),
+			usecase.StripeCatalog{
+				StarterMonthlyPriceID:    cfg.Stripe.StarterMonthlyPriceID,
+				StarterYearlyPriceID:     cfg.Stripe.StarterYearlyPriceID,
+				GrowthMonthlyPriceID:     cfg.Stripe.GrowthMonthlyPriceID,
+				GrowthYearlyPriceID:      cfg.Stripe.GrowthYearlyPriceID,
+				ProMonthlyPriceID:        cfg.Stripe.ProMonthlyPriceID,
+				ProYearlyPriceID:         cfg.Stripe.ProYearlyPriceID,
+				CorrectionCreditsPriceID: cfg.Stripe.CorrectionCreditsPriceID,
+			},
+			cfg.Stripe.CheckoutSuccessURL,
+			cfg.Stripe.CheckoutCancelURL,
+			cfg.Stripe.CustomerPortalReturnURL,
+		)
+	}
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()
