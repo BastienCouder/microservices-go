@@ -56,13 +56,7 @@ function normalizeWebsite(value: string): string {
     return trimmed.replace(/^https?:\/\//, "").replace(/\/.*$/, "");
 }
 
-export const BrandVisibilityChart = memo(function BrandVisibilityChart({
-    useScopedFilters = true,
-    periodOverride,
-}: {
-    useScopedFilters?: boolean;
-    periodOverride?: string;
-}) {
+export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
     const content = useI18nScope("dashboard-analytics-panel");
     const { data: dashboardData } = useDashboardData();
     const { project, recent_prompts } = dashboardData;
@@ -71,7 +65,6 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart({
         selectedModels,
         selectedPersonas,
         selectedCompetitors,
-        applyFiltersToGraphs,
         dateRange,
     } = useDashboardStore(
       useShallow((state) => ({
@@ -79,25 +72,21 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart({
         selectedModels: state.selectedModels,
         selectedPersonas: state.selectedPersonas,
         selectedCompetitors: state.selectedCompetitors,
-        applyFiltersToGraphs: state.applyFiltersToGraphs,
         dateRange: state.dateRange,
       })),
     );
-    const effectivePeriod = periodOverride ?? period;
     const [metricMode, setMetricMode] = useState<"sov" | "mention_rate">("sov");
-    const shouldApplyScope = applyFiltersToGraphs && useScopedFilters;
     const toTwoLetters = (value: string) => value.trim().slice(0, 2);
       const truncateWebsite = (value: string, max = 20) =>
         value.length > max ? `${value.slice(0, Math.max(0, max - 1))}…` : value;
 
     const filteredPrompts = recent_prompts.filter((prompt) => {
-        const isInPeriod = promptIsInPeriodWithDateRange(prompt, effectivePeriod, dateRange);
+        const isInPeriod = promptIsInPeriodWithDateRange(prompt, period, dateRange);
         if (!isInPeriod) return false;
-        if (!shouldApplyScope) return true;
         return matchesPromptAudienceFilters(prompt, selectedModels, selectedPersonas, []);
     });
 
-    const competitorSelection = shouldApplyScope && selectedCompetitors.length > 0
+    const competitorSelection = selectedCompetitors.length > 0
         ? project.competitors.filter((competitor) => selectedCompetitors.includes(competitor.name))
         : project.competitors;
 
@@ -209,7 +198,7 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart({
                           variant="secondary"
                           className="h-8 shrink-0 font-normal text-xs uppercase bg-muted/50 text-muted-foreground md:h-7"
                         >
-                            {effectivePeriod === 'today' ? '24h' : effectivePeriod}
+                            {period === "today" ? "24h" : period}
                         </Badge>
                     </div>
                 </div>

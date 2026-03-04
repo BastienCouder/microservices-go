@@ -1,19 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
 import type { DateRange } from "react-day-picker";
 
-import type { ExportDataset, ExportFormat } from "@/lib/export-client";
-
-type SectionFilterScope = {
-  criticalUpdates: boolean;
-  promptsStream: boolean;
-  kpiCards: boolean;
-  visibilityAnalytics: boolean;
-  brandVisibility: boolean;
-  aiSentiment: boolean;
-  topCitedPages: boolean;
-  autoInsights: boolean;
-};
-
 type DashboardStoreState = {
   period: string;
   setPeriod: (period: string) => void;
@@ -33,73 +20,7 @@ type DashboardStoreState = {
   toggleCompetitor: (competitor: string) => void;
   clearCompetitors: () => void;
 
-  applyFiltersToGraphs: boolean;
-  applyFiltersToLivePrompts: boolean;
-
-  kpiCardsPeriod: string | null;
-  setKpiCardsPeriod: (value: string | null) => void;
-  visibilityAnalyticsPeriod: string | null;
-  setVisibilityAnalyticsPeriod: (value: string | null) => void;
-  competitorAnalyticsPeriod: string | null;
-  setCompetitorAnalyticsPeriod: (value: string | null) => void;
-
-  sectionFilterScope: SectionFilterScope;
-  toggleSectionFilterScope: (key: keyof SectionFilterScope) => void;
-  resetSectionFilterScope: () => void;
-
-  isFiltersPanelOpen: boolean;
-  toggleFiltersPanel: () => void;
-
-  showAdvancedExport: boolean;
-  setShowAdvancedExport: (value: boolean) => void;
-  exportFormat: ExportFormat;
-  setExportFormat: (value: ExportFormat) => void;
-  exportUnreadOnly: boolean;
-  toggleExportUnreadOnly: () => void;
-  exportRunsLimit: string;
-  setExportRunsLimit: (value: string) => void;
-  selectedExportPreset: "essentials" | "executive" | "raw";
-  setSelectedExportPreset: (value: "essentials" | "executive" | "raw") => void;
-  exportSelection: Record<ExportDataset, boolean>;
-  toggleExportDataset: (dataset: ExportDataset) => void;
-  setExportSelection: (value: Record<ExportDataset, boolean>) => void;
-  selectAllExportDatasets: () => void;
-  clearExportDatasets: () => void;
-
   resetFilters: () => void;
-};
-
-const defaultSectionScope: SectionFilterScope = {
-  criticalUpdates: true,
-  promptsStream: true,
-  kpiCards: true,
-  visibilityAnalytics: true,
-  brandVisibility: true,
-  aiSentiment: true,
-  topCitedPages: true,
-  autoInsights: true,
-};
-
-const allDatasets: ExportDataset[] = [
-  "kpis",
-  "prompt-runs",
-  "alerts",
-  "competitors",
-  "visibility",
-  "runs",
-  "prompts",
-  "dashboard",
-];
-
-const defaultExportSelection: Record<ExportDataset, boolean> = {
-  "kpis": true,
-  "prompt-runs": true,
-  "alerts": true,
-  "competitors": true,
-  "visibility": false,
-  "runs": false,
-  "prompts": false,
-  "dashboard": false,
 };
 
 const DashboardStoreContext = createContext<DashboardStoreState | null>(null);
@@ -119,24 +40,6 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
 
   const [selectedPersonas, setSelectedPersonas] = useState<string[]>([]);
   const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>([]);
-
-  const [kpiCardsPeriod, setKpiCardsPeriod] = useState<string | null>(null);
-  const [visibilityAnalyticsPeriod, setVisibilityAnalyticsPeriod] = useState<string | null>(null);
-  const [competitorAnalyticsPeriod, setCompetitorAnalyticsPeriod] = useState<string | null>(null);
-
-  const [sectionFilterScope, setSectionFilterScope] =
-    useState<SectionFilterScope>(defaultSectionScope);
-
-  const [isFiltersPanelOpen, setIsFiltersPanelOpen] = useState<boolean>(true);
-
-  const [showAdvancedExport, setShowAdvancedExport] = useState<boolean>(false);
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("csv");
-  const [exportUnreadOnly, setExportUnreadOnly] = useState<boolean>(false);
-  const [exportRunsLimit, setExportRunsLimit] = useState<string>("100");
-  const [selectedExportPreset, setSelectedExportPreset] =
-    useState<"essentials" | "executive" | "raw">("essentials");
-  const [exportSelection, setExportSelection] =
-    useState<Record<ExportDataset, boolean>>(defaultExportSelection);
 
   const toggleModel = useCallback((id: string) => {
     setSelectedModels((prev) => toggleInArray(prev, id));
@@ -158,60 +61,12 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     setSelectedCompetitors([]);
   }, []);
 
-  const toggleSectionFilterScope = useCallback((key: keyof SectionFilterScope) => {
-    setSectionFilterScope((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
-  }, []);
-
-  const resetSectionFilterScope = useCallback(() => {
-    setSectionFilterScope(defaultSectionScope);
-  }, []);
-
-  const toggleFiltersPanel = useCallback(() => {
-    setIsFiltersPanelOpen((prev) => !prev);
-  }, []);
-
-  const toggleExportUnreadOnly = useCallback(() => {
-    setExportUnreadOnly((prev) => !prev);
-  }, []);
-
-  const toggleExportDataset = useCallback((dataset: ExportDataset) => {
-    setExportSelection((prev) => ({
-      ...prev,
-      [dataset]: !prev[dataset],
-    }));
-  }, []);
-
-  const selectAllExportDatasets = useCallback(() => {
-    setExportSelection(
-      allDatasets.reduce((acc, dataset) => {
-        acc[dataset] = true;
-        return acc;
-      }, {} as Record<ExportDataset, boolean>),
-    );
-  }, []);
-
-  const clearExportDatasets = useCallback(() => {
-    setExportSelection(
-      allDatasets.reduce((acc, dataset) => {
-        acc[dataset] = false;
-        return acc;
-      }, {} as Record<ExportDataset, boolean>),
-    );
-  }, []);
-
   const resetFilters = useCallback(() => {
     setPeriod("7d");
     setDateRange(undefined);
     setSelectedModels([]);
     setSelectedPersonas([]);
     setSelectedCompetitors([]);
-    setKpiCardsPeriod(null);
-    setVisibilityAnalyticsPeriod(null);
-    setCompetitorAnalyticsPeriod(null);
-    setSectionFilterScope(defaultSectionScope);
   }, []);
 
   const value = useMemo<DashboardStoreState>(
@@ -234,39 +89,6 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
       toggleCompetitor,
       clearCompetitors,
 
-      applyFiltersToGraphs: true,
-      applyFiltersToLivePrompts: true,
-
-      kpiCardsPeriod,
-      setKpiCardsPeriod,
-      visibilityAnalyticsPeriod,
-      setVisibilityAnalyticsPeriod,
-      competitorAnalyticsPeriod,
-      setCompetitorAnalyticsPeriod,
-
-      sectionFilterScope,
-      toggleSectionFilterScope,
-      resetSectionFilterScope,
-
-      isFiltersPanelOpen,
-      toggleFiltersPanel,
-
-      showAdvancedExport,
-      setShowAdvancedExport,
-      exportFormat,
-      setExportFormat,
-      exportUnreadOnly,
-      toggleExportUnreadOnly,
-      exportRunsLimit,
-      setExportRunsLimit,
-      selectedExportPreset,
-      setSelectedExportPreset,
-      exportSelection,
-      toggleExportDataset,
-      setExportSelection,
-      selectAllExportDatasets,
-      clearExportDatasets,
-
       resetFilters,
     }),
     [
@@ -281,23 +103,6 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
       selectedCompetitors,
       toggleCompetitor,
       clearCompetitors,
-      kpiCardsPeriod,
-      visibilityAnalyticsPeriod,
-      competitorAnalyticsPeriod,
-      sectionFilterScope,
-      toggleSectionFilterScope,
-      resetSectionFilterScope,
-      isFiltersPanelOpen,
-      toggleFiltersPanel,
-      showAdvancedExport,
-      exportFormat,
-      exportUnreadOnly,
-      exportRunsLimit,
-      selectedExportPreset,
-      exportSelection,
-      toggleExportDataset,
-      selectAllExportDatasets,
-      clearExportDatasets,
       resetFilters,
     ],
   );

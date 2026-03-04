@@ -39,11 +39,6 @@ export function AnalyticsPanel() {
     showUniqueModelFilters,
     selectedPersonas,
     selectedCompetitors,
-    applyFiltersToGraphs,
-    kpiCardsPeriod,
-    visibilityAnalyticsPeriod,
-    competitorAnalyticsPeriod,
-    sectionFilterScope,
     period,
     dateRange,
   } = useDashboardStore(
@@ -52,22 +47,12 @@ export function AnalyticsPanel() {
       showUniqueModelFilters: state.showUniqueModelFilters,
       selectedPersonas: state.selectedPersonas,
       selectedCompetitors: state.selectedCompetitors,
-      applyFiltersToGraphs: state.applyFiltersToGraphs,
-      kpiCardsPeriod: state.kpiCardsPeriod,
-      visibilityAnalyticsPeriod: state.visibilityAnalyticsPeriod,
-      competitorAnalyticsPeriod: state.competitorAnalyticsPeriod,
-      sectionFilterScope: state.sectionFilterScope,
       period: state.period,
       dateRange: state.dateRange,
     })),
   );
 
-  const effectiveKpiCardsPeriod = kpiCardsPeriod ?? period;
-  const effectiveVisibilityPeriod = visibilityAnalyticsPeriod ?? period;
-  const effectiveCompetitorPeriod = competitorAnalyticsPeriod ?? period;
-
-  const scopedPrompts = useMemo(() => {
-    if (!applyFiltersToGraphs) return recent_prompts;
+  const filteredPrompts = useMemo(() => {
     return recent_prompts.filter((prompt) =>
       matchesPromptAudienceFilters(
         prompt,
@@ -77,7 +62,6 @@ export function AnalyticsPanel() {
       ),
     );
   }, [
-    applyFiltersToGraphs,
     recent_prompts,
     selectedModels,
     selectedPersonas,
@@ -85,31 +69,23 @@ export function AnalyticsPanel() {
   ]);
 
   const promptsForKpiCards = useMemo(() => {
-    const sourcePrompts =
-      applyFiltersToGraphs && sectionFilterScope.kpiCards ? scopedPrompts : recent_prompts;
-    return sourcePrompts.filter((prompt) =>
-      promptIsInPeriodWithDateRange(prompt, effectiveKpiCardsPeriod, dateRange),
+    return filteredPrompts.filter((prompt) =>
+      promptIsInPeriodWithDateRange(prompt, period, dateRange),
     );
   }, [
-    applyFiltersToGraphs,
-    sectionFilterScope.kpiCards,
-    recent_prompts,
-    scopedPrompts,
-    effectiveKpiCardsPeriod,
+    filteredPrompts,
+    period,
     dateRange,
   ]);
 
-  const promptsForVisibilityAnalytics = applyFiltersToGraphs && sectionFilterScope.visibilityAnalytics ? scopedPrompts : recent_prompts;
-  const promptsForAiSentiment = applyFiltersToGraphs && sectionFilterScope.aiSentiment ? scopedPrompts : recent_prompts;
-  const promptsForAutoInsights = applyFiltersToGraphs && sectionFilterScope.autoInsights ? scopedPrompts : recent_prompts;
+  const promptsForVisibilityAnalytics = filteredPrompts;
+  const promptsForAiSentiment = filteredPrompts;
+  const promptsForAutoInsights = filteredPrompts;
   const modelsToShow = useMemo(() => {
     if (selectedModels.length === 0) return models;
-    if (!applyFiltersToGraphs || !sectionFilterScope.visibilityAnalytics) return models;
     return models.filter((m) => selectedModels.includes(m.id));
   }, [
     selectedModels,
-    applyFiltersToGraphs,
-    sectionFilterScope.visibilityAnalytics,
     models,
   ]);
 
@@ -152,7 +128,7 @@ export function AnalyticsPanel() {
   const promptsForVisibilityAnalyticsPeriod = useMemo(
     () => {
       const base = promptsForVisibilityAnalytics.filter((prompt) =>
-        promptIsInPeriodWithDateRange(prompt, effectiveVisibilityPeriod, dateRange),
+        promptIsInPeriodWithDateRange(prompt, period, dateRange),
       );
 
       // For this chart, competitor filtering is interpreted as "brand + competitor co-mentioned".
@@ -162,7 +138,7 @@ export function AnalyticsPanel() {
 
       return base;
     },
-    [promptsForVisibilityAnalytics, effectiveVisibilityPeriod, dateRange, selectedCompetitors.length],
+    [promptsForVisibilityAnalytics, period, dateRange, selectedCompetitors.length],
   );
 
   const visibilityAnalyticsBarData = useMemo(() => {
@@ -424,16 +400,13 @@ export function AnalyticsPanel() {
         />
 
         <VisibilityAnalytics
-          effectiveVisibilityPeriod={effectiveVisibilityPeriod}
+          effectiveVisibilityPeriod={period}
           barData={visibilityAnalyticsBarData}
           hasCompetitorFilter={selectedCompetitors.length > 0}
           title={selectedCompetitors.length > 0 ? "Co-mentions Analytics" : undefined}
         />
 
-        <BrandVisibilityChart
-          useScopedFilters={sectionFilterScope.brandVisibility}
-          periodOverride={effectiveCompetitorPeriod}
-        />
+        <BrandVisibilityChart />
 
         <div className="grid w-full min-w-0 grid-cols-1 items-stretch gap-4 md:grid-cols-2 xl:!grid-cols-2">
           <SentimentDistribution

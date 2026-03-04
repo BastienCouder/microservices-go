@@ -24,8 +24,6 @@ export function ActivityPanel() {
     selectedCompetitors,
     period,
     dateRange,
-    applyFiltersToLivePrompts,
-    sectionFilterScope,
   } = useDashboardStore(
     useShallow((state) => ({
       selectedModels: state.selectedModels,
@@ -33,8 +31,6 @@ export function ActivityPanel() {
       selectedCompetitors: state.selectedCompetitors,
       period: state.period,
       dateRange: state.dateRange,
-      applyFiltersToLivePrompts: state.applyFiltersToLivePrompts,
-      sectionFilterScope: state.sectionFilterScope,
     })),
   );
 
@@ -50,11 +46,7 @@ export function ActivityPanel() {
     return models.find((model) => model.id === modelId);
   }, [models]);
 
-  const shouldScopePromptsStream = applyFiltersToLivePrompts && sectionFilterScope.promptsStream;
-  const shouldScopeCriticalUpdates = applyFiltersToLivePrompts && sectionFilterScope.criticalUpdates;
-
   const filteredPrompts = useMemo(() => {
-    if (!shouldScopePromptsStream) return recent_prompts;
     return recent_prompts.filter(
       (prompt) =>
         matchesPromptAudienceFilters(
@@ -65,7 +57,6 @@ export function ActivityPanel() {
         ) && promptIsInPeriodWithDateRange(prompt, period, dateRange),
     );
   }, [
-    shouldScopePromptsStream,
     recent_prompts,
     selectedModels,
     selectedPersonas,
@@ -74,15 +65,7 @@ export function ActivityPanel() {
     dateRange,
   ]);
 
-  const filteredAlerts = useMemo(() => {
-    if (!shouldScopeCriticalUpdates) return alerts;
-    // Alerts are backend records but currently lack structured model/competitor fields in the UI payload.
-    // Avoid brittle text matching that hides all alerts when filters are applied.
-    return alerts;
-  }, [
-    shouldScopeCriticalUpdates,
-    alerts,
-  ]);
+  const filteredAlerts = alerts;
 
   const handleSelectAlert = useCallback((alert: DashboardAlert) => setSelectedAlert(alert), []);
   const handleSelectPrompt = useCallback((prompt: DashboardPrompt) => setSelectedPrompt(prompt), []);
