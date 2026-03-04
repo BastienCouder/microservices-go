@@ -33,7 +33,7 @@ require_env BACKUP_POSTGRES_PORT
 require_env BACKUP_POSTGRES_USER
 require_env BACKUP_POSTGRES_PASSWORD_FILE
 require_env BACKUP_INTERVAL_SECONDS
-require_env R2_BUCKET
+require_env R2_BUCKET_FILE
 require_env R2_ACCOUNT_ID_FILE
 require_env R2_ACCESS_KEY_ID_FILE
 require_env R2_SECRET_ACCESS_KEY_FILE
@@ -61,6 +61,7 @@ while true; do
   r2_account_id="$(read_secret "$R2_ACCOUNT_ID_FILE")"
   r2_access_key_id="$(read_secret "$R2_ACCESS_KEY_ID_FILE")"
   r2_secret_access_key="$(read_secret "$R2_SECRET_ACCESS_KEY_FILE")"
+  r2_bucket="$(read_secret "$R2_BUCKET_FILE")"
   r2_endpoint="${R2_ENDPOINT:-https://${r2_account_id}.r2.cloudflarestorage.com}"
 
   log "starting PostgreSQL dump"
@@ -69,7 +70,7 @@ while true; do
     --port "$BACKUP_POSTGRES_PORT" \
     --username "$BACKUP_POSTGRES_USER" \
     | gzip -9 > "$tmp_file"; then
-    log "dump done, uploading to s3://${R2_BUCKET}/${object_key}"
+    log "dump done, uploading to s3://${r2_bucket}/${object_key}"
   else
     log "dump failed"
     rm -f "$tmp_file"
@@ -80,7 +81,7 @@ while true; do
   if AWS_ACCESS_KEY_ID="$r2_access_key_id" \
     AWS_SECRET_ACCESS_KEY="$r2_secret_access_key" \
     AWS_DEFAULT_REGION="${R2_REGION:-auto}" \
-    aws --endpoint-url "$r2_endpoint" s3 cp "$tmp_file" "s3://${R2_BUCKET}/${object_key}"; then
+    aws --endpoint-url "$r2_endpoint" s3 cp "$tmp_file" "s3://${r2_bucket}/${object_key}"; then
     log "upload completed"
   else
     log "upload failed"

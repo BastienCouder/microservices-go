@@ -4,12 +4,13 @@ dsn: ${DSN}
 
 serve:
   public:
-    base_url: http://kratos:4433/
+    base_url: http://localhost:4433/
     cors:
       enabled: true
       allowed_origins:
-        - http://localhost:3000
-        - http://localhost:3001
+        - http://localhost:30000
+        - http://localhost:30004
+        - http://localhost:30001
       allowed_methods:
         - GET
         - POST
@@ -25,10 +26,16 @@ serve:
         - Content-Type
         - Set-Cookie
   admin:
-    base_url: http://kratos:4434/
+    base_url: http://localhost:4434/
 
 selfservice:
-  default_browser_return_url: http://localhost:3000/
+  default_browser_return_url: http://localhost:30004/
+  allowed_return_urls:
+    - http://localhost:30004/
+    - http://localhost:30000/
+    - http://localhost:30000/auth
+    - http://localhost:30000/auth/login
+    - http://localhost:30000/auth/register
 
   methods:
     password:
@@ -52,27 +59,33 @@ selfservice:
 
   flows:
     error:
-      ui_url: http://localhost:3000/auth/error
+      ui_url: http://localhost:30000/auth/error
     settings:
-      ui_url: http://localhost:3000/auth/settings
+      ui_url: http://localhost:30000/auth/settings
       privileged_session_max_age: 15m
     recovery:
       enabled: false
-      ui_url: http://localhost:3000/auth/recovery
+      ui_url: http://localhost:30000/auth/recovery
     verification:
       enabled: false
-      ui_url: http://localhost:3000/auth/verification
+      ui_url: http://localhost:30000/auth/verification
       after:
-        default_browser_return_url: http://localhost:3000/
+        default_browser_return_url: http://localhost:30000/
     logout:
       after:
-        default_browser_return_url: http://localhost:3000/auth/login
+        default_browser_return_url: http://localhost:30000/auth/login
     login:
-      ui_url: http://localhost:3000/auth/login
-    registration:
-      ui_url: http://localhost:3000/auth/register
+      ui_url: http://localhost:30000/auth/login
       after:
+        default_browser_return_url: http://localhost:30004/
+    registration:
+      ui_url: http://localhost:30000/auth/register
+      after:
+        default_browser_return_url: http://localhost:30004/
         password:
+          hooks:
+            - hook: session
+        oidc:
           hooks:
             - hook: session
 

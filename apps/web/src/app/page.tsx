@@ -14,7 +14,7 @@ function loadRuntimeConfig(): HomeRuntimeConfig {
   }
   return {
     gatewayURL,
-    appURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:19020",
+    appURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004",
   };
 }
 

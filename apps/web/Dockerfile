@@ -1,37 +1,32 @@
-FROM oven/bun:1.2.8-alpine AS dev
+FROM oven/bun:alpine AS deps
+WORKDIR /app
+COPY package.json bun.lock ./
+RUN bun install --frozen-lockfile --production
 
+FROM oven/bun:alpine AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ARG NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:50000
+ARG NEXT_PUBLIC_APP_URL=http://localhost:30004
+ENV NEXT_PUBLIC_API_GATEWAY_URL=${NEXT_PUBLIC_API_GATEWAY_URL}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+
+RUN bun run build
+
+FROM gcr.io/distroless/nodejs22-debian12 AS runner
 WORKDIR /app
 
-COPY apps/web/package.json apps/web/bun.lock ./
-RUN bun install --frozen-lockfile
+ARG NEXT_PUBLIC_API_GATEWAY_URL=http://localhost:50000
+ARG NEXT_PUBLIC_APP_URL=http://localhost:30004
 
-CMD ["bun", "run", "dev", "--hostname", "0.0.0.0", "--port", "3000"]
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_GATEWAY_URL=${NEXT_PUBLIC_API_GATEWAY_URL}
+ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
 
-FROM oven/bun:1.2.8-alpine AS builder
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-WORKDIR /app
-
-ARG NEXT_PUBLIC_API_GATEWAY_URL
-ARG NEXT_PUBLIC_APP_URL
-
-COPY apps/web/package.json apps/web/bun.lock ./
-RUN bun install --frozen-lockfile
-
-COPY apps/web ./
-RUN NEXT_PUBLIC_API_GATEWAY_URL="${NEXT_PUBLIC_API_GATEWAY_URL}" \
-    NEXT_PUBLIC_APP_URL="${NEXT_PUBLIC_APP_URL}" \
-    bun run build
-
-FROM nginx:1.27.4-alpine AS runtime
-
-COPY apps/web/nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/out /usr/share/nginx/html
-
-RUN chown -R nginx:nginx /usr/share/nginx/html \
-    && chown -R nginx:nginx /var/cache/nginx \
-    && chown -R nginx:nginx /var/log/nginx \
-    && touch /var/run/nginx.pid \
-    && chown nginx:nginx /var/run/nginx.pid
-
-USER nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["server.js"]

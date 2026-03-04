@@ -24,7 +24,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	kratos := kratosclient.NewClient(cfg.KratosPublicURL)
+	kratos := kratosclient.NewClient(cfg.KratosPublicURL, cfg.AppReturnURL)
 	svc := usecase.NewService(kratos)
 	h := httpadapter.NewHandler(svc, cfg.AllowedOrigin, cfg.KratosBrowserURL)
 

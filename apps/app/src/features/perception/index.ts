@@ -1,0 +1,1 @@
+export { PerceptionPage } from "./view";

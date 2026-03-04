@@ -13,7 +13,8 @@
     "strict": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "zustand/react/shallow": ["src/shims/zustand-shallow.ts"]
     }
   },
   "include": ["src"]

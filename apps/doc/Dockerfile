@@ -1,31 +1,31 @@
-FROM oven/bun:1.2.8-alpine AS dev
-
+# ── Stage 1 : Dépendances ─────────────────────────────────
+FROM oven/bun:alpine AS deps
 WORKDIR /app
-
-COPY apps/doc/package.json apps/doc/bun.lock ./
+COPY package.json bun.lockb ./
 RUN bun install --frozen-lockfile
 
-CMD ["bun", "run", "dev", "--hostname", "0.0.0.0", "--port", "3001"]
-
-FROM oven/bun:1.2.8-alpine AS builder
-
+# ── Stage 2 : Build ───────────────────────────────────────
+FROM oven/bun:alpine AS builder
 WORKDIR /app
-COPY apps/doc/package.json apps/doc/bun.lock ./
-RUN bun install --frozen-lockfile
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 
-COPY apps/doc ./
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+
 RUN bun run build
 
-FROM nginx:1.27.4-alpine AS runtime
+# ── Stage 3 : Runner distroless ───────────────────────────
+FROM gcr.io/distroless/nodejs20-debian12 AS runner
+WORKDIR /app
 
-COPY apps/doc/nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY --from=builder /app/out /usr/share/nginx/html
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
-RUN chown -R nginx:nginx /usr/share/nginx/html \
-    && chown -R nginx:nginx /var/cache/nginx \
-    && chown -R nginx:nginx /var/log/nginx \
-    && touch /var/run/nginx.pid \
-    && chown nginx:nginx /var/run/nginx.pid
+COPY --from=builder /app/.next/standalone ./
+COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
-USER nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["server.js"]

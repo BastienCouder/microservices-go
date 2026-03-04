@@ -5,7 +5,6 @@ import type { SessionInfo, UserProfile } from "@/shared/models";
 import { safeJSONStringify } from "@/shared/utils";
 
 type UseAuthSessionResult = {
-  loading: boolean;
   busy: boolean;
   session: SessionInfo | null;
   user: UserProfile | null;
@@ -16,7 +15,6 @@ type UseAuthSessionResult = {
 };
 
 export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
-  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -24,7 +22,6 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
 
   const refresh = useCallback(async () => {
     if (!apiBaseURL) {
-      setLoading(false);
       setSession(null);
       setUser(null);
       return;
@@ -59,7 +56,6 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
       setFeedback("");
     } finally {
       setBusy(false);
-      setLoading(false);
     }
   }, [apiBaseURL]);
 
@@ -116,7 +112,6 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
   );
 
   return {
-    loading,
     busy,
     session,
     user,

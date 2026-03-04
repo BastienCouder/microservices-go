@@ -40,7 +40,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -144,8 +144,38 @@ func optionalBoolEnv(key string, defaultValue bool) (bool, error) {
 	}
 }
 
+func optionalBoolEnvOrFile(key, fileKey string, defaultValue bool) (bool, error) {
+	if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
+		return parseBool(key, raw)
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return defaultValue, nil
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return false, fmt.Errorf("read value file %s for %s: %w", filePath, key, err)
+	}
+	value := strings.TrimSpace(string(raw))
+	if value == "" {
+		return defaultValue, nil
+	}
+	return parseBool(fileKey, value)
+}
+
+func parseBool(key, raw string) (bool, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "1", "true", "yes", "on":
+		return true, nil
+	case "0", "false", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
+	}
+}
+
 func loadStripeConfig() (StripeConfig, error) {
-	enabled, err := optionalBoolEnv("STRIPE_ENABLED", false)
+	enabled, err := optionalBoolEnvOrFile("STRIPE_ENABLED", "STRIPE_ENABLED_FILE", false)
 	if err != nil {
 		return StripeConfig{}, err
 	}

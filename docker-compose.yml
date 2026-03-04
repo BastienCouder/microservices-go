@@ -2,29 +2,34 @@ services:
   web:
     profiles: ["frontend"]
     build:
-      dockerfile: apps/web/Dockerfile
+      context: ./apps/web
+      dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
-        NEXT_PUBLIC_APP_URL: http://localhost:19020
+        NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
+        NEXT_PUBLIC_APP_URL: http://localhost:30004
     image: microservices-go/web:prod
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:8080
-      NEXT_PUBLIC_APP_URL: http://localhost:19020
+      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
+      NEXT_PUBLIC_APP_URL: http://localhost:30004
     ports:
-      - "3000:8080"
+      - "30000:3000"
 
   app:
     profiles: ["frontend"]
     build:
-      dockerfile: apps/app/Dockerfile
+      context: ./apps/app
+      dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://localhost:8080
-        VITE_WEB_AUTH_URL: http://localhost:3000/auth
+        VITE_API_BASE_URL: http://localhost:50000
+        VITE_WEB_AUTH_URL: http://localhost:30000/auth
     image: microservices-go/app:prod
     restart: unless-stopped
+    environment:
+      API_GATEWAY_INTERNAL_URL: http://api-gateway:8080
+      WEB_AUTH_URL: http://localhost:30000/auth
     ports:
-      - "19020:8080"
+      - "30004:8080"
 
   doc:
     profiles: ["doc"]
@@ -33,7 +38,7 @@ services:
     image: microservices-go/doc:prod
     restart: unless-stopped
     ports:
-      - "3001:8080"
+      - "30001:8080"
 
   email:
     profiles: ["email"]
@@ -44,7 +49,7 @@ services:
     environment:
       EMAIL_API_PORT: "3002"
     ports:
-      - "3002:3002"
+      - "30002:3002"
 
   mcp-server:
     profiles: ["mcp"]
@@ -56,7 +61,7 @@ services:
     restart: unless-stopped
     command: ["--transport", "http", "--http-addr", ":8090"]
     ports:
-      - "8090:8090"
+      - "50010:8090"
 
   api-gateway:
     profiles: ["backend"]
@@ -80,12 +85,14 @@ services:
       IA_SERVICE_URL: http://ia-service:8091
       ATTRIBUTION_SERVICE_URL: http://attribution-service:8092
       RATE_LIMIT_RPM: "120"
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
-      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:19020
+      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004
+    secrets:
+      - internal_jwt_secret
     ports:
-      - "8080:8080"
+      - "50000:8080"
 
   auth-service:
     profiles: ["backend"]
@@ -99,11 +106,14 @@ services:
       HTTP_ADDR: :8083
       KRATOS_PUBLIC_URL: http://kratos:4433
       KRATOS_BROWSER_URL: http://localhost:4433
-      ALLOWED_ORIGIN: http://localhost:3000
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      APP_RETURN_URL: http://localhost:30004/
+      ALLOWED_ORIGIN: http://localhost:30000
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
+    secrets:
+      - internal_jwt_secret
     ports:
-      - "8083:8083"
+      - "50003:8083"
 
   user-service:
     profiles: ["backend"]
@@ -121,12 +131,13 @@ services:
       USER_DB_NAME: usersvc
       USER_DB_SSLMODE: disable
       USER_DB_PASSWORD_FILE: /run/secrets/usersvc_db_password
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - usersvc_db_password
+      - internal_jwt_secret
     ports:
-      - "8081:8081"
+      - "50001:8081"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -167,12 +178,13 @@ services:
       ORG_DB_NAME: orgsvc
       ORG_DB_SSLMODE: disable
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - orgsvc_db_password
+      - internal_jwt_secret
     ports:
-      - "8084:8084"
+      - "50004:8084"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -215,13 +227,14 @@ services:
       PERMISSION_DB_SSLMODE: disable
       PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
       ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
     secrets:
       - permsvc_db_password
+      - internal_jwt_secret
     ports:
-      - "8085:8085"
+      - "50005:8085"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -262,9 +275,9 @@ services:
       BILLING_DB_NAME: billsvc
       BILLING_DB_SSLMODE: disable
       BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
-      STRIPE_ENABLED: ${STRIPE_ENABLED:-false}
+      STRIPE_ENABLED_FILE: /run/secrets/stripe_enabled
       STRIPE_SECRET_KEY_FILE: /run/secrets/stripe_secret_key
       STRIPE_WEBHOOK_SECRET_FILE: /run/secrets/stripe_webhook_secret
       STRIPE_CHECKOUT_SUCCESS_URL_FILE: /run/secrets/stripe_checkout_success_url
@@ -279,8 +292,10 @@ services:
       STRIPE_PRICE_CORRECTION_CREDITS_FILE: /run/secrets/stripe_price_correction_credits
     secrets:
       - billsvc_db_password
+      - internal_jwt_secret
       - stripe_secret_key
       - stripe_webhook_secret
+      - stripe_enabled
       - stripe_checkout_success_url
       - stripe_checkout_cancel_url
       - stripe_customer_portal_return_url
@@ -292,7 +307,7 @@ services:
       - stripe_price_pro_yearly
       - stripe_price_correction_credits
     ports:
-      - "8086:8086"
+      - "50006:8086"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -336,13 +351,14 @@ services:
       EMAIL_RENDERER_URL: http://email:3002
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       RESEND_FROM_EMAIL: noreply@example.com
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - notifsvc_db_password
       - resend_api_key
+      - internal_jwt_secret
     ports:
-      - "8087:8087"
+      - "50007:8087"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -369,17 +385,19 @@ services:
       PROJECT_DB_PASSWORD_FILE: /run/secrets/projectsvc_db_password
       ANALYSIS_SERVICE_GRPC_ADDR: analysis-service:9089
       IA_SERVICE_GRPC_ADDR: ia-service:9091
-      RABBITMQ_URL: ${RABBITMQ_URL:?RABBITMQ_URL must be set}
+      RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
       RABBITMQ_EXCHANGE: microservices.events
       RABBITMQ_PROJECT_FINALIZE_QUEUE: project.finalize
       RABBITMQ_PROJECT_FINALIZE_ROUTING_KEY: project.finalized
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
     secrets:
       - projectsvc_db_password
+      - internal_jwt_secret
+      - rabbitmq_url
     ports:
-      - "8088:8088"
+      - "50008:8088"
       - "9088:9088"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
@@ -406,13 +424,14 @@ services:
       ANALYSIS_DB_SSLMODE: disable
       ANALYSIS_DB_PASSWORD_FILE: /run/secrets/analysissvc_db_password
       PROJECT_SERVICE_GRPC_ADDR: project-service:9088
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
     secrets:
       - analysissvc_db_password
+      - internal_jwt_secret
     ports:
-      - "8089:8089"
+      - "50009:8089"
       - "9089:9089"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
@@ -434,11 +453,13 @@ services:
       GRPC_ADDR: :9091
       IA_EXECUTION_MODE: mock
       IA_PROVIDER_TIMEOUT_MS: "5000"
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
+    secrets:
+      - internal_jwt_secret
     ports:
-      - "8091:8091"
+      - "50011:8091"
       - "9091:9091"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
@@ -464,13 +485,14 @@ services:
       ATTRIBUTION_DB_SSLMODE: disable
       ATTRIBUTION_DB_PASSWORD_FILE: /run/secrets/attrsvc_db_password
       PROJECT_SERVICE_GRPC_ADDR: project-service:9088
-      INTERNAL_JWT_SECRET: ${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET must be set}
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
     secrets:
       - attrsvc_db_password
+      - internal_jwt_secret
     ports:
-      - "8092:8092"
+      - "50012:8092"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -555,7 +577,7 @@ services:
       - ./deployments/loki/loki-config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/loki
     ports:
-      - "3100:3100"
+      - "60002:3100"
 
   promtail:
     profiles: ["monitoring"]
@@ -578,7 +600,7 @@ services:
       - grafana-data:/var/lib/grafana
       - ./deployments/loki/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "3010:3000"
+      - "60000:3000"
 
   prometheus:
     profiles: ["monitoring"]
@@ -592,7 +614,7 @@ services:
       - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "9090:9090"
+      - "60001:9090"
 
   redis:
     profiles: ["backend", "infra"]
@@ -649,7 +671,7 @@ services:
       start_period: 10s
 
   postgres-backup-r2:
-    profiles: ["infra", "backup"]
+    profiles: ["backup"]
     image: postgres:18.1-alpine
     restart: unless-stopped
     entrypoint: ["sh", "/opt/backups/postgres-r2-backup.sh"]
@@ -659,7 +681,7 @@ services:
       BACKUP_POSTGRES_USER: postgres
       BACKUP_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
       BACKUP_INTERVAL_SECONDS: "86400"
-      R2_BUCKET: ${R2_BUCKET:?R2_BUCKET must be set}
+      R2_BUCKET_FILE: /run/secrets/r2_bucket
       R2_PREFIX: postgres
       R2_REGION: auto
       R2_ACCOUNT_ID_FILE: /run/secrets/r2_account_id
@@ -667,6 +689,7 @@ services:
       R2_SECRET_ACCESS_KEY_FILE: /run/secrets/r2_secret_access_key
     secrets:
       - postgres_superuser_password
+      - r2_bucket
       - r2_account_id
       - r2_access_key_id
       - r2_secret_access_key
@@ -696,7 +719,7 @@ services:
     profiles: ["backend", "infra"]
     image: oryd/kratos:v25.4.0
     restart: unless-stopped
-    entrypoint: ["sh", "/etc/config/kratos/start-prod.sh"]
+    entrypoint: ["sh", "/etc/config/kratos/start.sh"]
     environment:
       KRATOS_DB_HOST: postgres
       KRATOS_DB_PORT: "5432"
@@ -751,6 +774,8 @@ secrets:
     file: ./deployments/secrets/attrsvc_db_password.txt
   kratos_db_password:
     file: ./deployments/secrets/kratos_db_password.txt
+  internal_jwt_secret:
+    file: ./deployments/secrets/internal_jwt_secret.txt
   resend_api_key:
     file: ./deployments/secrets/resend_api_key.txt
   resend_smtp_connection_uri:
@@ -763,6 +788,8 @@ secrets:
     file: ./deployments/secrets/stripe_secret_key.txt
   stripe_webhook_secret:
     file: ./deployments/secrets/stripe_webhook_secret.txt
+  stripe_enabled:
+    file: ./deployments/secrets/stripe_enabled.txt
   stripe_checkout_success_url:
     file: ./deployments/secrets/stripe_checkout_success_url.txt
   stripe_checkout_cancel_url:
@@ -783,6 +810,10 @@ secrets:
     file: ./deployments/secrets/stripe_price_pro_yearly.txt
   stripe_price_correction_credits:
     file: ./deployments/secrets/stripe_price_correction_credits.txt
+  rabbitmq_url:
+    file: ./deployments/secrets/rabbitmq_url.txt
+  r2_bucket:
+    file: ./deployments/secrets/r2_bucket.txt
   r2_account_id:
     file: ./deployments/secrets/r2_account_id.txt
   r2_access_key_id:

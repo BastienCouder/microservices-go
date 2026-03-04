@@ -14,7 +14,7 @@ function getWebAuthURL(): string {
   if (typeof value === "string" && value.trim() !== "") {
     return value;
   }
-  return "http://localhost:3000/auth";
+  return "http://localhost:30000/auth";
 }
 
 function safeJSONStringify(value: unknown): string {

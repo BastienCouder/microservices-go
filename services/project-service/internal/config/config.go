@@ -49,7 +49,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	rabbitMQURL, err := requiredEnv("RABBITMQ_URL")
+	rabbitMQURL, err := requiredEnvOrFile("RABBITMQ_URL", "RABBITMQ_URL_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -164,6 +164,25 @@ func requiredEnv(key string) (string, error) {
 	value := os.Getenv(key)
 	if value == "" {
 		return "", fmt.Errorf("missing required environment variable %s", key)
+	}
+	return value, nil
+}
+
+func requiredEnvOrFile(key, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", fmt.Errorf("missing required environment variable %s or %s", key, fileKey)
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read value file %s: %w", filePath, err)
+	}
+	value := strings.TrimSpace(string(raw))
+	if value == "" {
+		return "", fmt.Errorf("value file %s is empty", filePath)
 	}
 	return value, nil
 }

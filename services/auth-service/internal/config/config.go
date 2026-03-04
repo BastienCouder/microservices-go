@@ -3,13 +3,15 @@ package config
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
-	HTTPAddr         string
-	KratosPublicURL  string
-	KratosBrowserURL string
-	AllowedOrigin    string
+	HTTPAddr          string
+	KratosPublicURL   string
+	KratosBrowserURL  string
+	AppReturnURL      string
+	AllowedOrigin     string
 	InternalJWTSecret string
 	InternalJWTIssuer string
 }
@@ -33,7 +35,8 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	appReturnURL := optionalEnv("APP_RETURN_URL")
+	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -43,10 +46,11 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		HTTPAddr:         httpAddr,
-		KratosPublicURL:  kratosPublicURL,
-		KratosBrowserURL: kratosBrowserURL,
-		AllowedOrigin:    allowedOrigin,
+		HTTPAddr:          httpAddr,
+		KratosPublicURL:   kratosPublicURL,
+		KratosBrowserURL:  kratosBrowserURL,
+		AppReturnURL:      appReturnURL,
+		AllowedOrigin:     allowedOrigin,
 		InternalJWTSecret: internalJWTSecret,
 		InternalJWTIssuer: internalJWTIssuer,
 	}, nil
@@ -58,4 +62,27 @@ func requiredEnv(key string) (string, error) {
 		return "", fmt.Errorf("missing required environment variable %s", key)
 	}
 	return value, nil
+}
+
+func passwordFromEnv(passwordKey, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(passwordKey)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", fmt.Errorf("missing required environment variable %s or %s", passwordKey, fileKey)
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read password file %s: %w", filePath, err)
+	}
+	value := strings.TrimSpace(string(raw))
+	if value == "" {
+		return "", fmt.Errorf("password file %s is empty", filePath)
+	}
+	return value, nil
+}
+
+func optionalEnv(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
 }

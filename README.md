@@ -28,24 +28,24 @@ make up
 
 Services exposés:
 
-- Gateway: `http://localhost:8080`
-- Auth: `http://localhost:8083`
-- User: `http://localhost:8081`
-- Organizations: `http://localhost:8084`
-- Permission: `http://localhost:8085`
-- Billing: `http://localhost:8086`
-- Notification: `http://localhost:8087`
-- Project: `http://localhost:8088`
-- Analysis: `http://localhost:8089`
-- IA: `http://localhost:8091`
-- Attribution: `http://localhost:8092`
+- Gateway: `http://localhost:50000`
+- Auth: `http://localhost:50003`
+- User: `http://localhost:50001`
+- Organizations: `http://localhost:50004`
+- Permission: `http://localhost:50005`
+- Billing: `http://localhost:50006`
+- Notification: `http://localhost:50007`
+- Project: `http://localhost:50008`
+- Analysis: `http://localhost:50009`
+- IA: `http://localhost:50011`
+- Attribution: `http://localhost:50012`
 - Kratos public: `http://localhost:4433`
 - Kratos admin: `http://localhost:4434`
 - RabbitMQ UI: `http://localhost:15672`
-- Web: `http://localhost:3000`
-- App (SPA): `http://localhost:19020`
-- Doc: `http://localhost:3001`
-- Email preview: `http://localhost:3002`
+- Web: `http://localhost:30000`
+- App (SPA): `http://localhost:30004`
+- Doc: `http://localhost:30001`
+- Email preview: `http://localhost:30002`
 
 ## Endpoints principaux (via Gateway)
 
@@ -78,8 +78,8 @@ Services exposés:
 
 ## Parcours auth → app → permissions (dev)
 
-1) Se connecter sur `http://localhost:3000/auth` (Kratos via `auth-service`/Gateway).
-2) Ouvrir `http://localhost:19020` (SPA) :
+1) Se connecter sur `http://localhost:30000/auth` (Kratos via `auth-service`/Gateway).
+2) Ouvrir `http://localhost:30004` (SPA) :
    - si nécessaire, créer le profil user (`POST /users`),
    - créer une organisation (le créateur est automatiquement ajouté comme `owner`),
    - tester les endpoints protégés (ex: création d’équipe) et `POST /permissions/check`.
@@ -189,6 +189,7 @@ Un service `postgres-backup-r2` exécute un `pg_dumpall`, compresse en `gzip`, p
 
 Secrets Docker à remplir:
 
+- `deployments/secrets/r2_bucket.txt`
 - `deployments/secrets/r2_account_id.txt`
 - `deployments/secrets/r2_access_key_id.txt`
 - `deployments/secrets/r2_secret_access_key.txt`
@@ -196,7 +197,7 @@ Secrets Docker à remplir:
 Lancement:
 
 ```bash
-R2_BUCKET=your-r2-bucket docker compose --profile infra --profile backup up -d postgres postgres-backup-r2
+docker compose --profile infra --profile backup up -d postgres postgres-backup-r2
 ```
 
 Réglages:

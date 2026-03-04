@@ -16,16 +16,14 @@ const LAST_ORGANIZATION_STORAGE_KEY = "app:last-org-id";
 type OrganizationsPageProps = {
   apiBaseURL: string;
   user: UserProfile | null;
-  routeHash: string;
+  routeSearch: string;
 };
 
-function readRouteQueryParam(routeHash: string, key: string): string {
-  const normalized = routeHash.startsWith("#") ? routeHash.slice(1) : routeHash;
-  const queryIndex = normalized.indexOf("?");
-  if (queryIndex < 0) {
-    return "";
-  }
-  const params = new URLSearchParams(normalized.slice(queryIndex + 1));
+type OrganizationsViewTab = "overview" | "teams" | "members" | "invitations" | "invitation-response";
+
+function readRouteQueryParam(routeSearch: string, key: string): string {
+  const normalized = routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch;
+  const params = new URLSearchParams(normalized);
   return params.get(key)?.trim() ?? "";
 }
 
@@ -74,8 +72,8 @@ function toDateTimeLocal(raw: string | null | undefined): string {
   return date.toISOString().slice(0, 16);
 }
 
-export function OrganizationsPage({ apiBaseURL, user, routeHash }: OrganizationsPageProps) {
-  const initialOrgHint = readRouteQueryParam(routeHash, "org");
+export function OrganizationsPage({ apiBaseURL, user, routeSearch }: OrganizationsPageProps) {
+  const initialOrgHint = readRouteQueryParam(routeSearch, "org");
 
   const [organizationName, setOrganizationName] = useState("Acme");
   const [organizationIDInput, setOrganizationIDInput] = useState(() => initialOrgHint || readStoredOrganizationID());
@@ -89,7 +87,7 @@ export function OrganizationsPage({ apiBaseURL, user, routeHash }: Organizations
   const [inviteExpiresAt, setInviteExpiresAt] = useState("");
   const [editingInvitationID, setEditingInvitationID] = useState<number | null>(null);
 
-  const [invitationTokenInput, setInvitationTokenInput] = useState(() => readRouteQueryParam(routeHash, "invite_token"));
+  const [invitationTokenInput, setInvitationTokenInput] = useState(() => readRouteQueryParam(routeSearch, "invite_token"));
 
   const [organization, setOrganization] = useState<Organization | null>(null);
   const [teams, setTeams] = useState<Team[]>([]);
@@ -99,6 +97,7 @@ export function OrganizationsPage({ apiBaseURL, user, routeHash }: Organizations
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [bootstrapped, setBootstrapped] = useState(false);
+  const [activeTab, setActiveTab] = useState<OrganizationsViewTab>("overview");
 
   const selectedOrganizationID = parsePositiveInt(organizationIDInput);
 
@@ -203,11 +202,12 @@ export function OrganizationsPage({ apiBaseURL, user, routeHash }: Organizations
   }, [bootstrapped, loadOrganization, selectedOrganizationID]);
 
   useEffect(() => {
-    const hintedOrg = parsePositiveInt(readRouteQueryParam(routeHash, "org"));
-    const hintedToken = readRouteQueryParam(routeHash, "invite_token");
+    const hintedOrg = parsePositiveInt(readRouteQueryParam(routeSearch, "org"));
+    const hintedToken = readRouteQueryParam(routeSearch, "invite_token");
 
     if (hintedToken !== "") {
       setInvitationTokenInput(hintedToken);
+      setActiveTab("invitation-response");
     }
 
     if (!hintedOrg) {
@@ -216,7 +216,7 @@ export function OrganizationsPage({ apiBaseURL, user, routeHash }: Organizations
 
     setOrganizationIDInput(String(hintedOrg));
     void loadOrganization(hintedOrg);
-  }, [loadOrganization, routeHash]);
+  }, [loadOrganization, routeSearch]);
 
   const createOrganization = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -520,291 +520,363 @@ export function OrganizationsPage({ apiBaseURL, user, routeHash }: Organizations
   };
 
   return (
-    <div className="page-grid">
-      <section className="card">
-        <h2>Contexte organisation</h2>
+    <div className="org-shell">
+      <section className="card org-page-head">
+        <h2>Organizations</h2>
         <p className="muted">
-          Toutes les routes protégées passent par <code>X-Organization-ID</code>. Sélectionne l'organisation active pour gérer équipes,
-          membres et invitations.
+          Design repris de <code>web1</code> avec sidebar + panneau principal. Les actions restent branchées sur les mêmes endpoints.
         </p>
-
-        <form
-          className="inline-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void loadOrganization();
-          }}
-        >
-          <label className="field inline-field">
-            <span>Organization ID</span>
-            <input
-              disabled={busy}
-              inputMode="numeric"
-              onChange={(event) => setOrganizationIDInput(event.target.value)}
-              placeholder="ex: 1"
-              value={organizationIDInput}
-            />
-          </label>
-          <button className="button" disabled={busy || !user || !selectedOrganizationID} type="submit">
-            Charger
-          </button>
-        </form>
-
-        <form className="inline-form" onSubmit={createOrganization}>
-          <label className="field inline-field">
-            <span>Nom de l'organisation</span>
-            <input disabled={busy} onChange={(event) => setOrganizationName(event.target.value)} value={organizationName} />
-          </label>
-          <button className="button button-primary" disabled={busy || !user || organizationName.trim() === ""} type="submit">
-            Créer l'organisation
-          </button>
-        </form>
       </section>
 
-      {!user && (
-        <section className="card warning">
-          <h2>Profil requis</h2>
-          <p>Crée d'abord ton profil utilisateur dans la page Profile pour accéder à la gestion organisation.</p>
-        </section>
-      )}
+      <div className="org-layout">
+        <aside className="card org-sidebar">
+          <div className="org-sidebar-header">
+            <h3>Organization Context</h3>
+            <p className="muted">Sélectionne l'organisation active pour piloter équipes, membres et invitations.</p>
+          </div>
 
-      {organization && (
-        <section className="card">
-          <h2>Détails organisation</h2>
-          <dl className="kv-list">
-            <div>
-              <dt>ID</dt>
-              <dd>
-                <code>{organization.ID}</code>
-              </dd>
-            </div>
-            <div>
-              <dt>Nom</dt>
-              <dd>{organization.Name}</dd>
-            </div>
-            <div>
-              <dt>Owner User ID</dt>
-              <dd>{organization.OwnerIdentityID}</dd>
-            </div>
-            <div>
-              <dt>Créée le</dt>
-              <dd>{formatDateTime(organization.CreatedAt)}</dd>
-            </div>
-          </dl>
-        </section>
-      )}
-
-      {selectedOrganizationID && user && (
-        <section className="card">
-          <h2>Équipes</h2>
-          <form className="inline-form" onSubmit={createTeam}>
-            <label className="field inline-field">
-              <span>Nom équipe</span>
-              <input disabled={busy} onChange={(event) => setTeamName(event.target.value)} value={teamName} />
-            </label>
-            <button className="button" disabled={busy || teamName.trim() === ""} type="submit">
-              Créer une équipe
-            </button>
-          </form>
-
-          {teams.length === 0 ? (
-            <p className="muted">Aucune équipe dans cette organisation.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Nom</th>
-                  <th>Créée le</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map((team) => (
-                  <tr key={team.ID}>
-                    <td>{team.ID}</td>
-                    <td>{team.Name}</td>
-                    <td>{formatDateTime(team.CreatedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
-      )}
-
-      {selectedOrganizationID && user && (
-        <section className="card">
-          <h2>Membres et rôles</h2>
-
-          <form className="inline-form" onSubmit={joinOrganization}>
-            <label className="field inline-field">
-              <span>Team ID (optionnel)</span>
+          <form
+            className="stack"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void loadOrganization();
+            }}
+          >
+            <label className="field">
+              <span>Organization ID</span>
               <input
                 disabled={busy}
                 inputMode="numeric"
-                onChange={(event) => setJoinTeamIDInput(event.target.value)}
-                placeholder="0 ou vide"
-                value={joinTeamIDInput}
+                onChange={(event) => setOrganizationIDInput(event.target.value)}
+                placeholder="ex: 1"
+                value={organizationIDInput}
               />
             </label>
-            <button className="button" disabled={busy} type="submit">
-              Me joindre à l'organisation
+            <button className="button" disabled={busy || !user || !selectedOrganizationID} type="submit">
+              Charger
             </button>
           </form>
 
-          <form className="inline-form" onSubmit={assignSelfRole}>
-            <label className="field inline-field">
-              <span>Mon rôle</span>
-              <input disabled={busy} onChange={(event) => setSelfRole(event.target.value)} value={selfRole} />
+          <form className="stack" onSubmit={createOrganization}>
+            <label className="field">
+              <span>Nom de l'organisation</span>
+              <input disabled={busy} onChange={(event) => setOrganizationName(event.target.value)} value={organizationName} />
             </label>
-            <button className="button" disabled={busy || selfRole.trim() === ""} type="submit">
-              Assigner mon rôle
+            <button className="button button-primary" disabled={busy || !user || organizationName.trim() === ""} type="submit">
+              Créer l'organisation
             </button>
           </form>
 
-          {members.length === 0 ? (
-            <p className="muted">Aucun membre pour le moment.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>User ID</th>
-                  <th>Team</th>
-                  <th>Rôles</th>
-                  <th>Ajouté le</th>
-                </tr>
-              </thead>
-              <tbody>
-                {members.map((member) => (
-                  <tr key={`${member.OrganizationID}-${member.UserID}`}>
-                    <td>{member.UserID}</td>
-                    <td>{member.TeamID > 0 ? teamsByID.get(member.TeamID) ?? `#${member.TeamID}` : "-"}</td>
-                    <td>{member.Roles.join(", ")}</td>
-                    <td>{formatDateTime(member.AddedAt)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="org-sidebar-stats">
+            <article>
+              <span>Teams</span>
+              <strong>{teams.length}</strong>
+            </article>
+            <article>
+              <span>Members</span>
+              <strong>{members.length}</strong>
+            </article>
+            <article>
+              <span>Invitations</span>
+              <strong>{invitations.length}</strong>
+            </article>
+          </div>
+        </aside>
+
+        <section className="org-main">
+          {!user && (
+            <section className="card warning">
+              <h2>Profil requis</h2>
+              <p>Crée d'abord ton profil utilisateur dans la page Profile pour accéder à la gestion organisation.</p>
+            </section>
           )}
-        </section>
-      )}
 
-      {selectedOrganizationID && user && (
-        <section className="card">
-          <h2>Invitations</h2>
-
-          <form className="stack" onSubmit={submitInvitation}>
-            <label className="field">
-              <span>Email destinataire</span>
-              <input
-                autoComplete="email"
-                disabled={busy}
-                onChange={(event) => setInviteEmail(event.target.value)}
-                placeholder="invite@acme.io"
-                value={inviteEmail}
-              />
-            </label>
-            <label className="field">
-              <span>Rôle proposé</span>
-              <input disabled={busy} onChange={(event) => setInviteRole(event.target.value)} value={inviteRole} />
-            </label>
-            <label className="field">
-              <span>Expire le (optionnel)</span>
-              <input disabled={busy} onChange={(event) => setInviteExpiresAt(event.target.value)} type="datetime-local" value={inviteExpiresAt} />
-            </label>
-            <label className="field">
-              <span>Message</span>
-              <textarea
-                disabled={busy}
-                onChange={(event) => setInviteMessage(event.target.value)}
-                placeholder="Contexte de l'invitation"
-                rows={3}
-                value={inviteMessage}
-              />
-            </label>
-            <div className="actions-row">
-              <button className="button button-primary" disabled={busy || inviteEmail.trim() === ""} type="submit">
-                {editingInvitationID === null ? "Créer l'invitation" : "Mettre à jour l'invitation"}
-              </button>
-              {editingInvitationID !== null && (
-                <button className="button" disabled={busy} onClick={resetInvitationForm} type="button">
-                  Annuler l'édition
+          {user && (
+            <>
+              <section className="card org-tab-bar">
+                <button className={`org-tab-button ${activeTab === "overview" ? "is-active" : ""}`} onClick={() => setActiveTab("overview")} type="button">
+                  Overview
                 </button>
-              )}
-            </div>
-          </form>
+                <button className={`org-tab-button ${activeTab === "teams" ? "is-active" : ""}`} onClick={() => setActiveTab("teams")} type="button">
+                  Teams
+                </button>
+                <button className={`org-tab-button ${activeTab === "members" ? "is-active" : ""}`} onClick={() => setActiveTab("members")} type="button">
+                  Members
+                </button>
+                <button
+                  className={`org-tab-button ${activeTab === "invitations" ? "is-active" : ""}`}
+                  onClick={() => setActiveTab("invitations")}
+                  type="button"
+                >
+                  Invitations
+                </button>
+                <button
+                  className={`org-tab-button ${activeTab === "invitation-response" ? "is-active" : ""}`}
+                  onClick={() => setActiveTab("invitation-response")}
+                  type="button"
+                >
+                  Invitation Token
+                </button>
+              </section>
 
-          {invitations.length === 0 ? (
-            <p className="muted">Aucune invitation dans cette organisation.</p>
-          ) : (
-            <table>
-              <thead>
-                <tr>
-                  <th>Email</th>
-                  <th>Rôle</th>
-                  <th>Status</th>
-                  <th>Token</th>
-                  <th>Créée le</th>
-                  <th>Expire le</th>
-                  <th>Répondue le</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {invitations.map((invitation) => (
-                  <tr key={invitation.ID}>
-                    <td>{invitation.Email}</td>
-                    <td>{invitation.Role}</td>
-                    <td>{invitation.Status}</td>
-                    <td>
-                      <code>{invitation.Token}</code>
-                    </td>
-                    <td>{formatDateTime(invitation.CreatedAt)}</td>
-                    <td>{formatDateTime(invitation.ExpiresAt)}</td>
-                    <td>{formatDateTime(invitation.RespondedAt)}</td>
-                    <td>
-                      <div className="actions-row">
-                        <button className="button button-small" disabled={busy} onClick={() => prepareInvitationEdit(invitation)} type="button">
-                          Éditer
+              {activeTab === "overview" && organization && (
+                <section className="card">
+                  <h2>Détails organisation</h2>
+                  <dl className="kv-list">
+                    <div>
+                      <dt>ID</dt>
+                      <dd>
+                        <code>{organization.ID}</code>
+                      </dd>
+                    </div>
+                    <div>
+                      <dt>Nom</dt>
+                      <dd>{organization.Name}</dd>
+                    </div>
+                    <div>
+                      <dt>Owner User ID</dt>
+                      <dd>{organization.OwnerIdentityID}</dd>
+                    </div>
+                    <div>
+                      <dt>Créée le</dt>
+                      <dd>{formatDateTime(organization.CreatedAt)}</dd>
+                    </div>
+                  </dl>
+                </section>
+              )}
+
+              {activeTab === "overview" && !organization && (
+                <section className="card">
+                  <h2>Aucune organisation chargée</h2>
+                  <p className="muted">Renseigne un ID dans la sidebar puis clique sur Charger.</p>
+                </section>
+              )}
+
+              {activeTab === "teams" && selectedOrganizationID && (
+                <section className="card">
+                  <h2>Équipes</h2>
+                  <form className="inline-form" onSubmit={createTeam}>
+                    <label className="field inline-field">
+                      <span>Nom équipe</span>
+                      <input disabled={busy} onChange={(event) => setTeamName(event.target.value)} value={teamName} />
+                    </label>
+                    <button className="button" disabled={busy || teamName.trim() === ""} type="submit">
+                      Créer une équipe
+                    </button>
+                  </form>
+
+                  {teams.length === 0 ? (
+                    <p className="muted">Aucune équipe dans cette organisation.</p>
+                  ) : (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>ID</th>
+                          <th>Nom</th>
+                          <th>Créée le</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {teams.map((team) => (
+                          <tr key={team.ID}>
+                            <td>{team.ID}</td>
+                            <td>{team.Name}</td>
+                            <td>{formatDateTime(team.CreatedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              )}
+
+              {activeTab === "members" && selectedOrganizationID && (
+                <section className="card">
+                  <h2>Membres et rôles</h2>
+
+                  <form className="inline-form" onSubmit={joinOrganization}>
+                    <label className="field inline-field">
+                      <span>Team ID (optionnel)</span>
+                      <input
+                        disabled={busy}
+                        inputMode="numeric"
+                        onChange={(event) => setJoinTeamIDInput(event.target.value)}
+                        placeholder="0 ou vide"
+                        value={joinTeamIDInput}
+                      />
+                    </label>
+                    <button className="button" disabled={busy} type="submit">
+                      Me joindre à l'organisation
+                    </button>
+                  </form>
+
+                  <form className="inline-form" onSubmit={assignSelfRole}>
+                    <label className="field inline-field">
+                      <span>Mon rôle</span>
+                      <input disabled={busy} onChange={(event) => setSelfRole(event.target.value)} value={selfRole} />
+                    </label>
+                    <button className="button" disabled={busy || selfRole.trim() === ""} type="submit">
+                      Assigner mon rôle
+                    </button>
+                  </form>
+
+                  {members.length === 0 ? (
+                    <p className="muted">Aucun membre pour le moment.</p>
+                  ) : (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>User ID</th>
+                          <th>Team</th>
+                          <th>Rôles</th>
+                          <th>Ajouté le</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {members.map((member) => (
+                          <tr key={`${member.OrganizationID}-${member.UserID}`}>
+                            <td>{member.UserID}</td>
+                            <td>{member.TeamID > 0 ? teamsByID.get(member.TeamID) ?? `#${member.TeamID}` : "-"}</td>
+                            <td>{member.Roles.join(", ")}</td>
+                            <td>{formatDateTime(member.AddedAt)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              )}
+
+              {activeTab === "invitations" && selectedOrganizationID && (
+                <section className="card">
+                  <h2>Invitations</h2>
+
+                  <form className="stack" onSubmit={submitInvitation}>
+                    <label className="field">
+                      <span>Email destinataire</span>
+                      <input
+                        autoComplete="email"
+                        disabled={busy}
+                        onChange={(event) => setInviteEmail(event.target.value)}
+                        placeholder="invite@acme.io"
+                        value={inviteEmail}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Rôle proposé</span>
+                      <input disabled={busy} onChange={(event) => setInviteRole(event.target.value)} value={inviteRole} />
+                    </label>
+                    <label className="field">
+                      <span>Expire le (optionnel)</span>
+                      <input
+                        disabled={busy}
+                        onChange={(event) => setInviteExpiresAt(event.target.value)}
+                        type="datetime-local"
+                        value={inviteExpiresAt}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Message</span>
+                      <textarea
+                        disabled={busy}
+                        onChange={(event) => setInviteMessage(event.target.value)}
+                        placeholder="Contexte de l'invitation"
+                        rows={3}
+                        value={inviteMessage}
+                      />
+                    </label>
+                    <div className="actions-row">
+                      <button className="button button-primary" disabled={busy || inviteEmail.trim() === ""} type="submit">
+                        {editingInvitationID === null ? "Créer l'invitation" : "Mettre à jour l'invitation"}
+                      </button>
+                      {editingInvitationID !== null && (
+                        <button className="button" disabled={busy} onClick={resetInvitationForm} type="button">
+                          Annuler l'édition
                         </button>
-                        <button className="button button-small" disabled={busy} onClick={() => void deleteInvitation(invitation.ID)} type="button">
-                          Révoquer
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      )}
+                    </div>
+                  </form>
+
+                  {invitations.length === 0 ? (
+                    <p className="muted">Aucune invitation dans cette organisation.</p>
+                  ) : (
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Email</th>
+                          <th>Rôle</th>
+                          <th>Status</th>
+                          <th>Token</th>
+                          <th>Créée le</th>
+                          <th>Expire le</th>
+                          <th>Répondue le</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invitations.map((invitation) => (
+                          <tr key={invitation.ID}>
+                            <td>{invitation.Email}</td>
+                            <td>{invitation.Role}</td>
+                            <td>{invitation.Status}</td>
+                            <td>
+                              <code>{invitation.Token}</code>
+                            </td>
+                            <td>{formatDateTime(invitation.CreatedAt)}</td>
+                            <td>{formatDateTime(invitation.ExpiresAt)}</td>
+                            <td>{formatDateTime(invitation.RespondedAt)}</td>
+                            <td>
+                              <div className="actions-row">
+                                <button className="button button-small" disabled={busy} onClick={() => prepareInvitationEdit(invitation)} type="button">
+                                  Éditer
+                                </button>
+                                <button className="button button-small" disabled={busy} onClick={() => void deleteInvitation(invitation.ID)} type="button">
+                                  Révoquer
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </section>
+              )}
+
+              {activeTab === "invitation-response" && (
+                <section className="card">
+                  <h2>Répondre à une invitation</h2>
+                  <p className="muted">Colle un token d'invitation pour l'accepter ou la refuser avec ton compte connecté.</p>
+                  <form className="stack" onSubmit={acceptInvitation}>
+                    <label className="field">
+                      <span>Token invitation</span>
+                      <input
+                        disabled={busy}
+                        onChange={(event) => setInvitationTokenInput(event.target.value)}
+                        placeholder="token invitation"
+                        value={invitationTokenInput}
+                      />
+                    </label>
+                    <div className="actions-row">
+                      <button className="button button-primary" disabled={busy || invitationTokenInput.trim() === ""} type="submit">
+                        Accepter
+                      </button>
+                      <button
+                        className="button"
+                        disabled={busy || invitationTokenInput.trim() === ""}
+                        onClick={() => void refuseInvitation()}
+                        type="button"
+                      >
+                        Refuser
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              )}
+            </>
           )}
         </section>
-      )}
-
-      {user && (
-        <section className="card">
-          <h2>Répondre à une invitation</h2>
-          <p className="muted">Colle un token d'invitation pour l'accepter ou la refuser avec ton compte connecté.</p>
-          <form className="stack" onSubmit={acceptInvitation}>
-            <label className="field">
-              <span>Token invitation</span>
-              <input
-                disabled={busy}
-                onChange={(event) => setInvitationTokenInput(event.target.value)}
-                placeholder="token invitation"
-                value={invitationTokenInput}
-              />
-            </label>
-            <div className="actions-row">
-              <button className="button button-primary" disabled={busy || invitationTokenInput.trim() === ""} type="submit">
-                Accepter
-              </button>
-              <button className="button" disabled={busy || invitationTokenInput.trim() === ""} onClick={() => void refuseInvitation()} type="button">
-                Refuser
-              </button>
-            </div>
-          </form>
-        </section>
-      )}
+      </div>
 
       {feedback !== "" && (
         <section className="card muted-panel">

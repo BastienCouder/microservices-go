@@ -1,8 +1,0 @@
-services:
-  spa:
-    build:
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    ports:
-      - 19020:8080
-

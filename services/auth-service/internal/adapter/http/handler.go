@@ -410,12 +410,55 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	csrfToken := flow.CSRFToken()
+	if csrfToken == "" {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "missing csrf token in flow"})
+		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "missing_csrf"})
+		return
+	}
+
+	submitCookie := mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies)
+	submitPayload := map[string]any{
+		"method":     "oidc",
+		"provider":   "google",
+		"csrf_token": csrfToken,
+	}
+
+	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, flow.ID, submitPayload, submitCookie)
+	if err != nil {
+		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "submit_failed"})
+		return
+	}
+
+	redirectTo := oidcRedirectFromRaw(raw)
+	if redirectTo == "" {
+		writeJSON(w, submitStatus, map[string]string{"error": "missing oidc redirect url"})
+		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "missing_redirect", "status": submitStatus})
+		return
+	}
+
 	appendSetCookies(w, initSetCookies)
-	writeJSON(w, http.StatusOK, map[string]any{
-		"ok":         true,
-		"redirectTo": h.kratosBrowserURL + "/self-service/methods/oidc/auth/google?flow=" + flow.ID,
-	})
-	auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "success"})
+	appendSetCookies(w, submitSetCookies)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "redirectTo": redirectTo})
+	auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "success", "status": submitStatus})
+}
+
+func oidcRedirectFromRaw(raw []byte) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload struct {
+		RedirectBrowserTo string `json:"redirect_browser_to"`
+		RedirectTo        string `json:"redirect_to"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	if payload.RedirectBrowserTo != "" {
+		return payload.RedirectBrowserTo
+	}
+	return payload.RedirectTo
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

@@ -17,12 +17,13 @@ import (
 
 type Client struct {
 	baseURL    string
+	appReturn  string
 	httpClient *http.Client
 	breaker    *circuitBreaker
 	bulkhead   *bulkhead
 }
 
-func NewClient(baseURL string) *Client {
+func NewClient(baseURL, appReturnURL string) *Client {
 	transport := &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           (&net.Dialer{Timeout: 2 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
@@ -35,7 +36,8 @@ func NewClient(baseURL string) *Client {
 		ExpectContinueTimeout: 1 * time.Second,
 	}
 	return &Client{
-		baseURL: strings.TrimRight(baseURL, "/"),
+		baseURL:   strings.TrimRight(baseURL, "/"),
+		appReturn: strings.TrimSpace(appReturnURL),
 		httpClient: &http.Client{
 			Transport: transport,
 			Timeout:   3 * time.Second,
@@ -73,7 +75,7 @@ func (c *Client) WhoAmI(ctx context.Context, cookieHeader, sessionToken string) 
 }
 
 func (c *Client) InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
-	path, err := flowInitPath(mode)
+	path, err := flowInitPath(mode, c.appReturn)
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -128,6 +130,19 @@ func (c *Client) SubmitFlow(ctx context.Context, mode, flowID string, payload an
 	if err != nil {
 		return nil, nil, 0, err
 	}
+
+	// Some Kratos OIDC flows answer with a redirect Location header (3xx) and
+	// an empty body. Expose that redirect in JSON so upper layers can route the browser.
+	if location := strings.TrimSpace(resp.Header.Get("Location")); location != "" {
+		trimmed := bytes.TrimSpace(raw)
+		if len(trimmed) == 0 {
+			encoded, marshalErr := json.Marshal(map[string]string{"redirect_to": location})
+			if marshalErr == nil {
+				raw = encoded
+			}
+		}
+	}
+
 	return raw, resp.Header.Values("Set-Cookie"), resp.StatusCode, nil
 }
 
@@ -155,8 +170,9 @@ func (c *Client) InitLogout(ctx context.Context, cookieHeader string) (*domain.L
 }
 
 func (c *Client) CompleteLogout(ctx context.Context, logoutURL, cookieHeader string) ([]string, int, error) {
+	targetURL := c.rewriteToInternalBase(logoutURL)
 	resp, _, err := c.doWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (*http.Request, error) {
-		req, reqErr := http.NewRequestWithContext(attemptCtx, http.MethodGet, logoutURL, nil)
+		req, reqErr := http.NewRequestWithContext(attemptCtx, http.MethodGet, targetURL, nil)
 		if reqErr != nil {
 			return nil, reqErr
 		}
@@ -169,6 +185,32 @@ func (c *Client) CompleteLogout(ctx context.Context, logoutURL, cookieHeader str
 		return nil, 0, err
 	}
 	return resp.Header.Values("Set-Cookie"), resp.StatusCode, nil
+}
+
+func (c *Client) rewriteToInternalBase(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return raw
+	}
+	target, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	base, err := url.Parse(c.baseURL)
+	if err != nil {
+		return raw
+	}
+	if target.Host == "" || base.Host == "" {
+		return raw
+	}
+
+	host := strings.ToLower(target.Hostname())
+	if host == "localhost" || host == "127.0.0.1" {
+		target.Scheme = base.Scheme
+		target.Host = base.Host
+		return target.String()
+	}
+	return raw
 }
 
 func (c *Client) doWithResilience(
@@ -252,12 +294,23 @@ func isTransientHTTPStatus(status int) bool {
 	return status == http.StatusTooManyRequests || status == http.StatusBadGateway || status == http.StatusServiceUnavailable || status == http.StatusGatewayTimeout
 }
 
-func flowInitPath(mode string) (string, error) {
+func flowInitPath(mode, appReturnURL string) (string, error) {
+	withReturn := func(path string) string {
+		if strings.TrimSpace(appReturnURL) == "" {
+			return path
+		}
+		sep := "?"
+		if strings.Contains(path, "?") {
+			sep = "&"
+		}
+		return path + sep + "return_to=" + url.QueryEscape(strings.TrimSpace(appReturnURL))
+	}
+
 	switch mode {
 	case "login":
-		return "/self-service/login/browser?refresh=true", nil
+		return withReturn("/self-service/login/browser?refresh=true"), nil
 	case "registration":
-		return "/self-service/registration/browser", nil
+		return withReturn("/self-service/registration/browser"), nil
 	default:
 		return "", fmt.Errorf("invalid mode: %s", mode)
 	}

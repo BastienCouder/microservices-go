@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+dist
+coverage
+.turbo
+.env.local
+.env.*.local
+.git
+.DS_Store
+npm-debug.log*
+yarn-error.log*

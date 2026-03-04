@@ -8,8 +8,8 @@ import (
 )
 
 type Config struct {
-	HTTPAddr         string
-	DatabaseURL      string
+	HTTPAddr          string
+	DatabaseURL       string
 	InternalJWTSecret string
 	InternalJWTIssuer string
 }
@@ -24,7 +24,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := requiredEnv("INTERNAL_JWT_SECRET")
+	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
