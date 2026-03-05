@@ -2,6 +2,8 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardStore } from "@/lib/dashboard-store";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import type { DashboardData, DashboardPrompt } from "@/lib/dashboard-data";
@@ -16,7 +18,7 @@ const PROMPTS_PREVIEW_COUNT = 5;
 type DashboardAlert = DashboardData["alerts"][number];
 
 export function ActivityPanel() {
-  const { data: dashboardData } = useDashboardData();
+  const { data: dashboardData, loading } = useDashboardData();
   const { alerts, recent_prompts, models } = dashboardData;
   const {
     selectedModels,
@@ -69,6 +71,38 @@ export function ActivityPanel() {
 
   const handleSelectAlert = useCallback((alert: DashboardAlert) => setSelectedAlert(alert), []);
   const handleSelectPrompt = useCallback((prompt: DashboardPrompt) => setSelectedPrompt(prompt), []);
+
+  if (loading) {
+    return (
+      <ScrollArea className="h-auto xl:h-full">
+        <div className="flex flex-col gap-6 pb-4">
+          <Card className="rounded-md">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle><Skeleton className="h-4 w-36" /></CardTitle>
+              <Skeleton className="h-5 w-8 rounded-full" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-[72px] rounded-md" />
+              <Skeleton className="h-[72px] rounded-md" />
+              <Skeleton className="h-[72px] rounded-md" />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-md">
+            <CardHeader className="flex-row items-center justify-between space-y-0">
+              <CardTitle><Skeleton className="h-4 w-32" /></CardTitle>
+              <Skeleton className="h-5 w-8 rounded-full" />
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-[108px] rounded-md" />
+              <Skeleton className="h-[108px] rounded-md" />
+              <Skeleton className="h-[108px] rounded-md" />
+            </CardContent>
+          </Card>
+        </div>
+      </ScrollArea>
+    );
+  }
 
   return (
     <>

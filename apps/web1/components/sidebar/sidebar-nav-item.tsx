@@ -61,7 +61,7 @@ export function SidebarNavItem({ href, icon: Icon, label, active, indent, collap
           <Link
             href={href}
             className={cn(
-              "relative flex items-center justify-center rounded-md p-2 transition-colors",
+              "relative flex items-center justify-center rounded-none p-2 transition-colors",
               active ? "bg-primary/8 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
@@ -82,7 +82,7 @@ export function SidebarNavItem({ href, icon: Icon, label, active, indent, collap
         <Link
           href={href}
           className={cn(
-            "flex-1 rounded-md px-2 py-1.5 text-sm transition-colors",
+            "flex-1 rounded-none px-2 py-1.5 text-sm transition-colors",
             active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
           )}
         >
@@ -96,7 +96,7 @@ export function SidebarNavItem({ href, icon: Icon, label, active, indent, collap
     <Link
       href={href}
       className={cn(
-        "group relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+        "group relative flex items-center gap-2 rounded-none px-2 py-1.5 text-sm transition-colors",
         active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >

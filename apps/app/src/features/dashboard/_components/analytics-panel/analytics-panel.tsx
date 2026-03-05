@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardStore } from "@/lib/dashboard-store";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
@@ -32,7 +34,7 @@ export function AnalyticsPanel() {
   const visibilityScoreSub = safeText(content.visibilityScoreSub, "Score combiné mention × position × sentiment", "Combined score: mention × position × sentiment");
   const avgPositionSub = safeText(content.avgPositionSub, "Sur toutes les réponses où vous êtes cité", "Across all responses where your brand is cited");
   const insightCitationsLabel = safeText(content.insightCitationsLabel, "Citations", "Citations");
-  const { data: dashboardData } = useDashboardData();
+  const { data: dashboardData, loading } = useDashboardData();
   const { kpis, models, recent_prompts, pagesStats } = dashboardData;
   const {
     selectedModels,
@@ -380,6 +382,55 @@ export function AnalyticsPanel() {
     topCitedPages,
     insightCitationsLabel,
   ]);
+
+  if (loading) {
+    return (
+      <ScrollArea className="h-auto px-1 xl:h-full">
+        <div className="flex flex-col gap-4 pb-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Card className="rounded-md">
+              <CardHeader><CardTitle><Skeleton className="h-4 w-24" /></CardTitle></CardHeader>
+              <CardContent className="space-y-2"><Skeleton className="h-8 w-28" /><Skeleton className="h-3 w-36" /></CardContent>
+            </Card>
+            <Card className="rounded-md">
+              <CardHeader><CardTitle><Skeleton className="h-4 w-28" /></CardTitle></CardHeader>
+              <CardContent className="space-y-2"><Skeleton className="h-8 w-28" /><Skeleton className="h-3 w-36" /></CardContent>
+            </Card>
+            <Card className="rounded-md">
+              <CardHeader><CardTitle><Skeleton className="h-4 w-24" /></CardTitle></CardHeader>
+              <CardContent className="space-y-2"><Skeleton className="h-8 w-20" /><Skeleton className="h-3 w-32" /></CardContent>
+            </Card>
+          </div>
+          <Card className="rounded-md">
+            <CardHeader><CardTitle><Skeleton className="h-4 w-40" /></CardTitle></CardHeader>
+            <CardContent><Skeleton className="h-[220px] w-full rounded-md" /></CardContent>
+          </Card>
+          <Card className="rounded-md">
+            <CardHeader><CardTitle><Skeleton className="h-4 w-44" /></CardTitle></CardHeader>
+            <CardContent><Skeleton className="h-[260px] w-full rounded-md" /></CardContent>
+          </Card>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <Card className="rounded-md">
+              <CardHeader><CardTitle><Skeleton className="h-4 w-32" /></CardTitle></CardHeader>
+              <CardContent><Skeleton className="h-[220px] w-full rounded-md" /></CardContent>
+            </Card>
+            <Card className="rounded-md">
+              <CardHeader><CardTitle><Skeleton className="h-4 w-36" /></CardTitle></CardHeader>
+              <CardContent><Skeleton className="h-[220px] w-full rounded-md" /></CardContent>
+            </Card>
+          </div>
+          <Card className="rounded-md">
+            <CardHeader><CardTitle><Skeleton className="h-4 w-36" /></CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+            </CardContent>
+          </Card>
+        </div>
+      </ScrollArea>
+    );
+  }
 
   return (
     <ScrollArea className="h-auto px-1 xl:h-full">

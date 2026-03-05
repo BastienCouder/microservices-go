@@ -22,28 +22,15 @@ export function DashboardClient({ apiBaseURL, routeSearch }: DashboardClientProp
 }
 
 const DashboardLayout = memo(function DashboardLayout() {
-  const { loading, error } = useDashboardData();
-
-  if (loading) {
-    return (
-      <section className="card">
-        <h2>Dashboard loading</h2>
-        <p className="muted">Chargement des donnees backend...</p>
-      </section>
-    );
-  }
-
-  if (error) {
-    return (
-      <section className="card">
-        <h2>Dashboard error</h2>
-        <p className="muted">{error}</p>
-      </section>
-    );
-  }
+  const { error } = useDashboardData();
 
   return (
     <div className="flex h-auto min-h-0 flex-col gap-3 md:m-4">
+      {error ? (
+        <section className="rounded-md border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+          Dashboard error: {error}
+        </section>
+      ) : null}
       <div className="m-0 grid h-auto min-h-0 grid-cols-12 gap-0 xl:h-full">
         <div className="col-span-12 h-auto overflow-visible rounded-md bg-background p-2 md:col-span-3 xl:col-span-3 xl:h-full xl:overflow-hidden">
           <FiltersPanel />

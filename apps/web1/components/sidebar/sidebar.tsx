@@ -39,7 +39,7 @@ export function Sidebar({ className, activePath }: { className?: string; activeP
         )}
       >
         <div className={cn("h-12 flex items-center px-3", collapsed ? "justify-center" : "gap-2")}>
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-none bg-primary">
             <span className="text-sm font-bold text-primary-foreground">logo</span>
           </div>
           {!collapsed ? <span className="text-[15px] font-semibold tracking-tight text-foreground">bco</span> : null}
@@ -72,7 +72,7 @@ export function Sidebar({ className, activePath }: { className?: string; activeP
           <div className="mb-1 mt-4">
             <SidebarSectionHeader iconSrc="/monitoring.svg" label={content.monitoring} collapsed={collapsed} />
             <div className="relative mt-1 space-y-0.5">
-              {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
+              {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-none bg-border" /> : null}
               {MONITORING_ITEMS.map((item) => (
                 <SidebarNavItem
                   key={item.href}
@@ -127,7 +127,7 @@ export function Sidebar({ className, activePath }: { className?: string; activeP
           <div className="mb-1 mt-4">
             <SidebarSectionHeader icon={Building2} label={content.organizations} collapsed={collapsed} />
             <div className="relative mt-1 space-y-0.5">
-              {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
+              {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-none bg-border" /> : null}
               {ORGANIZATION_ITEMS.map((item) => (
                 <SidebarNavItem
                   key={item.href}
@@ -147,7 +147,7 @@ export function Sidebar({ className, activePath }: { className?: string; activeP
           <button
             onClick={() => setCollapsed((prev) => !prev)}
             className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              "flex w-full items-center gap-2 rounded-none px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
               collapsed && "justify-center",
             )}
           >

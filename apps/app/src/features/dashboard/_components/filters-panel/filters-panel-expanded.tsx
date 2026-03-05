@@ -40,6 +40,7 @@ type FiltersPanelExpandedProps = {
   showAllCompetitors: boolean;
   setShowAllCompetitors: (value: boolean) => void;
   onResetFilters: () => void;
+  showResetFilters: boolean;
   showUniqueModelFilters: boolean;
   onToggleModelFilterMode: () => void;
 };
@@ -64,9 +65,11 @@ export function FiltersPanelExpanded(props: FiltersPanelExpandedProps) {
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-2">
               <h4 className="min-w-0 text-sm font-semibold text-foreground">{content.filters}</h4>
-              <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={props.onResetFilters}>
-                {content.resetFilters}
-              </Button>
+              {props.showResetFilters ? (
+                <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px]" onClick={props.onResetFilters}>
+                  {content.resetFilters}
+                </Button>
+              ) : null}
             </div>
 
             <div className="space-y-1.5">
@@ -79,48 +82,47 @@ export function FiltersPanelExpanded(props: FiltersPanelExpandedProps) {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-2">
-                <Label className="text-xs text-muted-foreground">{content.personas}</Label>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn("h-6 px-2 text-[10px]", props.selectedPersonas.length === 0 && "invisible pointer-events-none")}
-                  onClick={props.clearPersonas}
-                >
-                  {content.clearPersonas}
-                </Button>
-              </div>
+            {props.personaOptions.length > 0 ? (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs text-muted-foreground">{content.personas}</Label>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn("h-6 px-2 text-[10px]", props.selectedPersonas.length === 0 && "invisible pointer-events-none")}
+                    onClick={props.clearPersonas}
+                  >
+                    {content.clearPersonas}
+                  </Button>
+                </div>
 
-              <div className="space-y-2">
-                {visiblePersonas.map((persona) => {
-                  const isSelected = props.selectedPersonas.includes(persona.id);
-                  return (
-                    <label
-                      key={persona.id}
-                      className={cn(
-                        "flex cursor-pointer items-start gap-3 rounded-md border border-dashed px-3 py-2",
-                        isSelected ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/30",
-                      )}
-                    >
-                      <Checkbox checked={isSelected} onCheckedChange={() => props.togglePersona(persona.id)} />
-                      <span className="min-w-0 break-words text-sm leading-tight">{persona.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
+                <div className="space-y-2">
+                  {visiblePersonas.map((persona) => {
+                    const isSelected = props.selectedPersonas.includes(persona.id);
+                    return (
+                      <label
+                        key={persona.id}
+                        className={cn(
+                          "flex cursor-pointer items-start gap-3 rounded-md border border-dashed px-3 py-2",
+                          isSelected ? "border-primary bg-primary/5" : "border-border/60 hover:bg-muted/30",
+                        )}
+                      >
+                        <Checkbox checked={isSelected} onCheckedChange={() => props.togglePersona(persona.id)} />
+                        <span className="min-w-0 break-words text-sm leading-tight">{persona.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
 
-              {props.personaOptions.length === 0 ? (
-                <FiltersEmptyStateCard label={content.noDataAvailable} />
-              ) : null}
-              {props.personaOptions.length > PERSONAS_COUNT ? (
-                <ToggleMoreButton
-                  showAll={props.showAllPersonas}
-                  hiddenCount={props.personaOptions.length - PERSONAS_COUNT}
-                  onToggle={() => props.setShowAllPersonas(!props.showAllPersonas)}
-                />
-              ) : null}
-            </div>
+                {props.personaOptions.length > PERSONAS_COUNT ? (
+                  <ToggleMoreButton
+                    showAll={props.showAllPersonas}
+                    hiddenCount={props.personaOptions.length - PERSONAS_COUNT}
+                    onToggle={() => props.setShowAllPersonas(!props.showAllPersonas)}
+                  />
+                ) : null}
+              </div>
+            ) : null}
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">

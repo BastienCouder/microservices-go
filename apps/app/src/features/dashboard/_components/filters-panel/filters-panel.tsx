@@ -155,6 +155,24 @@ export function FiltersPanel() {
     selectedModels.forEach((id) => toggleModel(id));
   }, [selectedModels, toggleModel]);
 
+  const hasActiveFilters = useMemo(
+    () =>
+      period !== "7d" ||
+      dateRange !== undefined ||
+      selectedModels.length > 0 ||
+      showUniqueModelFilters ||
+      selectedPersonas.length > 0 ||
+      selectedCompetitors.length > 0,
+    [
+      period,
+      dateRange,
+      selectedModels.length,
+      showUniqueModelFilters,
+      selectedPersonas.length,
+      selectedCompetitors.length,
+    ],
+  );
+
   const projectWithDynamicCompetitors = useMemo(() => {
     const normalizeName = (value: string) => value.trim().toLowerCase();
     const competitorMentionCount = (prompts: DashboardPrompt[], competitorName: string) =>
@@ -280,6 +298,7 @@ export function FiltersPanel() {
       showAllCompetitors={showAllCompetitors}
       setShowAllCompetitors={setShowAllCompetitors}
       onResetFilters={resetFilters}
+      showResetFilters={hasActiveFilters}
       showUniqueModelFilters={showUniqueModelFilters}
       onToggleModelFilterMode={() => setShowUniqueModelFilters(!showUniqueModelFilters)}
     />

@@ -1,5 +1,61 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-ExtraLight.ttf") format("truetype");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Manrope";
+  src: url("../public/fonts/Manrope-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   /* --- MAPPING DES COULEURS --- */
   --color-background: hsl(var(--background));
@@ -79,13 +135,13 @@
   /* --- 3. RADIUS (Specifique Dashboard Pro) --- */
   --radius-xs: 4px;
   /* XS Custom */
-  --radius-sm: 6px;
+  --radius-sm: 0px;
   /* Badges/Alerts */
-  --radius-md: 8px;
+  --radius-md: 0px;
   /* Cards/KPIs/Inputs/Buttons (Primary) */
-  --radius-lg: 12px;
+  --radius-lg: 0px;
   /* Sidebar */
-  --radius-xl: 16px;
+  --radius-xl: 0px;
 
 
   /* --- 4. SHADOWS (Subtil B2B) --- */
@@ -250,7 +306,7 @@
 
   body {
     @apply bg-background text-foreground;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: "Manrope", Arial, Helvetica, sans-serif;
   }
 
   /* Mapping des classes H1, H2 pour cohérence automatique si tu utilises les balises HTML */

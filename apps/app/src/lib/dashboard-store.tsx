@@ -65,6 +65,7 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
     setPeriod("7d");
     setDateRange(undefined);
     setSelectedModels([]);
+    setShowUniqueModelFilters(false);
     setSelectedPersonas([]);
     setSelectedCompetitors([]);
   }, []);

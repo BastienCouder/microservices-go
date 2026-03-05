@@ -2,7 +2,6 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import type { AppRouterProps } from "./App";
-import { PageTemplateLoading } from "./template";
 
 const ProfilePage = lazy(() =>
   import("@/features/profile/views/profile-page").then((module) => ({
@@ -110,7 +109,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
       <Route
         path="/dashboard"
         element={
-          <Suspense fallback={<PageTemplateLoading />}>
+          <Suspense fallback={null}>
             <DashboardPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
@@ -120,7 +119,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
           key={item.path}
           path={item.path}
           element={
-            <Suspense fallback={<PageTemplateLoading />}>
+            <Suspense fallback={null}>
               <item.View />
             </Suspense>
           }
@@ -129,7 +128,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
       <Route
         path="/profile"
         element={
-          <Suspense fallback={<PageTemplateLoading />}>
+          <Suspense fallback={null}>
             {session ? (
               <ProfilePage
                 busy={busy}
@@ -149,7 +148,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
       <Route
         path="/organizations"
         element={
-          <Suspense fallback={<PageTemplateLoading />}>
+          <Suspense fallback={null}>
             <OrganizationsPage
               apiBaseURL={apiBaseURL}
               routeSearch={routeSearch}
