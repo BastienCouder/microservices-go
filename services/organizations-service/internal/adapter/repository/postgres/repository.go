@@ -89,6 +89,48 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Organizatio
 	}, nil
 }
 
+func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
+	query := r.psql.Select(
+		"m.organization_id",
+		"m.user_id",
+		"COALESCE(array_agg(distinct r.role) filter (where r.role is not null), '{}'::text[]) AS roles",
+	).
+		From("organization_members m").
+		Join("organizations o ON o.id = m.organization_id").
+		LeftJoin("member_roles r ON r.organization_id = m.organization_id AND r.user_id = m.user_id").
+		Where(sq.Eq{"m.user_id": userID}).
+		Where("m.deleted_at IS NULL").
+		Where("o.deleted_at IS NULL").
+		GroupBy("m.organization_id, m.user_id").
+		OrderBy("m.organization_id ASC")
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build list organizations by user query: %w", err)
+	}
+
+	rows, err := r.db.Query(ctx, sql, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations by user: %w", err)
+	}
+	defer rows.Close()
+
+	memberships := make([]domain.Membership, 0)
+	for rows.Next() {
+		var item domain.Membership
+		var roles []string
+		if err := rows.Scan(&item.OrganizationID, &item.UserID, &roles); err != nil {
+			return nil, fmt.Errorf("scan organization membership: %w", err)
+		}
+		item.Roles = append([]string(nil), roles...)
+		memberships = append(memberships, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate organization memberships: %w", err)
+	}
+	return memberships, nil
+}
+
 func (r *Repository) CreateTeam(ctx context.Context, team *domain.Team) error {
 	created, err := r.queries.CreateTeam(ctx, sqlc.CreateTeamParams{
 		ID:        team.OrganizationID,

@@ -8,14 +8,19 @@ export const metadata: Metadata = {
 
 type AuthRuntimeConfig = {
   gatewayURL: string;
+  appURL: string;
 };
 
 function loadRuntimeConfig(): AuthRuntimeConfig {
   const gatewayURL = process.env.NEXT_PUBLIC_API_GATEWAY_URL;
+  const appURL = process.env.NEXT_PUBLIC_APP_URL;
   if (!gatewayURL) {
     throw new Error("missing NEXT_PUBLIC_API_GATEWAY_URL");
   }
-  return { gatewayURL };
+  if (!appURL) {
+    throw new Error("missing NEXT_PUBLIC_APP_URL");
+  }
+  return { gatewayURL, appURL };
 }
 
 export default function AuthPage() {

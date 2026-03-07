@@ -1,6 +1,10 @@
-import { FeatureViewShell } from "@/features/shared/view/feature-view-shell";
-import { promptsViewContent } from "../core";
+import { PromptsClient } from "../prompts-client";
 
-export function PromptsTemplate() {
-  return <FeatureViewShell {...promptsViewContent} />;
+type PromptsTemplateProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function PromptsTemplate({ apiBaseURL, routeSearch }: PromptsTemplateProps) {
+  return <PromptsClient apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

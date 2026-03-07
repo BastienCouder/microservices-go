@@ -6,8 +6,9 @@ import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/
 import { Cell, Pie, PieChart } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { AI_SENTIMENT_COLORS } from "@/lib/app-data";
+import { DashboardSectionTitle } from "../dashboard-section-title";
 import { chartConfig } from "./analytics-utils";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 type SentimentItem = { name: string; value: number; fill: string };
 
@@ -43,8 +44,10 @@ export const SentimentDistribution = memo(function SentimentDistribution({
     <Card className="w-full rounded-md">
       <CardHeader className="pb-2">
         <div className="space-y-1">
-          <CardTitle className="text-lg font-semibold">{content.aiSentimentTitle}</CardTitle>
-          <CardDescription className="text-xs">{content.aiSentimentDescription}</CardDescription>
+          <CardTitle className="text-lg font-semibold">
+            <DashboardSectionTitle>{content.aiSentimentTitle}</DashboardSectionTitle>
+          </CardTitle>
+          <CardDescription className="text-xs leading-relaxed md:text-sm">{content.aiSentimentDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -115,7 +118,7 @@ export const SentimentDistribution = memo(function SentimentDistribution({
 
           <div className="-mt-1 text-center">
             <div className="text-xl font-bold leading-none">{factualAccuracy}%</div>
-            <div className="text-[11px] text-muted-foreground">{content.factualAccuracyLabel}</div>
+            <div className="text-xs text-muted-foreground md:text-sm">{content.factualAccuracyLabel}</div>
           </div>
 
           <div className="grid grid-cols-3 gap-2">

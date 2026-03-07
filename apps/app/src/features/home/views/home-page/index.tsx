@@ -2,7 +2,7 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 
 import { gatewayJSON } from "@/shared/api/gateway";
 
-import { HomePageView, type SessionInfo, type UserProfile } from "./home-page.view";
+import { HomePageView, type UserProfile } from "./home-page.view";
 
 function getAPIBaseURL(): string {
   const value = import.meta.env.VITE_API_BASE_URL;
@@ -25,14 +25,6 @@ function safeJSONStringify(value: unknown): string {
   }
 }
 
-function splitName(fullName: string): { firstName: string; lastName: string } {
-  const normalized = fullName.trim().replace(/\s+/g, " ");
-  if (!normalized) return { firstName: "", lastName: "" };
-  const parts = normalized.split(" ");
-  if (parts.length === 1) return { firstName: parts[0] ?? "", lastName: "" };
-  return { firstName: parts[0] ?? "", lastName: parts.slice(1).join(" ") };
-}
-
 export default function HomePageContainer() {
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
   const webAuthURL = useMemo(() => getWebAuthURL(), []);
@@ -40,7 +32,6 @@ export default function HomePageContainer() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState("");
 
-  const [session, setSession] = useState<SessionInfo | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
 
   const [organizationId, setOrganizationId] = useState("");
@@ -56,24 +47,12 @@ export default function HomePageContainer() {
     setBusy(true);
     setResult("");
     try {
-      const me = await gatewayJSON<SessionInfo>(apiBaseURL, "/auth/me", { method: "GET" });
-      if (!me.ok) {
-        setSession(null);
-        setUser(null);
-        setOrganizationId("");
-        setResult(`auth/me: ${me.status} ${me.error}`);
-        return;
-      }
-
-      setSession(me.data);
-
       const userMe = await gatewayJSON<UserProfile>(apiBaseURL, "/users/me", { method: "GET" });
       if (!userMe.ok) {
         setUser(null);
-        if (userMe.status === 404) {
-          const { firstName: fn, lastName: ln } = splitName(me.data.name);
-          setFirstName(fn);
-          setLastName(ln);
+        setOrganizationId("");
+        if (userMe.status === 401 || userMe.status === 404) {
+          setResult("");
           return;
         }
         setResult(`users/me: ${userMe.status} ${userMe.error}`);
@@ -81,6 +60,8 @@ export default function HomePageContainer() {
       }
 
       setUser(userMe.data);
+      setFirstName(userMe.data.first_name);
+      setLastName(userMe.data.last_name);
     } finally {
       setBusy(false);
     }
@@ -106,26 +87,18 @@ export default function HomePageContainer() {
   const createUser = useCallback(
     async (event: FormEvent) => {
       event.preventDefault();
-      if (!apiBaseURL || !session) return;
+      if (!apiBaseURL) return;
 
       setBusy(true);
       setResult("");
       try {
-        const res = await gatewayJSON<unknown>(apiBaseURL, "/users", {
-          method: "POST",
-          body: JSON.stringify({
-            email: session.email,
-            first_name: firstName,
-            last_name: lastName,
-          }),
-        });
-        setResult(res.ok ? "user created" : `users: ${res.status} ${res.error}\n${safeJSONStringify(res)}`);
+        setResult("Le profil utilisateur est auto-provisionné par auth-service.");
       } finally {
         setBusy(false);
         void refresh();
       }
     },
-    [apiBaseURL, firstName, lastName, refresh, session],
+    [apiBaseURL, refresh],
   );
 
   const createOrganization = useCallback(
@@ -220,7 +193,6 @@ export default function HomePageContainer() {
       webAuthURL={webAuthURL}
       busy={busy}
       result={result}
-      session={session}
       user={user}
       organizationId={organizationId}
       firstName={firstName}

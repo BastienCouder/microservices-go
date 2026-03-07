@@ -6,15 +6,25 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
+
+	internaljwt "github.com/bastiencouder/microservices-go/contracts/pkg/internaljwt"
 )
 
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
+	secret     string
+	issuer     string
 }
 
-func NewClient(baseURL string) *Client {
-	return &Client{baseURL: strings.TrimRight(baseURL, "/"), httpClient: &http.Client{}}
+func NewClient(baseURL, secret, issuer string) *Client {
+	return &Client{
+		baseURL:    strings.TrimRight(baseURL, "/"),
+		httpClient: &http.Client{},
+		secret:     secret,
+		issuer:     issuer,
+	}
 }
 
 func (c *Client) RolesForUser(ctx context.Context, organizationID, userID int64) ([]string, error) {
@@ -22,6 +32,21 @@ func (c *Client) RolesForUser(ctx context.Context, organizationID, userID int64)
 	if err != nil {
 		return nil, err
 	}
+	token, err := internaljwt.SignHS256(
+		c.secret,
+		c.issuer,
+		"organizations-service",
+		"permission-service",
+		internaljwt.TokenClaims{
+			UserID:         userID,
+			OrganizationID: organizationID,
+		},
+		60*time.Second,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("sign internal jwt: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -34,8 +59,8 @@ func (c *Client) RolesForUser(ctx context.Context, organizationID, userID int64)
 	}
 
 	var members []struct {
-		UserID int64    `json:"user_id"`
-		Roles  []string `json:"roles"`
+		UserID int64
+		Roles  []string
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&members); err != nil {
 		return nil, err

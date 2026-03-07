@@ -10,6 +10,7 @@ type Config struct {
 	HTTPAddr          string
 	KratosPublicURL   string
 	KratosBrowserURL  string
+	UserServiceURL    string
 	AppReturnURL      string
 	AllowedOrigin     string
 	InternalJWTSecret string
@@ -35,6 +36,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	userServiceURL, err := requiredEnv("USER_SERVICE_URL")
+	if err != nil {
+		return Config{}, err
+	}
 	appReturnURL := optionalEnv("APP_RETURN_URL")
 	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
@@ -49,6 +54,7 @@ func Load() (Config, error) {
 		HTTPAddr:          httpAddr,
 		KratosPublicURL:   kratosPublicURL,
 		KratosBrowserURL:  kratosBrowserURL,
+		UserServiceURL:    userServiceURL,
 		AppReturnURL:      appReturnURL,
 		AllowedOrigin:     allowedOrigin,
 		InternalJWTSecret: internalJWTSecret,

@@ -15,11 +15,17 @@ func (h *Handler) validateAuth(ctx context.Context, cookieHeader, sessionToken s
 		IdentityID string `json:"identity_id"`
 	}
 
-	err := h.executeDependencyCall(ctx, h.authBreaker, h.authBulkhead, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
+	internalToken, err := signInternalJWT(h.internalJWTSecret, h.internalJWTIssuer, "auth-service", internalTokenClaims{})
+	if err != nil {
+		return "", fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	err = h.executeDependencyCall(ctx, h.authBreaker, h.authBulkhead, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
 		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, h.authURL+"/auth/validate", nil)
 		if err != nil {
 			return false, true, err
 		}
+		req.Header.Set("Authorization", "Bearer "+internalToken)
 		if cookieHeader != "" {
 			req.Header.Set("Cookie", cookieHeader)
 		}
@@ -57,12 +63,19 @@ func (h *Handler) resolveUserID(ctx context.Context, identityID string) (int64, 
 	var payload struct {
 		ID int64 `json:"id"`
 	}
+	token, err := signInternalJWT(h.internalJWTSecret, h.internalJWTIssuer, "user-service", internalTokenClaims{
+		IdentityID: identityID,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("sign internal jwt: %w", err)
+	}
 
-	err := h.executeDependencyCall(ctx, h.userBreaker, h.userBulkhead, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
+	err = h.executeDependencyCall(ctx, h.userBreaker, h.userBulkhead, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
 		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, h.userURL+"/users/by-auth/"+url.PathEscape(identityID), nil)
 		if err != nil {
 			return false, true, err
 		}
+		req.Header.Set("Authorization", "Bearer "+token)
 
 		resp, err := h.httpClient.Do(req)
 		if err != nil {

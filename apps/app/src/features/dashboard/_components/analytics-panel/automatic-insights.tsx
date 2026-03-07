@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { DashboardSectionTitle } from "../dashboard-section-title";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 type InsightItem = { model: string; text: string; delta: string; level: "high" | "medium" };
 
@@ -21,8 +22,10 @@ export const AutomaticInsights = memo(function AutomaticInsights({ autoInsights 
     <Card className="col-span-1 gap-2 rounded-md">
       <CardHeader>
         <div className="space-y-1">
-          <CardTitle className="text-lg font-semibold">{content.autoInsightsTitle}</CardTitle>
-          <CardDescription className="text-xs">{content.autoInsightsDescription}</CardDescription>
+          <CardTitle className="text-lg font-semibold">
+            <DashboardSectionTitle>{content.autoInsightsTitle}</DashboardSectionTitle>
+          </CardTitle>
+          <CardDescription className="text-xs leading-relaxed md:text-sm">{content.autoInsightsDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -36,14 +39,14 @@ export const AutomaticInsights = memo(function AutomaticInsights({ autoInsights 
               className={cn("flex items-start justify-between gap-4 py-3", index !== autoInsights.length - 1 && "border-b border-border/50")}
             >
               <div className="min-w-0 space-y-1">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{insight.model}</p>
-                <p className="text-xs leading-relaxed text-foreground/90">{insight.text}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{insight.model}</p>
+                <p className="text-xs leading-relaxed text-foreground/90 md:text-sm">{insight.text}</p>
               </div>
               <div className="shrink-0">
                 <Badge
                   variant="secondary"
                   className={cn(
-                    "h-6 px-2 text-[10px] font-semibold",
+                    "h-6 px-2 text-xs font-semibold",
                     insight.level === "high" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground",
                   )}
                 >

@@ -9,7 +9,7 @@ const ProfilePage = lazy(() =>
   })),
 );
 const OrganizationsPage = lazy(() =>
-  import("@/features/organizations/views/organizations-page").then((module) => ({
+  import("@/features/organizations").then((module) => ({
     default: module.OrganizationsPage,
   })),
 );
@@ -43,6 +43,11 @@ const PerceptionPage = lazy(() =>
     default: module.PerceptionPage,
   })),
 );
+const PerceptionBrandCanonPage = lazy(() =>
+  import("@/features/perception/view/brand-canon-page").then((module) => ({
+    default: module.BrandCanonPage,
+  })),
+);
 const OptimizeActionsPage = lazy(() =>
   import("@/features/optimize-actions").then((module) => ({
     default: module.OptimizeActionsPage,
@@ -66,10 +71,6 @@ const SettingsPage = lazy(() =>
 
 const SIDEBAR_FEATURE_ROUTES = [
   {
-    path: "/prompts",
-    View: PromptsPage,
-  },
-  {
     path: "/pages",
     View: PagesPage,
   },
@@ -80,10 +81,6 @@ const SIDEBAR_FEATURE_ROUTES = [
   {
     path: "/models",
     View: ModelsPage,
-  },
-  {
-    path: "/perception",
-    View: PerceptionPage,
   },
   {
     path: "/optimize/actions",
@@ -103,7 +100,7 @@ const SIDEBAR_FEATURE_ROUTES = [
   },
 ] as const;
 
-export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCreateProfile }: AppRouterProps) {
+export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
   return (
     <Routes>
       <Route
@@ -111,6 +108,30 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
         element={
           <Suspense fallback={null}>
             <DashboardPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/prompts"
+        element={
+          <Suspense fallback={null}>
+            <PromptsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/perception"
+        element={
+          <Suspense fallback={null}>
+            <PerceptionPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/perception/brand-canon"
+        element={
+          <Suspense fallback={null}>
+            <PerceptionBrandCanonPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />
@@ -129,19 +150,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
         path="/profile"
         element={
           <Suspense fallback={null}>
-            {session ? (
-              <ProfilePage
-                busy={busy}
-                onCreateProfile={onCreateProfile}
-                session={session}
-                user={user}
-              />
-            ) : (
-              <section className="card">
-                <h2>Session absente</h2>
-                <p className="muted">Connecte-toi depuis le web auth pour accéder au profil.</p>
-              </section>
-            )}
+            <ProfilePage user={user} />
           </Suspense>
         }
       />
@@ -151,6 +160,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, session, user, onCrea
           <Suspense fallback={null}>
             <OrganizationsPage
               apiBaseURL={apiBaseURL}
+              busy={busy}
               routeSearch={routeSearch}
               user={user}
             />

@@ -1,13 +1,14 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { DashboardSectionTitle } from "../dashboard-section-title";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 type DashboardAlert = DashboardData["alerts"][number];
 
@@ -42,16 +43,19 @@ function getAlertTone(type: string) {
 
 export const ActivityAlerts = memo(function ActivityAlerts({ filteredAlerts, previewCount, onSelectAlert }: ActivityAlertsProps) {
   const content = useI18nScope("dashboard-activity-panel");
-  const visibleAlerts = filteredAlerts.slice(0, previewCount);
+  const [showAll, setShowAll] = useState(false);
+  const visibleAlerts = showAll ? filteredAlerts : filteredAlerts.slice(0, previewCount);
   const hasData = filteredAlerts.length > 0;
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h4 className="text-sm font-semibold">{content.criticalUpdates}</h4>
+          <h4 className="text-sm font-semibold md:text-base">
+            <DashboardSectionTitle>{content.criticalUpdates}</DashboardSectionTitle>
+          </h4>
         </div>
-        <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">
+        <Badge variant="secondary" className="h-6 bg-primary/10 px-2 font-mono text-xs text-primary">
           {filteredAlerts.length}
         </Badge>
       </div>
@@ -63,27 +67,29 @@ export const ActivityAlerts = memo(function ActivityAlerts({ filteredAlerts, pre
           visibleAlerts.map((alert, index) => {
           const tone = getAlertTone(alert.type);
           return (
-            <div
+            <button
+              type="button"
               key={`${alert.type}-${index}`}
               onClick={() => onSelectAlert(alert)}
-              className={cn("group relative cursor-pointer overflow-hidden rounded-md bg-background p-3 transition-all")}
+              className={cn("group relative w-full overflow-hidden rounded-md bg-background p-3 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40")}
+              aria-label={`${content.criticalUpdates}: ${alert.msg}`}
             >
               <div className="mb-1 flex items-start justify-between">
-                <span className={cn("text-[10px] font-bold uppercase tracking-wider", tone.label)}>{alert.type}</span>
-                <span className="text-[10px] text-muted-foreground">{getAlertTypeLabel(alert.prompts) || alert.time}</span>
+                <span className={cn("text-xs font-bold uppercase tracking-wider", tone.label)}>{alert.type}</span>
+                <span className="text-xs text-muted-foreground">{getAlertTypeLabel(alert.prompts) || alert.time}</span>
               </div>
-              <p className="mb-2 text-xs font-medium leading-snug text-foreground">{alert.msg}</p>
+              <p className="mb-2 text-xs font-medium leading-snug text-foreground md:text-sm">{alert.msg}</p>
               <div className="absolute bottom-2 right-2 flex justify-end opacity-0 transition-opacity group-hover:opacity-100">
                 <ChevronRight className={cn("h-4 w-4", tone.label)} />
               </div>
-            </div>
+            </button>
           );
           })
         )}
 
         {filteredAlerts.length > previewCount ? (
-          <Button variant="ghost" size="sm" className="w-full text-xs">
-            {content.showMore}
+          <Button variant="ghost" size="sm" className="w-full text-xs md:text-sm" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? content.showLess : content.showMore}
           </Button>
         ) : null}
       </div>

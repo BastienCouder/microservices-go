@@ -1,3 +1,5 @@
+import type { DateRange } from "react-day-picker";
+
 import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import { gatewayJSON } from "@/shared/api/gateway";
@@ -39,6 +41,10 @@ export type DashboardAlert = {
   msg: string;
   time: string;
   isRead: boolean;
+  createdAt?: string;
+  modelIds?: string[];
+  personas?: string[];
+  competitors?: string[];
 };
 
 export type DashboardData = {
@@ -73,6 +79,27 @@ export type DashboardLoadResult = {
 };
 
 type JsonObject = Record<string, unknown>;
+type DashboardRequestScope = "projects" | "project" | "models" | "competitors" | "dashboard" | "alerts";
+
+export type DashboardLoadFilters = {
+  period: string;
+  dateRange: DateRange | undefined;
+  selectedModels: string[];
+  selectedPersonas: string[];
+  selectedCompetitors: string[];
+};
+
+export class DashboardRequestError extends Error {
+  scope: DashboardRequestScope;
+  status: number;
+
+  constructor(scope: DashboardRequestScope, status: number, message?: string) {
+    super(message || `dashboard request failed: ${scope}`);
+    this.name = "DashboardRequestError";
+    this.scope = scope;
+    this.status = status;
+  }
+}
 
 function asObject(value: unknown): JsonObject {
   return value && typeof value === "object" ? (value as JsonObject) : {};
@@ -80,6 +107,12 @@ function asObject(value: unknown): JsonObject {
 
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+function asStringArray(value: unknown): string[] {
+  return asArray(value)
+    .map((entry) => asString(entry).trim())
+    .filter(Boolean);
 }
 
 function asString(value: unknown): string {
@@ -92,6 +125,10 @@ function asNumber(value: unknown): number {
 
 function asBool(value: unknown): boolean {
   return value === true;
+}
+
+function normalizeFilterValue(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 function getField<T = unknown>(obj: JsonObject, keys: string[]): T | undefined {
@@ -110,6 +147,16 @@ function unwrapSuccessEnvelope(value: unknown): unknown {
     return obj.data;
   }
   return value;
+}
+
+function unwrapRequiredEnvelope<T>(
+  result: Awaited<ReturnType<typeof gatewayJSON<T>>>,
+  scope: DashboardRequestScope,
+): unknown {
+  if (!result.ok) {
+    throw new DashboardRequestError(scope, result.status, result.error);
+  }
+  return unwrapSuccessEnvelope(result.data);
 }
 
 function toInitials(name: string): string {
@@ -136,6 +183,24 @@ function toRelativeTime(iso: string): string {
 
 function normalizeModelId(raw: string): string {
   return raw.trim().toLowerCase().replace(/\s+/g, "-");
+}
+
+function toPersona(response: JsonObject, promptRunsById: Map<string, JsonObject>, promptRunId: string): string {
+  const fromResponse = asString(
+    getField(response, ["persona", "personaName", "personaLabel", "Persona", "PersonaName", "PersonaLabel"]),
+  ).trim();
+  if (fromResponse !== "") {
+    return fromResponse;
+  }
+
+  const promptRun = promptRunsById.get(promptRunId);
+  if (!promptRun) {
+    return "";
+  }
+
+  return asString(
+    getField(promptRun, ["persona", "personaName", "personaLabel", "Persona", "PersonaName", "PersonaLabel"]),
+  ).trim();
 }
 
 function scoreFromAnalysis(response: JsonObject): number {
@@ -213,6 +278,73 @@ function fallbackDashboardData(): DashboardData {
   };
 }
 
+function alertMatchesDateScope(
+  alert: Pick<DashboardAlert, "createdAt">,
+  period: string,
+  dateRange: DateRange | undefined,
+) {
+  if (!alert.createdAt) {
+    return period === "7d" && dateRange === undefined;
+  }
+
+  const createdAt = new Date(alert.createdAt);
+  if (Number.isNaN(createdAt.getTime())) {
+    return false;
+  }
+
+  const now = new Date();
+
+  if (period === "custom") {
+    if (!dateRange?.from) return true;
+    const from = new Date(dateRange.from);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(dateRange.to ?? dateRange.from);
+    to.setHours(23, 59, 59, 999);
+    return createdAt >= from && createdAt <= to;
+  }
+
+  const from = new Date(now);
+  if (period === "today" || period === "24h") from.setHours(from.getHours() - 24);
+  else if (period === "14d") from.setDate(from.getDate() - 14);
+  else if (period === "30d") from.setDate(from.getDate() - 30);
+  else if (period === "90d") from.setDate(from.getDate() - 90);
+  else from.setDate(from.getDate() - 7);
+
+  return createdAt >= from && createdAt <= now;
+}
+
+function alertMatchesAudienceScope(
+  values: string[] | undefined,
+  selected: string[],
+) {
+  if (selected.length === 0) {
+    return true;
+  }
+  if (!values || values.length === 0) {
+    return false;
+  }
+
+  const normalizedValues = values.map(normalizeFilterValue);
+  return selected.some((value) => normalizedValues.includes(normalizeFilterValue(value)));
+}
+
+export function filterDashboardAlerts(
+  alerts: DashboardAlert[],
+  filters: DashboardLoadFilters,
+): DashboardAlert[] {
+  return alerts.filter((alert) => {
+    if (!alertMatchesDateScope(alert, filters.period, filters.dateRange)) {
+      return false;
+    }
+
+    return (
+      alertMatchesAudienceScope(alert.modelIds, filters.selectedModels) &&
+      alertMatchesAudienceScope(alert.personas, filters.selectedPersonas) &&
+      alertMatchesAudienceScope(alert.competitors, filters.selectedCompetitors)
+    );
+  });
+}
+
 function computeKpis(prompts: DashboardPrompt[]): DashboardData["kpis"] {
   if (prompts.length === 0) {
     return {
@@ -247,6 +379,7 @@ function computeKpis(prompts: DashboardPrompt[]): DashboardData["kpis"] {
 export async function loadDashboardData(
   apiBaseURL: string,
   routeSearch: string,
+  options?: { signal?: AbortSignal },
 ): Promise<DashboardLoadResult> {
   const mode = resolveRuntimeMode(routeSearch);
   const fallback = fallbackDashboardData();
@@ -257,8 +390,13 @@ export async function loadDashboardData(
 
   let projectId = readProjectIdFromSearch(routeSearch);
 
-  const projectsRes = await gatewayJSON<unknown>(apiBaseURL, "/projects", { method: "GET" });
-  const projectsPayload = projectsRes.ok ? unwrapSuccessEnvelope(projectsRes.data) : [];
+  const projectsPayload = unwrapRequiredEnvelope(
+    await gatewayJSON<unknown>(apiBaseURL, "/projects", {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    "projects",
+  );
   const projects = asArray(projectsPayload).map(asObject);
 
   if (!projectId) {
@@ -273,18 +411,33 @@ export async function loadDashboardData(
   }
 
   const [projectRes, modelsRes, competitorsRes, dashboardRes, alertsRes] = await Promise.all([
-    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}`, { method: "GET" }),
-    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}/models`, { method: "GET" }),
-    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}/competitors`, { method: "GET" }),
-    gatewayJSON<unknown>(apiBaseURL, `/analysis/projects/${projectId}/dashboard`, { method: "GET" }),
-    gatewayJSON<unknown>(apiBaseURL, `/analysis/projects/${projectId}/alerts`, { method: "GET" }),
+    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}`, {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}/models`, {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, `/projects/${projectId}/competitors`, {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, `/analysis/projects/${projectId}/dashboard`, {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, `/analysis/projects/${projectId}/alerts`, {
+      method: "GET",
+      signal: options?.signal,
+    }),
   ]);
 
-  const project = asObject(unwrapSuccessEnvelope(projectRes.ok ? projectRes.data : {}));
-  const modelsPayload = asArray(unwrapSuccessEnvelope(modelsRes.ok ? modelsRes.data : []));
-  const competitorsPayload = asArray(unwrapSuccessEnvelope(competitorsRes.ok ? competitorsRes.data : []));
-  const dashboardPayload = asObject(unwrapSuccessEnvelope(dashboardRes.ok ? dashboardRes.data : {}));
-  const alertsPayload = asArray(unwrapSuccessEnvelope(alertsRes.ok ? alertsRes.data : []));
+  const project = asObject(unwrapRequiredEnvelope(projectRes, "project"));
+  const modelsPayload = asArray(unwrapRequiredEnvelope(modelsRes, "models"));
+  const competitorsPayload = asArray(unwrapRequiredEnvelope(competitorsRes, "competitors"));
+  const dashboardPayload = asObject(unwrapRequiredEnvelope(dashboardRes, "dashboard"));
+  const alertsPayload = asArray(unwrapRequiredEnvelope(alertsRes, "alerts"));
 
   const models: DashboardModel[] = modelsPayload.map((entry) => {
     const row = asObject(entry);
@@ -320,14 +473,17 @@ export async function loadDashboardData(
   });
 
   const promptRuns = asArray(getField(dashboardPayload, ["promptRuns", "PromptRuns"]))
-    .map(asObject)
-    .map((row) => ({
-      id: asString(getField(row, ["id", "ID"])),
-      text:
-        asString(getField(row, ["promptText", "PromptText"])) ||
-        asString(getField(row, ["text", "Text"])),
-    }));
-  const promptRunById = new Map(promptRuns.map((row) => [row.id, row.text]));
+    .map(asObject);
+  const promptRunById = new Map(
+    promptRuns.map((row) => [
+      asString(getField(row, ["id", "ID"])),
+      asString(getField(row, ["promptText", "PromptText"])) ||
+      asString(getField(row, ["text", "Text"])),
+    ]),
+  );
+  const promptRunMetaById = new Map(
+    promptRuns.map((row) => [asString(getField(row, ["id", "ID"])), row]),
+  );
 
   const projectName =
     asString(getField(project, ["brandName", "BrandName"])) ||
@@ -357,7 +513,7 @@ export async function loadDashboardData(
       modelFilterKey: modelId || undefined,
       modelIconKey: model?.id || undefined,
       text: promptRunById.get(promptRunId) || rawResponse.slice(0, 160) || "",
-      persona: "general",
+      persona: toPersona(response, promptRunMetaById, promptRunId),
       competitorsMentioned,
       mention: asBool(getField(response, ["brandMentioned", "BrandMentioned"])),
       rank: rankFromPosition(response),
@@ -408,6 +564,25 @@ export async function loadDashboardData(
         "",
       time: createdAt ? toRelativeTime(createdAt) : "-",
       isRead: asBool(getField(row, ["isRead", "IsRead"])),
+      createdAt: createdAt || undefined,
+      modelIds: (() => {
+        const modelIds = asStringArray(getField(row, ["modelIds", "ModelIDs"]));
+        if (modelIds.length > 0) return modelIds;
+        const modelId = asString(getField(row, ["modelId", "ModelID"])).trim();
+        return modelId ? [modelId] : undefined;
+      })(),
+      personas: (() => {
+        const personas = asStringArray(getField(row, ["personas", "Personas"]));
+        if (personas.length > 0) return personas;
+        const persona = asString(getField(row, ["persona", "Persona"])).trim();
+        return persona ? [persona] : undefined;
+      })(),
+      competitors: (() => {
+        const competitors = asStringArray(
+          getField(row, ["competitors", "Competitors", "competitorNames", "CompetitorNames"]),
+        );
+        return competitors.length > 0 ? competitors : undefined;
+      })(),
     };
   });
 

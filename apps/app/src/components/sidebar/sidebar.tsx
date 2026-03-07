@@ -2,7 +2,7 @@
 
 import { memo, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { Building2, ChevronsLeft, ChevronsRight, LayoutDashboard, LineChart, Sparkles, Target, Zap } from "lucide-react";
+import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { cn } from "@/shared/utils";
@@ -10,7 +10,17 @@ import { MONITORING_ITEMS, ORGANIZATION_ITEMS, ORGS } from "./sidebar-constants"
 import { SidebarOrganizationSwitcher } from "./sidebar-organization-switcher";
 import { SidebarNavItem, SidebarSectionHeader } from "./sidebar-nav-item";
 
-function SidebarComponent({ className, activePath }: { className?: string; activePath?: string }) {
+function SidebarComponent({
+  className,
+  activePath,
+  busy = false,
+  onLogout,
+}: {
+  className?: string;
+  activePath?: string;
+  busy?: boolean;
+  onLogout?: () => Promise<void>;
+}) {
   const pathname = useLocation().pathname;
   const currentPath = activePath || pathname;
   const canonicalCurrentPath = currentPath;
@@ -60,7 +70,6 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           <div className="mb-1">
             <SidebarNavItem
               href="/dashboard"
-              icon={LayoutDashboard}
               label={"dashboard"}
               active={canonicalCurrentPath === "/dashboard"}
               collapsed={collapsed}
@@ -68,14 +77,13 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           </div>
 
           <div className="mb-1 mt-4">
-            <SidebarSectionHeader iconSrc="/monitoring.svg" label={"monitoring"} collapsed={collapsed} />
+            <SidebarSectionHeader label={"monitoring"} collapsed={collapsed} />
             <div className="relative mt-1 space-y-0.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {MONITORING_ITEMS.map((item) => (
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  icon={item.icon}
                   label={navLabels[item.labelKey]}
                   active={canonicalCurrentPath === item.href}
                   indent={!collapsed}
@@ -88,7 +96,6 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           <div className="mb-1">
             <SidebarNavItem
               href="/perception"
-              icon={LineChart}
               label={"perception"}
               active={canonicalCurrentPath === "/perception"}
               collapsed={collapsed}
@@ -97,7 +104,6 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           <div className="mb-1">
             <SidebarNavItem
               href="/optimize/actions"
-              icon={Zap}
               label={"optimize actions"}
               active={canonicalCurrentPath === "/optimize/actions"}
               collapsed={collapsed}
@@ -106,7 +112,6 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           <div className="mb-1">
             <SidebarNavItem
               href="/optimize/content-optimizer"
-              icon={Sparkles}
               label="Content Optimizer"
               active={canonicalCurrentPath === "/optimize/content-optimizer"}
               collapsed={collapsed}
@@ -115,7 +120,6 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           <div className="mb-1">
             <SidebarNavItem
               href="/impact"
-              icon={Target}
               label={"impact"}
               active={canonicalCurrentPath === "/impact"}
               collapsed={collapsed}
@@ -123,14 +127,13 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
           </div>
 
           <div className="mb-1 mt-4">
-            <SidebarSectionHeader icon={Building2} label={"organizations"} collapsed={collapsed} />
+            <SidebarSectionHeader label={"organizations"} collapsed={collapsed} />
             <div className="relative mt-1 space-y-0.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {ORGANIZATION_ITEMS.map((item) => (
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  icon={item.icon}
                   label={navLabels[item.labelKey]}
                   active={canonicalCurrentPath === item.href}
                   indent={!collapsed}
@@ -142,6 +145,18 @@ function SidebarComponent({ className, activePath }: { className?: string; activ
         </nav>
 
         <div className="border-t border-border p-2">
+          <button
+            disabled={busy}
+            className={cn(
+              "mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+              collapsed && "justify-center",
+              busy && "cursor-not-allowed opacity-60",
+            )}
+            onClick={() => void onLogout?.()}
+            type="button"
+          >
+            {collapsed ? <span className="text-xs font-semibold uppercase tracking-[0.18em]">L</span> : <span>logout</span>}
+          </button>
           <button
             onClick={() => setCollapsed((prev) => !prev)}
             className={cn(

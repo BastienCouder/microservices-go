@@ -286,6 +286,9 @@ down-dev:
 logs-dev:
 	$(COMPOSE_DEV) logs -f
 
+logs:
+	$(COMPOSE_PROD) logs -f $(or $(SERVICE),api-gateway)
+
 kratos-init:
 	$(COMPOSE_PROD) --profile infra up -d postgres
 	$(COMPOSE_PROD) --profile migrations run --rm kratos-migrate

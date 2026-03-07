@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router-dom";
 
-import type { SessionInfo, UserProfile } from "@/shared/models";
+import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { AppLayout } from "./layout";
 import { AppRouter } from "./router";
@@ -18,7 +18,7 @@ export default function App() {
   const routeSearch = location.search;
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
-  const { busy, session, user, feedback, refresh, logout, createUserProfile } = useAuthSession(apiBaseURL);
+  const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
   if (!apiBaseURL) {
     return (
       <main className="app-root">
@@ -33,12 +33,10 @@ export default function App() {
   }
 
   return (
-    <AppLayout busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh} session={session}>
+    <AppLayout busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
       <AppRouter
         apiBaseURL={apiBaseURL}
-        onCreateProfile={createUserProfile}
         routeSearch={routeSearch}
-        session={session}
         user={user}
         busy={busy}
       />
@@ -50,7 +48,5 @@ export type AppRouterProps = {
   apiBaseURL: string;
   busy: boolean;
   routeSearch: string;
-  session: SessionInfo | null;
   user: UserProfile | null;
-  onCreateProfile: (firstName: string, lastName: string) => Promise<void>;
 };

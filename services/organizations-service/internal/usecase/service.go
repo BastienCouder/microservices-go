@@ -45,6 +45,17 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 	return org, nil
 }
 
+func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("%w: user id must be positive", domain.ErrInvalidMember)
+	}
+	memberships, err := s.repo.ListOrganizationsByUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations by user: %w", err)
+	}
+	return memberships, nil
+}
+
 func (s *Service) CreateTeam(ctx context.Context, organizationID int64, name string) (*domain.Team, error) {
 	team := &domain.Team{
 		OrganizationID: organizationID,

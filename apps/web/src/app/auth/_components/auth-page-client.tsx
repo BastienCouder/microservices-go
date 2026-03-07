@@ -1,10 +1,12 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { buildBrowserCallbackURL, normalizeAppReturnTo } from "../auth-routing";
 
 type AuthPageClientProps = {
   config: {
     gatewayURL: string;
+    appURL: string;
   };
 };
 
@@ -33,7 +35,17 @@ export function AuthPageClient({ config }: AuthPageClientProps) {
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const { gatewayURL } = config;
+  const { appURL, gatewayURL } = config;
+
+  function getReturnTo(): string {
+    if (typeof window === "undefined") {
+      return normalizeAppReturnTo("", appURL);
+    }
+    const params = new URLSearchParams(window.location.search);
+    const resolved = normalizeAppReturnTo(params.get("return_to"), appURL);
+    window.sessionStorage.setItem("auth:return_to", resolved);
+    return resolved;
+  }
 
   async function logoutKratos() {
     setBusy(true);
@@ -166,7 +178,10 @@ export function AuthPageClient({ config }: AuthPageClientProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ mode: nextMode }),
+        body: JSON.stringify({
+          mode: nextMode,
+          returnTo: buildBrowserCallbackURL(window.location.origin, getReturnTo()),
+        }),
       });
       const payload = (await parseJSON(response)) as { redirectTo?: string; error?: string };
       if (!response.ok || !payload.redirectTo) {

@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardStore } from "@/lib/dashboard-store";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
-import type { DashboardData, DashboardPrompt } from "@/lib/dashboard-data";
+import {
+  filterDashboardAlerts,
+  type DashboardData,
+  type DashboardPrompt,
+} from "@/lib/dashboard-data";
 import { useShallow } from "zustand/react/shallow";
 import { ActivityAlerts } from "./activity-alerts";
 import { ActivityPromptsStream } from "./activity-prompts-stream";
@@ -67,14 +70,31 @@ export function ActivityPanel() {
     dateRange,
   ]);
 
-  const filteredAlerts = alerts;
+  const filteredAlerts = useMemo(
+    () =>
+      filterDashboardAlerts(alerts, {
+        period,
+        dateRange,
+        selectedModels,
+        selectedPersonas,
+        selectedCompetitors,
+      }),
+    [
+      alerts,
+      period,
+      dateRange,
+      selectedModels,
+      selectedPersonas,
+      selectedCompetitors,
+    ],
+  );
 
   const handleSelectAlert = useCallback((alert: DashboardAlert) => setSelectedAlert(alert), []);
   const handleSelectPrompt = useCallback((prompt: DashboardPrompt) => setSelectedPrompt(prompt), []);
 
   if (loading) {
     return (
-      <ScrollArea className="h-auto xl:h-full">
+      <div className="h-auto lg:h-full lg:overflow-y-auto">
         <div className="flex flex-col gap-6 pb-4">
           <Card className="rounded-md">
             <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -100,13 +120,13 @@ export function ActivityPanel() {
             </CardContent>
           </Card>
         </div>
-      </ScrollArea>
+      </div>
     );
   }
 
   return (
     <>
-      <ScrollArea className="h-auto xl:h-full">
+      <div className="h-auto lg:h-full lg:overflow-y-auto">
         <div className="flex flex-col gap-6 pb-4">
           <ActivityAlerts
             filteredAlerts={filteredAlerts}
@@ -121,7 +141,7 @@ export function ActivityPanel() {
             onSelectPrompt={handleSelectPrompt}
           />
         </div>
-      </ScrollArea>
+      </div>
 
       <ActivityDetailSheets
         selectedAlert={selectedAlert}

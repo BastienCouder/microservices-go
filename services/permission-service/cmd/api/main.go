@@ -41,7 +41,7 @@ func main() {
 	defer db.Close()
 
 	repo := permissionrepo.NewRepository(db)
-	roleResolver := organizationsclient.NewClient(cfg.OrganizationsServiceURL)
+	roleResolver := organizationsclient.NewClient(cfg.OrganizationsServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
 	svc := usecase.NewService(repo, roleResolver)
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 	g := grpcadapter.NewServer(svc)

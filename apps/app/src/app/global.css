@@ -121,10 +121,10 @@
   --text-base--line-height: 1.5rem;
   /* 24px */
 
-  /* Small (14px) */
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.25rem;
-  /* 20px */
+  /* Small (12px) */
+  --text-sm: 0.75rem;
+  --text-sm--line-height: 1rem;
+  /* 16px */
 
   /* XS (12px) */
   --text-xs: 0.75rem;
@@ -132,16 +132,17 @@
   /* 16px */
 
 
+
   /* --- 3. RADIUS (Specifique Dashboard Pro) --- */
-  --radius-xs: 4px;
+  --radius-xs: 25px;
   /* XS Custom */
-  --radius-sm: 0px;
+  --radius-sm: 25px;
   /* Badges/Alerts */
-  --radius-md: 0px;
+  --radius-md: 25px;
   /* Cards/KPIs/Inputs/Buttons (Primary) */
-  --radius-lg: 0px;
+  --radius-lg: 25px;
   /* Sidebar */
-  --radius-xl: 0px;
+  --radius-xl: 25px;
 
 
   /* --- 4. SHADOWS (Subtil B2B) --- */
@@ -191,16 +192,16 @@
     --popover-foreground: 222.2 84% 4.9%;
 
     /* Primary Bleu */
-    --primary: 221 39% 34%;
+    --primary: 217.18 60% 49%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 217, 52%, 68%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
+    --accent: 217, 52%, 68%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;

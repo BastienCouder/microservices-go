@@ -12,6 +12,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	kratosclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/kratos"
+	userclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/user"
 	httpadapter "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/security"
@@ -25,7 +26,8 @@ func main() {
 	}
 
 	kratos := kratosclient.NewClient(cfg.KratosPublicURL, cfg.AppReturnURL)
-	svc := usecase.NewService(kratos)
+	users := userclient.NewClient(cfg.UserServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+	svc := usecase.NewService(kratos, users)
 	h := httpadapter.NewHandler(svc, cfg.AllowedOrigin, cfg.KratosBrowserURL)
 
 	mux := http.NewServeMux()

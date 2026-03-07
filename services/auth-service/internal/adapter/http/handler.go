@@ -18,7 +18,8 @@ type Handler struct {
 }
 
 type modeRequest struct {
-	Mode string `json:"mode"`
+	Mode     string `json:"mode"`
+	ReturnTo string `json:"returnTo"`
 }
 
 type passwordRequest struct {
@@ -83,6 +84,13 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
 	}
+	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+		auditSecurityEvent("auth_validate", map[string]any{
+			"result":      "profile_unavailable",
+			"identity_id": session.Identity.ID,
+			"error":       err.Error(),
+		})
+	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
@@ -109,6 +117,13 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	if statusCode != http.StatusOK || session == nil || !session.Active {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 		return
+	}
+	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+		auditSecurityEvent("auth_me", map[string]any{
+			"result":      "profile_unavailable",
+			"identity_id": session.Identity.ID,
+			"error":       err.Error(),
+		})
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
@@ -140,7 +155,7 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, r.Header.Get("Cookie"))
+	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, "", r.Header.Get("Cookie"))
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
@@ -190,6 +205,7 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "invalid kratos response"})
 		return
 	}
+	h.syncUserProfileFromSession(r, append([]string{}, initSetCookies...), append([]string{}, submitSetCookies...), "auth_password", req.Mode)
 	message := "connexion réussie"
 	if req.Mode == "registration" {
 		message = "inscription réussie"
@@ -220,7 +236,7 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, r.Header.Get("Cookie"))
+	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, "", r.Header.Get("Cookie"))
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
@@ -327,6 +343,7 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "invalid kratos response"})
 		return
 	}
+	h.syncUserProfileFromSession(r, nil, append([]string{}, submitSetCookies...), "auth_otp_verify", req.Mode)
 	message := "connexion OTP réussie"
 	if req.Mode == "registration" {
 		message = "inscription OTP réussie"
@@ -398,7 +415,7 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, r.Header.Get("Cookie"))
+	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, strings.TrimSpace(req.ReturnTo), r.Header.Get("Cookie"))
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "dependency_error"})
@@ -539,4 +556,27 @@ func auditSecurityEvent(event string, fields map[string]any) {
 		return
 	}
 	log.Printf("audit %s", string(raw))
+}
+
+func (h *Handler) syncUserProfileFromSession(r *http.Request, initSetCookies, submitSetCookies []string, event, mode string) {
+	submitCookie := mergeCookieHeader(mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies), submitSetCookies)
+	session, statusCode, err := h.svc.WhoAmI(r.Context(), submitCookie, "")
+	if err != nil || statusCode != http.StatusOK || session == nil || !session.Active {
+		auditSecurityEvent(event, map[string]any{"mode": mode, "result": "profile_sync_skipped"})
+		return
+	}
+	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+		auditSecurityEvent(event, map[string]any{
+			"mode":        mode,
+			"result":      "profile_sync_failed",
+			"identity_id": session.Identity.ID,
+			"error":       err.Error(),
+		})
+		return
+	}
+	auditSecurityEvent(event, map[string]any{
+		"mode":        mode,
+		"result":      "profile_sync_ok",
+		"identity_id": session.Identity.ID,
+	})
 }

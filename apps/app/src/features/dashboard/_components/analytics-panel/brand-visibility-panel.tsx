@@ -16,7 +16,8 @@ import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { useShallow } from "zustand/react/shallow";
 import { matchesPromptAudienceFilters, promptIsInPeriodWithDateRange } from "./analytics-utils";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { DashboardSectionTitle } from "../dashboard-section-title";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 const BRAND_VISIBILITY_COLORS = {
     primaryBrand: "hsl(186 49% 62%)",
@@ -160,8 +161,10 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
       return (
         <Card className="col-span-1 rounded-md min-w-0 overflow-hidden xl:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">{content.brandVisibilityTitle}</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">{content.brandVisibilityDescription}</CardDescription>
+            <CardTitle className="text-lg font-semibold">
+              <DashboardSectionTitle>{content.brandVisibilityTitle}</DashboardSectionTitle>
+            </CardTitle>
+            <CardDescription className="text-xs leading-relaxed md:text-sm">{content.brandVisibilityDescription}</CardDescription>
           </CardHeader>
           <CardContent>
             <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
@@ -176,9 +179,9 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div className="min-w-0 flex-1">
                         <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                            {content.brandVisibilityTitle}
+                            <DashboardSectionTitle>{content.brandVisibilityTitle}</DashboardSectionTitle>
                         </CardTitle>
-                        <CardDescription className="pr-1 text-xs leading-relaxed">
+                        <CardDescription className="pr-1 text-xs leading-relaxed md:text-sm">
                             {content.brandVisibilityDescription}
                         </CardDescription>
                     </div>
@@ -187,16 +190,16 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
                           value={metricMode}
                           onValueChange={(v) => setMetricMode(v as "sov" | "mention_rate")}
                         >
-                          <TabsList className="h-8 w-full max-w-full md:h-7 md:w-auto">
-                            <TabsTrigger value="sov" className="px-2 text-[10px] md:text-[10px]">SOV %</TabsTrigger>
-                            <TabsTrigger value="mention_rate" className="px-2 text-[10px] md:text-[10px]">
+                          <TabsList className="h-8 w-full max-w-full md:h-9 md:w-auto">
+                            <TabsTrigger value="sov" className="px-2 text-[11px] md:px-3 md:text-xs">SOV %</TabsTrigger>
+                            <TabsTrigger value="mention_rate" className="px-2 text-[11px] md:px-3 md:text-xs">
                               Mention rate %
                             </TabsTrigger>
                           </TabsList>
                         </Tabs>
                         <Badge
                           variant="secondary"
-                          className="h-8 shrink-0 font-normal text-xs uppercase bg-muted/50 text-muted-foreground md:h-7"
+                          className="h-8 shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:h-9 md:text-sm"
                         >
                             {period === "today" ? "24h" : period}
                         </Badge>
@@ -243,8 +246,10 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
                     <div className="min-w-0 border-t bg-muted/5 px-4 xl:col-span-7 xl:flex xl:flex-col xl:border-t-0">
                         <div className="flex items-center justify-between border-b border-border/50 p-4">
                             <div>
-                                <h4 className="text-sm font-semibold">{content.topBrands}</h4>
-                                <p className="text-xs text-muted-foreground">{content.byVisibility}</p>
+                                <h4 className="text-sm font-semibold md:text-base">
+                                  <DashboardSectionTitle>{content.topBrands}</DashboardSectionTitle>
+                                </h4>
+                                <p className="text-xs text-muted-foreground md:text-sm">{content.byVisibility}</p>
                             </div>
                         </div>
 
@@ -260,21 +265,21 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
                                         </div>
 
                                         <div className="flex-shrink-0">
-                                            <div className="w-8 h-8 rounded-md bg-background border border-border flex items-center justify-center text-[10px] font-bold text-muted-foreground">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background text-xs font-bold text-muted-foreground">
                                                 {brand.initials}
                                             </div>
                                         </div>
 
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-baseline mb-0.5">
-                                                <span className="font-semibold text-sm truncate block">{brand.name}</span>
-                                                <span className="font-bold text-xs tabular-nums">{brand.percentage}%</span>
+                                                <span className="block truncate text-xs font-semibold md:text-sm">{brand.name}</span>
+                                                <span className="text-xs font-bold tabular-nums md:text-sm">{brand.percentage}%</span>
                                             </div>
                                             <div className="flex justify-between items-center">
-                                             <span className="min-w-0 flex-1 truncate text-[10px] text-muted-foreground">
+                                             <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                                                     {truncateWebsite(brand.website || "", 22)}
                                                 </span>
-                                                <span className="text-[10px] text-muted-foreground tabular-nums">
+                                                <span className="text-xs tabular-nums text-muted-foreground">
                                                   {brand.mentions} {content.mentions}
                                                   {metricMode === "mention_rate" ? ` • ${brand.sovPercentage}% SOV` : ""}
                                                 </span>
@@ -326,10 +331,10 @@ function BrandVisibilityTooltip({
     <div className="min-w-[210px] rounded-md border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur-sm">
       <div className="mb-2 flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs font-medium">{row.name}</span>
+        <span className="text-sm font-medium">{row.name}</span>
       </div>
       <div className="grid gap-2">
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between text-xs">
           <span className="text-muted-foreground">Mentions</span>
           <span className="font-mono tabular-nums">{mentions} / {Math.max(totalScopedPrompts, 0)}</span>
         </div>
@@ -344,7 +349,7 @@ function TooltipMetricBar({ label, value, color }: { label: string; value: numbe
   const safe = Math.max(0, Math.min(100, Number(value) || 0));
   return (
     <div className="space-y-1">
-      <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{label}</span>
         <span className="tabular-nums">{safe.toFixed(1)}%</span>
       </div>

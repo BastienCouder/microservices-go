@@ -1,8 +1,19 @@
 import type { DateRange } from "react-day-picker";
 
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type DatePickerWithRangeProps = {
+  className?: string;
   date: DateRange | undefined;
   setDate: (value: DateRange | undefined) => void;
   period: string;
@@ -26,36 +37,44 @@ function fromDateInputValue(value: string): Date | undefined {
 }
 
 export function DatePickerWithRange({
+  className,
   date,
   setDate,
   period,
   setPeriod,
 }: DatePickerWithRangeProps) {
   return (
-    <div className="space-y-2">
-      <select
-        className="h-8 w-full rounded-lg border border-input bg-background px-2 text-sm"
-        value={period}
-        onChange={(event) => {
-          const next = event.target.value;
-          setPeriod(next);
-          if (next !== "custom") {
-            setDate(undefined);
-          }
-        }}
-      >
-        <option value="today">Today (24h)</option>
-        <option value="7d">Last 7 days</option>
-        <option value="14d">Last 14 days</option>
-        <option value="30d">Last 30 days</option>
-        <option value="90d">Last 3 months</option>
-        <option value="custom">Custom range</option>
-      </select>
-
+    <FieldGroup className={cn("gap-2", className)}>
+      <Field className="gap-1">
+        <Select
+          value={period}
+          onValueChange={(next) => {
+            setPeriod(next);
+            if (next !== "custom") {
+              setDate(undefined);
+            }
+          }}
+        >
+          <SelectTrigger className="h-10 w-full lg:h-8">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent position="item-aligned">
+            <SelectGroup>
+              <SelectItem value="today">Today (24h)</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="14d">Last 14 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
+              <SelectItem value="90d">Last 3 months</SelectItem>
+              <SelectItem value="custom">Custom range</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+      </Field>
       {period === "custom" ? (
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Input
             type="date"
+            className="h-10 lg:h-9"
             value={toDateInputValue(date?.from)}
             onChange={(event) => {
               const from = fromDateInputValue(event.target.value);
@@ -64,6 +83,7 @@ export function DatePickerWithRange({
           />
           <Input
             type="date"
+            className="h-10 lg:h-9"
             value={toDateInputValue(date?.to)}
             onChange={(event) => {
               const to = fromDateInputValue(event.target.value);
@@ -72,6 +92,6 @@ export function DatePickerWithRange({
           />
         </div>
       ) : null}
-    </div>
+    </FieldGroup>
   );
 }

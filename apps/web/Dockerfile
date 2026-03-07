@@ -24,6 +24,7 @@ ARG NEXT_PUBLIC_APP_URL=http://localhost:30004
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_PUBLIC_API_GATEWAY_URL=${NEXT_PUBLIC_API_GATEWAY_URL}
 ENV NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
+ENV KRATOS_PUBLIC_PROXY_URL=http://kratos:4433
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

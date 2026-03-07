@@ -55,6 +55,9 @@ func shouldEnforcePermission(r *http.Request) bool {
 	if r.URL.Path == "/organizations" && r.Method == http.MethodPost {
 		return false
 	}
+	if r.URL.Path == "/organizations/me" && r.Method == http.MethodGet {
+		return false
+	}
 	if r.URL.Path == "/permissions/check" && r.Method == http.MethodPost {
 		return false
 	}

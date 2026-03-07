@@ -27,6 +27,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /organizations", h.createOrganization)
+	mux.HandleFunc("GET /organizations/me", h.listMyOrganizations)
 	mux.HandleFunc("/organizations/", h.organizationRoutes)
 	mux.HandleFunc("/invitations/", h.invitationRoutes)
 }
@@ -45,6 +46,12 @@ func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 
 type createOrganizationRequest struct {
 	Name string `json:"name"`
+}
+
+type membershipResponse struct {
+	ID             string `json:"id"`
+	OrganizationID string `json:"organizationId"`
+	Role           string `json:"role"`
 }
 
 func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +80,42 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, organization)
+}
+
+func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	memberships, err := h.svc.ListOrganizationsByUser(r.Context(), authUserID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+
+	response := make([]membershipResponse, 0, len(memberships))
+	for _, membership := range memberships {
+		role := "member"
+		for _, candidate := range membership.Roles {
+			if candidate == "owner" {
+				role = "owner"
+				break
+			}
+			if candidate == "admin" {
+				role = "admin"
+			}
+		}
+		organizationID := strconv.FormatInt(membership.OrganizationID, 10)
+		response = append(response, membershipResponse{
+			ID:             organizationID,
+			OrganizationID: organizationID,
+			Role:           role,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {

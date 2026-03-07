@@ -59,7 +59,13 @@ export function FiltersPanel() {
 
   const personaOptions = useMemo(
     () =>
-      Array.from(new Set(recent_prompts.map((prompt) => prompt.persona))).map((persona) => ({
+      Array.from(
+        new Set(
+          recent_prompts
+            .map((prompt) => prompt.persona.trim())
+            .filter(Boolean),
+        ),
+      ).map((persona) => ({
         id: persona,
         label: persona.charAt(0).toUpperCase() + persona.slice(1),
       })),

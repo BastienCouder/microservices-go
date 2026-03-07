@@ -8,26 +8,38 @@ import (
 
 type KratosClient interface {
 	WhoAmI(ctx context.Context, cookieHeader, sessionToken string) (*domain.Session, int, error)
-	InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error)
+	InitFlow(ctx context.Context, mode, returnTo, cookieHeader string) (*domain.BrowserFlow, []string, int, error)
 	SubmitFlow(ctx context.Context, mode, flowID string, payload any, cookieHeader string) (domain.RawJSON, []string, int, error)
 	InitLogout(ctx context.Context, cookieHeader string) (*domain.LogoutInitResponse, []string, int, error)
 	CompleteLogout(ctx context.Context, logoutURL, cookieHeader string) ([]string, int, error)
 }
 
-type Service struct {
-	kratosClient KratosClient
+type UserProfileProvisioner interface {
+	EnsureProfile(ctx context.Context, identity domain.Identity) error
 }
 
-func NewService(kratosClient KratosClient) *Service {
-	return &Service{kratosClient: kratosClient}
+type Service struct {
+	kratosClient     KratosClient
+	profileProvision UserProfileProvisioner
+}
+
+func NewService(kratosClient KratosClient, profileProvision UserProfileProvisioner) *Service {
+	return &Service{kratosClient: kratosClient, profileProvision: profileProvision}
 }
 
 func (s *Service) WhoAmI(ctx context.Context, cookieHeader, sessionToken string) (*domain.Session, int, error) {
 	return s.kratosClient.WhoAmI(ctx, cookieHeader, sessionToken)
 }
 
-func (s *Service) InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
-	return s.kratosClient.InitFlow(ctx, mode, cookieHeader)
+func (s *Service) InitFlow(ctx context.Context, mode, returnTo, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
+	return s.kratosClient.InitFlow(ctx, mode, returnTo, cookieHeader)
+}
+
+func (s *Service) EnsureUserProfile(ctx context.Context, session *domain.Session) error {
+	if s.profileProvision == nil || session == nil {
+		return nil
+	}
+	return s.profileProvision.EnsureProfile(ctx, session.Identity)
 }
 
 func (s *Service) SubmitFlow(ctx context.Context, mode, flowID string, payload any, cookieHeader string) (domain.RawJSON, []string, int, error) {

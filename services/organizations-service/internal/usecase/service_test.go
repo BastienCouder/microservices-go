@@ -50,6 +50,21 @@ func (f *fakeRepo) GetByID(_ context.Context, id int64) (*domain.Organization, e
 	return &clone, nil
 }
 
+func (f *fakeRepo) ListOrganizationsByUser(_ context.Context, userID int64) ([]domain.Membership, error) {
+	out := make([]domain.Membership, 0)
+	for key, member := range f.members {
+		if key[1] != userID {
+			continue
+		}
+		out = append(out, domain.Membership{
+			OrganizationID: member.OrganizationID,
+			UserID:         member.UserID,
+			Roles:          append([]string(nil), member.Roles...),
+		})
+	}
+	return out, nil
+}
+
 func (f *fakeRepo) CreateTeam(_ context.Context, team *domain.Team) error {
 	if _, ok := f.organizations[team.OrganizationID]; !ok {
 		return domain.ErrOrganizationNotFound

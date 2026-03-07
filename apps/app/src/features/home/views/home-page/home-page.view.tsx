@@ -1,11 +1,5 @@
 import { FormEvent } from "react";
 
-export type SessionInfo = {
-  identity_id: string;
-  email: string;
-  name: string;
-};
-
 export type UserProfile = {
   id: number;
   auth_identity_id: string;
@@ -19,7 +13,6 @@ export type HomePageViewProps = {
   webAuthURL: string;
   busy: boolean;
   result: string;
-  session: SessionInfo | null;
   user: UserProfile | null;
   organizationId: string;
   firstName: string;
@@ -46,7 +39,6 @@ export function HomePageView({
   webAuthURL,
   busy,
   result,
-  session,
   user,
   organizationId,
   firstName,
@@ -85,64 +77,28 @@ export function HomePageView({
       </header>
 
       <section style={{ marginTop: 18, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
-        <h2 style={{ marginTop: 0 }}>Session</h2>
-        {!session ? (
+        <h2 style={{ marginTop: 0 }}>User Profile</h2>
+        {!user ? (
           <div>
-            <p>Non connecté.</p>
+            <p>Aucune donnée utilisateur.</p>
             <a href={webAuthURL}>Se connecter (via Web)</a>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 6 }}>
             <div>
-              <strong>Identity:</strong> <code>{session.identity_id}</code>
+              <strong>Identity:</strong> <code>{user.auth_identity_id}</code>
             </div>
             <div>
-              <strong>Email:</strong> {session.email}
+              <strong>Email:</strong> {user.email}
             </div>
             <div>
-              <strong>Name:</strong> {session.name}
+              <strong>Name:</strong> {user.first_name} {user.last_name}
             </div>
           </div>
         )}
       </section>
 
-      {session && (
-        <section style={{ marginTop: 18, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
-          <h2 style={{ marginTop: 0 }}>User Profile</h2>
-          {!user ? (
-            <form onSubmit={onCreateUser} style={{ display: "grid", gap: 10 }}>
-              <p style={{ margin: 0, color: "#555" }}>
-                Aucun profil user. Crée-le pour accéder aux endpoints protégés et au service permissions.
-              </p>
-              <label style={{ display: "grid", gap: 6 }}>
-                Prénom
-                <input disabled={busy} onChange={(e) => onChangeFirstName(e.target.value)} value={firstName} />
-              </label>
-              <label style={{ display: "grid", gap: 6 }}>
-                Nom
-                <input disabled={busy} onChange={(e) => onChangeLastName(e.target.value)} value={lastName} />
-              </label>
-              <button disabled={busy || !firstName.trim() || !lastName.trim()} type="submit">
-                Créer mon user
-              </button>
-            </form>
-          ) : (
-            <div style={{ display: "grid", gap: 6 }}>
-              <div>
-                <strong>User ID:</strong> <code>{user.id}</code>
-              </div>
-              <div>
-                <strong>Name:</strong> {user.first_name} {user.last_name}
-              </div>
-              <div>
-                <strong>Email:</strong> {user.email}
-              </div>
-            </div>
-          )}
-        </section>
-      )}
-
-      {session && user && (
+      {user && (
         <section style={{ marginTop: 18, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
           <h2 style={{ marginTop: 0 }}>Organization</h2>
           <form onSubmit={onCreateOrganization} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -166,7 +122,7 @@ export function HomePageView({
         </section>
       )}
 
-      {session && user && organizationId.trim() !== "" && (
+      {user && organizationId.trim() !== "" && (
         <section style={{ marginTop: 18, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
           <h2 style={{ marginTop: 0 }}>Permissions</h2>
           <form onSubmit={onCheckPermission} style={{ display: "grid", gap: 10 }}>
@@ -187,7 +143,7 @@ export function HomePageView({
         </section>
       )}
 
-      {session && user && organizationId.trim() !== "" && (
+      {user && organizationId.trim() !== "" && (
         <section style={{ marginTop: 18, padding: 12, border: "1px solid #ddd", borderRadius: 10 }}>
           <h2 style={{ marginTop: 0 }}>Teams</h2>
           <form onSubmit={onCreateTeam} style={{ display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
@@ -211,4 +167,3 @@ export function HomePageView({
     </main>
   );
 }
-

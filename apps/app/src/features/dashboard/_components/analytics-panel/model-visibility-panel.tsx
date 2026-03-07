@@ -7,8 +7,9 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { VISIBILITY_ANALYTICS_COLORS } from "@/lib/app-data";
+import { DashboardSectionTitle } from "../dashboard-section-title";
 import { chartConfig } from "./analytics-utils";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 type VisibilityAnalyticsProps = {
   effectiveVisibilityPeriod: string;
@@ -35,15 +36,17 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
       <CardHeader className="pb-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
-            <CardTitle className="text-base font-semibold sm:text-lg">{title || content.visibilityAnalyticsTitle}</CardTitle>
-            <CardDescription className="text-xs leading-relaxed">
+            <CardTitle className="text-base font-semibold sm:text-lg">
+              <DashboardSectionTitle>{title || content.visibilityAnalyticsTitle}</DashboardSectionTitle>
+            </CardTitle>
+            <CardDescription className="text-xs leading-relaxed md:text-sm">
               Nombre de reponses IA ou votre marque est mentionnee.
               {hasCompetitorFilter
                 ? " Avec un filtre concurrent, on compte seulement les co-mentions (votre marque + concurrent selectionne)."
                 : ""}
             </CardDescription>
           </div>
-          <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground">
+          <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
             {effectiveVisibilityPeriod === "today" ? "24h" : effectiveVisibilityPeriod}
           </Badge>
         </div>
@@ -105,7 +108,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
                   dataKey="value"
                   position="right"
                   formatter={(value) => `${value ?? 0}`}
-                  className="fill-foreground text-[10px] font-medium"
+                  className="fill-foreground text-xs font-medium"
                 />
               </Bar>
             </BarChart>
@@ -138,11 +141,11 @@ function VisibilityAnalyticsTooltip({
     <div className="min-w-[180px] rounded-md border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur-sm">
       <div className="mb-2 flex items-center gap-2">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs font-medium">{label}</span>
+        <span className="text-xs font-medium md:text-sm">{label}</span>
       </div>
-      <div className="mb-1 flex items-center justify-between text-[11px] gap-4">
+      <div className="mb-1 flex items-center justify-between gap-4 text-xs">
         <span className="text-muted-foreground">% dans les resultats affiches</span>
-        <span className="font-mono text-sm font-semibold tabular-nums">{share}%</span>
+        <span className="font-mono text-sm font-semibold tabular-nums md:text-base">{share}%</span>
       </div>
       <div className="space-y-1">
         <div className="h-1.5 overflow-hidden rounded-full bg-muted/50">

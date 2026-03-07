@@ -74,8 +74,8 @@ func (c *Client) WhoAmI(ctx context.Context, cookieHeader, sessionToken string) 
 	return &session, resp.StatusCode, nil
 }
 
-func (c *Client) InitFlow(ctx context.Context, mode, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
-	path, err := flowInitPath(mode, c.appReturn)
+func (c *Client) InitFlow(ctx context.Context, mode, returnTo, cookieHeader string) (*domain.BrowserFlow, []string, int, error) {
+	path, err := flowInitPath(mode, firstNonEmpty(strings.TrimSpace(returnTo), c.appReturn))
 	if err != nil {
 		return nil, nil, 0, err
 	}
@@ -171,7 +171,7 @@ func (c *Client) InitLogout(ctx context.Context, cookieHeader string) (*domain.L
 
 func (c *Client) CompleteLogout(ctx context.Context, logoutURL, cookieHeader string) ([]string, int, error) {
 	targetURL := c.rewriteToInternalBase(logoutURL)
-	resp, _, err := c.doWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (*http.Request, error) {
+	resp, _, err := c.doWithResilienceNoRedirect(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (*http.Request, error) {
 		req, reqErr := http.NewRequestWithContext(attemptCtx, http.MethodGet, targetURL, nil)
 		if reqErr != nil {
 			return nil, reqErr
@@ -220,6 +220,31 @@ func (c *Client) doWithResilience(
 	attemptTimeout time.Duration,
 	reqBuilder func(context.Context) (*http.Request, error),
 ) (*http.Response, []byte, error) {
+	return c.doWithClient(ctx, c.httpClient, attempts, baseBackoff, attemptTimeout, reqBuilder)
+}
+
+func (c *Client) doWithResilienceNoRedirect(
+	ctx context.Context,
+	attempts int,
+	baseBackoff time.Duration,
+	attemptTimeout time.Duration,
+	reqBuilder func(context.Context) (*http.Request, error),
+) (*http.Response, []byte, error) {
+	noRedirectClient := *c.httpClient
+	noRedirectClient.CheckRedirect = func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return c.doWithClient(ctx, &noRedirectClient, attempts, baseBackoff, attemptTimeout, reqBuilder)
+}
+
+func (c *Client) doWithClient(
+	ctx context.Context,
+	client *http.Client,
+	attempts int,
+	baseBackoff time.Duration,
+	attemptTimeout time.Duration,
+	reqBuilder func(context.Context) (*http.Request, error),
+) (*http.Response, []byte, error) {
 	if attempts <= 0 {
 		return nil, nil, fmt.Errorf("attempts must be positive")
 	}
@@ -242,7 +267,7 @@ func (c *Client) doWithResilience(
 			c.breaker.OnFailure(time.Now().UTC())
 			return nil, nil, reqErr
 		}
-		resp, doErr := c.httpClient.Do(req)
+		resp, doErr := client.Do(req)
 		if doErr != nil {
 			cancel()
 			lastErr = doErr
@@ -325,4 +350,13 @@ func flowSubmitPath(mode string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid mode: %s", mode)
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }

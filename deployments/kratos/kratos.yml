@@ -4,7 +4,7 @@ dsn: ${DSN}
 
 serve:
   public:
-    base_url: http://localhost:4433/
+    base_url: ${KRATOS_PUBLIC_BASE_URL}
     cors:
       enabled: true
       allowed_origins:
@@ -34,6 +34,7 @@ selfservice:
     - http://localhost:30004/
     - http://localhost:30000/
     - http://localhost:30000/auth
+    - http://localhost:30000/auth/callback
     - http://localhost:30000/auth/login
     - http://localhost:30000/auth/register
 

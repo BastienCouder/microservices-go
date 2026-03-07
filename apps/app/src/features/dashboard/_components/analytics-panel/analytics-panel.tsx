@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useDashboardStore } from "@/lib/dashboard-store";
@@ -385,7 +384,7 @@ export function AnalyticsPanel() {
 
   if (loading) {
     return (
-      <ScrollArea className="h-auto px-1 xl:h-full">
+      <div className="h-auto px-0 md:px-1 lg:h-full lg:overflow-y-auto">
         <div className="flex flex-col gap-4 pb-4">
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Card className="rounded-md">
@@ -428,12 +427,12 @@ export function AnalyticsPanel() {
             </CardContent>
           </Card>
         </div>
-      </ScrollArea>
+      </div>
     );
   }
 
   return (
-    <ScrollArea className="h-auto px-1 xl:h-full">
+    <div className="h-auto px-0 md:px-1 lg:h-full lg:overflow-y-auto">
       <div className="flex flex-col gap-4 pb-4">
         <KpiOverviewGrid
           mentionRateValue={mentionRateValue}
@@ -470,6 +469,6 @@ export function AnalyticsPanel() {
 
         <AutomaticInsights autoInsights={autoInsights} />
       </div>
-    </ScrollArea>
+    </div>
   );
 }

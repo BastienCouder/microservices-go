@@ -68,6 +68,12 @@ type Member struct {
 	DeletedAt      *time.Time
 }
 
+type Membership struct {
+	OrganizationID int64
+	UserID         int64
+	Roles          []string
+}
+
 func (m *Member) Validate() error {
 	if m.OrganizationID <= 0 {
 		return fmt.Errorf("%w: organization id must be positive", ErrInvalidMember)

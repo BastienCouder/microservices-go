@@ -1,12 +1,13 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { DashboardData } from "@/lib/dashboard-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { FiltersEmptyStateCard } from "../filters-panel/filters-empty-state-card";
+import { DashboardSectionTitle } from "../dashboard-section-title";
+import { FiltersEmptyStateCard } from "../filters-empty-state-card";
 
 type PromptItem = DashboardData["recent_prompts"][number];
 type ModelItem = DashboardData["models"][number];
@@ -35,13 +36,16 @@ function iconSrcFromKey(iconKey?: string) {
 
 export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filteredPrompts, models, previewCount, onSelectPrompt }: ActivityPromptsStreamProps) {
   const content = useI18nScope("dashboard-activity-panel");
-  const visiblePrompts = filteredPrompts.slice(0, previewCount);
+  const [showAll, setShowAll] = useState(false);
+  const visiblePrompts = showAll ? filteredPrompts : filteredPrompts.slice(0, previewCount);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold">{content.promptsStream}</h4>
-        <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">
+        <h4 className="text-sm font-semibold md:text-base">
+          <DashboardSectionTitle>{content.promptsStream}</DashboardSectionTitle>
+        </h4>
+        <Badge variant="secondary" className="h-6 bg-primary/10 px-2 font-mono text-xs text-primary">
           {filteredPrompts.length}
         </Badge>
       </div>
@@ -53,10 +57,12 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filte
             const modelObj = getModelData(models, prompt.model, prompt.modelFilterKey);
             const promptIconSrc = iconSrcFromKey(prompt.modelIconKey) ?? modelObj?.icon ?? null;
             return (
-              <div
+              <button
+                type="button"
                 key={`${prompt.model}-${prompt.time}-${index}`}
                 onClick={() => onSelectPrompt(prompt)}
-                className="group cursor-pointer rounded-md bg-background p-4 transition-all hover:bg-primary/5"
+                className="group w-full rounded-md bg-background p-4 text-left transition-all hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                aria-label={`${content.promptsStream}: ${prompt.model}`}
               >
                 <div className="mb-2.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -72,24 +78,24 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filte
                         />
                       </div>
                     ) : null}
-                    <p className="text-xs font-medium text-foreground">{prompt.model}</p>
+                    <p className="text-xs font-medium text-foreground md:text-sm">{prompt.model}</p>
                   </div>
-                  <span className="font-mono text-[10px] text-muted-foreground">{prompt.time}</span>
+                  <span className="font-mono text-xs text-muted-foreground">{prompt.time}</span>
                 </div>
 
-                <p className="mb-3 line-clamp-3 text-xs font-medium leading-relaxed text-foreground/90 transition-colors group-hover:text-foreground">&quot;{prompt.text}&quot;</p>
+                <p className="mb-3 line-clamp-3 text-xs font-medium leading-relaxed text-foreground/90 transition-colors group-hover:text-foreground md:text-sm">&quot;{prompt.text}&quot;</p>
 
                 <div className="flex items-center justify-between border-t border-border/40 pt-3">
                   <div className="flex items-center gap-3">
                     {prompt.mention ? (
-                      <span className="rounded-sm text-[10px] font-semibold text-emerald-600">{content.mentioned}</span>
+                      <span className="rounded-sm text-xs font-semibold text-emerald-600">{content.mentioned}</span>
                     ) : (
-                      <span className="rounded-sm text-[10px] font-medium text-destructive">{content.missed}</span>
+                      <span className="rounded-sm text-xs font-medium text-destructive">{content.missed}</span>
                     )}
                     {prompt.rank ? (
                       <>
                         <div className="h-[12px] w-[1px] bg-border" />
-                        <span className={cn("text-[10px]", prompt.rank === 1 ? "font-bold text-primary" : "text-muted-foreground")}>
+                        <span className={cn("text-xs", prompt.rank === 1 ? "font-bold text-primary" : "text-muted-foreground")}>
                           {prompt.rank === 1 ? content.rankTop : `#${prompt.rank}`}
                         </span>
                       </>
@@ -97,21 +103,21 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filte
                   </div>
                   <div
                     className={cn(
-                      "flex h-5 items-center rounded-sm px-2 text-[10px] font-bold",
+                      "flex h-6 items-center rounded-sm px-2 text-xs font-bold",
                       prompt.score > 80 ? "bg-green-500/10 text-green-700" : prompt.score > 50 ? "bg-amber-500/10 text-amber-700" : "bg-destructive/10 text-destructive",
                     )}
                   >
                     {prompt.score}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })
         )}
 
         {filteredPrompts.length > previewCount ? (
-          <Button variant="ghost" size="sm" className="w-full text-xs">
-            {content.showMore}
+          <Button variant="ghost" size="sm" className="w-full text-xs md:text-sm" onClick={() => setShowAll((value) => !value)}>
+            {showAll ? content.showLess : content.showMore}
           </Button>
         ) : null}
       </div>

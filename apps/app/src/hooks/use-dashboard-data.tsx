@@ -4,11 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 
-import { loadDashboardData, type DashboardData, type DashboardPrompt } from "@/lib/dashboard-data";
+import {
+  DashboardRequestError,
+  loadDashboardData,
+  type DashboardData,
+  type DashboardPrompt,
+} from "@/lib/dashboard-data";
 import type { RuntimeMode } from "@/lib/runtime-mode";
 
 type DashboardDataContextValue = {
@@ -27,6 +33,18 @@ type DashboardDataProviderProps = {
 };
 
 const DashboardDataContext = createContext<DashboardDataContextValue | null>(null);
+
+function isAbortError(err: unknown) {
+  return err instanceof Error && err.name === "AbortError";
+}
+
+function toDashboardErrorMessage(err: unknown): string {
+  if (err instanceof DashboardRequestError) {
+    return "Impossible de charger le dashboard pour le moment.";
+  }
+
+  return "Impossible de charger le dashboard pour le moment.";
+}
 
 const EMPTY_DASHBOARD_DATA: DashboardData = {
   project: {
@@ -63,26 +81,45 @@ export function DashboardDataProvider({
   const [error, setError] = useState<string | null>(null);
   const [mode, setMode] = useState<RuntimeMode>("live");
   const [projectId, setProjectId] = useState<string | null>(null);
+  const requestIdRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const runRefresh = useCallback(async (signal?: AbortSignal) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+
     try {
       setLoading(true);
       setError(null);
-      const result = await loadDashboardData(apiBaseURL, routeSearch);
+      const result = await loadDashboardData(apiBaseURL, routeSearch, { signal });
+      if (signal?.aborted || requestId !== requestIdRef.current) {
+        return;
+      }
       setData(result.data);
       setMode(result.mode);
       setProjectId(result.projectId);
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setError(message);
+      if (isAbortError(err) || requestId !== requestIdRef.current) {
+        return;
+      }
+      setError(toDashboardErrorMessage(err));
     } finally {
-      setLoading(false);
+      if (!signal?.aborted && requestId === requestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [apiBaseURL, routeSearch]);
 
+  const refresh = useCallback(async () => {
+    await runRefresh();
+  }, [runRefresh]);
+
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    const controller = new AbortController();
+    void runRefresh(controller.signal);
+    return () => {
+      controller.abort();
+    };
+  }, [runRefresh]);
 
   const value = useMemo<DashboardDataContextValue>(
     () => ({

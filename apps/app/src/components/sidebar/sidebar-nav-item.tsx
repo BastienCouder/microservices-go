@@ -1,6 +1,5 @@
 "use client";
 
-import { type ComponentType } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/shared/utils";
@@ -8,7 +7,6 @@ import { Link } from "react-router-dom";
 
 type SidebarNavItemProps = {
   href: string;
-  icon: ComponentType<{ className?: string }>;
   label: string;
   active: boolean;
   indent?: boolean;
@@ -16,44 +14,22 @@ type SidebarNavItemProps = {
 };
 
 export function SidebarSectionHeader({
-  icon: Icon,
-  iconSrc,
   label,
   collapsed,
 }: {
-  icon?: ComponentType<{ className?: string }>;
-  iconSrc?: string;
   label: string;
   collapsed: boolean;
 }) {
   if (collapsed) return <Separator className="my-2" />;
 
   return (
-    <div className="flex items-center gap-1.5 px-2 py-1">
-      {iconSrc ? (
-        <span
-          aria-hidden="true"
-          className="h-[18px] w-[18px] bg-primary"
-          style={{
-            maskImage: `url(${iconSrc})`,
-            WebkitMaskImage: `url(${iconSrc})`,
-            maskRepeat: "no-repeat",
-            WebkitMaskRepeat: "no-repeat",
-            maskPosition: "center",
-            WebkitMaskPosition: "center",
-            maskSize: "contain",
-            WebkitMaskSize: "contain",
-          }}
-        />
-      ) : Icon ? (
-        <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-      ) : null}
+    <div className="flex items-center px-2 py-1">
       <span className="text-xs font-semibold text-foreground">{label}</span>
     </div>
   );
 }
 
-export function SidebarNavItem({ href, icon: Icon, label, active, indent, collapsed }: SidebarNavItemProps) {
+export function SidebarNavItem({ href, label, active, indent, collapsed }: SidebarNavItemProps) {
   if (collapsed) {
     return (
       <Tooltip>
@@ -66,7 +42,7 @@ export function SidebarNavItem({ href, icon: Icon, label, active, indent, collap
             )}
           >
             {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-            <Icon className={cn("h-4 w-4", active && "text-primary")} />
+            <span className="text-xs font-semibold uppercase tracking-[0.18em]">{label.slice(0, 1)}</span>
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
@@ -96,12 +72,11 @@ export function SidebarNavItem({ href, icon: Icon, label, active, indent, collap
     <Link
       to={href}
       className={cn(
-        "group relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors",
+        "group relative flex items-center rounded-md px-2 py-1.5 text-sm transition-colors",
         active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
       )}
     >
       {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-      <Icon className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground")} />
       {label}
     </Link>
   );

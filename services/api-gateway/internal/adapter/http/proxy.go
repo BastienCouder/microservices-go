@@ -3,6 +3,7 @@ package http
 import (
 	"net/http"
 	"strings"
+	"time"
 )
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -16,16 +17,22 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 
 	if !isHealthRequest(r) && !h.rateLimiter.Allow(h.clientIP(r)) {
 		writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded")
+		auditAccess(r, "api-gateway", http.StatusTooManyRequests, 0, time.Now().UTC())
 		return
 	}
 
 	for _, route := range h.routes {
 		if route.match(r) {
-			route.handler.ServeHTTP(w, r)
+			started := time.Now().UTC()
+			recorder := newStatusRecorder(w)
+			route.handler.ServeHTTP(recorder, r)
+			auditAccess(r, route.service, recorder.status, recorder.bytes, started)
 			return
 		}
 	}
+	started := time.Now().UTC()
 	http.NotFound(w, r)
+	auditAccess(r, "api-gateway", http.StatusNotFound, 0, started)
 }
 
 func (h *Handler) handleCORS(w http.ResponseWriter, r *http.Request) bool {

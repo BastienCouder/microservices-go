@@ -11,7 +11,7 @@ export function FiltersEmptyStateCard({ label, className }: FiltersEmptyStateCar
   return (
     <div
       className={cn(
-        "flex h-16 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-muted/5 px-3 text-center text-xs text-muted-foreground",
+        "flex h-16 items-center justify-center rounded-md border border-dashed border-foreground/20 bg-muted/5 px-3 text-center text-xs leading-relaxed text-muted-foreground md:text-sm",
         className,
       )}
     >
@@ -19,4 +19,3 @@ export function FiltersEmptyStateCard({ label, className }: FiltersEmptyStateCar
     </div>
   );
 }
-

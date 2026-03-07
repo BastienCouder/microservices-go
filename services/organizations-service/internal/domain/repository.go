@@ -8,6 +8,7 @@ import (
 type Repository interface {
 	Create(ctx context.Context, organization *Organization) error
 	GetByID(ctx context.Context, id int64) (*Organization, error)
+	ListOrganizationsByUser(ctx context.Context, userID int64) ([]Membership, error)
 	CreateTeam(ctx context.Context, team *Team) error
 	ListTeams(ctx context.Context, organizationID int64) ([]Team, error)
 	UpsertMember(ctx context.Context, member *Member) error
