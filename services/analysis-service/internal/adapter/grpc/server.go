@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
+	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,8 +21,12 @@ func NewServer(svc *usecase.Service) *Server {
 }
 
 func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysisRequest) (*analysisv1.StartAnalysisResponse, error) {
-	if req.GetProjectId() == "" || req.GetUserId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "project_id and user_id are required")
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+	claims, ok := security.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 || claims.UserID <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization or user claims")
 	}
 
 	promptTexts := make([]usecase.PromptText, 0, len(req.GetPromptTexts()))
@@ -34,12 +38,13 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 	}
 
 	result, err := s.svc.StartAnalysis(ctx, usecase.StartAnalysisInput{
-		RequestID:   req.GetRequestId(),
-		UserID:      strconv.FormatInt(req.GetUserId(), 10),
-		ProjectID:   req.GetProjectId(),
-		PromptTexts: promptTexts,
-		ModelIDs:    req.GetModelIds(),
-		RunType:     req.GetRunType(),
+		RequestID:      req.GetRequestId(),
+		OrganizationID: claims.Organization,
+		CreatedBy:      claims.UserID,
+		ProjectID:      req.GetProjectId(),
+		PromptTexts:    promptTexts,
+		ModelIDs:       req.GetModelIds(),
+		RunType:        req.GetRunType(),
 	})
 	if err != nil {
 		return nil, toStatus(err)

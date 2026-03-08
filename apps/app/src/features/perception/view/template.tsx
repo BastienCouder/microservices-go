@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FiltersEmptyStateCard } from "@/features/dashboard/_components/filters-empty-state-card";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { FiltersEmptyStateCard } from "@/features/monitoring/_components/filters-empty-state-card";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon } from "@/lib/perception-data";
 import { BrandCanonEditorPageClient } from "../brand-canon/page-client";

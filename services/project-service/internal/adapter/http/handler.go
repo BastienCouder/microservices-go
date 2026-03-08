@@ -23,6 +23,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /projects", h.createProject)
 	mux.HandleFunc("GET /projects", h.listProjects)
+	mux.HandleFunc("GET /projects/ai-models", h.listModels)
+	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
 	mux.HandleFunc("/projects/", h.projectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
 	mux.HandleFunc("/competitors/", h.competitorRoutes)
@@ -50,9 +52,14 @@ type createProjectRequest struct {
 }
 
 func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authenticatedUserID(r)
+	createdBy, ok := authenticatedUserID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
@@ -63,7 +70,8 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := h.svc.CreateProject(r.Context(), usecase.CreateProjectInput{
-		UserID:           userID,
+		OrganizationID:   organizationID,
+		CreatedBy:        createdBy,
 		Name:             req.Name,
 		Domain:           req.Domain,
 		WebsiteURL:       req.WebsiteURL,
@@ -82,13 +90,13 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	projects, err := h.svc.ListProjects(r.Context(), userID)
+	projects, err := h.svc.ListProjects(r.Context(), organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -167,12 +175,12 @@ func (h *Handler) competitorRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getProject(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	project, err := h.svc.GetProject(r.Context(), projectID, userID)
+	project, err := h.svc.GetProject(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -190,9 +198,9 @@ type updateProjectRequest struct {
 }
 
 func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
@@ -202,7 +210,7 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 		return
 	}
 
-	project, err := h.svc.UpdateProject(r.Context(), projectID, userID, usecase.UpdateProjectInput{
+	project, err := h.svc.UpdateProject(r.Context(), projectID, organizationID, usecase.UpdateProjectInput{
 		Name:             req.Name,
 		Domain:           req.Domain,
 		WebsiteURL:       req.WebsiteURL,
@@ -218,12 +226,12 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 }
 
 func (h *Handler) activateProject(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	project, err := h.svc.ActivateProject(r.Context(), projectID, userID)
+	project, err := h.svc.ActivateProject(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -232,12 +240,12 @@ func (h *Handler) activateProject(w http.ResponseWriter, r *http.Request, projec
 }
 
 func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	result, err := h.svc.FinalizeProject(r.Context(), projectID, userID)
+	result, err := h.svc.FinalizeProject(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -250,9 +258,9 @@ type addPromptsRequest struct {
 }
 
 func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 	var req addPromptsRequest
@@ -261,7 +269,7 @@ func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID s
 		return
 	}
 
-	prompts, err := h.svc.AddPrompts(r.Context(), projectID, userID, req.Prompts)
+	prompts, err := h.svc.AddPrompts(r.Context(), projectID, organizationID, req.Prompts)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -270,12 +278,18 @@ func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID s
 }
 
 func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	prompts, err := h.svc.ListPrompts(r.Context(), projectID, userID)
+	page, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page")))
+	pageSize, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page_size")))
+	prompts, err := h.svc.ListPrompts(r.Context(), projectID, organizationID, usecase.ListPromptsInput{
+		Search:   r.URL.Query().Get("search"),
+		Page:     page,
+		PageSize: pageSize,
+	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -290,9 +304,9 @@ type updatePromptRequest struct {
 }
 
 func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 	var req updatePromptRequest
@@ -300,7 +314,7 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, userID, usecase.UpdatePromptInput{
+	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, organizationID, usecase.UpdatePromptInput{
 		Text:     req.Text,
 		Intent:   req.Intent,
 		IsActive: req.IsActive,
@@ -313,12 +327,12 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 }
 
 func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	if err := h.svc.DeletePrompt(r.Context(), promptID, userID); err != nil {
+	if err := h.svc.DeletePrompt(r.Context(), promptID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
@@ -330,9 +344,9 @@ type addCompetitorsRequest struct {
 }
 
 func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 	var req addCompetitorsRequest
@@ -340,7 +354,7 @@ func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, project
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	competitors, err := h.svc.AddCompetitors(r.Context(), projectID, userID, req.Competitors)
+	competitors, err := h.svc.AddCompetitors(r.Context(), projectID, organizationID, req.Competitors)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -349,12 +363,12 @@ func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, project
 }
 
 func (h *Handler) listCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	competitors, err := h.svc.ListCompetitors(r.Context(), projectID, userID)
+	competitors, err := h.svc.ListCompetitors(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -370,9 +384,9 @@ type updateCompetitorRequest struct {
 }
 
 func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 	var req updateCompetitorRequest
@@ -380,7 +394,7 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	competitor, err := h.svc.UpdateCompetitor(r.Context(), competitorID, userID, usecase.UpdateCompetitorInput{
+	competitor, err := h.svc.UpdateCompetitor(r.Context(), competitorID, organizationID, usecase.UpdateCompetitorInput{
 		Name:       req.Name,
 		Domain:     req.Domain,
 		WebsiteURL: req.WebsiteURL,
@@ -394,12 +408,12 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 }
 
 func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	if err := h.svc.DeleteCompetitor(r.Context(), competitorID, userID); err != nil {
+	if err := h.svc.DeleteCompetitor(r.Context(), competitorID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
@@ -432,12 +446,12 @@ func (h *Handler) seedModels(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) listProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	selection, err := h.svc.ListProjectModels(r.Context(), projectID, userID)
+	selection, err := h.svc.ListProjectModels(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -450,9 +464,9 @@ type replaceProjectModelsRequest struct {
 }
 
 func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 	var req replaceProjectModelsRequest
@@ -460,7 +474,7 @@ func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, p
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	result, err := h.svc.ReplaceProjectModels(r.Context(), projectID, userID, req.ModelIDs)
+	result, err := h.svc.ReplaceProjectModels(r.Context(), projectID, organizationID, req.ModelIDs)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -489,15 +503,34 @@ func splitPathAfter(path, prefix string) []string {
 	return strings.Split(trimmed, "/")
 }
 
-func authenticatedUserID(r *http.Request) (string, bool) {
+func authenticatedUserID(r *http.Request) (int64, bool) {
 	value := strings.TrimSpace(r.Header.Get("X-Authenticated-User-ID"))
 	if value == "" {
 		value = strings.TrimSpace(r.Header.Get("x-user-id"))
 	}
 	if value == "" {
-		return "", false
+		return 0, false
 	}
-	return value, true
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func authenticatedOrganizationID(r *http.Request) (int64, bool) {
+	value := strings.TrimSpace(r.Header.Get("X-Organization-ID"))
+	if value == "" {
+		value = strings.TrimSpace(r.Header.Get("x-organization-id"))
+	}
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {

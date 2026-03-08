@@ -1,6 +1,8 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { apiRoutes } from "@/lib/api-config";
+import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
 import type { OrganizationInvitation, OrganizationMember, Team, UserProfile } from "@/shared/models";
 import { Separator } from "@/components/ui/separator";
@@ -23,6 +25,16 @@ type MembershipSummary = {
 
 const SELECTED_ORG_KEY = "selected-organization-id";
 const SIM_PLAN_KEY_PREFIX = "simulated-billing-plan:";
+
+function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan | null {
+  if (rawPlan === "starter" || rawPlan === "growth" || rawPlan === "pro" || rawPlan === "agency-enterprise") {
+    return rawPlan;
+  }
+  if (rawPlan === "free") return "starter";
+  if (rawPlan === "pro-monthly") return "growth";
+  if (rawPlan === "pro-yearly") return "pro";
+  return null;
+}
 
 function buildApiUrl(baseURL: string, path: string): string {
   const base = baseURL.trim();
@@ -162,30 +174,94 @@ function generateSlug(value: string): string {
 
 function getPlanLabel(organizationId: string): string | null {
   if (typeof window === "undefined") return null;
-  const plan = window.localStorage.getItem(`${SIM_PLAN_KEY_PREFIX}${organizationId}`) as SimulatedPlan | null;
+  const plan = normalizeStoredPlan(window.localStorage.getItem(`${SIM_PLAN_KEY_PREFIX}${organizationId}`));
   if (!plan) return null;
-  if (plan === "free") return "Sim Free";
-  if (plan === "pro-monthly") return "Sim Pro Monthly";
-  return "Sim Pro Yearly";
+  if (plan === "starter") return "Starter";
+  if (plan === "growth") return "Growth";
+  if (plan === "pro") return "Pro";
+  return "Agency / Enterprise";
+}
+
+async function loadOrganizationsList(apiBaseURL: string, signal?: AbortSignal): Promise<OrganizationSummary[]> {
+  const membershipsResponse = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
+    method: "GET",
+    signal,
+  });
+  if (!membershipsResponse.ok) {
+    if (membershipsResponse.status === 401) {
+      return [];
+    }
+    throw new Error("Impossible de charger les organisations pour le moment.");
+  }
+
+  const memberships = normalizeMemberships(membershipsResponse.data);
+  const summaries = await Promise.all(
+    memberships.map(async (membership) => {
+      const organizationId = membership.organizationId ?? membership.id;
+      if (!organizationId) return null;
+
+      const organizationResponse = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.get(organizationId), {
+        method: "GET",
+        organizationId,
+        signal,
+      });
+      if (!organizationResponse.ok) {
+        return null;
+      }
+
+      return normalizeOrganizationDetails(organizationResponse.data, organizationId, membership.role || "member");
+    }),
+  );
+
+  return summaries.filter((item): item is OrganizationSummary => item !== null);
+}
+
+async function loadOrganizationResources(
+  apiBaseURL: string,
+  organizationId: string,
+  signal?: AbortSignal,
+): Promise<{
+  teams: Team[];
+  members: OrganizationMember[];
+  invitations: OrganizationInvitation[];
+}> {
+  const [teamsResponse, membersResponse, invitationsResponse] = await Promise.all([
+    gatewayJSON<Team[]>(apiBaseURL, `/organizations/${organizationId}/teams`, {
+      method: "GET",
+      organizationId,
+      signal,
+    }),
+    gatewayJSON<OrganizationMember[]>(apiBaseURL, `/organizations/${organizationId}/members`, {
+      method: "GET",
+      organizationId,
+      signal,
+    }),
+    gatewayJSON<OrganizationInvitation[]>(apiBaseURL, `/organizations/${organizationId}/invitations`, {
+      method: "GET",
+      organizationId,
+      signal,
+    }),
+  ]);
+
+  return {
+    teams: teamsResponse.ok ? teamsResponse.data : [],
+    members: membersResponse.ok ? membersResponse.data : [],
+    invitations: invitationsResponse.ok ? invitationsResponse.data : [],
+  };
 }
 
 export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, user }: OrganizationsClientProps) {
+  const queryClient = useQueryClient();
   const hintedOrganizationId = readRouteQueryParam(routeSearch, "org");
-
-  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [members, setMembers] = useState<OrganizationMember[]>([]);
-  const [invitations, setInvitations] = useState<OrganizationInvitation[]>([]);
 
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>(hintedOrganizationId || readStoredOrganizationID());
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   const [showCreateWizard, setShowCreateWizard] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftSlug, setDraftSlug] = useState("");
-  const [draftPlan, setDraftPlan] = useState<SimulatedPlan>("free");
+  const [draftPlan, setDraftPlan] = useState<SimulatedPlan>("starter");
   const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
 
   const [editedName, setEditedName] = useState("");
@@ -195,6 +271,22 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
   const [isDeleting, setIsDeleting] = useState(false);
   const [activeTab, setActiveTab] = useState<OrganizationTab>("members");
   const deferredSearch = useDeferredValue(search);
+
+  const organizationsQuery = useQuery({
+    queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+    enabled: apiBaseURL.trim() !== "" && !busy,
+    queryFn: ({ signal }) => loadOrganizationsList(apiBaseURL, signal),
+  });
+  const organizations = organizationsQuery.data ?? [];
+
+  const organizationResourcesQuery = useQuery({
+    queryKey: appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
+    enabled: apiBaseURL.trim() !== "" && selectedOrganizationId !== "",
+    queryFn: ({ signal }) => loadOrganizationResources(apiBaseURL, selectedOrganizationId, signal),
+  });
+  const teams = organizationResourcesQuery.data?.teams ?? [];
+  const members = organizationResourcesQuery.data?.members ?? [];
+  const invitations = organizationResourcesQuery.data?.invitations ?? [];
 
   const filteredOrganizations = useMemo(() => {
     if (!deferredSearch.trim()) return organizations;
@@ -210,110 +302,27 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
   const canManageOrganizationSettings = selectedOrganization?.role === "owner" || selectedOrganization?.role === "admin";
   const canDeleteOrganization = selectedOrganization?.role === "owner";
 
-  const loadOrganizations = async (preferredOrganizationId?: string) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const membershipsResponse = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
-        method: "GET",
-      });
-      if (!membershipsResponse.ok) {
-        if (membershipsResponse.status === 401) {
-          setOrganizations([]);
-          setError(null);
-          return;
-        }
-        setError("Impossible de charger les organisations pour le moment.");
-        setOrganizations([]);
-        return;
-      }
-
-      const memberships = normalizeMemberships(membershipsResponse.data);
-      const summaries = await Promise.all(
-        memberships.map(async (membership) => {
-          const organizationId = membership.organizationId ?? membership.id;
-          if (!organizationId) return null;
-
-          const organizationResponse = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.get(organizationId), {
-            method: "GET",
-            organizationId,
-          });
-          if (!organizationResponse.ok) {
-            return null;
-          }
-
-          return normalizeOrganizationDetails(organizationResponse.data, organizationId, membership.role || "member");
-        }),
-      );
-
-      const nextOrganizations = summaries.filter((item): item is OrganizationSummary => item !== null);
-      setOrganizations(nextOrganizations);
-
-      const nextSelectedId =
-        preferredOrganizationId ||
-        readRouteQueryParam(routeSearch, "org") ||
-        readStoredOrganizationID() ||
-        nextOrganizations[0]?.id ||
-        "";
-
-      setSelectedOrganizationId(nextSelectedId);
-      if (nextSelectedId) {
-        storeOrganizationID(nextSelectedId);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadOrganizationResources = useMemo(
-    () => async (organizationId: string) => {
-      if (!organizationId) {
-        setTeams([]);
-        setMembers([]);
-        setInvitations([]);
-        return;
-      }
-
-      const [teamsResponse, membersResponse, invitationsResponse] = await Promise.all([
-        gatewayJSON<Team[]>(apiBaseURL, `/organizations/${organizationId}/teams`, {
-          method: "GET",
-          organizationId,
-        }),
-        gatewayJSON<OrganizationMember[]>(apiBaseURL, `/organizations/${organizationId}/members`, {
-          method: "GET",
-          organizationId,
-        }),
-        gatewayJSON<OrganizationInvitation[]>(apiBaseURL, `/organizations/${organizationId}/invitations`, {
-          method: "GET",
-          organizationId,
-        }),
-      ]);
-
-      if (teamsResponse.ok) setTeams(teamsResponse.data);
-      else setTeams([]);
-
-      if (membersResponse.ok) setMembers(membersResponse.data);
-      else setMembers([]);
-
-      if (invitationsResponse.ok) setInvitations(invitationsResponse.data);
-      else setInvitations([]);
-    },
-    [apiBaseURL],
-  );
-
   useEffect(() => {
-    if (busy) {
-      return;
+    const nextSelectedId =
+      (selectedOrganizationId && organizations.some((organization) => organization.id === selectedOrganizationId)
+        ? selectedOrganizationId
+        : "") ||
+      readRouteQueryParam(routeSearch, "org") ||
+      readStoredOrganizationID() ||
+      organizations[0]?.id ||
+      "";
+
+    setSelectedOrganizationId((current) => (current === nextSelectedId ? current : nextSelectedId));
+    if (nextSelectedId) {
+      storeOrganizationID(nextSelectedId);
     }
-    void loadOrganizations();
-  }, [apiBaseURL, busy, routeSearch, user]);
+  }, [organizations, routeSearch, selectedOrganizationId]);
 
   useEffect(() => {
     if (!selectedOrganizationId) {
       setEditedName("");
-      setTeams([]);
-      setMembers([]);
-      setInvitations([]);
+      setShowDeleteConfirm(false);
+      setDeleteConfirmName("");
       return;
     }
 
@@ -322,8 +331,15 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
     setShowDeleteConfirm(false);
     setDeleteConfirmName("");
     storeOrganizationID(selectedOrganizationId);
-    void loadOrganizationResources(selectedOrganizationId);
-  }, [organizations, selectedOrganizationId, loadOrganizationResources]);
+  }, [organizations, selectedOrganizationId]);
+
+  useEffect(() => {
+    if (organizationsQuery.error instanceof Error) {
+      setError(organizationsQuery.error.message);
+      return;
+    }
+    setError(null);
+  }, [organizationsQuery.error]);
 
   const teamsByID = useMemo(() => {
     const map = new Map<number, string>();
@@ -363,13 +379,16 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
       if (createdId) {
         window.localStorage.setItem(SELECTED_ORG_KEY, createdId);
         window.localStorage.setItem(`${SIM_PLAN_KEY_PREFIX}${createdId}`, draftPlan);
+        setSelectedOrganizationId(createdId);
       }
 
       setShowCreateWizard(false);
       setDraftName("");
       setDraftSlug("");
-      setDraftPlan("free");
-      await loadOrganizations(createdId ?? undefined);
+      setDraftPlan("starter");
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to create organization";
       setError(message);
@@ -391,7 +410,9 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: nextName }),
       });
-      await loadOrganizations(selectedOrganization.id);
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to update organization name";
       setError(message);
@@ -417,12 +438,15 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
       setDeleteConfirmName("");
       const remaining = organizations.filter((org) => org.id !== selectedOrganization.id);
       const nextSelectedId = remaining[0]?.id ?? "";
+      setSelectedOrganizationId(nextSelectedId);
       if (nextSelectedId) {
         window.localStorage.setItem(SELECTED_ORG_KEY, nextSelectedId);
       } else {
         window.localStorage.removeItem(SELECTED_ORG_KEY);
       }
-      await loadOrganizations(nextSelectedId || undefined);
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+      });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete organization";
       setError(message);
@@ -466,7 +490,7 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
               setShowCreateWizard(false);
               setDraftName("");
               setDraftSlug("");
-              setDraftPlan("free");
+              setDraftPlan("starter");
             }}
             organizations={filteredOrganizations}
             selectedOrganizationId={selectedOrganizationId}
@@ -500,7 +524,13 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
             members={members}
             invitations={invitations}
             teamsByID={teamsByID}
-            loading={loading}
+            loading={
+              organizationsQuery.isLoading ||
+              (organizationsQuery.isFetching && !organizationsQuery.data) ||
+              (selectedOrganizationId !== "" &&
+                (organizationResourcesQuery.isLoading ||
+                  (organizationResourcesQuery.isFetching && !organizationResourcesQuery.data)))
+            }
           />
         </div>
       </div>

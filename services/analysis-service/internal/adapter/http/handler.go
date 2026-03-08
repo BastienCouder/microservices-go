@@ -126,9 +126,14 @@ type startAnalysisRequest struct {
 }
 
 func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	createdBy, ok := authenticatedUserID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
@@ -151,11 +156,12 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectI
 	}
 
 	result, err := h.svc.StartAnalysis(r.Context(), usecase.StartAnalysisInput{
-		UserID:      userID,
-		ProjectID:   projectID,
-		PromptTexts: promptTexts,
-		ModelIDs:    req.ModelIDs,
-		RunType:     req.RunType,
+		OrganizationID: organizationID,
+		CreatedBy:      createdBy,
+		ProjectID:      projectID,
+		PromptTexts:    promptTexts,
+		ModelIDs:       req.ModelIDs,
+		RunType:        req.RunType,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -165,9 +171,9 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectI
 }
 
 func (h *Handler) listRuns(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
@@ -178,7 +184,7 @@ func (h *Handler) listRuns(w http.ResponseWriter, r *http.Request, projectID str
 			limit = parsed
 		}
 	}
-	runs, err := h.svc.ListAnalysisRuns(r.Context(), projectID, userID, limit)
+	runs, err := h.svc.ListAnalysisRuns(r.Context(), projectID, organizationID, limit)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -187,13 +193,13 @@ func (h *Handler) listRuns(w http.ResponseWriter, r *http.Request, projectID str
 }
 
 func (h *Handler) getRun(w http.ResponseWriter, r *http.Request, runID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	details, err := h.svc.GetAnalysisRun(r.Context(), runID, userID)
+	details, err := h.svc.GetAnalysisRun(r.Context(), runID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -238,13 +244,13 @@ func (h *Handler) recordResponse(w http.ResponseWriter, r *http.Request, runID s
 }
 
 func (h *Handler) getDashboard(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	dashboard, err := h.svc.GetDashboard(r.Context(), projectID, userID)
+	dashboard, err := h.svc.GetDashboard(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -253,13 +259,13 @@ func (h *Handler) getDashboard(w http.ResponseWriter, r *http.Request, projectID
 }
 
 func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	perception, err := h.svc.GetPerception(r.Context(), projectID, userID)
+	perception, err := h.svc.GetPerception(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -275,9 +281,9 @@ type createAlertRequest struct {
 }
 
 func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
@@ -286,7 +292,7 @@ func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID 
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	alert, err := h.svc.CreateAlert(r.Context(), projectID, userID, usecase.CreateAlertInput{
+	alert, err := h.svc.CreateAlert(r.Context(), projectID, organizationID, usecase.CreateAlertInput{
 		AlertType:   req.AlertType,
 		Severity:    req.Severity,
 		Title:       req.Title,
@@ -300,14 +306,14 @@ func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID 
 }
 
 func (h *Handler) listAlerts(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
 	unreadOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("unreadOnly")), "true")
-	alerts, err := h.svc.ListAlerts(r.Context(), projectID, userID, unreadOnly)
+	alerts, err := h.svc.ListAlerts(r.Context(), projectID, organizationID, unreadOnly)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -316,13 +322,13 @@ func (h *Handler) listAlerts(w http.ResponseWriter, r *http.Request, projectID s
 }
 
 func (h *Handler) markAlertRead(w http.ResponseWriter, r *http.Request, alertID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	alert, err := h.svc.MarkAlertRead(r.Context(), alertID, userID)
+	alert, err := h.svc.MarkAlertRead(r.Context(), alertID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -331,13 +337,13 @@ func (h *Handler) markAlertRead(w http.ResponseWriter, r *http.Request, alertID 
 }
 
 func (h *Handler) markAllAlertsRead(w http.ResponseWriter, r *http.Request, projectID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	if err := h.svc.MarkAllAlertsRead(r.Context(), projectID, userID); err != nil {
+	if err := h.svc.MarkAllAlertsRead(r.Context(), projectID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
@@ -345,13 +351,13 @@ func (h *Handler) markAllAlertsRead(w http.ResponseWriter, r *http.Request, proj
 }
 
 func (h *Handler) deleteAlert(w http.ResponseWriter, r *http.Request, alertID string) {
-	userID, ok := authenticatedUserID(r)
+	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
 
-	if err := h.svc.DeleteAlert(r.Context(), alertID, userID); err != nil {
+	if err := h.svc.DeleteAlert(r.Context(), alertID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
@@ -379,15 +385,34 @@ func splitPathAfter(path, prefix string) []string {
 	return strings.Split(trimmed, "/")
 }
 
-func authenticatedUserID(r *http.Request) (string, bool) {
+func authenticatedUserID(r *http.Request) (int64, bool) {
 	value := strings.TrimSpace(r.Header.Get("X-Authenticated-User-ID"))
 	if value == "" {
 		value = strings.TrimSpace(r.Header.Get("x-user-id"))
 	}
 	if value == "" {
-		return "", false
+		return 0, false
 	}
-	return value, true
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func authenticatedOrganizationID(r *http.Request) (int64, bool) {
+	value := strings.TrimSpace(r.Header.Get("X-Organization-ID"))
+	if value == "" {
+		value = strings.TrimSpace(r.Header.Get("x-organization-id"))
+	}
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {

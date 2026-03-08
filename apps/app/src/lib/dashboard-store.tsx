@@ -1,5 +1,7 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useRef, type ReactNode } from "react";
 import type { DateRange } from "react-day-picker";
+import { createStore } from "zustand/vanilla";
+import { useStoreWithEqualityFn } from "zustand/traditional";
 
 type DashboardStoreState = {
   period: string;
@@ -23,7 +25,9 @@ type DashboardStoreState = {
   resetFilters: () => void;
 };
 
-const DashboardStoreContext = createContext<DashboardStoreState | null>(null);
+type DashboardStoreApi = ReturnType<typeof createDashboardStore>;
+
+const DashboardStoreContext = createContext<DashboardStoreApi | null>(null);
 
 function toggleInArray(source: string[], value: string): string[] {
   return source.includes(value)
@@ -31,94 +35,68 @@ function toggleInArray(source: string[], value: string): string[] {
     : [...source, value];
 }
 
+function createDashboardStore() {
+  return createStore<DashboardStoreState>((set) => ({
+    period: "7d",
+    setPeriod: (period) => set({ period }),
+    dateRange: undefined,
+    setDateRange: (dateRange) => set({ dateRange }),
+
+    selectedModels: [],
+    showUniqueModelFilters: false,
+    setShowUniqueModelFilters: (showUniqueModelFilters) => set({ showUniqueModelFilters }),
+    toggleModel: (id) =>
+      set((state) => ({
+        selectedModels: toggleInArray(state.selectedModels, id),
+      })),
+
+    selectedPersonas: [],
+    togglePersona: (persona) =>
+      set((state) => ({
+        selectedPersonas: toggleInArray(state.selectedPersonas, persona),
+      })),
+    clearPersonas: () => set({ selectedPersonas: [] }),
+
+    selectedCompetitors: [],
+    toggleCompetitor: (competitor) =>
+      set((state) => ({
+        selectedCompetitors: toggleInArray(state.selectedCompetitors, competitor),
+      })),
+    clearCompetitors: () => set({ selectedCompetitors: [] }),
+
+    resetFilters: () =>
+      set({
+        period: "7d",
+        dateRange: undefined,
+        selectedModels: [],
+        showUniqueModelFilters: false,
+        selectedPersonas: [],
+        selectedCompetitors: [],
+      }),
+  }));
+}
+
 export function DashboardStoreProvider({ children }: { children: ReactNode }) {
-  const [period, setPeriod] = useState<string>("7d");
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [showUniqueModelFilters, setShowUniqueModelFilters] = useState<boolean>(false);
-
-  const [selectedPersonas, setSelectedPersonas] = useState<string[]>([]);
-  const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>([]);
-
-  const toggleModel = useCallback((id: string) => {
-    setSelectedModels((prev) => toggleInArray(prev, id));
-  }, []);
-
-  const togglePersona = useCallback((persona: string) => {
-    setSelectedPersonas((prev) => toggleInArray(prev, persona));
-  }, []);
-
-  const clearPersonas = useCallback(() => {
-    setSelectedPersonas([]);
-  }, []);
-
-  const toggleCompetitor = useCallback((competitor: string) => {
-    setSelectedCompetitors((prev) => toggleInArray(prev, competitor));
-  }, []);
-
-  const clearCompetitors = useCallback(() => {
-    setSelectedCompetitors([]);
-  }, []);
-
-  const resetFilters = useCallback(() => {
-    setPeriod("7d");
-    setDateRange(undefined);
-    setSelectedModels([]);
-    setShowUniqueModelFilters(false);
-    setSelectedPersonas([]);
-    setSelectedCompetitors([]);
-  }, []);
-
-  const value = useMemo<DashboardStoreState>(
-    () => ({
-      period,
-      setPeriod,
-      dateRange,
-      setDateRange,
-
-      selectedModels,
-      showUniqueModelFilters,
-      setShowUniqueModelFilters,
-      toggleModel,
-
-      selectedPersonas,
-      togglePersona,
-      clearPersonas,
-
-      selectedCompetitors,
-      toggleCompetitor,
-      clearCompetitors,
-
-      resetFilters,
-    }),
-    [
-      period,
-      dateRange,
-      selectedModels,
-      showUniqueModelFilters,
-      toggleModel,
-      selectedPersonas,
-      togglePersona,
-      clearPersonas,
-      selectedCompetitors,
-      toggleCompetitor,
-      clearCompetitors,
-      resetFilters,
-    ],
-  );
+  const storeRef = useRef<DashboardStoreApi | null>(null);
+  if (!storeRef.current) {
+    storeRef.current = createDashboardStore();
+  }
 
   return (
-    <DashboardStoreContext.Provider value={value}>
+    <DashboardStoreContext.Provider value={storeRef.current}>
       {children}
     </DashboardStoreContext.Provider>
   );
 }
 
-export function useDashboardStore<T>(selector: (state: DashboardStoreState) => T): T {
-  const state = useContext(DashboardStoreContext);
-  if (!state) {
+export function useDashboardStore<T>(
+  selector: (state: DashboardStoreState) => T,
+  equalityFn?: (a: T, b: T) => boolean,
+): T {
+  const store = useContext(DashboardStoreContext);
+  if (!store) {
     throw new Error("useDashboardStore must be used inside DashboardStoreProvider");
   }
-  return selector(state);
+
+  return useStoreWithEqualityFn(store, selector, equalityFn);
 }

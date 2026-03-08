@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { BrandCanonSummary } from "./brand-canon-summary";
 import type { BrandCanon, PerceptionViewData } from "@/lib/perception-data";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 
 export function PerceptionLeftPanel({
   canon,

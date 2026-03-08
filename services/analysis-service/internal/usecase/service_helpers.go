@@ -21,6 +21,28 @@ func (s *Service) promptRunsForRunLocked(runID string) []PromptRun {
 	return out
 }
 
+func (s *Service) promptRunsForProjectLocked(projectID string) []PromptRun {
+	runIDs := s.runsByProject[projectID]
+	if len(runIDs) == 0 {
+		return []PromptRun{}
+	}
+
+	out := make([]PromptRun, 0)
+	for _, runID := range runIDs {
+		ids := s.promptRunsByRun[runID]
+		for _, id := range ids {
+			if item, ok := s.promptRuns[id]; ok {
+				out = append(out, copyPromptRun(item))
+			}
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out
+}
+
 func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 	ids := s.responsesByRun[runID]
 	out := make([]AIResponse, 0, len(ids))
@@ -35,8 +57,34 @@ func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 	return out
 }
 
+func (s *Service) responsesForProjectLocked(projectID string) []AIResponse {
+	runIDs := s.runsByProject[projectID]
+	if len(runIDs) == 0 {
+		return []AIResponse{}
+	}
+
+	out := make([]AIResponse, 0)
+	for _, runID := range runIDs {
+		ids := s.responsesByRun[runID]
+		for _, id := range ids {
+			if item, ok := s.responses[id]; ok {
+				out = append(out, copyResponse(item))
+			}
+		}
+	}
+
+	sort.Slice(out, func(i, j int) bool {
+		return out[i].CreatedAt.Before(out[j].CreatedAt)
+	})
+	return out
+}
+
 func (s *Service) calculateVisibilityScoreLocked(runID string) int {
 	responses := s.responsesForRunLocked(runID)
+	return calculateVisibilityScoreFromResponses(responses)
+}
+
+func calculateVisibilityScoreFromResponses(responses []AIResponse) int {
 	if len(responses) == 0 {
 		return 0
 	}

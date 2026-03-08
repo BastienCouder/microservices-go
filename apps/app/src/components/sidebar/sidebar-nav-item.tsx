@@ -29,7 +29,7 @@ export function SidebarSectionHeader({
   );
 }
 
-export function SidebarNavItem({ href, label, active, indent, collapsed }: SidebarNavItemProps) {
+export function SidebarNavItem({ href, label, active, indent, collapsed, className }: SidebarNavItemProps & { className?: string }) {
   if (collapsed) {
     return (
       <Tooltip>
@@ -37,8 +37,9 @@ export function SidebarNavItem({ href, label, active, indent, collapsed }: Sideb
           <Link
             to={href}
             className={cn(
-              "relative flex items-center justify-center rounded-md p-2 transition-colors",
+              "relative flex items-center justify-center rounded-[5px] p-2 transition-colors",
               active ? "bg-primary/8 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+              className,
             )}
           >
             {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
@@ -58,8 +59,9 @@ export function SidebarNavItem({ href, label, active, indent, collapsed }: Sideb
         <Link
           to={href}
           className={cn(
-            "flex-1 rounded-md px-2 py-1.5 text-sm transition-colors",
+            "flex-1 rounded-[5px] px-2 py-1.5 text-sm transition-colors",
             active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
+            className,
           )}
         >
           {label}
@@ -72,9 +74,10 @@ export function SidebarNavItem({ href, label, active, indent, collapsed }: Sideb
     <Link
       to={href}
       className={cn(
-        "group relative flex items-center rounded-md px-2 py-1.5 text-sm transition-colors",
+        "group relative flex items-center rounded-[5px] px-2 py-1.5 text-sm transition-colors",
         active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-      )}
+        className,
+        )}
     >
       {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
       {label}

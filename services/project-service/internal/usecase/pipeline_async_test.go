@@ -61,20 +61,21 @@ func TestFinalizeProjectEnqueuesOutboxWithoutBlockingPipeline(t *testing.T) {
 	}
 
 	project, err := svc.CreateProject(ctx, CreateProjectInput{
-		UserID:     "user-1",
-		Name:       "Acme",
-		Domain:     "acme.com",
-		WebsiteURL: "https://acme.com",
-		BrandName:  "Acme",
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if _, err := svc.AddPrompts(ctx, project.ID, "user-1", []string{"Quel CRM pour PME ?"}); err != nil {
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM pour PME ?"}); err != nil {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	result, err := svc.FinalizeProject(ctx, project.ID, "user-1")
+	result, err := svc.FinalizeProject(ctx, project.ID, 42)
 	if err != nil {
 		t.Fatalf("finalize: %v", err)
 	}
@@ -111,20 +112,21 @@ func TestOutboxEventProcessingRunsPipelineOnce(t *testing.T) {
 	}
 
 	project, err := svc.CreateProject(ctx, CreateProjectInput{
-		UserID:     "user-1",
-		Name:       "Acme",
-		Domain:     "acme.com",
-		WebsiteURL: "https://acme.com",
-		BrandName:  "Acme",
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if _, err := svc.AddPrompts(ctx, project.ID, "user-1", []string{"Q1", "Q2"}); err != nil {
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1", "Q2"}); err != nil {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	if _, err := svc.FinalizeProject(ctx, project.ID, "user-1"); err != nil {
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
 		t.Fatalf("finalize: %v", err)
 	}
 	events, err := svc.ListOutboxEventsToPublish(ctx, 10)

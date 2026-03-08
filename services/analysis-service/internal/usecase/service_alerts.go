@@ -6,12 +6,12 @@ import (
 	"strings"
 )
 
-func (s *Service) CreateAlert(ctx context.Context, projectID, userID string, input CreateAlertInput) (Alert, error) {
+func (s *Service) CreateAlert(ctx context.Context, projectID string, organizationID int64, input CreateAlertInput) (Alert, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return Alert{}, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return Alert{}, err
 	}
 
@@ -28,6 +28,10 @@ func (s *Service) CreateAlert(ctx context.Context, projectID, userID string, inp
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return Alert{}, err
+	}
 
 	backup := s.snapshotLocked()
 	now := s.now().UTC()
@@ -52,17 +56,21 @@ func (s *Service) CreateAlert(ctx context.Context, projectID, userID string, inp
 	return copyAlert(alert), nil
 }
 
-func (s *Service) ListAlerts(ctx context.Context, projectID, userID string, unreadOnly bool) ([]Alert, error) {
+func (s *Service) ListAlerts(ctx context.Context, projectID string, organizationID int64, unreadOnly bool) ([]Alert, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return nil, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return nil, err
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	ids := s.alertsByProject[projectID]
 	out := make([]Alert, 0, len(ids))
@@ -79,27 +87,35 @@ func (s *Service) ListAlerts(ctx context.Context, projectID, userID string, unre
 	return out, nil
 }
 
-func (s *Service) MarkAlertRead(ctx context.Context, alertID, userID string) (Alert, error) {
+func (s *Service) MarkAlertRead(ctx context.Context, alertID string, organizationID int64) (Alert, error) {
 	alertID = strings.TrimSpace(alertID)
 	if alertID == "" {
 		return Alert{}, fmt.Errorf("%w: alertId is required", ErrValidation)
 	}
 
-	s.mu.RLock()
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return Alert{}, err
+	}
 	alert, ok := s.alerts[alertID]
 	if !ok {
-		s.mu.RUnlock()
+		s.mu.Unlock()
 		return Alert{}, fmt.Errorf("%w: alert", ErrNotFound)
 	}
 	projectID := alert.ProjectID
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return Alert{}, err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return Alert{}, err
+	}
 
 	backup := s.snapshotLocked()
 	alert, ok = s.alerts[alertID]
@@ -115,17 +131,21 @@ func (s *Service) MarkAlertRead(ctx context.Context, alertID, userID string) (Al
 	return copyAlert(alert), nil
 }
 
-func (s *Service) MarkAllAlertsRead(ctx context.Context, projectID, userID string) error {
+func (s *Service) MarkAllAlertsRead(ctx context.Context, projectID string, organizationID int64) error {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	backup := s.snapshotLocked()
 	for _, alertID := range s.alertsByProject[projectID] {
@@ -141,27 +161,35 @@ func (s *Service) MarkAllAlertsRead(ctx context.Context, projectID, userID strin
 	return nil
 }
 
-func (s *Service) DeleteAlert(ctx context.Context, alertID, userID string) error {
+func (s *Service) DeleteAlert(ctx context.Context, alertID string, organizationID int64) error {
 	alertID = strings.TrimSpace(alertID)
 	if alertID == "" {
 		return fmt.Errorf("%w: alertId is required", ErrValidation)
 	}
 
-	s.mu.RLock()
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
 	alert, ok := s.alerts[alertID]
 	if !ok {
-		s.mu.RUnlock()
+		s.mu.Unlock()
 		return fmt.Errorf("%w: alert", ErrNotFound)
 	}
 	projectID := alert.ProjectID
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return err
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	backup := s.snapshotLocked()
 	alert, ok = s.alerts[alertID]

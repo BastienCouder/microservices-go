@@ -40,6 +40,22 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			writeJSONError(w, http.StatusUnauthorized, "user profile required")
 			return
 		}
+
+		if orgID, err := organizationIDFromHeader(r2.Header.Get("X-Organization-ID")); err == nil {
+			claims.Organization = orgID
+		} else if claims.UserID > 0 && requiresOrganizationContext(r2) {
+			orgID, err := h.resolveOrganizationID(r.Context(), claims.UserID)
+			if err != nil {
+				if isDependencyUnavailableError(err) {
+					writeJSONError(w, http.StatusServiceUnavailable, "organization dependency unavailable")
+					return
+				}
+				writeJSONError(w, http.StatusForbidden, "organization required")
+				return
+			}
+			r2.Header.Set("X-Organization-ID", strconv.FormatInt(orgID, 10))
+			claims.Organization = orgID
+		}
 		if denyReason, enforce := enforceSelfScopedUserRoute(r2, identityID, claims.UserID); enforce {
 			if denyReason != "" {
 				writeJSONError(w, http.StatusForbidden, "forbidden")
@@ -132,6 +148,11 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 
 		h.serveProxyWithInternalAuth(w, r2, next, serviceAudience, claims)
 	})
+}
+
+func requiresOrganizationContext(r *http.Request) bool {
+	return strings.HasPrefix(r.URL.Path, "/projects") ||
+		strings.HasPrefix(r.URL.Path, "/analysis")
 }
 
 func requiresResolvedUserID(r *http.Request) bool {

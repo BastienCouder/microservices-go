@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (s *Service) AddPrompts(ctx context.Context, projectID, userID string, prompts []string) ([]Prompt, error) {
+func (s *Service) AddPrompts(ctx context.Context, projectID string, organizationID int64, prompts []string) ([]Prompt, error) {
 	if len(prompts) == 0 {
 		return nil, fmt.Errorf("%w: prompts cannot be empty", ErrValidation)
 	}
@@ -24,7 +24,11 @@ func (s *Service) AddPrompts(ctx context.Context, projectID, userID string, prom
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -49,29 +53,98 @@ func (s *Service) AddPrompts(ctx context.Context, projectID, userID string, prom
 	return out, nil
 }
 
-func (s *Service) ListPrompts(_ context.Context, projectID, userID string) ([]Prompt, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
-		return nil, err
+func normalizePromptPage(input ListPromptsInput) ListPromptsInput {
+	if input.Page <= 0 {
+		input.Page = 1
 	}
-
-	prompts := make([]Prompt, 0)
-	for _, prompt := range s.prompts {
-		if prompt.ProjectID == projectID {
-			prompts = append(prompts, copyPrompt(prompt))
-		}
+	if input.PageSize <= 0 {
+		input.PageSize = 25
 	}
-	sort.Slice(prompts, func(i, j int) bool {
-		return prompts[i].CreatedAt.Before(prompts[j].CreatedAt)
-	})
-	return prompts, nil
+	if input.PageSize > 100 {
+		input.PageSize = 100
+	}
+	input.Search = strings.TrimSpace(input.Search)
+	return input
 }
 
-func (s *Service) UpdatePrompt(ctx context.Context, promptID, userID string, input UpdatePromptInput) (Prompt, error) {
+func (s *Service) ListPrompts(ctx context.Context, projectID string, organizationID int64, input ListPromptsInput) (PromptPage, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return PromptPage{}, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return PromptPage{}, err
+	}
+
+	input = normalizePromptPage(input)
+	search := strings.ToLower(input.Search)
+	prompts := make([]Prompt, 0)
+	for _, prompt := range s.prompts {
+		if prompt.ProjectID != projectID {
+			continue
+		}
+		if search != "" && !strings.Contains(strings.ToLower(prompt.Text), search) {
+			continue
+		}
+		prompts = append(prompts, copyPrompt(prompt))
+	}
+	sort.Slice(prompts, func(i, j int) bool {
+		return prompts[i].CreatedAt.After(prompts[j].CreatedAt)
+	})
+
+	total := len(prompts)
+	if total == 0 {
+		return PromptPage{
+			Items:       []Prompt{},
+			Total:       0,
+			Page:        input.Page,
+			PageSize:    input.PageSize,
+			TotalPages:  0,
+			HasNext:     false,
+			HasPrevious: input.Page > 1,
+		}, nil
+	}
+
+	totalPages := (total + input.PageSize - 1) / input.PageSize
+	if input.Page > totalPages {
+		input.Page = totalPages
+	}
+
+	start := (input.Page - 1) * input.PageSize
+	if start < 0 {
+		start = 0
+	}
+	end := start + input.PageSize
+	if end > total {
+		end = total
+	}
+
+	items := make([]Prompt, 0, end-start)
+	for _, prompt := range prompts[start:end] {
+		items = append(items, prompt)
+	}
+
+	return PromptPage{
+		Items:       items,
+		Total:       total,
+		Page:        input.Page,
+		PageSize:    input.PageSize,
+		TotalPages:  totalPages,
+		HasNext:     input.Page < totalPages,
+		HasPrevious: input.Page > 1,
+	}, nil
+}
+
+func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizationID int64, input UpdatePromptInput) (Prompt, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return Prompt{}, err
+	}
 
 	prompt, ok := s.prompts[strings.TrimSpace(promptID)]
 	if !ok {
@@ -81,7 +154,7 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID, userID string, inp
 	if !ok {
 		return Prompt{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
-	if project.UserID != strings.TrimSpace(userID) {
+	if project.OrganizationID != organizationID {
 		return Prompt{}, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 	backup := *prompt
@@ -107,9 +180,13 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID, userID string, inp
 	return copyPrompt(prompt), nil
 }
 
-func (s *Service) DeletePrompt(ctx context.Context, promptID, userID string) error {
+func (s *Service) DeletePrompt(ctx context.Context, promptID string, organizationID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	prompt, ok := s.prompts[strings.TrimSpace(promptID)]
 	if !ok {
@@ -119,7 +196,7 @@ func (s *Service) DeletePrompt(ctx context.Context, promptID, userID string) err
 	if !ok {
 		return fmt.Errorf("%w: project", ErrNotFound)
 	}
-	if project.UserID != strings.TrimSpace(userID) {
+	if project.OrganizationID != organizationID {
 		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 	delete(s.prompts, prompt.ID)

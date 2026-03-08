@@ -40,7 +40,7 @@ describe("loadDashboardData", () => {
     mockFetchSequence([
       jsonResponse(200, { success: true, data: [{ id: "project-1" }] }),
       jsonResponse(200, { success: true, data: { id: "project-1", brandName: "Acme" } }),
-      jsonResponse(200, { success: true, data: [{ id: "chatgpt", name: "ChatGPT", provider: "openai" }] }),
+      jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
       jsonResponse(200, {
         success: true,

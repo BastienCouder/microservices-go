@@ -54,7 +54,6 @@
 
 ### Add-ons & Leviers
 
-- 🆓 **Freemium** : 1 marque, 1 LLM, 10 prompts/mois → acquisition PLG (Product-Led Growth)
 - ➕ **Add-on Correction** : crédits de génération de contenu à la page produite (~5 €/draft)
 - 📅 **Remise annuelle** : 20–25% pour sécuriser la trésorerie
 - 🏢 **Tarif agence** : dashboard multi-clients white-label, LTV multiplié

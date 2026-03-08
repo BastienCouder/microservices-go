@@ -2,7 +2,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-ExtraLight.ttf") format("truetype");
+  src: url("/fonts/Manrope-ExtraLight.ttf") format("truetype");
   font-weight: 200;
   font-style: normal;
   font-display: swap;
@@ -10,7 +10,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-Light.ttf") format("truetype");
+  src: url("/fonts/Manrope-Light.ttf") format("truetype");
   font-weight: 300;
   font-style: normal;
   font-display: swap;
@@ -18,7 +18,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-Regular.ttf") format("truetype");
+  src: url("/fonts/Manrope-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -26,7 +26,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-Medium.ttf") format("truetype");
+  src: url("/fonts/Manrope-Medium.ttf") format("truetype");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -34,7 +34,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-SemiBold.ttf") format("truetype");
+  src: url("/fonts/Manrope-SemiBold.ttf") format("truetype");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -42,7 +42,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-Bold.ttf") format("truetype");
+  src: url("/fonts/Manrope-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -50,7 +50,7 @@
 
 @font-face {
   font-family: "Manrope";
-  src: url("../public/fonts/Manrope-ExtraBold.ttf") format("truetype");
+  src: url("/fonts/Manrope-ExtraBold.ttf") format("truetype");
   font-weight: 800;
   font-style: normal;
   font-display: swap;
@@ -220,6 +220,29 @@
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --chart-brand-primary: var(--primary);
+    --chart-series-1: 217 60% 49%;
+    --chart-series-2: 211 55% 58%;
+    --chart-series-3: 224 40% 45%;
+    --chart-series-4: 204 64% 67%;
+    --chart-series-5: 229 47% 62%;
+    --chart-series-6: 214 32% 52%;
+    --chart-series-7: 220 38% 73%;
+    --chart-axis: var(--muted-foreground);
+    --chart-cursor: var(--muted);
+    --chart-legend-fallback: var(--muted);
+    --chart-sentiment-positive: var(--primary);
+    --chart-sentiment-neutral: 211 55% 58%;
+    --chart-sentiment-negative: 229 47% 62%;
+    --chart-perception-positioning: var(--chart-series-1);
+    --chart-perception-factual: var(--chart-series-2);
+    --chart-perception-sentiment: var(--chart-series-3);
+    --chart-perception-use-cases: var(--chart-series-3);
+    --chart-perception-features: var(--chart-series-4);
+    --chart-perception-competitors: var(--chart-series-6);
+    --scrollbar-thumb: 217 38% 61%;
+    --scrollbar-thumb-hover: 217 42% 54%;
+    --scrollbar-track: 214 32% 96%;
 
     /* Sidebar Claire */
     --sidebar-background: 0 0% 98%;
@@ -277,6 +300,29 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --chart-brand-primary: var(--primary);
+    --chart-series-1: 217.2 91.2% 59.8%;
+    --chart-series-2: 211 72% 67%;
+    --chart-series-3: 224 63% 61%;
+    --chart-series-4: 204 72% 70%;
+    --chart-series-5: 229 66% 71%;
+    --chart-series-6: 214 45% 63%;
+    --chart-series-7: 220 45% 78%;
+    --chart-axis: var(--muted-foreground);
+    --chart-cursor: var(--muted);
+    --chart-legend-fallback: var(--muted);
+    --chart-sentiment-positive: var(--primary);
+    --chart-sentiment-neutral: 211 72% 67%;
+    --chart-sentiment-negative: 229 66% 71%;
+    --chart-perception-positioning: var(--chart-series-1);
+    --chart-perception-factual: var(--chart-series-2);
+    --chart-perception-sentiment: var(--chart-series-3);
+    --chart-perception-use-cases: var(--chart-series-3);
+    --chart-perception-features: var(--chart-series-4);
+    --chart-perception-competitors: var(--chart-series-6);
+    --scrollbar-thumb: 217 34% 46%;
+    --scrollbar-thumb-hover: 217 40% 54%;
+    --scrollbar-track: 217 22% 20%;
 
     /* Sidebar Sombre */
     --sidebar-background: 240 5.9% 10%;
@@ -303,6 +349,8 @@
 @layer base {
   * {
     @apply border-border;
+    scrollbar-color: hsl(var(--scrollbar-thumb)) hsl(var(--scrollbar-track));
+    scrollbar-width: thin;
   }
 
   body {
@@ -329,6 +377,30 @@
 
   small {
     @apply text-sm font-medium;
+  }
+
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: hsl(var(--scrollbar-track));
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, hsl(var(--scrollbar-thumb)), hsl(var(--scrollbar-thumb-hover)));
+    border: 2px solid hsl(var(--scrollbar-track));
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, hsl(var(--scrollbar-thumb-hover)), hsl(var(--scrollbar-thumb)));
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: hsl(var(--scrollbar-track));
   }
 }
 

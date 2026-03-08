@@ -13,7 +13,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	if projectID == "" {
 		return StartAnalysisResult{}, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, input.UserID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, input.OrganizationID); err != nil {
 		return StartAnalysisResult{}, err
 	}
 
@@ -62,18 +62,25 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return StartAnalysisResult{}, err
+	}
 
 	if requestID != "" {
 		requestKey := projectID + "|" + requestID
 		if existingRunID, ok := s.runByRequest[requestKey]; ok {
 			run := s.runs[existingRunID]
 			if run == nil {
+				s.mu.Unlock()
 				return StartAnalysisResult{}, fmt.Errorf("%w: run", ErrNotFound)
 			}
+			promptRuns := s.promptRunsForRunLocked(existingRunID)
+			s.mu.Unlock()
 			return StartAnalysisResult{
 				AnalysisRun: copyAnalysisRun(run),
-				PromptRuns:  s.promptRunsForRunLocked(existingRunID),
+				PromptRuns:  promptRuns,
 			}, nil
 		}
 	}
@@ -84,6 +91,8 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	run := &AnalysisRun{
 		ID:                 s.nextID("run"),
 		ProjectID:          projectID,
+		OrganizationID:     input.OrganizationID,
+		CreatedBy:          input.CreatedBy,
 		RunType:            runType,
 		Status:             "running",
 		PromptsCount:       len(normalizedPrompts),
@@ -116,13 +125,20 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 
 	if err := s.persistLocked(ctx); err != nil {
 		s.restoreLocked(backup)
+		s.mu.Unlock()
 		return StartAnalysisResult{}, err
 	}
 
-	return StartAnalysisResult{
+	dashboard := s.dashboardDataLocked(projectID)
+	result := StartAnalysisResult{
 		AnalysisRun: copyAnalysisRun(run),
 		PromptRuns:  promptRuns,
-	}, nil
+	}
+	s.mu.Unlock()
+
+	s.storeDashboardInCache(ctx, projectID, input.OrganizationID, dashboard)
+
+	return result, nil
 }
 
 func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error {
@@ -134,19 +150,26 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
 
 	backup := s.snapshotLocked()
 
 	run, ok := s.runs[runID]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("%w: run", ErrNotFound)
 	}
 	promptRun, ok := s.promptRuns[promptRunID]
 	if !ok {
+		s.mu.Unlock()
 		return fmt.Errorf("%w: promptRun", ErrNotFound)
 	}
 	if promptRun.RunID != runID {
+		s.mu.Unlock()
 		return fmt.Errorf("%w: promptRun does not belong to run", ErrValidation)
 	}
 
@@ -194,25 +217,37 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 
 	if err := s.persistLocked(ctx); err != nil {
 		s.restoreLocked(backup)
+		s.mu.Unlock()
 		return err
 	}
+	projectID := run.ProjectID
+	organizationID := run.OrganizationID
+	dashboard := s.dashboardDataLocked(projectID)
+	s.mu.Unlock()
+
+	s.storeDashboardInCache(ctx, projectID, organizationID, dashboard)
+
 	return nil
 }
 
-func (s *Service) ListAnalysisRuns(ctx context.Context, projectID, userID string, limit int) ([]AnalysisRun, error) {
+func (s *Service) ListAnalysisRuns(ctx context.Context, projectID string, organizationID int64, limit int) ([]AnalysisRun, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return nil, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return nil, err
 	}
 	if limit <= 0 {
 		limit = 10
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	ids := s.runsByProject[projectID]
 	if len(ids) == 0 {
@@ -230,27 +265,35 @@ func (s *Service) ListAnalysisRuns(ctx context.Context, projectID, userID string
 	return out, nil
 }
 
-func (s *Service) GetAnalysisRun(ctx context.Context, runID, userID string) (AnalysisRunDetails, error) {
+func (s *Service) GetAnalysisRun(ctx context.Context, runID string, organizationID int64) (AnalysisRunDetails, error) {
 	runID = strings.TrimSpace(runID)
 	if runID == "" {
 		return AnalysisRunDetails{}, fmt.Errorf("%w: runId is required", ErrValidation)
 	}
 
-	s.mu.RLock()
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return AnalysisRunDetails{}, err
+	}
 	run, ok := s.runs[runID]
 	if !ok {
-		s.mu.RUnlock()
+		s.mu.Unlock()
 		return AnalysisRunDetails{}, fmt.Errorf("%w: run", ErrNotFound)
 	}
 	projectID := run.ProjectID
-	s.mu.RUnlock()
+	s.mu.Unlock()
 
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return AnalysisRunDetails{}, err
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return AnalysisRunDetails{}, err
+	}
 
 	run, ok = s.runs[runID]
 	if !ok {
@@ -265,41 +308,32 @@ func (s *Service) GetAnalysisRun(ctx context.Context, runID, userID string) (Ana
 	}, nil
 }
 
-func (s *Service) GetDashboard(ctx context.Context, projectID, userID string) (DashboardData, error) {
+func (s *Service) GetDashboard(ctx context.Context, projectID string, organizationID int64) (DashboardData, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return DashboardData{}, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if err := s.verifyProjectAccess(ctx, projectID, userID); err != nil {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return DashboardData{}, err
 	}
-
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	ids := s.runsByProject[projectID]
-	if len(ids) == 0 {
-		return DashboardData{HasData: false, VisibilityScore: 0, PromptRuns: []PromptRun{}, Responses: []AIResponse{}}, nil
+	if dashboard, ok := s.loadDashboardFromCache(ctx, projectID, organizationID); ok {
+		return dashboard, nil
 	}
 
-	latestID := ids[len(ids)-1]
-	run := s.runs[latestID]
-	if run == nil {
-		return DashboardData{HasData: false, VisibilityScore: 0, PromptRuns: []PromptRun{}, Responses: []AIResponse{}}, nil
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return DashboardData{}, err
 	}
-	latest := copyAnalysisRun(run)
+	dashboard := s.dashboardDataLocked(projectID)
+	s.mu.Unlock()
 
-	return DashboardData{
-		HasData:         true,
-		LatestRun:       &latest,
-		VisibilityScore: run.VisibilityScore,
-		PromptRuns:      s.promptRunsForRunLocked(latestID),
-		Responses:       s.responsesForRunLocked(latestID),
-	}, nil
+	s.storeDashboardInCache(ctx, projectID, organizationID, dashboard)
+	return dashboard, nil
 }
 
-func (s *Service) GetPerception(ctx context.Context, projectID, userID string) (PerceptionData, error) {
-	dashboard, err := s.GetDashboard(ctx, projectID, userID)
+func (s *Service) GetPerception(ctx context.Context, projectID string, organizationID int64) (PerceptionData, error) {
+	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
 	if err != nil {
 		return PerceptionData{}, err
 	}

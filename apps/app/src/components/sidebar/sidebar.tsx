@@ -69,16 +69,16 @@ function SidebarComponent({
         <nav className="flex-1 overflow-y-auto px-3 py-3">
           <div className="mb-1">
             <SidebarNavItem
-              href="/dashboard"
-              label={"dashboard"}
-              active={canonicalCurrentPath === "/dashboard"}
+              href="/monitoring"
+              label={"monitoring"}
+              active={canonicalCurrentPath === "/monitoring"}
               collapsed={collapsed}
+              className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
 
-          <div className="mb-1 mt-4">
-            <SidebarSectionHeader label={"monitoring"} collapsed={collapsed} />
-            <div className="relative mt-1 space-y-0.5">
+          <div className="mb-1 mt-2">
+            <div className="relative space-y-0.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {MONITORING_ITEMS.map((item) => (
                 <SidebarNavItem
@@ -99,6 +99,7 @@ function SidebarComponent({
               label={"perception"}
               active={canonicalCurrentPath === "/perception"}
               collapsed={collapsed}
+                  className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
           <div className="mb-1">
@@ -107,6 +108,7 @@ function SidebarComponent({
               label={"optimize actions"}
               active={canonicalCurrentPath === "/optimize/actions"}
               collapsed={collapsed}
+                  className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
           <div className="mb-1">
@@ -115,6 +117,7 @@ function SidebarComponent({
               label="Content Optimizer"
               active={canonicalCurrentPath === "/optimize/content-optimizer"}
               collapsed={collapsed}
+                  className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
           <div className="mb-1">
@@ -123,11 +126,11 @@ function SidebarComponent({
               label={"impact"}
               active={canonicalCurrentPath === "/impact"}
               collapsed={collapsed}
+                  className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
 
           <div className="mb-1 mt-4">
-            <SidebarSectionHeader label={"organizations"} collapsed={collapsed} />
             <div className="relative mt-1 space-y-0.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {ORGANIZATION_ITEMS.map((item) => (

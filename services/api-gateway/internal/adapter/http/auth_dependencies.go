@@ -102,3 +102,51 @@ func (h *Handler) resolveUserID(ctx context.Context, identityID string) (int64, 
 	}
 	return payload.ID, nil
 }
+
+func (h *Handler) resolveOrganizationID(ctx context.Context, userID int64) (int64, error) {
+	var payload []struct {
+		OrganizationID string `json:"organizationId"`
+	}
+	token, err := signInternalJWT(h.internalJWTSecret, h.internalJWTIssuer, "organizations-service", internalTokenClaims{
+		UserID: userID,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	err = h.executeDependencyCall(ctx, h.organizationBreaker, h.organizationBulkhead, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
+		req, err := http.NewRequestWithContext(attemptCtx, http.MethodGet, h.organizationsURL+"/organizations/me", nil)
+		if err != nil {
+			return false, true, err
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp, err := h.httpClient.Do(req)
+		if err != nil {
+			return isTransientNetError(err), true, err
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusNotFound {
+			return false, false, errors.New("organization not found")
+		}
+		if resp.StatusCode != http.StatusOK {
+			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("organizations status=%d", resp.StatusCode)
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+			return false, true, err
+		}
+		if len(payload) == 0 {
+			return false, false, errors.New("organization not found")
+		}
+		return false, true, nil
+	})
+	if err != nil {
+		return 0, err
+	}
+	organizationID, err := organizationIDFromHeader(payload[0].OrganizationID)
+	if err != nil {
+		return 0, err
+	}
+	return organizationID, nil
+}

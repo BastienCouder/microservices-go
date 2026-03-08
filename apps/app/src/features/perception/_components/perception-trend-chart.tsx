@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { APP_CHART_UI_COLORS, PERCEPTION_TEXT, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 
 type TrendPoint = {
   label: string;

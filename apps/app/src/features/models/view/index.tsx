@@ -1,5 +1,10 @@
 import { ModelsTemplate } from "./template";
 
-export function ModelsPage() {
-  return <ModelsTemplate />;
+type ModelsPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function ModelsPage({ apiBaseURL, routeSearch }: ModelsPageProps) {
+  return <ModelsTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

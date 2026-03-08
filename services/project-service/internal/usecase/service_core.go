@@ -58,6 +58,13 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 func (s *Service) load(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.reloadLocked(ctx)
+}
+
+func (s *Service) reloadLocked(ctx context.Context) error {
+	if s.store == nil {
+		return nil
+	}
 
 	state := persistedState{}
 	payload, ok, err := s.store.Load(ctx)
@@ -155,31 +162,32 @@ func (s *Service) persistLocked(ctx context.Context) error {
 
 func (s *Service) seedDefaultModels() {
 	defaults := []AIModel{
-		{ID: "gpt-4o-mini", Name: "gpt-4o-mini", Label: "GPT-4o Mini", Provider: "openai", ModelID: "gpt-4o-mini", IsActive: true},
-		{ID: "gpt-4o", Name: "gpt-4o", Label: "GPT-4o", Provider: "openai", ModelID: "gpt-4o", IsActive: true},
-		{ID: "gemini-2.0-flash", Name: "gemini-2.0-flash", Label: "Gemini 2.0 Flash", Provider: "google", ModelID: "gemini-2.0-flash", IsActive: true},
-		{ID: "sonar", Name: "sonar", Label: "Perplexity Sonar", Provider: "perplexity", ModelID: "sonar", IsActive: true, SupportsLiveSearch: true},
+		{ID: "gpt-4o-mini", Label: "GPT-4o Mini", Provider: "openai", Group: "chatgpt", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "gpt-4o-mini", IsActive: true},
+		{ID: "gpt-4o", Label: "GPT-4o", Provider: "openai", Group: "chatgpt", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "gpt-4o", IsActive: true},
+		{ID: "claude-3-5-sonnet", Label: "Claude 3.5 Sonnet", Provider: "anthropic", Group: "claude", IconKey: "claude", IconPath: "/models/claude.svg", ModelID: "claude-3-5-sonnet", IsActive: true},
+		{ID: "gemini-2.0-flash", Label: "Gemini 2.0 Flash", Provider: "google", Group: "gemini", IconKey: "gemini", IconPath: "/models/gemini.svg", ModelID: "gemini-2.0-flash", IsActive: true},
+		{ID: "sonar", Label: "Perplexity Sonar", Provider: "perplexity", Group: "perplexity", IconKey: "perplexity", IconPath: "/models/perplexity.svg", ModelID: "sonar", IsActive: true, SupportsLiveSearch: true},
+		{ID: "mistral-large", Label: "Mistral Large", Provider: "mistral", Group: "mistral", IconKey: "mistral", IconPath: "/models/mistral.svg", ModelID: "mistral-large", IsActive: true},
 	}
 	for _, model := range defaults {
 		s.models[model.ID] = model
 	}
 }
 
-func (s *Service) getOwnedProjectLocked(projectID, userID string) (*Project, error) {
+func (s *Service) getProjectForOrganizationLocked(projectID string, organizationID int64) (*Project, error) {
 	projectID = strings.TrimSpace(projectID)
-	userID = strings.TrimSpace(userID)
 	if projectID == "" {
 		return nil, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if userID == "" {
-		return nil, fmt.Errorf("%w: userId is required", ErrValidation)
+	if organizationID <= 0 {
+		return nil, fmt.Errorf("%w: organizationId must be positive", ErrValidation)
 	}
 
 	project, ok := s.projects[projectID]
 	if !ok {
 		return nil, fmt.Errorf("%w: project", ErrNotFound)
 	}
-	if project.UserID != userID {
+	if project.OrganizationID != organizationID {
 		return nil, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 	return project, nil

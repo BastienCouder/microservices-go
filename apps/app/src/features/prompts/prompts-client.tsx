@@ -9,7 +9,7 @@ type PromptsClientProps = {
 export function PromptsClient({ apiBaseURL, routeSearch }: PromptsClientProps) {
   return (
     <DashboardDataProvider apiBaseURL={apiBaseURL} routeSearch={routeSearch}>
-      <PromptsResponsesWorkspace />
+      <PromptsResponsesWorkspace apiBaseURL={apiBaseURL} />
     </DashboardDataProvider>
   );
 }

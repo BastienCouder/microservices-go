@@ -21,6 +21,8 @@ type PromptText struct {
 type AnalysisRun struct {
 	ID                 string    `json:"id"`
 	ProjectID          string    `json:"projectId"`
+	OrganizationID     int64     `json:"organizationId"`
+	CreatedBy          int64     `json:"createdBy"`
 	RunType            string    `json:"runType"`
 	Status             string    `json:"status"`
 	PromptsCount       int       `json:"promptsCount"`
@@ -56,7 +58,8 @@ type AIResponse struct {
 
 type StartAnalysisInput struct {
 	RequestID   string
-	UserID      string
+	OrganizationID int64
+	CreatedBy   int64
 	ProjectID   string
 	PromptTexts []PromptText
 	ModelIDs    []string
@@ -127,12 +130,20 @@ type StateStore interface {
 	Save(ctx context.Context, payload []byte) error
 }
 
+type DashboardCache interface {
+	GetDashboard(ctx context.Context, projectID string, organizationID int64) (DashboardData, bool, error)
+	SetDashboard(ctx context.Context, projectID string, organizationID int64, data DashboardData, ttl time.Duration) error
+	DeleteDashboard(ctx context.Context, projectID string, organizationID int64) error
+}
+
 type ProjectAccessVerifier interface {
-	EnsureProjectOwnedByUser(ctx context.Context, projectID, userID string) error
+	EnsureProjectAccessible(ctx context.Context, projectID string, organizationID int64) error
 }
 
 type Dependencies struct {
 	Store           StateStore
+	DashboardCache  DashboardCache
+	DashboardCacheTTL time.Duration
 	ProjectVerifier ProjectAccessVerifier
 }
 
@@ -166,5 +177,7 @@ type Service struct {
 	alertsByProject    map[string][]string
 
 	store           StateStore
+	dashboardCache  DashboardCache
+	dashboardCacheTTL time.Duration
 	projectVerifier ProjectAccessVerifier
 }

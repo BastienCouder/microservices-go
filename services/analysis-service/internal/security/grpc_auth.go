@@ -11,6 +11,15 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+type claimsContextKey string
+
+const internalClaimsContextKey claimsContextKey = "internal-jwt-claims"
+
+func ClaimsFromContext(ctx context.Context) (internalTokenClaims, bool) {
+	claims, ok := ctx.Value(internalClaimsContextKey).(internalTokenClaims)
+	return claims, ok
+}
+
 func NewUnaryAuthInterceptor(secret, issuer, audience string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req any, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		md, ok := metadata.FromIncomingContext(ctx)
@@ -26,9 +35,10 @@ func NewUnaryAuthInterceptor(secret, issuer, audience string) grpc.UnaryServerIn
 			return nil, status.Error(codes.Unauthenticated, "invalid authorization format")
 		}
 		token := strings.TrimSpace(strings.TrimPrefix(raw, "Bearer "))
-		if _, err := verifyInternalJWT(token, secret, issuer, audience); err != nil {
+		claims, err := verifyInternalJWT(token, secret, issuer, audience)
+		if err != nil {
 			return nil, status.Error(codes.Unauthenticated, fmt.Sprintf("invalid token: %v", err))
 		}
-		return handler(ctx, req)
+		return handler(context.WithValue(ctx, internalClaimsContextKey, claims), req)
 	}
 }

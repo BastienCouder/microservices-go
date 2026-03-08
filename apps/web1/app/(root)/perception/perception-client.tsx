@@ -20,7 +20,7 @@ import {
 } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { BrandCanon, OptimizePriority, PerceptionError, PerceptionViewData } from "@/lib/perception-data";
-import { ModelCard } from "../../../../app/src/features/dashboard/_components/left-col/left-col-cards";
+import { ModelCard } from "../../../../app/src/features/monitoring/_components/left-col/left-col-cards";
 import { PerceptionDonutVisual } from "./_components/perception-donut-visual";
 import { PerceptionLeftPanel } from "./_components/perception-left-panel";
 import { PerceptionModelAxisHeatmap } from "./_components/perception-model-axis-heatmap";

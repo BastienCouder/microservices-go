@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -21,6 +22,9 @@ type Config struct {
 	GRPCTLSServerName        string
 	GRPCTLSClientCAFile      string
 	GRPCTLSRequireClientCert bool
+	RedisAddr                string
+	RedisPassword            string
+	DashboardCacheTTL        time.Duration
 }
 
 func Load() (Config, error) {
@@ -56,6 +60,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	redisAddr, err := requiredEnv("REDIS_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	redisPassword, err := optionalPasswordFromEnv("REDIS_PASSWORD", "REDIS_PASSWORD_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	dashboardCacheTTL, err := requiredDurationEnv("DASHBOARD_CACHE_TTL")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:                 httpAddr,
@@ -71,6 +87,9 @@ func Load() (Config, error) {
 		GRPCTLSServerName:        optionalEnv("GRPC_TLS_SERVER_NAME"),
 		GRPCTLSClientCAFile:      optionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
 		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
+		RedisAddr:                redisAddr,
+		RedisPassword:            redisPassword,
+		DashboardCacheTTL:        dashboardCacheTTL,
 	}, nil
 }
 
@@ -130,6 +149,21 @@ func passwordFromEnv(passwordKey, fileKey string) (string, error) {
 	return value, nil
 }
 
+func optionalPasswordFromEnv(passwordKey, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(passwordKey)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", nil
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read password file %s: %w", filePath, err)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
 func requiredEnv(key string) (string, error) {
 	value := os.Getenv(key)
 	if value == "" {
@@ -155,4 +189,16 @@ func optionalBoolEnv(key string, defaultValue bool) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
 	}
+}
+
+func requiredDurationEnv(key string) (time.Duration, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return 0, fmt.Errorf("missing required environment variable %s", key)
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("invalid environment variable %s: %w", key, err)
+	}
+	return duration, nil
 }

@@ -56,10 +56,20 @@ export function PromptsFiltersToolbar({
   toggleModel,
 }: PromptsFiltersToolbarProps) {
   return (
-    <>
-      <div className="mt-6 flex flex-wrap items-center gap-2">
+      <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="relative w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="h-10 pl-9 sm:h-8"
+            placeholder="Search in prompts"
+          />
+        </div>
+
+
         <DatePickerWithRange
-          className="w-[220px]"
+          className="w-full sm:w-[220px]"
           date={dateRange}
           setDate={setDateRange}
           period={period}
@@ -68,7 +78,7 @@ export function PromptsFiltersToolbar({
 
         {availablePersonas.length > 0 ? (
           <Select value={persona} onValueChange={setPersona}>
-            <SelectTrigger className="h-8 w-[150px]">
+            <SelectTrigger className="h-10 w-full sm:h-8 sm:w-[160px]">
               <SelectValue placeholder="Persona" />
             </SelectTrigger>
             <SelectContent>
@@ -92,22 +102,12 @@ export function PromptsFiltersToolbar({
           toggleModel={toggleModel}
         />
 
-        <div className="relative w-96">
-          <Search className="absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            className="h-8 pl-8"
-            placeholder="Search in prompts"
-          />
-        </div>
-
+      
         {hasActiveGlobalFilters && (
-          <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={clearFilters}>
+          <Button size="sm" variant="ghost" className="h-10 justify-center rounded-full px-4 text-xs sm:h-8" onClick={clearFilters}>
             Clear all
           </Button>
         )}
       </div>
-    </>
   );
 }

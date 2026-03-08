@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-const rateLimiterMaxEntries = 10_000
+const rateLimiterMaxEntries = 50_000
 
 type rateLimiter struct {
 	mu         sync.Mutex

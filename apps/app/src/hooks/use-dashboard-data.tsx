@@ -2,19 +2,19 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
-  useRef,
-  useState,
   type ReactNode,
 } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import {
   DashboardRequestError,
+  getDashboardQueryContext,
   loadDashboardData,
   type DashboardData,
   type DashboardPrompt,
 } from "@/lib/dashboard-data";
+import { appQueryKeys } from "@/lib/query-keys";
 import type { RuntimeMode } from "@/lib/runtime-mode";
 
 type DashboardDataContextValue = {
@@ -76,50 +76,29 @@ export function DashboardDataProvider({
   routeSearch,
   children,
 }: DashboardDataProviderProps) {
-  const [data, setData] = useState<DashboardData>(EMPTY_DASHBOARD_DATA);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [mode, setMode] = useState<RuntimeMode>("live");
-  const [projectId, setProjectId] = useState<string | null>(null);
-  const requestIdRef = useRef(0);
-
-  const runRefresh = useCallback(async (signal?: AbortSignal) => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await loadDashboardData(apiBaseURL, routeSearch, { signal });
-      if (signal?.aborted || requestId !== requestIdRef.current) {
-        return;
-      }
-      setData(result.data);
-      setMode(result.mode);
-      setProjectId(result.projectId);
-    } catch (err) {
-      if (isAbortError(err) || requestId !== requestIdRef.current) {
-        return;
-      }
-      setError(toDashboardErrorMessage(err));
-    } finally {
-      if (!signal?.aborted && requestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [apiBaseURL, routeSearch]);
+  const { projectId: queryProjectId, mode: queryMode } = useMemo(
+    () => getDashboardQueryContext(routeSearch),
+    [routeSearch],
+  );
+  const dashboardQuery = useQuery({
+    queryKey: appQueryKeys.dashboard(apiBaseURL, queryProjectId, queryMode),
+    enabled: apiBaseURL.trim() !== "",
+    queryFn: ({ signal }) => loadDashboardData(apiBaseURL, routeSearch, { signal }),
+  });
 
   const refresh = useCallback(async () => {
-    await runRefresh();
-  }, [runRefresh]);
+    await dashboardQuery.refetch();
+  }, [dashboardQuery.refetch]);
 
-  useEffect(() => {
-    const controller = new AbortController();
-    void runRefresh(controller.signal);
-    return () => {
-      controller.abort();
-    };
-  }, [runRefresh]);
+  const error =
+    dashboardQuery.error && !isAbortError(dashboardQuery.error)
+      ? toDashboardErrorMessage(dashboardQuery.error)
+      : null;
+  const result = dashboardQuery.data;
+  const data = result?.data ?? EMPTY_DASHBOARD_DATA;
+  const mode: RuntimeMode = result?.mode ?? "live";
+  const projectId = result?.projectId ?? null;
+  const loading = dashboardQuery.isLoading || (dashboardQuery.isFetching && !dashboardQuery.data);
 
   const value = useMemo<DashboardDataContextValue>(
     () => ({

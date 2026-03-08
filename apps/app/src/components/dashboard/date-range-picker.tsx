@@ -55,7 +55,7 @@ export function DatePickerWithRange({
             }
           }}
         >
-          <SelectTrigger className="h-10 w-full lg:h-8">
+          <SelectTrigger className="h-10 w-full lg:h-8 bg-background">
             <SelectValue />
           </SelectTrigger>
           <SelectContent position="item-aligned">

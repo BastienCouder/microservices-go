@@ -7,9 +7,13 @@ import (
 	"strings"
 )
 
-func (s *Service) ListModels(_ context.Context, onlyActive bool) ([]AIModel, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Service) ListModels(ctx context.Context, onlyActive bool) ([]AIModel, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	models := make([]AIModel, 0, len(s.models))
 	for _, model := range s.models {
@@ -22,11 +26,15 @@ func (s *Service) ListModels(_ context.Context, onlyActive bool) ([]AIModel, err
 	return models, nil
 }
 
-func (s *Service) ListProjectModels(_ context.Context, projectID, userID string) ([]ProjectModelSelection, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Service) ListProjectModels(ctx context.Context, projectID string, organizationID int64) ([]ProjectModelSelection, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -48,7 +56,7 @@ func (s *Service) ListProjectModels(_ context.Context, projectID, userID string)
 	return selection, nil
 }
 
-func (s *Service) ReplaceProjectModels(ctx context.Context, projectID, userID string, modelIDs []string) (ReplaceProjectModelsResult, error) {
+func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, organizationID int64, modelIDs []string) (ReplaceProjectModelsResult, error) {
 	if len(modelIDs) == 0 {
 		return ReplaceProjectModelsResult{}, fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
 	}
@@ -70,7 +78,11 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID, userID st
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
+	if err := s.reloadLocked(ctx); err != nil {
+		return ReplaceProjectModelsResult{}, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return ReplaceProjectModelsResult{}, err
 	}
 	for _, modelID := range normalized {
@@ -97,6 +109,11 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID, userID st
 func (s *Service) SeedDefaultModels(ctx context.Context) ([]AIModel, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
 	s.seedDefaultModels()
 	if err := s.persistLocked(ctx); err != nil {
 		return nil, err

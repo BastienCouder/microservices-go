@@ -1,23 +1,23 @@
 export const VISIBILITY_ANALYTICS_COLORS = {
   series: [
-    "hsl(186 49% 62%)",
-    "hsl(204 40% 47%)",
-    "hsl(221 39% 34%)",
-    "hsl(200 63% 68%)",
-    "hsl(230 53% 58%)",
-    "hsl(213 29% 45%)",
-    "hsl(193 34% 56%)",
+    "hsl(var(--chart-series-1))",
+    "hsl(var(--chart-series-2))",
+    "hsl(var(--chart-series-3))",
+    "hsl(var(--chart-series-4))",
+    "hsl(var(--chart-series-5))",
+    "hsl(var(--chart-series-6))",
+    "hsl(var(--chart-series-7))",
   ],
-  axisTick: "hsl(var(--muted-foreground))",
-  tooltipCursor: "hsl(var(--muted) / 0.2)",
-  fallbackBar: "hsl(var(--primary))",
+  axisTick: "hsl(var(--chart-axis))",
+  tooltipCursor: "hsl(var(--chart-cursor) / 0.2)",
+  fallbackBar: "hsl(var(--chart-brand-primary))",
 } as const;
 
 export const AI_SENTIMENT_COLORS = {
-  positive: "hsl(var(--primary))",
-  neutral: "hsl(200 90% 45%)",
-  negative: "hsl(230 85% 60%)",
-  legendFallback: "hsl(var(--muted-foreground))",
+  positive: "hsl(var(--chart-sentiment-positive))",
+  neutral: "hsl(var(--chart-sentiment-neutral))",
+  negative: "hsl(var(--chart-sentiment-negative))",
+  legendFallback: "hsl(var(--chart-axis))",
 } as const;
 
 export const DASHBOARD_TEXT = {
@@ -46,12 +46,12 @@ export const DASHBOARD_TEXT = {
 } as const;
 
 export const APP_CHART_UI_COLORS = {
-  axisTick: "hsl(var(--muted-foreground))",
-  tooltipCursor: "hsl(var(--muted) / 0.18)",
-  legendFallback: "hsl(var(--muted))",
+  axisTick: "hsl(var(--chart-axis))",
+  tooltipCursor: "hsl(var(--chart-cursor) / 0.18)",
+  legendFallback: "hsl(var(--chart-legend-fallback))",
   background: "hsl(var(--background))",
-  primary: "hsl(193 34% 56%)",
-  primaryMuted: "hsl(193 34% 56% / 0.6)",
+  primary: "hsl(var(--chart-brand-primary))",
+  primaryMuted: "hsl(var(--chart-brand-primary) / 0.6)",
 } as const;
 
 export const PERCEPTION_VISIBLE_AXES = [
@@ -180,30 +180,30 @@ export const PERCEPTION_TEXT = {
 
 export const PERCEPTION_SCORE_CARD_COLORS = {
   positioning: {
-    accent: "hsl(186 49% 62%)",
-    accentSoft: "hsl(186 49% 62% / 0.18)",
-    ring: "hsl(186 49% 62% / 0.95)",
+    accent: "hsl(var(--chart-perception-positioning))",
+    accentSoft: "hsl(var(--chart-perception-positioning) / 0.18)",
+    ring: "hsl(var(--chart-perception-positioning) / 0.95)",
   },
   factual: {
-    accent: "hsl(204 40% 47%)",
-    accentSoft: "hsl(204 40% 47% / 0.18)",
-    ring: "hsl(204 40% 47% / 0.95)",
+    accent: "hsl(var(--chart-perception-factual))",
+    accentSoft: "hsl(var(--chart-perception-factual) / 0.18)",
+    ring: "hsl(var(--chart-perception-factual) / 0.95)",
   },
   sentiment: {
-    accent: "hsl(221 39% 34%)",
-    accentSoft: "hsl(221 39% 34% / 0.18)",
-    ring: "hsl(221 39% 34% / 0.95)",
+    accent: "hsl(var(--chart-perception-sentiment))",
+    accentSoft: "hsl(var(--chart-perception-sentiment) / 0.18)",
+    ring: "hsl(var(--chart-perception-sentiment) / 0.95)",
   },
   ringTrack: "hsl(var(--muted) / 0.5)",
 } as const;
 
 export const PERCEPTION_DONUT_COLORS = {
   axis: {
-    positioning: "hsl(186 49% 62%)",
-    use_cases: "hsl(221 39% 34%)",
-    sentiment: "hsl(200 63% 68%)",
-    features: "hsl(230 53% 58%)",
-    competitors: "hsl(213 29% 45%)",
+    positioning: "hsl(var(--chart-perception-positioning))",
+    use_cases: "hsl(var(--chart-perception-use-cases))",
+    sentiment: "hsl(var(--chart-perception-sentiment))",
+    features: "hsl(var(--chart-perception-features))",
+    competitors: "hsl(var(--chart-perception-competitors))",
   },
   primary: APP_CHART_UI_COLORS.primary,
   primaryMuted: APP_CHART_UI_COLORS.primaryMuted,
@@ -212,17 +212,17 @@ export const PERCEPTION_DONUT_COLORS = {
 } as const;
 
 export const PERCEPTION_HEATMAP_AXIS_COLORS: Record<string, string> = {
-  positioning: "hsl(186 49% 62%)",
-  use_cases: "hsl(221 39% 34%)",
-  features: "hsl(200 63% 68%)",
-  sentiment: "hsl(230 53% 58%)",
-  competitors: "hsl(213 29% 45%)",
+  positioning: "hsl(var(--chart-perception-positioning))",
+  use_cases: "hsl(var(--chart-perception-use-cases))",
+  features: "hsl(var(--chart-perception-features))",
+  sentiment: "hsl(var(--chart-perception-sentiment))",
+  competitors: "hsl(var(--chart-perception-competitors))",
 };
 
 export const PERCEPTION_TREND_COLORS = {
-  positioning: "hsl(186 49% 62%)",
-  factual: "hsl(204 40% 47%)",
-  sentiment: "hsl(221 39% 34%)",
+  positioning: "hsl(var(--chart-perception-positioning))",
+  factual: "hsl(var(--chart-perception-factual))",
+  sentiment: "hsl(var(--chart-perception-sentiment))",
 } as const;
 
 export function getModelIconForName(modelName: string): string {

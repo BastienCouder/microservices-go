@@ -3,9 +3,9 @@ package grpc
 import (
 	"context"
 	"errors"
-	"strconv"
 
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
+	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,12 +21,16 @@ func NewServer(svc *usecase.Service) *Server {
 }
 
 func (s *Server) CheckProjectAccess(ctx context.Context, req *projectv1.CheckProjectAccessRequest) (*projectv1.CheckProjectAccessResponse, error) {
-	if req.GetProjectId() == "" || req.GetUserId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "project_id and user_id are required")
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
 	}
 
-	userID := strconv.FormatInt(req.GetUserId(), 10)
-	_, err := s.svc.GetProject(ctx, req.GetProjectId(), userID)
+	claims, ok := security.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
+	}
+
+	_, err := s.svc.GetProject(ctx, req.GetProjectId(), claims.Organization)
 	if err == nil {
 		return &projectv1.CheckProjectAccessResponse{Allowed: true, Exists: true, Reason: "ok"}, nil
 	}

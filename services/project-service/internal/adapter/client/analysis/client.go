@@ -3,7 +3,6 @@ package analysis
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -104,19 +103,11 @@ func NewClient(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConf
 	if target == "" {
 		return nil, fmt.Errorf("analysis grpc target is required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 	dialOptions, err := grpctls.ClientDialOptions(tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("configure analysis grpc tls: %w", err)
 	}
-	dialOptions = append(dialOptions, grpc.WithBlock())
-
-	conn, err := grpc.DialContext(
-		ctx,
-		target,
-		dialOptions...,
-	)
+	conn, err := grpc.Dial(target, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("dial analysis grpc: %w", err)
 	}
@@ -139,9 +130,9 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartRequest) (usecase.AnalysisStartResponse, error) {
-	claims := security.OutboundTokenClaims{}
-	if parsed, err := strconv.ParseInt(strings.TrimSpace(req.UserID), 10, 64); err == nil && parsed > 0 {
-		claims.UserID = parsed
+	claims := security.OutboundTokenClaims{
+		UserID:       req.CreatedBy,
+		Organization: req.OrganizationID,
 	}
 	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", claims)
 	if err != nil {
@@ -152,14 +143,12 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 	for _, prompt := range req.PromptTexts {
 		promptTexts = append(promptTexts, &analysisv1.PromptText{Id: prompt.ID, Text: prompt.Text})
 	}
-	userID, _ := strconv.ParseInt(strings.TrimSpace(req.UserID), 10, 64)
-
 	var grpcResp *analysisv1.StartAnalysisResponse
 	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
 		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
 		resp, callErr := c.client.StartAnalysis(callCtx, &analysisv1.StartAnalysisRequest{
 			RequestId:   req.RequestID,
-			UserId:      userID,
+			UserId:      req.CreatedBy,
 			ProjectId:   req.ProjectID,
 			PromptTexts: promptTexts,
 			ModelIds:    req.ModelIDs,

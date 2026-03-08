@@ -2,12 +2,32 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
+	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
 const singletonStateID = 1
+
+type persistedState struct {
+	Seq                int64                          `json:"seq"`
+	Runs               map[string]*usecase.AnalysisRun `json:"runs"`
+	RunsByProject      map[string][]string            `json:"runsByProject"`
+	PromptRuns         map[string]*usecase.PromptRun  `json:"promptRuns"`
+	PromptRunsByRun    map[string][]string            `json:"promptRunsByRun"`
+	Responses          map[string]*usecase.AIResponse `json:"responses"`
+	ResponsesByRun     map[string][]string            `json:"responsesByRun"`
+	ResponseIndexByRun map[string]map[string]string   `json:"responseIndexByRun"`
+	RunByRequest       map[string]string              `json:"runByRequest"`
+	Alerts             map[string]*usecase.Alert      `json:"alerts"`
+	AlertsByProject    map[string][]string            `json:"alertsByProject"`
+}
 
 type StateStore struct {
 	db *pgxpool.Pool
@@ -18,34 +38,366 @@ func NewStateStore(db *pgxpool.Pool) *StateStore {
 }
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
-	const query = `
-		SELECT payload
-		FROM analysis_service_state
-		WHERE id = $1
-	`
+	state := persistedState{
+		Runs:               make(map[string]*usecase.AnalysisRun),
+		RunsByProject:      make(map[string][]string),
+		PromptRuns:         make(map[string]*usecase.PromptRun),
+		PromptRunsByRun:    make(map[string][]string),
+		Responses:          make(map[string]*usecase.AIResponse),
+		ResponsesByRun:     make(map[string][]string),
+		ResponseIndexByRun: make(map[string]map[string]string),
+		RunByRequest:       make(map[string]string),
+		Alerts:             make(map[string]*usecase.Alert),
+		AlertsByProject:    make(map[string][]string),
+	}
 
-	var payload []byte
-	err := s.db.QueryRow(ctx, query, singletonStateID).Scan(&payload)
+	err := s.db.QueryRow(ctx, `
+		SELECT seq
+		FROM analysis_service_meta
+		WHERE id = $1
+	`, singletonStateID).Scan(&state.Seq)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, false, nil
 		}
-		return nil, false, fmt.Errorf("select analysis state: %w", err)
+		return nil, false, fmt.Errorf("select analysis meta: %w", err)
 	}
 
+	if err := s.loadRuns(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadPromptRuns(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadResponses(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadAlerts(ctx, &state); err != nil {
+		return nil, false, err
+	}
+
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return nil, false, fmt.Errorf("marshal analysis state: %w", err)
+	}
 	return payload, true, nil
 }
 
 func (s *StateStore) Save(ctx context.Context, payload []byte) error {
-	const query = `
-		INSERT INTO analysis_service_state (id, payload, updated_at)
-		VALUES ($1, $2::jsonb, NOW())
-		ON CONFLICT (id)
-		DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()
-	`
+	var state persistedState
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return fmt.Errorf("decode analysis state payload: %w", err)
+	}
 
-	if _, err := s.db.Exec(ctx, query, singletonStateID, payload); err != nil {
-		return fmt.Errorf("upsert analysis state: %w", err)
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin analysis state transaction: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback(context.Background())
+		}
+	}()
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO analysis_service_meta (id, seq, updated_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (id)
+		DO UPDATE SET seq = EXCLUDED.seq, updated_at = NOW()
+	`, singletonStateID, state.Seq); err != nil {
+		return fmt.Errorf("upsert analysis meta: %w", err)
+	}
+
+	for _, statement := range []string{
+		`DELETE FROM alerts`,
+		`DELETE FROM ai_responses`,
+		`DELETE FROM prompt_runs`,
+		`DELETE FROM analysis_runs`,
+	} {
+		if _, err := tx.Exec(ctx, statement); err != nil {
+			return fmt.Errorf("reset analysis tables: %w", err)
+		}
+	}
+
+	if err := insertAnalysisRuns(ctx, tx, state.Runs, state.RunByRequest); err != nil {
+		return err
+	}
+	if err := insertPromptRuns(ctx, tx, state.PromptRuns); err != nil {
+		return err
+	}
+	if err := insertResponses(ctx, tx, state.Responses); err != nil {
+		return err
+	}
+	if err := insertAlerts(ctx, tx, state.Alerts); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit analysis state transaction: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
+func (s *StateStore) loadRuns(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, expected_responses, completed_responses, visibility_score, created_at, updated_at
+		FROM analysis_runs
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select analysis runs: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item      usecase.AnalysisRun
+			requestID *string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.ProjectID,
+			&item.OrganizationID,
+			&item.CreatedBy,
+			&requestID,
+			&item.RunType,
+			&item.Status,
+			&item.PromptsCount,
+			&item.ModelsCount,
+			&item.ExpectedResponses,
+			&item.CompletedResponses,
+			&item.VisibilityScore,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan analysis run: %w", err)
+		}
+		run := item
+		state.Runs[item.ID] = &run
+		state.RunsByProject[item.ProjectID] = append(state.RunsByProject[item.ProjectID], item.ID)
+		if requestID != nil && *requestID != "" {
+			state.RunByRequest[item.ProjectID+"|"+*requestID] = item.ID
+		}
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadPromptRuns(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, run_id, prompt_id, prompt_text, created_at
+		FROM prompt_runs
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select prompt runs: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item usecase.PromptRun
+		if err := rows.Scan(&item.ID, &item.RunID, &item.PromptID, &item.PromptText, &item.CreatedAt); err != nil {
+			return fmt.Errorf("scan prompt run: %w", err)
+		}
+		promptRun := item
+		state.PromptRuns[item.ID] = &promptRun
+		state.PromptRunsByRun[item.RunID] = append(state.PromptRunsByRun[item.RunID], item.ID)
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadResponses(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at
+		FROM ai_responses
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select ai responses: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item usecase.AIResponse
+			raw  []byte
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.RunID,
+			&item.PromptRunID,
+			&item.ModelID,
+			&item.RawResponse,
+			&item.BrandMentioned,
+			&item.BrandPosition,
+			&item.CitationFound,
+			&raw,
+			&item.Sentiment,
+			&item.CreatedAt,
+		); err != nil {
+			return fmt.Errorf("scan ai response: %w", err)
+		}
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &item.CitedURLs); err != nil {
+				return fmt.Errorf("decode cited urls: %w", err)
+			}
+		}
+		response := item
+		state.Responses[item.ID] = &response
+		state.ResponsesByRun[item.RunID] = append(state.ResponsesByRun[item.RunID], item.ID)
+		if state.ResponseIndexByRun[item.RunID] == nil {
+			state.ResponseIndexByRun[item.RunID] = make(map[string]string)
+		}
+		state.ResponseIndexByRun[item.RunID][item.PromptRunID+"|"+item.ModelID] = item.ID
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadAlerts(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, project_id, alert_type, severity, title, description, is_read, created_at, updated_at
+		FROM alerts
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select alerts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item usecase.Alert
+		if err := rows.Scan(
+			&item.ID,
+			&item.ProjectID,
+			&item.AlertType,
+			&item.Severity,
+			&item.Title,
+			&item.Description,
+			&item.IsRead,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan alert: %w", err)
+		}
+		alert := item
+		state.Alerts[item.ID] = &alert
+		state.AlertsByProject[item.ProjectID] = append(state.AlertsByProject[item.ProjectID], item.ID)
+	}
+	return rows.Err()
+}
+
+func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase.AnalysisRun, runByRequest map[string]string) error {
+	requestIDs := reverseRunRequestMap(runByRequest)
+	for _, runID := range sortedAnalysisRunIDs(runs) {
+		run := runs[runID]
+		requestID := requestIDs[runID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO analysis_runs (id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, expected_responses, completed_responses, visibility_score, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		`, run.ID, run.ProjectID, run.OrganizationID, run.CreatedBy, nullableString(requestID), run.RunType, run.Status, run.PromptsCount, run.ModelsCount, run.ExpectedResponses, run.CompletedResponses, run.VisibilityScore, run.CreatedAt, run.UpdatedAt); err != nil {
+			return fmt.Errorf("insert analysis run %s: %w", run.ID, err)
+		}
 	}
 	return nil
+}
+
+func insertPromptRuns(ctx context.Context, tx pgx.Tx, promptRuns map[string]*usecase.PromptRun) error {
+	for _, promptRunID := range sortedPromptRunIDs(promptRuns) {
+		promptRun := promptRuns[promptRunID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO prompt_runs (id, run_id, prompt_id, prompt_text, created_at)
+			VALUES ($1, $2, $3, $4, $5)
+		`, promptRun.ID, promptRun.RunID, promptRun.PromptID, promptRun.PromptText, promptRun.CreatedAt); err != nil {
+			return fmt.Errorf("insert prompt run %s: %w", promptRun.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertResponses(ctx context.Context, tx pgx.Tx, responses map[string]*usecase.AIResponse) error {
+	for _, responseID := range sortedResponseIDs(responses) {
+		response := responses[responseID]
+		rawCitedURLs, err := json.Marshal(response.CitedURLs)
+		if err != nil {
+			return fmt.Errorf("marshal cited urls for %s: %w", response.ID, err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO ai_responses (id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
+		`, response.ID, response.RunID, response.PromptRunID, response.ModelID, response.RawResponse, response.BrandMentioned, response.BrandPosition, response.CitationFound, rawCitedURLs, response.Sentiment, response.CreatedAt); err != nil {
+			return fmt.Errorf("insert ai response %s: %w", response.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertAlerts(ctx context.Context, tx pgx.Tx, alerts map[string]*usecase.Alert) error {
+	for _, alertID := range sortedAlertIDs(alerts) {
+		alert := alerts[alertID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO alerts (id, project_id, alert_type, severity, title, description, is_read, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		`, alert.ID, alert.ProjectID, alert.AlertType, alert.Severity, alert.Title, alert.Description, alert.IsRead, alert.CreatedAt, alert.UpdatedAt); err != nil {
+			return fmt.Errorf("insert alert %s: %w", alert.ID, err)
+		}
+	}
+	return nil
+}
+
+func reverseRunRequestMap(runByRequest map[string]string) map[string]string {
+	reversed := make(map[string]string, len(runByRequest))
+	for key, runID := range runByRequest {
+		if runID == "" {
+			continue
+		}
+		parts := strings.SplitN(key, "|", 2)
+		if len(parts) != 2 || parts[1] == "" {
+			continue
+		}
+		reversed[runID] = parts[1]
+	}
+	return reversed
+}
+
+func sortedAnalysisRunIDs(items map[string]*usecase.AnalysisRun) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedPromptRunIDs(items map[string]*usecase.PromptRun) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedResponseIDs(items map[string]*usecase.AIResponse) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedAlertIDs(items map[string]*usecase.Alert) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func nullableString(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
 }

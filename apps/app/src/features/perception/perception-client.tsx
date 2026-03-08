@@ -19,7 +19,7 @@ import {
 } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { BrandCanon, OptimizePriority, PerceptionError, PerceptionViewData } from "@/lib/perception-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 import { PerceptionThreeColumnLayout } from "./_components/perception-three-column-layout";
 import { PerceptionDonutVisual } from "./_components/perception-donut-visual";
 import { PerceptionLeftPanel } from "./_components/perception-left-panel";
@@ -525,7 +525,7 @@ function ModelCard({
         selected ? "border-primary bg-primary/5 text-foreground" : "border-border/60 bg-background hover:bg-muted/40",
       )}
     >
-      <img src={icon} alt="" className="h-4 w-4 shrink-0" aria-hidden="true" />
+      <img src={icon} alt="" className="h-4 w-4 shrink-0" aria-hidden="true" decoding="async" />
       <span className="min-w-0 truncate text-xs font-medium">{name}</span>
     </button>
   );

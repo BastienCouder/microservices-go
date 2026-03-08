@@ -78,24 +78,31 @@ export function OrganizationsSidebar({
             <div className="grid gap-2">
               <button
                 type="button"
-                onClick={() => onDraftPlanChange("free")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "free" && "border-primary bg-primary/5")}
+                onClick={() => onDraftPlanChange("starter")}
+                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "starter" && "border-primary bg-primary/5")}
               >
-                Free
+                Starter
               </button>
               <button
                 type="button"
-                onClick={() => onDraftPlanChange("pro-monthly")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "pro-monthly" && "border-primary bg-primary/5")}
+                onClick={() => onDraftPlanChange("growth")}
+                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "growth" && "border-primary bg-primary/5")}
               >
-                Pro Monthly (simulated)
+                Growth
               </button>
               <button
                 type="button"
-                onClick={() => onDraftPlanChange("pro-yearly")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "pro-yearly" && "border-primary bg-primary/5")}
+                onClick={() => onDraftPlanChange("pro")}
+                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "pro" && "border-primary bg-primary/5")}
               >
-                Pro Yearly (simulated)
+                Pro
+              </button>
+              <button
+                type="button"
+                onClick={() => onDraftPlanChange("agency-enterprise")}
+                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "agency-enterprise" && "border-primary bg-primary/5")}
+              >
+                Agency / Enterprise
               </button>
             </div>
             <div className="flex gap-2">

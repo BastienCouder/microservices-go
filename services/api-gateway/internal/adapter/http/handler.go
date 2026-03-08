@@ -26,6 +26,7 @@ type Handler struct {
 	routes             []routeEntry
 	authURL            string
 	userURL            string
+	organizationsURL   string
 	permissionGRPC     *permissionGRPCClient
 	httpClient         *http.Client
 	rateLimiter        *rateLimiter
@@ -33,6 +34,8 @@ type Handler struct {
 	authBulkhead       *bulkhead
 	userBreaker        *circuitBreaker
 	userBulkhead       *bulkhead
+	organizationBreaker  *circuitBreaker
+	organizationBulkhead *bulkhead
 	permissionBreaker  *circuitBreaker
 	permissionBulkhead *bulkhead
 	internalJWTSecret  string
@@ -144,6 +147,10 @@ func NewHandlerWithGRPCAndServices(
 	if err != nil {
 		return nil, err
 	}
+	organizationBreaker, err := newCircuitBreaker(5, 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
 	permissionBreaker, err := newCircuitBreaker(5, 30*time.Second)
 	if err != nil {
 		return nil, err
@@ -153,6 +160,10 @@ func NewHandlerWithGRPCAndServices(
 		return nil, err
 	}
 	userBulkhead, err := newBulkhead(128)
+	if err != nil {
+		return nil, err
+	}
+	organizationBulkhead, err := newBulkhead(128)
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +209,7 @@ func NewHandlerWithGRPCAndServices(
 		attributionProxy:   attributionProxy,
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
+		organizationsURL:   strings.TrimRight(organizationsServiceURL, "/"),
 		permissionGRPC:     permissionGRPC,
 		httpClient: &http.Client{
 			Transport: transport,
@@ -208,6 +220,8 @@ func NewHandlerWithGRPCAndServices(
 		authBulkhead:       authBulkhead,
 		userBreaker:        userBreaker,
 		userBulkhead:       userBulkhead,
+		organizationBreaker:  organizationBreaker,
+		organizationBulkhead: organizationBulkhead,
 		permissionBreaker:  permissionBreaker,
 		permissionBulkhead: permissionBulkhead,
 		internalJWTSecret:  internalJWTSecret,

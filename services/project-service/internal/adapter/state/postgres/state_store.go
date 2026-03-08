@@ -2,12 +2,28 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"sort"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
 const singletonStateID = 1
+
+type persistedState struct {
+	Seq           int64                       `json:"seq"`
+	Projects      map[string]*usecase.Project `json:"projects"`
+	Prompts       map[string]*usecase.Prompt  `json:"prompts"`
+	Competitors   map[string]*usecase.Competitor `json:"competitors"`
+	Models        map[string]usecase.AIModel  `json:"models"`
+	ProjectModels map[string]map[string]bool  `json:"projectModels"`
+	Outbox        map[string]*usecase.OutboxEvent `json:"outbox"`
+	OutboxOrder   []string                    `json:"outboxOrder"`
+}
 
 type StateStore struct {
 	db *pgxpool.Pool
@@ -18,34 +34,503 @@ func NewStateStore(db *pgxpool.Pool) *StateStore {
 }
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
-	const query = `
-		SELECT payload
-		FROM project_service_state
-		WHERE id = $1
-	`
+	state := persistedState{
+		Projects:      make(map[string]*usecase.Project),
+		Prompts:       make(map[string]*usecase.Prompt),
+		Competitors:   make(map[string]*usecase.Competitor),
+		Models:        make(map[string]usecase.AIModel),
+		ProjectModels: make(map[string]map[string]bool),
+		Outbox:        make(map[string]*usecase.OutboxEvent),
+		OutboxOrder:   make([]string, 0),
+	}
 
-	var payload []byte
-	err := s.db.QueryRow(ctx, query, singletonStateID).Scan(&payload)
+	err := s.db.QueryRow(ctx, `
+		SELECT seq
+		FROM project_service_meta
+		WHERE id = $1
+	`, singletonStateID).Scan(&state.Seq)
 	if err != nil {
 		if isNoRows(err) {
 			return nil, false, nil
 		}
-		return nil, false, fmt.Errorf("select project state: %w", err)
+		return nil, false, fmt.Errorf("select project meta: %w", err)
 	}
 
+	if err := s.loadProjects(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadPrompts(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadCompetitors(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadModels(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadProjectModels(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadOutbox(ctx, &state); err != nil {
+		return nil, false, err
+	}
+
+	payload, err := json.Marshal(state)
+	if err != nil {
+		return nil, false, fmt.Errorf("marshal project state: %w", err)
+	}
 	return payload, true, nil
 }
 
 func (s *StateStore) Save(ctx context.Context, payload []byte) error {
-	const query = `
-		INSERT INTO project_service_state (id, payload, updated_at)
-		VALUES ($1, $2::jsonb, NOW())
-		ON CONFLICT (id)
-		DO UPDATE SET payload = EXCLUDED.payload, updated_at = NOW()
-	`
+	var state persistedState
+	if err := json.Unmarshal(payload, &state); err != nil {
+		return fmt.Errorf("decode project state payload: %w", err)
+	}
 
-	if _, err := s.db.Exec(ctx, query, singletonStateID, payload); err != nil {
-		return fmt.Errorf("upsert project state: %w", err)
+	tx, err := s.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin project state transaction: %w", err)
+	}
+	defer func() {
+		if tx != nil {
+			_ = tx.Rollback(context.Background())
+		}
+	}()
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO project_service_meta (id, seq, updated_at)
+		VALUES ($1, $2, NOW())
+		ON CONFLICT (id)
+		DO UPDATE SET seq = EXCLUDED.seq, updated_at = NOW()
+	`, singletonStateID, state.Seq); err != nil {
+		return fmt.Errorf("upsert project meta: %w", err)
+	}
+
+	for _, statement := range []string{
+		`DELETE FROM outbox_events`,
+		`DELETE FROM project_models`,
+		`DELETE FROM competitors`,
+		`DELETE FROM prompts`,
+		`DELETE FROM projects`,
+		`DELETE FROM ai_models`,
+	} {
+		if _, err := tx.Exec(ctx, statement); err != nil {
+			return fmt.Errorf("reset project tables: %w", err)
+		}
+	}
+
+	if err := insertProjectModelsCatalog(ctx, tx, state.Models); err != nil {
+		return err
+	}
+	if err := insertProjects(ctx, tx, state.Projects); err != nil {
+		return err
+	}
+	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
+		return err
+	}
+	if err := insertCompetitors(ctx, tx, state.Competitors); err != nil {
+		return err
+	}
+	if err := insertProjectSelections(ctx, tx, state.ProjectModels); err != nil {
+		return err
+	}
+	if err := insertOutboxEvents(ctx, tx, state.Outbox, state.OutboxOrder); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit project state transaction: %w", err)
+	}
+	tx = nil
+	return nil
+}
+
+func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, organization_id, created_by, name, domain, website_url, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at
+		FROM projects
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select projects: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item             usecase.Project
+			brandName        *string
+			brandDescription *string
+			industry         *string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.OrganizationID,
+			&item.CreatedBy,
+			&item.Name,
+			&item.Domain,
+			&item.WebsiteURL,
+			&brandName,
+			&brandDescription,
+			&industry,
+			&item.PrimaryLanguage,
+			&item.Country,
+			&item.Status,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan project: %w", err)
+		}
+		item.BrandName = stringValue(brandName)
+		item.BrandDescription = stringValue(brandDescription)
+		item.Industry = stringValue(industry)
+		project := item
+		state.Projects[item.ID] = &project
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, project_id, text, intent, is_active, created_at, updated_at
+		FROM prompts
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select prompts: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item   usecase.Prompt
+			intent *string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.ProjectID,
+			&item.Text,
+			&intent,
+			&item.IsActive,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan prompt: %w", err)
+		}
+		item.Intent = stringValue(intent)
+		prompt := item
+		state.Prompts[item.ID] = &prompt
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadCompetitors(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, project_id, name, domain, website_url, is_active, created_at, updated_at
+		FROM competitors
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select competitors: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item       usecase.Competitor
+			domain     *string
+			websiteURL *string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.ProjectID,
+			&item.Name,
+			&domain,
+			&websiteURL,
+			&item.IsActive,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan competitor: %w", err)
+		}
+		item.Domain = stringValue(domain)
+		item.WebsiteURL = stringValue(websiteURL)
+		competitor := item
+		state.Competitors[item.ID] = &competitor
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadModels(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, display_name, provider, group_name, icon_key, provider_model_id, is_active, supports_live_search
+		FROM ai_models
+		ORDER BY display_name ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select models: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item    usecase.AIModel
+			group   *string
+			iconKey *string
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.Label,
+			&item.Provider,
+			&group,
+			&iconKey,
+			&item.ModelID,
+			&item.IsActive,
+			&item.SupportsLiveSearch,
+		); err != nil {
+			return fmt.Errorf("scan model: %w", err)
+		}
+		item.Group = stringValue(group)
+		item.IconKey = stringValue(iconKey)
+		item.IconPath = iconPathFromKey(item.IconKey)
+		state.Models[item.ID] = item
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadProjectModels(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, model_id, is_enabled
+		FROM project_models
+		ORDER BY project_id ASC, model_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select project models: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var projectID string
+		var modelID string
+		var enabled bool
+		if err := rows.Scan(&projectID, &modelID, &enabled); err != nil {
+			return fmt.Errorf("scan project model: %w", err)
+		}
+		if state.ProjectModels[projectID] == nil {
+			state.ProjectModels[projectID] = make(map[string]bool)
+		}
+		state.ProjectModels[projectID][modelID] = enabled
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, event_type, status, payload, sort_order, created_at, updated_at
+		FROM outbox_events
+		ORDER BY sort_order ASC, created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item     usecase.OutboxEvent
+			raw      []byte
+			sortOrder int
+		)
+		if err := rows.Scan(&item.ID, &item.EventType, &item.Status, &raw, &sortOrder, &item.CreatedAt, &item.UpdatedAt); err != nil {
+			return fmt.Errorf("scan outbox event: %w", err)
+		}
+		if len(raw) > 0 {
+			if err := json.Unmarshal(raw, &item.Payload); err != nil {
+				return fmt.Errorf("decode outbox payload: %w", err)
+			}
+		}
+		event := item
+		state.Outbox[item.ID] = &event
+		state.OutboxOrder = append(state.OutboxOrder, item.ID)
+	}
+	return rows.Err()
+}
+
+func insertProjectModelsCatalog(ctx context.Context, tx pgx.Tx, models map[string]usecase.AIModel) error {
+	for _, modelID := range sortedModelIDs(models) {
+		model := models[modelID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO ai_models (id, provider, display_name, group_name, icon_key, provider_model_id, is_active, supports_live_search, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+		`, model.ID, model.Provider, model.Label, nullIfEmptyOrFallback(model.Group, model.Provider), nullIfEmptyOrFallback(model.IconKey, model.Provider), nullIfEmptyOrFallback(model.ModelID, model.ID), model.IsActive, model.SupportsLiveSearch); err != nil {
+			return fmt.Errorf("insert ai model %s: %w", model.ID, err)
+		}
 	}
 	return nil
+}
+
+func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase.Project) error {
+	for _, projectID := range sortedProjectIDs(projects) {
+		project := projects[projectID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
+			return fmt.Errorf("insert project %s: %w", project.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertPrompts(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.Prompt) error {
+	for _, promptID := range sortedPromptIDs(prompts) {
+		prompt := prompts[promptID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO prompts (id, project_id, text, intent, language, country, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, 'fr', 'FR', $5, $6, $7)
+		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
+			return fmt.Errorf("insert prompt %s: %w", prompt.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertCompetitors(ctx context.Context, tx pgx.Tx, competitors map[string]*usecase.Competitor) error {
+	for _, competitorID := range sortedCompetitorIDs(competitors) {
+		competitor := competitors[competitorID]
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO competitors (id, project_id, name, domain, website_url, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		`, competitor.ID, competitor.ProjectID, competitor.Name, nullIfEmpty(competitor.Domain), nullIfEmpty(competitor.WebsiteURL), competitor.IsActive, competitor.CreatedAt, competitor.UpdatedAt); err != nil {
+			return fmt.Errorf("insert competitor %s: %w", competitor.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertProjectSelections(ctx context.Context, tx pgx.Tx, selections map[string]map[string]bool) error {
+	projectIDs := make([]string, 0, len(selections))
+	for projectID := range selections {
+		projectIDs = append(projectIDs, projectID)
+	}
+	sort.Strings(projectIDs)
+	for _, projectID := range projectIDs {
+		modelIDs := make([]string, 0, len(selections[projectID]))
+		for modelID := range selections[projectID] {
+			modelIDs = append(modelIDs, modelID)
+		}
+		sort.Strings(modelIDs)
+		for _, modelID := range modelIDs {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO project_models (project_id, model_id, is_enabled, created_at, updated_at)
+				VALUES ($1, $2, $3, NOW(), NOW())
+			`, projectID, modelID, selections[projectID][modelID]); err != nil {
+				return fmt.Errorf("insert project model %s/%s: %w", projectID, modelID, err)
+			}
+		}
+	}
+	return nil
+}
+
+func insertOutboxEvents(ctx context.Context, tx pgx.Tx, outbox map[string]*usecase.OutboxEvent, ordered []string) error {
+	for index, eventID := range orderedOutboxIDs(outbox, ordered) {
+		event := outbox[eventID]
+		raw, err := json.Marshal(event.Payload)
+		if err != nil {
+			return fmt.Errorf("marshal outbox payload %s: %w", event.ID, err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO outbox_events (id, event_type, status, payload, sort_order, created_at, updated_at)
+			VALUES ($1, $2, $3, $4::jsonb, $5, $6, $7)
+		`, event.ID, event.EventType, event.Status, raw, index, event.CreatedAt, event.UpdatedAt); err != nil {
+			return fmt.Errorf("insert outbox event %s: %w", event.ID, err)
+		}
+	}
+	return nil
+}
+
+func sortedProjectIDs(items map[string]*usecase.Project) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedPromptIDs(items map[string]*usecase.Prompt) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedCompetitorIDs(items map[string]*usecase.Competitor) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedModelIDs(items map[string]usecase.AIModel) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func orderedOutboxIDs(outbox map[string]*usecase.OutboxEvent, order []string) []string {
+	seen := make(map[string]bool, len(order))
+	orderedIDs := make([]string, 0, len(outbox))
+	for _, id := range order {
+		if outbox[id] == nil || seen[id] {
+			continue
+		}
+		seen[id] = true
+		orderedIDs = append(orderedIDs, id)
+	}
+	extras := make([]string, 0)
+	for id := range outbox {
+		if seen[id] {
+			continue
+		}
+		extras = append(extras, id)
+	}
+	sort.Strings(extras)
+	return append(orderedIDs, extras...)
+}
+
+func nullIfEmpty(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func nullIfEmptyOrFallback(value, fallback string) string {
+	if value == "" {
+		return fallback
+	}
+	return value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func iconPathFromKey(iconKey string) string {
+	if iconKey == "" {
+		return ""
+	}
+	return "/models/" + iconKey + ".svg"
 }

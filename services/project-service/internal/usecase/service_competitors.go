@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func (s *Service) AddCompetitors(ctx context.Context, projectID, userID string, competitors []AddCompetitorInput) ([]Competitor, error) {
+func (s *Service) AddCompetitors(ctx context.Context, projectID string, organizationID int64, competitors []AddCompetitorInput) ([]Competitor, error) {
 	if len(competitors) == 0 {
 		return nil, fmt.Errorf("%w: competitors cannot be empty", ErrValidation)
 	}
@@ -23,7 +23,11 @@ func (s *Service) AddCompetitors(ctx context.Context, projectID, userID string, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -48,11 +52,15 @@ func (s *Service) AddCompetitors(ctx context.Context, projectID, userID string, 
 	return out, nil
 }
 
-func (s *Service) ListCompetitors(_ context.Context, projectID, userID string) ([]Competitor, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Service) ListCompetitors(ctx context.Context, projectID string, organizationID int64) ([]Competitor, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if _, err := s.getOwnedProjectLocked(projectID, userID); err != nil {
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return nil, err
 	}
 
@@ -68,9 +76,13 @@ func (s *Service) ListCompetitors(_ context.Context, projectID, userID string) (
 	return competitors, nil
 }
 
-func (s *Service) UpdateCompetitor(ctx context.Context, competitorID, userID string, input UpdateCompetitorInput) (Competitor, error) {
+func (s *Service) UpdateCompetitor(ctx context.Context, competitorID string, organizationID int64, input UpdateCompetitorInput) (Competitor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return Competitor{}, err
+	}
 
 	competitor, ok := s.competitors[strings.TrimSpace(competitorID)]
 	if !ok {
@@ -80,7 +92,7 @@ func (s *Service) UpdateCompetitor(ctx context.Context, competitorID, userID str
 	if !ok {
 		return Competitor{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
-	if project.UserID != strings.TrimSpace(userID) {
+	if project.OrganizationID != organizationID {
 		return Competitor{}, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 	backup := *competitor
@@ -109,9 +121,13 @@ func (s *Service) UpdateCompetitor(ctx context.Context, competitorID, userID str
 	return copyCompetitor(competitor), nil
 }
 
-func (s *Service) DeleteCompetitor(ctx context.Context, competitorID, userID string) error {
+func (s *Service) DeleteCompetitor(ctx context.Context, competitorID string, organizationID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	competitor, ok := s.competitors[strings.TrimSpace(competitorID)]
 	if !ok {
@@ -121,7 +137,7 @@ func (s *Service) DeleteCompetitor(ctx context.Context, competitorID, userID str
 	if !ok {
 		return fmt.Errorf("%w: project", ErrNotFound)
 	}
-	if project.UserID != strings.TrimSpace(userID) {
+	if project.OrganizationID != organizationID {
 		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 	delete(s.competitors, competitor.ID)

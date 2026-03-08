@@ -16,6 +16,7 @@ import (
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
@@ -53,9 +54,13 @@ func main() {
 	}
 	defer projectGRPCClient.Close()
 
+	dashboardCache := rediscache.NewDashboardCache(cfg.RedisAddr, cfg.RedisPassword)
+
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:           analysisstate.NewStateStore(db),
-		ProjectVerifier: projectGRPCClient,
+		Store:             analysisstate.NewStateStore(db),
+		DashboardCache:    dashboardCache,
+		DashboardCacheTTL: cfg.DashboardCacheTTL,
+		ProjectVerifier:   projectGRPCClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)

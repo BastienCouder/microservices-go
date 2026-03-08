@@ -23,7 +23,8 @@ const (
 
 type Project struct {
 	ID               string    `json:"id"`
-	UserID           string    `json:"userId"`
+	OrganizationID   int64     `json:"organizationId"`
+	CreatedBy        int64     `json:"createdBy"`
 	Name             string    `json:"name"`
 	Domain           string    `json:"domain"`
 	WebsiteURL       string    `json:"websiteUrl"`
@@ -60,11 +61,12 @@ type Competitor struct {
 
 type AIModel struct {
 	ID                 string `json:"id"`
-	Name               string `json:"name"`
-	Label              string `json:"label"`
+	Label              string `json:"displayName"`
 	Provider           string `json:"provider"`
-	IconKey            string `json:"iconKey,omitempty"`
-	ModelID            string `json:"modelId"`
+	Group              string `json:"groupName"`
+	IconKey            string `json:"-"`
+	IconPath           string `json:"iconPath"`
+	ModelID            string `json:"providerModelId"`
 	IsActive           bool   `json:"isActive"`
 	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
 }
@@ -75,7 +77,8 @@ type ProjectModelSelection struct {
 }
 
 type CreateProjectInput struct {
-	UserID           string
+	OrganizationID   int64
+	CreatedBy        int64
 	Name             string
 	Domain           string
 	WebsiteURL       string
@@ -99,6 +102,22 @@ type UpdatePromptInput struct {
 	Text     *string
 	Intent   *string
 	IsActive *bool
+}
+
+type ListPromptsInput struct {
+	Search   string
+	Page     int
+	PageSize int
+}
+
+type PromptPage struct {
+	Items       []Prompt `json:"items"`
+	Total       int      `json:"total"`
+	Page        int      `json:"page"`
+	PageSize    int      `json:"pageSize"`
+	TotalPages  int      `json:"totalPages"`
+	HasNext     bool     `json:"hasNext"`
+	HasPrevious bool     `json:"hasPrevious"`
 }
 
 type AddCompetitorInput struct {
@@ -139,7 +158,8 @@ type AnalysisPromptRun struct {
 
 type AnalysisStartRequest struct {
 	RequestID   string
-	UserID      string
+	OrganizationID int64
+	CreatedBy   int64
 	ProjectID   string
 	PromptTexts []AnalysisPromptText
 	ModelIDs    []string

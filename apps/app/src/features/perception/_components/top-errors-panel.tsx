@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { getModelIconForName, PERCEPTION_TEXT } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { PerceptionError } from "@/lib/perception-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 
 export function TopErrorsPanel({
   errors,
@@ -82,7 +82,7 @@ export function TopErrorsPanel({
                       variant="secondary"
                       className="inline-flex items-center gap-1 font-normal"
                     >
-                      <img src={getModelIconForName(model)} alt="" className="h-3 w-3 shrink-0" aria-hidden="true" />
+                      <img src={getModelIconForName(model)} alt="" className="h-3 w-3 shrink-0" aria-hidden="true" decoding="async" />
                       {model}
                     </Badge>
                   ))}
@@ -208,7 +208,7 @@ function TopErrorCard({
         </Badge> */}
         {error.detectedInModels.slice(0, 2).map((model) => (
           <Badge key={model} variant="outline" className="inline-flex items-center gap-1 font-normal">
-            <img src={getModelIconForName(model)} alt={model} className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <img src={getModelIconForName(model)} alt={model} className="h-3 w-3 shrink-0" aria-hidden="true" decoding="async" />
             {model}
           </Badge>
         ))}

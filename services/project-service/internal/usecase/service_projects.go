@@ -8,12 +8,11 @@ import (
 )
 
 func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (Project, error) {
-	userID := strings.TrimSpace(input.UserID)
 	name := strings.TrimSpace(input.Name)
 	domain := strings.TrimSpace(input.Domain)
 	websiteURL := strings.TrimSpace(input.WebsiteURL)
-	if userID == "" || name == "" || domain == "" || websiteURL == "" {
-		return Project{}, fmt.Errorf("%w: userId, name, domain and websiteUrl are required", ErrValidation)
+	if input.OrganizationID <= 0 || input.CreatedBy <= 0 || name == "" || domain == "" || websiteURL == "" {
+		return Project{}, fmt.Errorf("%w: organizationId, createdBy, name, domain and websiteUrl are required", ErrValidation)
 	}
 
 	primaryLanguage := strings.TrimSpace(input.PrimaryLanguage)
@@ -28,10 +27,15 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if err := s.reloadLocked(ctx); err != nil {
+		return Project{}, err
+	}
+
 	now := s.now().UTC()
 	project := &Project{
 		ID:               s.nextID("prj"),
-		UserID:           userID,
+		OrganizationID:   input.OrganizationID,
+		CreatedBy:        input.CreatedBy,
 		Name:             name,
 		Domain:           domain,
 		WebsiteURL:       websiteURL,
@@ -62,18 +66,21 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 	return copyProject(project), nil
 }
 
-func (s *Service) ListProjects(_ context.Context, userID string) ([]Project, error) {
-	userID = strings.TrimSpace(userID)
-	if userID == "" {
-		return nil, fmt.Errorf("%w: userId is required", ErrValidation)
+func (s *Service) ListProjects(ctx context.Context, organizationID int64) ([]Project, error) {
+	if organizationID <= 0 {
+		return nil, fmt.Errorf("%w: organizationId must be positive", ErrValidation)
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	projects := make([]Project, 0)
 	for _, project := range s.projects {
-		if project.UserID == userID {
+		if project.OrganizationID == organizationID {
 			projects = append(projects, copyProject(project))
 		}
 	}
@@ -83,22 +90,30 @@ func (s *Service) ListProjects(_ context.Context, userID string) ([]Project, err
 	return projects, nil
 }
 
-func (s *Service) GetProject(_ context.Context, projectID, userID string) (Project, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+func (s *Service) GetProject(ctx context.Context, projectID string, organizationID int64) (Project, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	project, err := s.getOwnedProjectLocked(projectID, userID)
+	if err := s.reloadLocked(ctx); err != nil {
+		return Project{}, err
+	}
+
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return Project{}, err
 	}
 	return copyProject(project), nil
 }
 
-func (s *Service) UpdateProject(ctx context.Context, projectID, userID string, input UpdateProjectInput) (Project, error) {
+func (s *Service) UpdateProject(ctx context.Context, projectID string, organizationID int64, input UpdateProjectInput) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	project, err := s.getOwnedProjectLocked(projectID, userID)
+	if err := s.reloadLocked(ctx); err != nil {
+		return Project{}, err
+	}
+
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return Project{}, err
 	}
@@ -144,11 +159,15 @@ func (s *Service) UpdateProject(ctx context.Context, projectID, userID string, i
 	return copyProject(project), nil
 }
 
-func (s *Service) ActivateProject(ctx context.Context, projectID, userID string) (Project, error) {
+func (s *Service) ActivateProject(ctx context.Context, projectID string, organizationID int64) (Project, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	project, err := s.getOwnedProjectLocked(projectID, userID)
+	if err := s.reloadLocked(ctx); err != nil {
+		return Project{}, err
+	}
+
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return Project{}, err
 	}
@@ -162,11 +181,15 @@ func (s *Service) ActivateProject(ctx context.Context, projectID, userID string)
 	return copyProject(project), nil
 }
 
-func (s *Service) FinalizeProject(ctx context.Context, projectID, userID string) (FinalizeResult, error) {
+func (s *Service) FinalizeProject(ctx context.Context, projectID string, organizationID int64) (FinalizeResult, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	project, err := s.getOwnedProjectLocked(projectID, userID)
+	if err := s.reloadLocked(ctx); err != nil {
+		return FinalizeResult{}, err
+	}
+
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return FinalizeResult{}, err
 	}

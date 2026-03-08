@@ -7,6 +7,12 @@ interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
 
+declare const Bun: {
+  file(path: string | URL): {
+    text(): Promise<string>;
+  };
+};
+
 declare module "*.svg" {
   const src: string;
   export default src;

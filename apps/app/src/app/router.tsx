@@ -2,6 +2,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import type { AppRouterProps } from "./App";
+import { loadPromptsPageModule } from "./route-preloads";
 
 const ProfilePage = lazy(() =>
   import("@/features/profile/views/profile-page").then((module) => ({
@@ -13,29 +14,23 @@ const OrganizationsPage = lazy(() =>
     default: module.OrganizationsPage,
   })),
 );
-const DashboardPage = lazy(() =>
-  import("@/features/dashboard").then((module) => ({
-    default: module.DashboardPage,
-  })),
-);
-const PromptsPage = lazy(() =>
-  import("@/features/prompts").then((module) => ({
-    default: module.PromptsPage,
-  })),
-);
+
+import { DashboardPage } from "@/features/monitoring";
+
+const PromptsPage = lazy(loadPromptsPageModule);
 const PagesPage = lazy(() =>
   import("@/features/pages").then((module) => ({
     default: module.PagesPage,
   })),
 );
-const BrandsPage = lazy(() =>
-  import("@/features/brands").then((module) => ({
-    default: module.BrandsPage,
-  })),
-);
 const ModelsPage = lazy(() =>
   import("@/features/models").then((module) => ({
     default: module.ModelsPage,
+  })),
+);
+const BrandsPage = lazy(() =>
+  import("@/features/brands").then((module) => ({
+    default: module.BrandsPage,
   })),
 );
 const PerceptionPage = lazy(() =>
@@ -79,10 +74,6 @@ const SIDEBAR_FEATURE_ROUTES = [
     View: BrandsPage,
   },
   {
-    path: "/models",
-    View: ModelsPage,
-  },
-  {
     path: "/optimize/actions",
     View: OptimizeActionsPage,
   },
@@ -104,7 +95,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
   return (
     <Routes>
       <Route
-        path="/dashboard"
+        path="/monitoring"
         element={
           <Suspense fallback={null}>
             <DashboardPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
@@ -116,6 +107,14 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         element={
           <Suspense fallback={null}>
             <PromptsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/models"
+        element={
+          <Suspense fallback={null}>
+            <ModelsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />
@@ -167,8 +166,8 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
           </Suspense>
         }
       />
-      <Route path="/" element={<Navigate replace to="/dashboard" />} />
-      <Route path="*" element={<Navigate replace to="/dashboard" />} />
+      <Route path="/" element={<Navigate replace to="/monitoring" />} />
+      <Route path="*" element={<Navigate replace to="/monitoring" />} />
     </Routes>
   );
 }

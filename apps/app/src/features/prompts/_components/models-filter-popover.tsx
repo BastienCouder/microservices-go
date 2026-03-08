@@ -30,7 +30,7 @@ export function ModelsFilterPopover({
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="h-8 text-xs">
+        <Button variant="outline" className="h-10 w-full justify-start rounded-full px-4 text-xs sm:h-8 sm:w-auto">
           {allModelsSelected ? "Models: All" : `Models (${selectedModels.length})`}
         </Button>
       </PopoverTrigger>
@@ -53,7 +53,7 @@ export function ModelsFilterPopover({
                 )}
               >
                 <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-border/50 p-1.5">
-                  <img src={meta.icon} alt={model} className="h-full w-full object-contain opacity-80" />
+                  <img src={meta.icon} alt={model} className="h-full w-full object-contain opacity-80" decoding="async" />
                 </div>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold leading-tight text-foreground">{meta.label}</div>

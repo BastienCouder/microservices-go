@@ -3,7 +3,6 @@ package project
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -104,19 +103,11 @@ func NewClient(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConf
 	if target == "" {
 		return nil, fmt.Errorf("project grpc target is required")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
 	dialOptions, err := grpctls.ClientDialOptions(tlsConfig)
 	if err != nil {
 		return nil, fmt.Errorf("configure project grpc tls: %w", err)
 	}
-	dialOptions = append(dialOptions, grpc.WithBlock())
-
-	conn, err := grpc.DialContext(
-		ctx,
-		target,
-		dialOptions...,
-	)
+	conn, err := grpc.Dial(target, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("dial project grpc: %w", err)
 	}
@@ -138,22 +129,16 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) EnsureProjectOwnedByUser(ctx context.Context, projectID, userID string) error {
+func (c *Client) EnsureProjectAccessible(ctx context.Context, projectID string, organizationID int64) error {
 	projectID = strings.TrimSpace(projectID)
-	userID = strings.TrimSpace(userID)
 	if projectID == "" {
 		return fmt.Errorf("%w: projectId is required", usecase.ErrValidation)
 	}
-	if userID == "" {
-		return fmt.Errorf("%w: userId is required", usecase.ErrValidation)
+	if organizationID <= 0 {
+		return fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
 	}
 
-	parsedUserID, err := strconv.ParseInt(userID, 10, 64)
-	if err != nil || parsedUserID <= 0 {
-		return fmt.Errorf("%w: userId must be a positive integer", usecase.ErrValidation)
-	}
-
-	claims := security.OutboundTokenClaims{UserID: parsedUserID}
+	claims := security.OutboundTokenClaims{Organization: organizationID}
 	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
 	if err != nil {
 		return fmt.Errorf("sign internal jwt: %w", err)
@@ -162,7 +147,7 @@ func (c *Client) EnsureProjectOwnedByUser(ctx context.Context, projectID, userID
 	var grpcResp *projectv1.CheckProjectAccessResponse
 	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
 		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
-		resp, callErr := c.client.CheckProjectAccess(callCtx, &projectv1.CheckProjectAccessRequest{ProjectId: projectID, UserId: parsedUserID})
+		resp, callErr := c.client.CheckProjectAccess(callCtx, &projectv1.CheckProjectAccessRequest{ProjectId: projectID})
 		if callErr != nil {
 			return isTransientGRPCError(callErr), callErr
 		}

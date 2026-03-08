@@ -27,6 +27,8 @@ func NewService() *Service {
 func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Service, error) {
 	svc := NewService()
 	svc.store = deps.Store
+	svc.dashboardCache = deps.DashboardCache
+	svc.dashboardCacheTTL = deps.DashboardCacheTTL
 	svc.projectVerifier = deps.ProjectVerifier
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
@@ -39,6 +41,13 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 func (s *Service) load(ctx context.Context) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.reloadLocked(ctx)
+}
+
+func (s *Service) reloadLocked(ctx context.Context) error {
+	if s.store == nil {
+		return nil
+	}
 
 	payload, ok, err := s.store.Load(ctx)
 	if err != nil {
@@ -145,19 +154,18 @@ func (s *Service) persistLocked(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) verifyProjectAccess(ctx context.Context, projectID, userID string) error {
+func (s *Service) verifyProjectAccess(ctx context.Context, projectID string, organizationID int64) error {
 	projectID = strings.TrimSpace(projectID)
-	userID = strings.TrimSpace(userID)
 	if projectID == "" {
 		return fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	if userID == "" {
-		return fmt.Errorf("%w: userId is required", ErrValidation)
+	if organizationID <= 0 {
+		return fmt.Errorf("%w: organizationId must be positive", ErrValidation)
 	}
 	if s.projectVerifier == nil {
 		return nil
 	}
-	if err := s.projectVerifier.EnsureProjectOwnedByUser(ctx, projectID, userID); err != nil {
+	if err := s.projectVerifier.EnsureProjectAccessible(ctx, projectID, organizationID); err != nil {
 		return err
 	}
 	return nil

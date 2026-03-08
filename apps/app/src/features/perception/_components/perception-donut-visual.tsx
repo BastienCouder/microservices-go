@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PerceptionViewData } from "@/lib/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 
 export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["radar"] }) {
   const [hoveredAxis, setHoveredAxis] = useState<PerceptionViewData["radar"][number]["axis"] | null>(null);

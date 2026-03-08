@@ -2,8 +2,10 @@ export type PeriodKey = "today" | "7d" | "14d" | "30d" | "90d" | "custom";
 export type Stage = "Awareness" | "Consideration" | "Decision";
 export type Persona = string;
 export type AIModel = string;
-export type PromptSort = "mention" | "rank" | "sov";
+export type PromptSort = "prompt" | "persona" | "ai" | "mention" | "rank" | "sov" | "lastRun" | "status";
+export type PromptSortDirection = "asc" | "desc";
 export type ResponseView = "table" | "timeline";
+export type PromptRowMode = "global" | "model";
 
 export type PromptRun = {
   id: string;
@@ -22,6 +24,8 @@ export type PromptRun = {
 
 export type PromptItem = {
   id: string;
+  sourcePromptId: string;
+  rowMode: PromptRowMode;
   prompt: string;
   type?: string | null;
   stage: Stage;

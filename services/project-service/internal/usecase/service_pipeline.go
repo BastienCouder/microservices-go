@@ -7,13 +7,17 @@ import (
 	"time"
 )
 
-func (s *Service) ListOutboxEventsToPublish(_ context.Context, limit int) ([]OutboxEvent, error) {
+func (s *Service) ListOutboxEventsToPublish(ctx context.Context, limit int) ([]OutboxEvent, error) {
 	if limit <= 0 {
 		limit = 50
 	}
 
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	out := make([]OutboxEvent, 0, limit)
 	for _, eventID := range s.outboxOrder {
@@ -40,6 +44,10 @@ func (s *Service) MarkOutboxEventPublished(ctx context.Context, eventID string) 
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	event, ok := s.outbox[eventID]
 	if !ok {
@@ -88,6 +96,10 @@ func (s *Service) beginOutboxProcessing(ctx context.Context, eventID string) (*F
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
 	event, ok := s.outbox[eventID]
 	if !ok {
 		return nil, fmt.Errorf("%w: outbox event", ErrNotFound)
@@ -123,6 +135,10 @@ func (s *Service) markOutboxProcessed(ctx context.Context, eventID string) error
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
+
 	event, ok := s.outbox[eventID]
 	if !ok {
 		return fmt.Errorf("%w: outbox event", ErrNotFound)
@@ -144,6 +160,10 @@ func (s *Service) markOutboxProcessed(ctx context.Context, eventID string) error
 func (s *Service) markOutboxProcessingFailed(ctx context.Context, eventID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return err
+	}
 
 	event, ok := s.outbox[eventID]
 	if !ok {
@@ -170,12 +190,13 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 
 	requestID := fmt.Sprintf("%s-%d", project.ID, time.Now().UTC().UnixNano())
 	startResp, err := s.analysisClient.StartAnalysis(ctx, AnalysisStartRequest{
-		RequestID:   requestID,
-		UserID:      project.UserID,
-		ProjectID:   project.ID,
-		PromptTexts: prompts,
-		ModelIDs:    modelIDs,
-		RunType:     "manual",
+		RequestID:      requestID,
+		OrganizationID: project.OrganizationID,
+		CreatedBy:      project.CreatedBy,
+		ProjectID:      project.ID,
+		PromptTexts:    prompts,
+		ModelIDs:       modelIDs,
+		RunType:        "manual",
 	})
 	if err != nil {
 		return fmt.Errorf("start analysis run: %w", err)

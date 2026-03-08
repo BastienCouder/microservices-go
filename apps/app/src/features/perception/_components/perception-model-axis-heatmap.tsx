@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERCEPTION_HEATMAP_AXIS_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/dashboard/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
 
 type HeatmapAxis = {
   key: string;
