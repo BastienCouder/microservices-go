@@ -2,15 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { useOnboarding, OnboardingProvider } from "@/hooks/use-onboarding";
-import { OnboardingLeftPanel } from "@/components/onboarding/left-panel";
-import { StepWebsite } from "@/components/onboarding/step-website";
-import { StepBrand } from "@/components/onboarding/step-brand";
-import { StepCompetitors } from "@/components/onboarding/step-competitors";
-import { StepPrompts } from "@/components/onboarding/step-prompts";
-import { StepModels } from "@/components/onboarding/step-models";
-import { StepAnalysis } from "@/components/onboarding/step-analysis";
+import { OnboardingLeftPanel } from "@/app/onboarding/left-panel";
+import { StepWebsite } from "@/app/onboarding/step-website";
+import { StepBrand } from "@/app/onboarding/step-brand";
+import { StepCompetitors } from "@/app/onboarding/step-competitors";
+import { StepPrompts } from "@/app/onboarding/step-prompts";
+import { StepModels } from "@/app/onboarding/step-models";
+import { StepAnalysis } from "@/app/onboarding/step-analysis";
 import { DEMO_INITIAL_STATE } from "@/components/onboarding/demo-data";
-import { StepProgress } from "@/components/onboarding/step-progress";
+import { StepProgress } from "@/app/onboarding/step-progress";
 
 function DemoContent() {
     const { step } = useOnboarding();

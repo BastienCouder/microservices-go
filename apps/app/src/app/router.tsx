@@ -18,6 +18,11 @@ const OrganizationsPage = lazy(() =>
 import { DashboardPage } from "@/features/monitoring";
 
 const PromptsPage = lazy(loadPromptsPageModule);
+const OnboardingPage = lazy(() =>
+  import("@/features/onboarding").then((module) => ({
+    default: module.OnboardingPage,
+  })),
+);
 const PagesPage = lazy(() =>
   import("@/features/pages").then((module) => ({
     default: module.PagesPage,
@@ -94,6 +99,14 @@ const SIDEBAR_FEATURE_ROUTES = [
 export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
   return (
     <Routes>
+      <Route
+        path="/onboarding"
+        element={
+          <Suspense fallback={null}>
+            <OnboardingPage />
+          </Suspense>
+        }
+      />
       <Route
         path="/monitoring"
         element={

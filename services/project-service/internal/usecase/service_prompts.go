@@ -5,7 +5,132 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"unicode"
 )
+
+func normalizePromptStatus(raw string) (string, bool) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case PromptStatusActive:
+		return PromptStatusActive, true
+	case PromptStatusDisabled:
+		return PromptStatusDisabled, true
+	case PromptStatusArchived:
+		return PromptStatusArchived, true
+	default:
+		return "", false
+	}
+}
+
+func applyPromptStatus(prompt *Prompt, status string) {
+	prompt.Status = status
+	prompt.IsActive = status == PromptStatusActive
+}
+
+func validatePromptModelIDs(rawModelIDs []string, enabledModelIDs []string) ([]string, error) {
+	modelIDs := normalizeModelIDs(rawModelIDs)
+	if len(modelIDs) == 0 {
+		return nil, fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
+	}
+
+	enabled := make(map[string]struct{}, len(enabledModelIDs))
+	for _, modelID := range enabledModelIDs {
+		enabled[modelID] = struct{}{}
+	}
+
+	for _, modelID := range modelIDs {
+		if _, ok := enabled[modelID]; !ok {
+			return nil, fmt.Errorf("%w: model %s is not enabled for project", ErrValidation, modelID)
+		}
+	}
+
+	return modelIDs, nil
+}
+
+func defaultPromptSchedule() PromptSchedule {
+	return PromptSchedule{
+		Mode:       PromptScheduleModeGlobal,
+		Cron:       DefaultPromptCron,
+		Timezone:   DefaultPromptTimezone,
+		ModelCrons: map[string]string{},
+	}
+}
+
+func isValidCronExpression(raw string) bool {
+	fields := strings.Fields(strings.TrimSpace(raw))
+	if len(fields) != 5 {
+		return false
+	}
+	for _, field := range fields {
+		if field == "" {
+			return false
+		}
+		for _, r := range field {
+			if unicode.IsDigit(r) || r == '*' || r == '/' || r == ',' || r == '-' {
+				continue
+			}
+			return false
+		}
+	}
+	return true
+}
+
+func normalizePromptSchedule(raw PromptSchedule, allowedModelIDs []string) (PromptSchedule, error) {
+	mode := strings.TrimSpace(raw.Mode)
+	if mode == "" {
+		mode = PromptScheduleModeGlobal
+	}
+	if mode != PromptScheduleModeGlobal && mode != PromptScheduleModePerModel {
+		return PromptSchedule{}, fmt.Errorf("%w: unsupported schedule mode", ErrValidation)
+	}
+
+	cron := strings.TrimSpace(raw.Cron)
+	if cron == "" {
+		cron = DefaultPromptCron
+	}
+	if !isValidCronExpression(cron) {
+		return PromptSchedule{}, fmt.Errorf("%w: invalid cron expression", ErrValidation)
+	}
+
+	timezone := strings.TrimSpace(raw.Timezone)
+	if timezone == "" {
+		timezone = DefaultPromptTimezone
+	}
+
+	allowed := make(map[string]struct{}, len(allowedModelIDs))
+	for _, modelID := range allowedModelIDs {
+		allowed[modelID] = struct{}{}
+	}
+
+	modelCrons := make(map[string]string)
+	for modelID, modelCron := range raw.ModelCrons {
+		trimmedModelID := strings.TrimSpace(modelID)
+		if trimmedModelID == "" {
+			return PromptSchedule{}, fmt.Errorf("%w: schedule model id cannot be empty", ErrValidation)
+		}
+		if _, ok := allowed[trimmedModelID]; !ok {
+			return PromptSchedule{}, fmt.Errorf("%w: schedule model %s is not enabled for prompt", ErrValidation, trimmedModelID)
+		}
+		trimmedCron := strings.TrimSpace(modelCron)
+		if trimmedCron == "" {
+			continue
+		}
+		if !isValidCronExpression(trimmedCron) {
+			return PromptSchedule{}, fmt.Errorf("%w: invalid model cron expression", ErrValidation)
+		}
+		modelCrons[trimmedModelID] = trimmedCron
+	}
+
+	if mode == PromptScheduleModeGlobal {
+		modelCrons = map[string]string{}
+	}
+
+	return PromptSchedule{
+		Mode:       mode,
+		Cron:       cron,
+		Timezone:   timezone,
+		ModelCrons: modelCrons,
+	}, nil
+}
 
 func (s *Service) AddPrompts(ctx context.Context, projectID string, organizationID int64, prompts []string) ([]Prompt, error) {
 	if len(prompts) == 0 {
@@ -32,10 +157,25 @@ func (s *Service) AddPrompts(ctx context.Context, projectID string, organization
 		return nil, err
 	}
 
+	defaultModelIDs := filterEnabledModels(s.projectModels, projectID)
+	if len(defaultModelIDs) == 0 {
+		return nil, fmt.Errorf("%w: at least one model must be enabled", ErrValidation)
+	}
+
 	now := s.now().UTC()
 	created := make([]*Prompt, 0, len(normalized))
 	for _, text := range normalized {
-		prompt := &Prompt{ID: s.nextID("prm"), ProjectID: projectID, Text: text, IsActive: true, CreatedAt: now, UpdatedAt: now}
+		prompt := &Prompt{
+			ID:        s.nextID("prm"),
+			ProjectID: projectID,
+			Text:      text,
+			ModelIDs:  nonNilStringSlice(defaultModelIDs),
+			Schedule:  defaultPromptSchedule(),
+			Status:    PromptStatusActive,
+			IsActive:  true,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}
 		s.prompts[prompt.ID] = prompt
 		created = append(created, prompt)
 	}
@@ -169,8 +309,39 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 	if input.Intent != nil {
 		prompt.Intent = strings.TrimSpace(*input.Intent)
 	}
-	if input.IsActive != nil {
-		prompt.IsActive = *input.IsActive
+	if input.ModelIDs != nil {
+		enabledModelIDs := filterEnabledModels(s.projectModels, project.ID)
+		modelIDs, err := validatePromptModelIDs(*input.ModelIDs, enabledModelIDs)
+		if err != nil {
+			return Prompt{}, err
+		}
+		prompt.ModelIDs = modelIDs
+	}
+	if input.Schedule != nil {
+		schedule, err := normalizePromptSchedule(*input.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, project.ID)))
+		if err != nil {
+			return Prompt{}, err
+		}
+		prompt.Schedule = schedule
+	} else {
+		schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, project.ID)))
+		if err != nil {
+			return Prompt{}, err
+		}
+		prompt.Schedule = schedule
+	}
+	if input.Status != nil {
+		status, ok := normalizePromptStatus(*input.Status)
+		if !ok {
+			return Prompt{}, fmt.Errorf("%w: unsupported prompt status", ErrValidation)
+		}
+		applyPromptStatus(prompt, status)
+	} else if input.IsActive != nil {
+		if *input.IsActive {
+			applyPromptStatus(prompt, PromptStatusActive)
+		} else {
+			applyPromptStatus(prompt, PromptStatusDisabled)
+		}
 	}
 	prompt.UpdatedAt = s.now().UTC()
 	if err := s.persistLocked(ctx); err != nil {
@@ -178,6 +349,72 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 		return Prompt{}, err
 	}
 	return copyPrompt(prompt), nil
+}
+
+func (s *Service) UpdatePromptsStatus(ctx context.Context, projectID string, organizationID int64, input UpdatePromptsStatusInput) ([]Prompt, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return nil, err
+	}
+
+	status, ok := normalizePromptStatus(input.Status)
+	if !ok {
+		return nil, fmt.Errorf("%w: unsupported prompt status", ErrValidation)
+	}
+
+	if len(input.PromptIDs) == 0 {
+		return nil, fmt.Errorf("%w: promptIds cannot be empty", ErrValidation)
+	}
+
+	uniqueIDs := make([]string, 0, len(input.PromptIDs))
+	seen := make(map[string]struct{}, len(input.PromptIDs))
+	for _, rawID := range input.PromptIDs {
+		promptID := strings.TrimSpace(rawID)
+		if promptID == "" {
+			return nil, fmt.Errorf("%w: promptId cannot be empty", ErrValidation)
+		}
+		if _, exists := seen[promptID]; exists {
+			continue
+		}
+		prompt, exists := s.prompts[promptID]
+		if !exists {
+			return nil, fmt.Errorf("%w: prompt", ErrNotFound)
+		}
+		if prompt.ProjectID != projectID {
+			return nil, fmt.Errorf("%w: prompt does not belong to project", ErrValidation)
+		}
+		seen[promptID] = struct{}{}
+		uniqueIDs = append(uniqueIDs, promptID)
+	}
+
+	backups := make(map[string]Prompt, len(uniqueIDs))
+	now := s.now().UTC()
+	for _, promptID := range uniqueIDs {
+		prompt := s.prompts[promptID]
+		backups[promptID] = *prompt
+		applyPromptStatus(prompt, status)
+		prompt.UpdatedAt = now
+	}
+
+	if err := s.persistLocked(ctx); err != nil {
+		for promptID, backup := range backups {
+			restored := backup
+			s.prompts[promptID] = &restored
+		}
+		return nil, err
+	}
+
+	updated := make([]Prompt, 0, len(uniqueIDs))
+	for _, promptID := range uniqueIDs {
+		updated = append(updated, copyPrompt(s.prompts[promptID]))
+	}
+	return updated, nil
 }
 
 func (s *Service) DeletePrompt(ctx context.Context, promptID string, organizationID int64) error {

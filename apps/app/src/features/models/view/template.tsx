@@ -12,6 +12,7 @@ import { PageHeader } from "@/features/shared/view/page-header";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { cn } from "@/lib/utils";
 import { gatewayJSON } from "@/shared/api/gateway";
 import {
   getPlanLabel,
@@ -467,13 +468,13 @@ export function ModelsTemplate({ apiBaseURL, routeSearch }: ModelsTemplateProps)
               No AI models available for this search.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-stretch gap-4">
               {filteredCatalog.map((model) => {
                 const isSelected = selectedModelIds.includes(model.id);
                 const disabledByPlan = !isSelected && selectedModelIds.length >= selectionLimit;
 
                 return (
-                  <div key={model.id} className={disabledByPlan ? "opacity-70" : undefined}>
+                  <div key={model.id} className={cn("h-full min-w-0", disabledByPlan && "opacity-70")}>
                     <ModelCard
                       name={model.name}
                       description={model.description}
@@ -481,6 +482,7 @@ export function ModelsTemplate({ apiBaseURL, routeSearch }: ModelsTemplateProps)
                       selected={isSelected}
                       onClick={() => toggleModel(model.id)}
                       modelGroup={model.modelGroup}
+                      size="models"
                     />
                   </div>
                 );
@@ -492,3 +494,5 @@ export function ModelsTemplate({ apiBaseURL, routeSearch }: ModelsTemplateProps)
     </div>
   );
 }
+
+export default ModelsTemplate;

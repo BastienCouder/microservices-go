@@ -59,6 +59,15 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 				"projectId": "prj-1",
 				"text": "Quel outil recommander ?",
 				"intent": "commercial",
+				"modelIds": ["gpt-4o"],
+				"schedule": {
+					"mode": "per_model",
+					"cron": "0 */6 * * *",
+					"timezone": "UTC",
+					"modelCrons": {
+						"gpt-4o": "15 */2 * * *"
+					}
+				},
 				"isActive": true,
 				"createdAt": "2026-03-01T10:10:00Z",
 				"updatedAt": "2026-03-01T11:10:00Z"
@@ -130,6 +139,8 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 
 	assertProjectTableCount(t, ctx, db, "projects", 1)
 	assertProjectTableCount(t, ctx, db, "prompts", 1)
+	assertProjectTableCount(t, ctx, db, "prompt_models", 1)
+	assertProjectTableCount(t, ctx, db, "prompt_model_schedules", 1)
 	assertProjectTableCount(t, ctx, db, "competitors", 1)
 	assertProjectTableCount(t, ctx, db, "ai_models", 1)
 	assertProjectTableCount(t, ctx, db, "project_models", 1)
@@ -160,6 +171,23 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	model := models["gpt-4o"].(map[string]any)
 	if model["groupName"] != "chatgpt" {
 		t.Fatalf("expected model group chatgpt, got %#v", model["groupName"])
+	}
+	prompts := got["prompts"].(map[string]any)
+	prompt := prompts["prm-1"].(map[string]any)
+	modelIDs := prompt["modelIds"].([]any)
+	if len(modelIDs) != 1 || modelIDs[0] != "gpt-4o" {
+		t.Fatalf("expected prompt modelIds [gpt-4o], got %#v", modelIDs)
+	}
+	schedule := prompt["schedule"].(map[string]any)
+	if schedule["mode"] != "per_model" {
+		t.Fatalf("expected schedule mode per_model, got %#v", schedule["mode"])
+	}
+	if schedule["cron"] != "0 */6 * * *" {
+		t.Fatalf("expected schedule cron 0 */6 * * *, got %#v", schedule["cron"])
+	}
+	modelCrons := schedule["modelCrons"].(map[string]any)
+	if modelCrons["gpt-4o"] != "15 */2 * * *" {
+		t.Fatalf("expected gpt-4o override, got %#v", modelCrons["gpt-4o"])
 	}
 	outboxOrder := got["outboxOrder"].([]any)
 	if len(outboxOrder) != 1 || outboxOrder[0] != "evt-1" {

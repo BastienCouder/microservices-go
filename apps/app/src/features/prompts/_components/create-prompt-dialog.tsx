@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,8 +22,8 @@ type CreatePromptDialogProps = {
   setFormPrompt: (value: string) => void;
   formPersona: Persona;
   setFormPersona: (value: Persona) => void;
-  formModel: AIModel;
-  setFormModel: (value: AIModel) => void;
+  formModels: AIModel[];
+  setFormModels: (value: AIModel[]) => void;
   availablePersonas: Persona[];
   availableModels: AIModel[];
   getModelLabel: (model: string) => string;
@@ -37,22 +37,33 @@ export function CreatePromptDialog({
   setFormPrompt,
   formPersona,
   setFormPersona,
-  formModel,
-  setFormModel,
+  formModels,
+  setFormModels,
   availablePersonas,
   availableModels,
   getModelLabel,
   onCreate,
 }: CreatePromptDialogProps) {
+  const toggleModel = (model: AIModel) => {
+    setFormModels(
+      formModels.includes(model)
+        ? formModels.filter((item) => item !== model)
+        : [...formModels, model],
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New prompt</DialogTitle>
-          <DialogDescription>Create a prompt with an optional persona and a default AI model.</DialogDescription>
+          <DialogDescription>
+            Create a prompt with an optional persona and choose exactly which AI
+            models should appear on it.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="prompt-text">Prompt</Label>
             <Textarea
@@ -63,11 +74,13 @@ export function CreatePromptDialog({
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {availablePersonas.length > 0 ? (
+          {availablePersonas.length > 0 ? (
             <div className="space-y-1">
               <Label>Persona</Label>
-              <Select value={formPersona} onValueChange={(value) => setFormPersona(value as Persona)}>
+              <Select
+                value={formPersona}
+                onValueChange={(value) => setFormPersona(value as Persona)}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -80,21 +93,23 @@ export function CreatePromptDialog({
                 </SelectContent>
               </Select>
             </div>
-            ) : null}
-            <div className="space-y-1">
-              <Label>AI</Label>
-              <Select value={formModel} onValueChange={(value) => setFormModel(value as AIModel)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableModels.map((item) => (
-                    <SelectItem key={item} value={item}>
-                      {getModelLabel(item)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          ) : null}
+
+          <div className="space-y-2">
+            <Label>AI coverage</Label>
+            <div className="grid max-h-56 grid-cols-1 gap-2 overflow-y-auto rounded-2xl border border-border/70 p-3 sm:grid-cols-2">
+              {availableModels.map((model) => (
+                <label
+                  key={model}
+                  className="flex items-center gap-2 rounded-xl border border-border/70 px-3 py-2 text-sm"
+                >
+                  <Checkbox
+                    checked={formModels.includes(model)}
+                    onCheckedChange={() => toggleModel(model)}
+                  />
+                  <span>{getModelLabel(model)}</span>
+                </label>
+              ))}
             </div>
           </div>
         </div>
@@ -103,7 +118,9 @@ export function CreatePromptDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={onCreate}>Create</Button>
+          <Button onClick={onCreate} disabled={formModels.length === 0}>
+            Create
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -188,6 +188,17 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		return fmt.Errorf("%w: analysis and ia clients are required", ErrValidation)
 	}
 
+	effectiveModelIDs := normalizeModelIDs(modelIDs)
+	if len(effectiveModelIDs) == 0 {
+		for _, prompt := range prompts {
+			effectiveModelIDs = append(effectiveModelIDs, prompt.ModelIDs...)
+		}
+		effectiveModelIDs = normalizeModelIDs(effectiveModelIDs)
+	}
+	if len(effectiveModelIDs) == 0 {
+		return fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
+	}
+
 	requestID := fmt.Sprintf("%s-%d", project.ID, time.Now().UTC().UnixNano())
 	startResp, err := s.analysisClient.StartAnalysis(ctx, AnalysisStartRequest{
 		RequestID:      requestID,
@@ -195,7 +206,7 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		CreatedBy:      project.CreatedBy,
 		ProjectID:      project.ID,
 		PromptTexts:    prompts,
-		ModelIDs:       modelIDs,
+		ModelIDs:       effectiveModelIDs,
 		RunType:        "manual",
 	})
 	if err != nil {
@@ -213,7 +224,17 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 	}
 
 	for _, promptRun := range startResp.PromptRuns {
-		for _, modelID := range modelIDs {
+		promptModelIDs := effectiveModelIDs
+		for _, prompt := range prompts {
+			if prompt.ID == promptRun.PromptID {
+				if normalized := normalizeModelIDs(prompt.ModelIDs); len(normalized) > 0 {
+					promptModelIDs = normalized
+				}
+				break
+			}
+		}
+
+		for _, modelID := range promptModelIDs {
 			iaResult, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{
 				PromptID:    promptRun.PromptID,
 				PromptText:  promptRun.PromptText,

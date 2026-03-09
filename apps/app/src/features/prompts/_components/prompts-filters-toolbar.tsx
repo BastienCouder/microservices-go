@@ -4,6 +4,7 @@ import { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { DatePickerWithRange } from "@/components/dashboard/date-range-picker";
 import { Search } from "lucide-react";
 import { ModelsFilterPopover } from "./models-filter-popover";
@@ -24,6 +25,8 @@ type PromptsFiltersToolbarProps = {
   availablePersonas: string[];
   search: string;
   setSearch: (value: string) => void;
+  showArchived: boolean;
+  setShowArchived: (value: boolean) => void;
   hasActiveGlobalFilters: boolean;
   clearFilters: () => void;
   modelsPopoverOpen: boolean;
@@ -45,6 +48,8 @@ export function PromptsFiltersToolbar({
   availablePersonas,
   search,
   setSearch,
+  showArchived,
+  setShowArchived,
   hasActiveGlobalFilters,
   clearFilters,
   modelsPopoverOpen,
@@ -101,6 +106,16 @@ export function PromptsFiltersToolbar({
           getModelVisual={getModelVisual}
           toggleModel={toggleModel}
         />
+
+        <label className="flex h-10 shrink-0 items-center gap-2 rounded-full border border-border/80 px-3 text-xs font-medium text-foreground sm:h-8">
+          <Switch
+            size="sm"
+            checked={showArchived}
+            onCheckedChange={setShowArchived}
+            aria-label="Show archived prompts"
+          />
+          <span>Show archived</span>
+        </label>
 
       
         {hasActiveGlobalFilters && (

@@ -3,6 +3,8 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreatePromptDialog } from "./create-prompt-dialog";
 import { PromptDetailsSheet } from "./prompt-details-sheet";
+import { PromptModelsDialog } from "./prompt-models-dialog";
+import { PromptScheduleDialog } from "./prompt-schedule-dialog";
 import { PromptsFiltersToolbar } from "./prompts-filters-toolbar";
 import { PromptsPageHeader } from "./prompts-page-header";
 import { PromptsTabContent } from "./prompts-tab-content";
@@ -18,6 +20,14 @@ type PromptsResponsesWorkspaceProps = {
 
 export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorkspaceProps) {
   const state = usePromptsResponsesState(apiBaseURL);
+  const editingPrompt =
+    state.prompts.find(
+      (item) => (item.sourcePromptId || item.id) === state.editingPromptModelsId,
+    ) ?? null;
+  const editingSchedulePrompt =
+    state.prompts.find(
+      (item) => (item.sourcePromptId || item.id) === state.editingPromptScheduleId,
+    ) ?? null;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
@@ -40,6 +50,8 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
             availablePersonas={state.availablePersonas}
             search={state.search}
             setSearch={state.setSearch}
+            showArchived={state.showArchived}
+            setShowArchived={state.setShowArchived}
             hasActiveGlobalFilters={state.hasActiveGlobalFilters}
             clearFilters={state.clearFilters}
             modelsPopoverOpen={state.modelsPopoverOpen}
@@ -72,6 +84,7 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
               changePromptSort={state.changePromptSort}
               promptRowMode={state.promptRowMode}
               setPromptRowMode={state.setPromptRowMode}
+              getPromptSelectionKey={state.getPromptSelectionKey}
               toggleSelectAllPrompts={state.toggleSelectAllPrompts}
               togglePromptSelection={state.togglePromptSelection}
               setSelectedPromptId={state.setSelectedPromptId}
@@ -80,6 +93,8 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
               setFocusPromptId={state.setFocusPromptId}
               setTabResponses={() => state.setTab("responses")}
               deletePrompt={state.deletePrompt}
+              onEditPromptModels={state.setEditingPromptModelsId}
+              onEditPromptSchedule={state.setEditingPromptScheduleId}
               getModelVisual={state.getModelVisual}
               rankTone={rankTone}
               statusBadgeVariant={statusBadgeVariant}
@@ -126,12 +141,45 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
         setFormPrompt={state.setFormPrompt}
         formPersona={state.formPersona}
         setFormPersona={state.setFormPersona}
-        formModel={state.formModel}
-        setFormModel={state.setFormModel}
+        formModels={state.formModels}
+        setFormModels={state.setFormModels}
         availablePersonas={state.availablePersonas}
         availableModels={state.availableModels}
         getModelLabel={(model) => state.getModelVisual(model).label}
         onCreate={state.createPrompt}
+      />
+
+      <PromptModelsDialog
+        open={!!state.editingPromptModelsId && !!editingPrompt}
+        onOpenChange={(open) => !open && state.setEditingPromptModelsId(null)}
+        promptLabel={editingPrompt?.prompt || ""}
+        selectedModels={editingPrompt?.models || []}
+        availableModels={state.availableModels}
+        getModelVisual={state.getModelVisual}
+        saving={state.updatingPromptModels}
+        onSave={(models) => {
+          if (!editingPrompt) return;
+          state.updatePromptModels(editingPrompt.sourcePromptId || editingPrompt.id, models);
+        }}
+      />
+
+      <PromptScheduleDialog
+        open={!!state.editingPromptScheduleId && !!editingSchedulePrompt}
+        onOpenChange={(open) => !open && state.setEditingPromptScheduleId(null)}
+        promptLabel={editingSchedulePrompt?.prompt || ""}
+        schedule={editingSchedulePrompt?.schedule || state.prompts[0]?.schedule || {
+          mode: "global",
+          cron: "0 */6 * * *",
+          timezone: "UTC",
+          modelCrons: {},
+        }}
+        selectedModels={editingSchedulePrompt?.models || []}
+        getModelVisual={state.getModelVisual}
+        saving={state.updatingPromptSchedule}
+        onSave={(schedule) => {
+          if (!editingSchedulePrompt) return;
+          state.updatePromptSchedule(editingSchedulePrompt.sourcePromptId || editingSchedulePrompt.id, schedule);
+        }}
       />
 
       <PromptDetailsSheet

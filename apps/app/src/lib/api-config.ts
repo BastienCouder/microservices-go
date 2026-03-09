@@ -16,6 +16,7 @@ export const apiRoutes = {
   },
   projects: {
     list: () => "/projects",
+    promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
     prompts: (
       projectId: string,
@@ -28,6 +29,9 @@ export const apiRoutes = {
       const query = params.toString();
       return `/projects/${projectId}/prompts${query ? `?${query}` : ""}`;
     },
+  },
+  prompts: {
+    update: (promptId: string) => `/prompts/${promptId}`,
   },
   aiModels: {
     list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,

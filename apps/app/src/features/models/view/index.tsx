@@ -1,4 +1,4 @@
-import { ModelsTemplate } from "./template";
+import ModelsTemplate from "./template";
 
 type ModelsPageProps = {
   apiBaseURL: string;

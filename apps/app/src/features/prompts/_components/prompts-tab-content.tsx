@@ -3,6 +3,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   Bot,
+  Clock3,
   ChevronLeft,
   ChevronRight,
   Copy,
@@ -42,6 +43,7 @@ type PromptsTabContentProps = {
   changePromptSort: (value: PromptSort) => void;
   promptRowMode: PromptRowMode;
   setPromptRowMode: (value: PromptRowMode) => void;
+  getPromptSelectionKey: (item: PromptItem) => string;
   toggleSelectAllPrompts: (checked: boolean) => void;
   togglePromptSelection: (id: string) => void;
   setSelectedPromptId: (id: string) => void;
@@ -50,6 +52,8 @@ type PromptsTabContentProps = {
   setFocusPromptId: (id: string | null) => void;
   setTabResponses: () => void;
   deletePrompt: (id: string) => void;
+  onEditPromptModels: (id: string) => void;
+  onEditPromptSchedule: (id: string) => void;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
   statusBadgeVariant: (status: PromptItem["status"]) => "secondary" | "outline" | "destructive";
@@ -96,17 +100,19 @@ function SortableColumnHeader({
 function PromptModelBadges({
   item,
   getModelVisual,
+  singleLine = false,
 }: {
   item: PromptItem;
   getModelVisual: (model: string) => ModelVisual;
+  singleLine?: boolean;
 }) {
-  const visibleModels = item.models.slice(0, 3);
-  const hiddenModels = item.models.slice(3);
+  const visibleModels = item.models.slice(0, 2);
+  const hiddenModels = item.models.slice(2);
   const remaining = item.models.length - visibleModels.length;
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className="flex flex-wrap gap-1">
+      <div className={cn("flex items-center gap-1", singleLine ? "flex-nowrap overflow-hidden" : "flex-wrap")}>
         {visibleModels.map((model) => {
           const visual = getModelVisual(model);
           const tooltipLabel = visual.description?.trim() || visual.label || model;
@@ -116,7 +122,7 @@ function PromptModelBadges({
               <TooltipTrigger asChild>
                 <span
                   tabIndex={0}
-                  className="inline-flex cursor-default items-center gap-1 rounded-full border px-2 py-1 text-[11px] outline-none"
+                  className="inline-flex shrink-0 cursor-default items-center gap-1 rounded-full border px-2 py-1 text-[11px] outline-none"
                 >
                   <img
                     src={visual.icon}
@@ -138,7 +144,7 @@ function PromptModelBadges({
             <TooltipTrigger asChild>
               <span
                 tabIndex={0}
-                className="inline-flex cursor-default items-center rounded-full border px-2 py-1 text-[11px] text-muted-foreground outline-none"
+                className="inline-flex shrink-0 cursor-default items-center rounded-full border px-2 py-1 text-[11px] text-muted-foreground outline-none"
               >
                 +{remaining}
               </span>
@@ -164,6 +170,8 @@ function PromptActions({
   setFocusPromptId,
   setTabResponses,
   deletePrompt,
+  onEditPromptModels,
+  onEditPromptSchedule,
 }: {
   item: PromptItem;
   setSelectedPromptId: (id: string) => void;
@@ -171,6 +179,8 @@ function PromptActions({
   setFocusPromptId: (id: string | null) => void;
   setTabResponses: () => void;
   deletePrompt: (id: string) => void;
+  onEditPromptModels: (id: string) => void;
+  onEditPromptSchedule: (id: string) => void;
 }) {
   const sourcePromptId = item.sourcePromptId || item.id;
 
@@ -186,6 +196,24 @@ function PromptActions({
         <DropdownMenuItem onClick={(event) => event.stopPropagation()}>
           <Pencil className="h-4 w-4" />
           Edit prompt
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation();
+            onEditPromptSchedule(sourcePromptId);
+          }}
+        >
+          <Clock3 className="h-4 w-4" />
+          Edit analysis cadence
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(event) => {
+            event.stopPropagation();
+            onEditPromptModels(sourcePromptId);
+          }}
+        >
+          <Bot className="h-4 w-4" />
+          Edit AI coverage
         </DropdownMenuItem>
         <DropdownMenuItem
           onClick={(event) => {
@@ -272,6 +300,7 @@ export function PromptsTabContent({
   changePromptSort,
   promptRowMode,
   setPromptRowMode,
+  getPromptSelectionKey,
   toggleSelectAllPrompts,
   togglePromptSelection,
   setSelectedPromptId,
@@ -280,6 +309,8 @@ export function PromptsTabContent({
   setFocusPromptId,
   setTabResponses,
   deletePrompt,
+  onEditPromptModels,
+  onEditPromptSchedule,
   getModelVisual,
   rankTone,
   statusBadgeVariant,
@@ -299,7 +330,7 @@ export function PromptsTabContent({
         <Checkbox
           checked={
             filteredPrompts.length > 0 &&
-            Array.from(new Set(filteredPrompts.map((item) => item.sourcePromptId || item.id))).every(
+            Array.from(new Set(filteredPrompts.map((item) => getPromptSelectionKey(item)))).every(
               (id) => selectedPromptIds.includes(id),
             )
           }
@@ -346,6 +377,10 @@ export function PromptsTabContent({
           changePromptSort={changePromptSort}
         />
       ),
+    },
+    {
+      id: "cadence",
+      label: "Cadence",
     },
     {
       id: "mention",
@@ -467,7 +502,7 @@ export function PromptsTabContent({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4">
           <div className="hidden min-h-0 w-full md:block">
             <div className="overflow-x-auto pb-4">
               <WorkspaceTable
@@ -478,6 +513,7 @@ export function PromptsTabContent({
                 emptyLabel={promptsLoading ? "Loading prompts..." : "No prompts match the current filters."}
                 renderRow={(item) => {
                   const sourcePromptId = item.sourcePromptId || item.id;
+                  const selectionKey = getPromptSelectionKey(item);
 
                   return (
                     <TableRow
@@ -490,13 +526,13 @@ export function PromptsTabContent({
                     >
                       <TableCell onClick={(event) => event.stopPropagation()}>
                         <Checkbox
-                          checked={selectedPromptIds.includes(sourcePromptId)}
-                          onCheckedChange={() => togglePromptSelection(sourcePromptId)}
+                          checked={selectedPromptIds.includes(selectionKey)}
+                          onCheckedChange={() => togglePromptSelection(selectionKey)}
                         />
                       </TableCell>
-                      <TableCell className="min-w-[340px] max-w-[420px]">
+                      <TableCell className="min-w-[280px] max-w-[340px]">
                         <div className="min-w-0">
-                          <div className="line-clamp-2 font-medium leading-6">{item.prompt}</div>
+                          <div className="truncate font-medium leading-6">{item.prompt}</div>
                         </div>
                       </TableCell>
                       {hasPersonas ? (
@@ -509,7 +545,18 @@ export function PromptsTabContent({
                         </TableCell>
                       ) : null}
                       <TableCell>
-                        <PromptModelBadges item={item} getModelVisual={getModelVisual} />
+                        <PromptModelBadges
+                          item={item}
+                          getModelVisual={getModelVisual}
+                          singleLine={promptRowMode === "global"}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <div className="min-w-[170px]">
+                          <div className="flex items-center gap-2 text-xs font-medium">
+                            {item.effectiveScheduleLabel}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <div className="w-24">
@@ -557,6 +604,8 @@ export function PromptsTabContent({
                           setFocusPromptId={setFocusPromptId}
                           setTabResponses={setTabResponses}
                           deletePrompt={deletePrompt}
+                          onEditPromptModels={onEditPromptModels}
+                          onEditPromptSchedule={onEditPromptSchedule}
                         />
                       </TableCell>
                     </TableRow>
@@ -574,6 +623,7 @@ export function PromptsTabContent({
             ) : (
               filteredPrompts.map((item) => {
                 const sourcePromptId = item.sourcePromptId || item.id;
+                const selectionKey = getPromptSelectionKey(item);
                 return (
                   <div
                     key={item.id}
@@ -595,8 +645,8 @@ export function PromptsTabContent({
                     <div className="flex items-start gap-3">
                       <div onClick={(event) => event.stopPropagation()}>
                         <Checkbox
-                          checked={selectedPromptIds.includes(sourcePromptId)}
-                          onCheckedChange={() => togglePromptSelection(sourcePromptId)}
+                          checked={selectedPromptIds.includes(selectionKey)}
+                          onCheckedChange={() => togglePromptSelection(selectionKey)}
                         />
                       </div>
                       <div className="min-w-0 flex-1 space-y-3">
@@ -619,6 +669,10 @@ export function PromptsTabContent({
                           <div>
                             <div className="text-xs text-muted-foreground">Rank</div>
                             <div className="mt-1 font-semibold">{item.rank.toFixed(1)}</div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-muted-foreground">Cadence</div>
+                            <div className="mt-1 font-semibold">{item.effectiveScheduleLabel}</div>
                           </div>
                           <div>
                             <div className="text-xs text-muted-foreground">SOV</div>
@@ -670,6 +724,8 @@ export function PromptsTabContent({
                               setFocusPromptId={setFocusPromptId}
                               setTabResponses={setTabResponses}
                               deletePrompt={deletePrompt}
+                              onEditPromptModels={onEditPromptModels}
+                              onEditPromptSchedule={onEditPromptSchedule}
                             />
                           </div>
                         </div>

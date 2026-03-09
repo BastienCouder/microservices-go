@@ -89,6 +89,18 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	if len(s.models) == 0 {
 		s.seedDefaultModels()
 	}
+	for _, prompt := range s.prompts {
+		if prompt.Status == "" {
+			if prompt.IsActive {
+				prompt.Status = PromptStatusActive
+			} else {
+				prompt.Status = PromptStatusDisabled
+			}
+		}
+		if schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, prompt.ProjectID))); err == nil {
+			prompt.Schedule = schedule
+		}
+	}
 	return nil
 }
 
@@ -209,7 +221,10 @@ func copyPrompt(prompt *Prompt) Prompt {
 	if prompt == nil {
 		return Prompt{}
 	}
-	return *prompt
+	out := *prompt
+	out.ModelIDs = nonNilStringSlice(prompt.ModelIDs)
+	out.Schedule = copyPromptSchedule(prompt.Schedule)
+	return out
 }
 
 func copyCompetitor(competitor *Competitor) Competitor {
@@ -285,11 +300,76 @@ func nonNilStringSlice(input []string) []string {
 	return append([]string(nil), input...)
 }
 
-func filterActivePromptsByProject(prompts map[string]*Prompt, projectID string) []AnalysisPromptText {
+func copyStringMap(input map[string]string) map[string]string {
+	if input == nil {
+		return map[string]string{}
+	}
+	out := make(map[string]string, len(input))
+	for key, value := range input {
+		out[key] = value
+	}
+	return out
+}
+
+func copyPromptSchedule(input PromptSchedule) PromptSchedule {
+	return PromptSchedule{
+		Mode:       input.Mode,
+		Cron:       input.Cron,
+		Timezone:   input.Timezone,
+		ModelCrons: copyStringMap(input.ModelCrons),
+	}
+}
+
+func normalizeModelIDs(modelIDs []string) []string {
+	seen := make(map[string]struct{}, len(modelIDs))
+	out := make([]string, 0, len(modelIDs))
+	for _, raw := range modelIDs {
+		modelID := strings.TrimSpace(raw)
+		if modelID == "" {
+			continue
+		}
+		if _, exists := seen[modelID]; exists {
+			continue
+		}
+		seen[modelID] = struct{}{}
+		out = append(out, modelID)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func effectivePromptModelIDs(prompt *Prompt, enabledModelIDs []string) []string {
+	if prompt == nil {
+		return nonNilStringSlice(enabledModelIDs)
+	}
+
+	enabled := make(map[string]struct{}, len(enabledModelIDs))
+	for _, modelID := range enabledModelIDs {
+		enabled[modelID] = struct{}{}
+	}
+
+	selected := make([]string, 0, len(prompt.ModelIDs))
+	for _, modelID := range normalizeModelIDs(prompt.ModelIDs) {
+		if _, ok := enabled[modelID]; ok {
+			selected = append(selected, modelID)
+		}
+	}
+	if len(selected) > 0 {
+		return selected
+	}
+	return nonNilStringSlice(enabledModelIDs)
+}
+
+func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[string]map[string]bool, projectID string) []AnalysisPromptText {
+	enabledModelIDs := filterEnabledModels(projectModels, projectID)
 	out := make([]AnalysisPromptText, 0)
 	for _, prompt := range prompts {
 		if prompt.ProjectID == projectID && prompt.IsActive {
-			out = append(out, AnalysisPromptText{ID: prompt.ID, Text: prompt.Text})
+			out = append(out, AnalysisPromptText{
+				ID:       prompt.ID,
+				Text:     prompt.Text,
+				ModelIDs: effectivePromptModelIDs(prompt, enabledModelIDs),
+			})
 		}
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })

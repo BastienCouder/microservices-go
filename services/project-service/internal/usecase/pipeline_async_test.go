@@ -2,16 +2,20 @@ package usecase
 
 import (
 	"context"
+	"reflect"
 	"testing"
 )
 
 type analysisClientSpy struct {
-	startCalls  int
-	recordCalls int
+	startCalls    int
+	recordCalls   int
+	lastStartReq  AnalysisStartRequest
+	recordedCalls []AnalysisRecordResponseInput
 }
 
 func (s *analysisClientSpy) StartAnalysis(_ context.Context, req AnalysisStartRequest) (AnalysisStartResponse, error) {
 	s.startCalls++
+	s.lastStartReq = req
 	promptRuns := make([]AnalysisPromptRun, 0, len(req.PromptTexts))
 	for _, prompt := range req.PromptTexts {
 		promptRuns = append(promptRuns, AnalysisPromptRun{
@@ -26,17 +30,20 @@ func (s *analysisClientSpy) StartAnalysis(_ context.Context, req AnalysisStartRe
 	}, nil
 }
 
-func (s *analysisClientSpy) RecordResponse(_ context.Context, _ string, _ AnalysisRecordResponseInput) error {
+func (s *analysisClientSpy) RecordResponse(_ context.Context, _ string, input AnalysisRecordResponseInput) error {
 	s.recordCalls++
+	s.recordedCalls = append(s.recordedCalls, input)
 	return nil
 }
 
 type iaClientSpy struct {
 	execCalls int
+	execInputs []IAExecutePromptInput
 }
 
-func (s *iaClientSpy) ExecutePrompt(_ context.Context, _ IAExecutePromptInput) (IAExecutePromptResult, error) {
+func (s *iaClientSpy) ExecutePrompt(_ context.Context, input IAExecutePromptInput) (IAExecutePromptResult, error) {
 	s.execCalls++
+	s.execInputs = append(s.execInputs, input)
 	var result IAExecutePromptResult
 	result.RawResponse = "ok"
 	result.Analysis.BrandMentioned = true
@@ -157,5 +164,86 @@ func TestOutboxEventProcessingRunsPipelineOnce(t *testing.T) {
 	}
 	if analysisSpy.recordCalls != iaSpy.execCalls {
 		t.Fatalf("expected same ia and record counts, got ia=%d record=%d", iaSpy.execCalls, analysisSpy.recordCalls)
+	}
+}
+
+func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1", "Q2"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	firstPromptModels := []string{"gpt-4o"}
+	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &firstPromptModels}); err != nil {
+		t.Fatalf("update first prompt models: %v", err)
+	}
+	secondPromptModels := []string{"sonar"}
+	if _, err := svc.UpdatePrompt(ctx, prompts[1].ID, 42, UpdatePromptInput{ModelIDs: &secondPromptModels}); err != nil {
+		t.Fatalf("update second prompt models: %v", err)
+	}
+
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+	events, err := svc.ListOutboxEventsToPublish(ctx, 10)
+	if err != nil {
+		t.Fatalf("list outbox events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d", len(events))
+	}
+
+	eventID := events[0].ID
+	if err := svc.MarkOutboxEventPublished(ctx, eventID); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if err := svc.ProcessFinalizedProjectOutboxEvent(ctx, eventID); err != nil {
+		t.Fatalf("process outbox event: %v", err)
+	}
+
+	if !reflect.DeepEqual(analysisSpy.lastStartReq.ModelIDs, []string{"gpt-4o", "sonar"}) {
+		t.Fatalf("expected analysis start modelIds [gpt-4o sonar], got %#v", analysisSpy.lastStartReq.ModelIDs)
+	}
+	if len(iaSpy.execInputs) != 2 {
+		t.Fatalf("expected 2 ia executions, got %d", len(iaSpy.execInputs))
+	}
+
+	gotCoverage := map[string][]string{}
+	for _, call := range iaSpy.execInputs {
+		gotCoverage[call.PromptID] = append(gotCoverage[call.PromptID], call.ModelID)
+	}
+
+	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"gpt-4o"}) {
+		t.Fatalf("expected first prompt coverage [gpt-4o], got %#v", gotCoverage[prompts[0].ID])
+	}
+	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"sonar"}) {
+		t.Fatalf("expected second prompt coverage [sonar], got %#v", gotCoverage[prompts[1].ID])
 	}
 }

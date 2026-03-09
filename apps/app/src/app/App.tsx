@@ -16,6 +16,7 @@ function getAPIBaseURL(): string {
 export default function App() {
   const location = useLocation();
   const routeSearch = location.search;
+  const isOnboardingRoute = location.pathname === "/onboarding" || location.pathname.startsWith("/onboarding/");
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
@@ -29,6 +30,17 @@ export default function App() {
           </p>
         </section>
       </main>
+    );
+  }
+
+  if (isOnboardingRoute) {
+    return (
+      <AppRouter
+        apiBaseURL={apiBaseURL}
+        routeSearch={routeSearch}
+        user={user}
+        busy={busy}
+      />
     );
   }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -208,5 +209,227 @@ func TestListProjectsReloadsStateFromStore(t *testing.T) {
 	}
 	if projects[0].ID != "seed-demo-project" {
 		t.Fatalf("expected seed-demo-project, got %q", projects[0].ID)
+	}
+}
+
+func TestUpdatePromptsStatusPersistsPromptStatus(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one", "Prompt two"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	updated, err := svc.UpdatePromptsStatus(ctx, project.ID, 42, UpdatePromptsStatusInput{
+		PromptIDs: []string{prompts[0].ID, prompts[1].ID},
+		Status:    PromptStatusArchived,
+	})
+	if err != nil {
+		t.Fatalf("update prompts status: %v", err)
+	}
+	if len(updated) != 2 {
+		t.Fatalf("expected 2 updated prompts, got %d", len(updated))
+	}
+	for _, prompt := range updated {
+		if prompt.Status != PromptStatusArchived {
+			t.Fatalf("expected archived status, got %q", prompt.Status)
+		}
+		if prompt.IsActive {
+			t.Fatalf("expected archived prompt to be inactive")
+		}
+	}
+
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if len(page.Items) != 2 {
+		t.Fatalf("expected 2 prompts in page, got %d", len(page.Items))
+	}
+	for _, prompt := range page.Items {
+		if prompt.Status != PromptStatusArchived {
+			t.Fatalf("expected archived status after reload, got %q", prompt.Status)
+		}
+	}
+}
+
+func TestUpdatePromptPersistsModelCoverage(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	modelIDs := []string{"sonar"}
+	updated, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
+	if err != nil {
+		t.Fatalf("update prompt: %v", err)
+	}
+
+	if !reflect.DeepEqual(updated.ModelIDs, []string{"sonar"}) {
+		t.Fatalf("expected modelIds [sonar], got %#v", updated.ModelIDs)
+	}
+
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected 1 prompt, got %d", len(page.Items))
+	}
+	if !reflect.DeepEqual(page.Items[0].ModelIDs, []string{"sonar"}) {
+		t.Fatalf("expected persisted modelIds [sonar], got %#v", page.Items[0].ModelIDs)
+	}
+}
+
+func TestUpdatePromptRejectsModelOutsideProjectCoverage(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	modelIDs := []string{"sonar"}
+	_, err = svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestUpdatePromptPersistsScheduleConfig(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	schedule := PromptSchedule{
+		Mode:     PromptScheduleModePerModel,
+		Cron:     "0 */4 * * *",
+		Timezone: "Europe/Paris",
+		ModelCrons: map[string]string{
+			"gpt-4o": "15 */2 * * *",
+			"sonar":  "45 6 * * 1-5",
+		},
+	}
+
+	updated, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule})
+	if err != nil {
+		t.Fatalf("update prompt schedule: %v", err)
+	}
+
+	if updated.Schedule.Mode != PromptScheduleModePerModel {
+		t.Fatalf("expected per_model mode, got %q", updated.Schedule.Mode)
+	}
+	if updated.Schedule.Cron != "0 */4 * * *" {
+		t.Fatalf("expected global cron to persist, got %q", updated.Schedule.Cron)
+	}
+	if updated.Schedule.Timezone != "Europe/Paris" {
+		t.Fatalf("expected timezone Europe/Paris, got %q", updated.Schedule.Timezone)
+	}
+	if !reflect.DeepEqual(updated.Schedule.ModelCrons, schedule.ModelCrons) {
+		t.Fatalf("expected model overrides %#v, got %#v", schedule.ModelCrons, updated.Schedule.ModelCrons)
+	}
+
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if got := page.Items[0].Schedule; !reflect.DeepEqual(got, updated.Schedule) {
+		t.Fatalf("expected persisted schedule %#v, got %#v", updated.Schedule, got)
+	}
+}
+
+func TestUpdatePromptRejectsInvalidCronSchedule(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	schedule := PromptSchedule{
+		Mode:     PromptScheduleModeGlobal,
+		Cron:     "every day at nine",
+		Timezone: "UTC",
+	}
+	_, err = svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
 	}
 }

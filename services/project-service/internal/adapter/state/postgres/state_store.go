@@ -62,6 +62,12 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadPrompts(ctx, &state); err != nil {
 		return nil, false, err
 	}
+	if err := s.loadPromptModels(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadPromptModelSchedules(ctx, &state); err != nil {
+		return nil, false, err
+	}
 	if err := s.loadCompetitors(ctx, &state); err != nil {
 		return nil, false, err
 	}
@@ -109,6 +115,8 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 	for _, statement := range []string{
 		`DELETE FROM outbox_events`,
+		`DELETE FROM prompt_model_schedules`,
+		`DELETE FROM prompt_models`,
 		`DELETE FROM project_models`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
@@ -127,6 +135,12 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
+		return err
+	}
+	if err := insertPromptModels(ctx, tx, state.Prompts); err != nil {
+		return err
+	}
+	if err := insertPromptModelSchedules(ctx, tx, state.Prompts); err != nil {
 		return err
 	}
 	if err := insertCompetitors(ctx, tx, state.Competitors); err != nil {
@@ -193,7 +207,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 
 func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, project_id, text, intent, is_active, created_at, updated_at
+		SELECT id, project_id, text, intent, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at
 		FROM prompts
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -204,14 +218,22 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 
 	for rows.Next() {
 		var (
-			item   usecase.Prompt
-			intent *string
+			item             usecase.Prompt
+			intent           *string
+			scheduleMode     *string
+			scheduleCron     *string
+			scheduleTimezone *string
+			status           *string
 		)
 		if err := rows.Scan(
 			&item.ID,
 			&item.ProjectID,
 			&item.Text,
 			&intent,
+			&scheduleMode,
+			&scheduleCron,
+			&scheduleTimezone,
+			&status,
 			&item.IsActive,
 			&item.CreatedAt,
 			&item.UpdatedAt,
@@ -219,8 +241,87 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 			return fmt.Errorf("scan prompt: %w", err)
 		}
 		item.Intent = stringValue(intent)
+		item.Schedule = usecase.PromptSchedule{
+			Mode:       stringValue(scheduleMode),
+			Cron:       stringValue(scheduleCron),
+			Timezone:   stringValue(scheduleTimezone),
+			ModelCrons: map[string]string{},
+		}
+		if item.Schedule.Mode == "" {
+			item.Schedule.Mode = usecase.PromptScheduleModeGlobal
+		}
+		if item.Schedule.Cron == "" {
+			item.Schedule.Cron = usecase.DefaultPromptCron
+		}
+		if item.Schedule.Timezone == "" {
+			item.Schedule.Timezone = usecase.DefaultPromptTimezone
+		}
+		item.Status = stringValue(status)
+		if item.Status == "" {
+			if item.IsActive {
+				item.Status = usecase.PromptStatusActive
+			} else {
+				item.Status = usecase.PromptStatusDisabled
+			}
+		}
 		prompt := item
 		state.Prompts[item.ID] = &prompt
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadPromptModels(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT prompt_id, model_id
+		FROM prompt_models
+		ORDER BY prompt_id ASC, model_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select prompt models: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var promptID string
+		var modelID string
+		if err := rows.Scan(&promptID, &modelID); err != nil {
+			return fmt.Errorf("scan prompt model: %w", err)
+		}
+		prompt := state.Prompts[promptID]
+		if prompt == nil {
+			continue
+		}
+		prompt.ModelIDs = append(prompt.ModelIDs, modelID)
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadPromptModelSchedules(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT prompt_id, model_id, cron_expr
+		FROM prompt_model_schedules
+		ORDER BY prompt_id ASC, model_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select prompt model schedules: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var promptID string
+		var modelID string
+		var cronExpr string
+		if err := rows.Scan(&promptID, &modelID, &cronExpr); err != nil {
+			return fmt.Errorf("scan prompt model schedule: %w", err)
+		}
+		prompt := state.Prompts[promptID]
+		if prompt == nil {
+			continue
+		}
+		if prompt.Schedule.ModelCrons == nil {
+			prompt.Schedule.ModelCrons = map[string]string{}
+		}
+		prompt.Schedule.ModelCrons[modelID] = cronExpr
 	}
 	return rows.Err()
 }
@@ -387,10 +488,45 @@ func insertPrompts(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.P
 	for _, promptID := range sortedPromptIDs(prompts) {
 		prompt := prompts[promptID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO prompts (id, project_id, text, intent, language, country, is_active, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, 'fr', 'FR', $5, $6, $7)
-		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
+			INSERT INTO prompts (id, project_id, text, intent, language, country, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, 'fr', 'FR', $5, $6, $7, $8, $9, $10, $11)
+		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), nullIfEmptyOrFallback(prompt.Schedule.Mode, usecase.PromptScheduleModeGlobal), nullIfEmptyOrFallback(prompt.Schedule.Cron, usecase.DefaultPromptCron), nullIfEmptyOrFallback(prompt.Schedule.Timezone, usecase.DefaultPromptTimezone), nullIfEmptyOrFallback(prompt.Status, usecase.PromptStatusActive), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
 			return fmt.Errorf("insert prompt %s: %w", prompt.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertPromptModels(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.Prompt) error {
+	for _, promptID := range sortedPromptIDs(prompts) {
+		prompt := prompts[promptID]
+		for _, modelID := range sortedUniqueStrings(prompt.ModelIDs) {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO prompt_models (prompt_id, model_id, created_at, updated_at)
+				VALUES ($1, $2, NOW(), NOW())
+			`, prompt.ID, modelID); err != nil {
+				return fmt.Errorf("insert prompt model %s/%s: %w", prompt.ID, modelID, err)
+			}
+		}
+	}
+	return nil
+}
+
+func insertPromptModelSchedules(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.Prompt) error {
+	for _, promptID := range sortedPromptIDs(prompts) {
+		prompt := prompts[promptID]
+		modelIDs := make([]string, 0, len(prompt.Schedule.ModelCrons))
+		for modelID := range prompt.Schedule.ModelCrons {
+			modelIDs = append(modelIDs, modelID)
+		}
+		sort.Strings(modelIDs)
+		for _, modelID := range modelIDs {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO prompt_model_schedules (prompt_id, model_id, cron_expr, created_at, updated_at)
+				VALUES ($1, $2, $3, NOW(), NOW())
+			`, prompt.ID, modelID, prompt.Schedule.ModelCrons[modelID]); err != nil {
+				return fmt.Errorf("insert prompt model schedule %s/%s: %w", prompt.ID, modelID, err)
+			}
 		}
 	}
 	return nil
@@ -505,6 +641,23 @@ func orderedOutboxIDs(outbox map[string]*usecase.OutboxEvent, order []string) []
 	}
 	sort.Strings(extras)
 	return append(orderedIDs, extras...)
+}
+
+func sortedUniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func nullIfEmpty(value string) any {

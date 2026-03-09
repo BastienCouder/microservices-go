@@ -6,6 +6,14 @@ export type PromptSort = "prompt" | "persona" | "ai" | "mention" | "rank" | "sov
 export type PromptSortDirection = "asc" | "desc";
 export type ResponseView = "table" | "timeline";
 export type PromptRowMode = "global" | "model";
+export type PromptScheduleMode = "global" | "per_model";
+
+export type PromptSchedule = {
+  mode: PromptScheduleMode;
+  cron: string;
+  timezone: string;
+  modelCrons: Record<string, string>;
+};
 
 export type PromptRun = {
   id: string;
@@ -31,6 +39,10 @@ export type PromptItem = {
   stage: Stage;
   persona?: Persona | null;
   models: AIModel[];
+  schedule: PromptSchedule;
+  effectiveCron: string;
+  effectiveScheduleLabel: string;
+  effectiveScheduleSource: "global" | "override";
   mentionRate: number;
   rank: number;
   sov: number;

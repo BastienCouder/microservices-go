@@ -125,6 +125,8 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.addPrompts(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodGet:
 		h.listPrompts(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "prompts" && parts[2] == "status" && r.Method == http.MethodPatch:
+		h.bulkUpdatePromptStatus(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodPost:
 		h.addCompetitors(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodGet:
@@ -298,8 +300,11 @@ func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID 
 }
 
 type updatePromptRequest struct {
-	Text     *string `json:"text"`
-	Intent   *string `json:"intent"`
+	Text     *string                 `json:"text"`
+	Intent   *string                 `json:"intent"`
+	ModelIDs *[]string `json:"modelIds"`
+	Schedule *usecase.PromptSchedule `json:"schedule"`
+	Status   *string `json:"status"`
 	IsActive *bool   `json:"isActive"`
 }
 
@@ -317,6 +322,9 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, organizationID, usecase.UpdatePromptInput{
 		Text:     req.Text,
 		Intent:   req.Intent,
+		ModelIDs: req.ModelIDs,
+		Schedule: req.Schedule,
+		Status:   req.Status,
 		IsActive: req.IsActive,
 	})
 	if err != nil {
@@ -324,6 +332,33 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 		return
 	}
 	writeSuccess(w, http.StatusOK, prompt)
+}
+
+type bulkUpdatePromptStatusRequest struct {
+	PromptIDs []string `json:"promptIds"`
+	Status    string   `json:"status"`
+}
+
+func (h *Handler) bulkUpdatePromptStatus(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	var req bulkUpdatePromptStatusRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	prompts, err := h.svc.UpdatePromptsStatus(r.Context(), projectID, organizationID, usecase.UpdatePromptsStatusInput{
+		PromptIDs: req.PromptIDs,
+		Status:    req.Status,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, prompts)
 }
 
 func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID string) {

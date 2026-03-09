@@ -84,6 +84,29 @@ function PromptDetailsContent({ prompt, mobile }: { prompt: PromptItem; mobile: 
 
           <section className="space-y-3">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              Analysis cadence
+            </div>
+            <div className="rounded-xl border border-border/70 p-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline">
+                  {prompt.schedule.mode === "global" ? "Global" : "Per AI"}
+                </Badge>
+                <Badge variant="outline">{prompt.schedule.timezone}</Badge>
+                {prompt.effectiveScheduleSource === "override" ? (
+                  <Badge variant="outline">Override active</Badge>
+                ) : null}
+              </div>
+              <div className="mt-3 text-base font-semibold">{prompt.effectiveScheduleLabel}</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                {prompt.effectiveScheduleSource === "override"
+                  ? "A specific AI override is currently active for this view."
+                  : "This cadence is inherited from the prompt baseline."}
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
               30-day trend
             </div>
             <div className="flex h-24 items-end gap-2 rounded-xl border border-border/70 px-4 py-4">

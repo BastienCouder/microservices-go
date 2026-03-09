@@ -13,6 +13,15 @@ var (
 )
 
 const (
+	PromptStatusActive   = "active"
+	PromptStatusDisabled = "disabled"
+	PromptStatusArchived = "archived"
+
+	PromptScheduleModeGlobal   = "global"
+	PromptScheduleModePerModel = "per_model"
+	DefaultPromptCron         = "0 */6 * * *"
+	DefaultPromptTimezone     = "UTC"
+
 	OutboxEventTypeProjectFinalized = "project.finalized"
 
 	OutboxStatusPending    = "pending"
@@ -43,9 +52,19 @@ type Prompt struct {
 	ProjectID string    `json:"projectId"`
 	Text      string    `json:"text"`
 	Intent    string    `json:"intent,omitempty"`
+	ModelIDs  []string  `json:"modelIds,omitempty"`
+	Schedule  PromptSchedule `json:"schedule"`
+	Status    string    `json:"status"`
 	IsActive  bool      `json:"isActive"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type PromptSchedule struct {
+	Mode       string            `json:"mode"`
+	Cron       string            `json:"cron"`
+	Timezone   string            `json:"timezone"`
+	ModelCrons map[string]string `json:"modelCrons,omitempty"`
 }
 
 type Competitor struct {
@@ -101,7 +120,15 @@ type UpdateProjectInput struct {
 type UpdatePromptInput struct {
 	Text     *string
 	Intent   *string
+	ModelIDs *[]string
+	Schedule *PromptSchedule
+	Status   *string
 	IsActive *bool
+}
+
+type UpdatePromptsStatusInput struct {
+	PromptIDs []string
+	Status    string
 }
 
 type ListPromptsInput struct {
@@ -146,8 +173,9 @@ type ReplaceProjectModelsResult struct {
 }
 
 type AnalysisPromptText struct {
-	ID   string `json:"id"`
-	Text string `json:"text"`
+	ID       string   `json:"id"`
+	Text     string   `json:"text"`
+	ModelIDs []string `json:"modelIds,omitempty"`
 }
 
 type AnalysisPromptRun struct {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DateRange } from "react-day-picker";
 import { differenceInCalendarDays } from "date-fns";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
@@ -11,9 +11,13 @@ import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { SELECTED_ORG_KEY } from "@/features/models/core/model-access";
 import {
+  DEFAULT_PROMPT_CRON,
+  DEFAULT_PROMPT_TIMEZONE,
   PERIOD_TO_MINUTES,
   STAGES,
+  defaultPromptSchedule,
   normalizeModelName,
+  promptScheduleLabel,
 } from "./prompts-workspace-utils";
 import {
   AIModel,
@@ -22,6 +26,7 @@ import {
   Persona,
   PromptItem,
   PromptRowMode,
+  PromptSchedule,
   PromptSort,
   PromptSortDirection,
   ResponseView,
@@ -58,6 +63,9 @@ type ProjectPromptRecord = {
   id: string;
   text: string;
   intent?: string;
+  modelIds?: string[];
+  schedule?: PromptSchedule;
+  status?: PromptItem["status"];
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -104,6 +112,119 @@ function getNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function normalizePromptStatus(value: unknown): PromptItem["status"] | undefined {
+  const raw = getString(value).toLowerCase();
+  if (raw === "active" || raw === "disabled" || raw === "archived") {
+    return raw;
+  }
+  return undefined;
+}
+
+function dedupeModels(models: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  for (const model of models) {
+    const value = model.trim();
+    if (!value) continue;
+    const key = normalizeModelName(value);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    unique.push(value);
+  }
+
+  return unique;
+}
+
+function normalizePromptScheduleValue(input: unknown): PromptSchedule {
+  if (!isRecord(input)) return defaultPromptSchedule();
+  const mode = getString(getField(input, ["mode", "Mode"])) === "per_model" ? "per_model" : "global";
+  const cron = getString(getField(input, ["cron", "Cron"])) || DEFAULT_PROMPT_CRON;
+  const timezone = getString(getField(input, ["timezone", "Timezone"])) || DEFAULT_PROMPT_TIMEZONE;
+  const rawOverrides = getField<Record<string, unknown>>(input, ["modelCrons", "ModelCrons"]);
+  const modelCrons = Object.fromEntries(
+    Object.entries(rawOverrides ?? {})
+      .map(([modelId, cronValue]) => [modelId.trim(), getString(cronValue)])
+      .filter(([modelId, cronValue]) => modelId !== "" && cronValue !== ""),
+  );
+
+  return {
+    mode,
+    cron,
+    timezone,
+    modelCrons,
+  };
+}
+
+function buildScopedPromptMetrics(item: PromptItem, models: string[]): PromptItem {
+  const scopedModels = dedupeModels(models);
+  const normalizedScopedModels = new Set(
+    scopedModels.map((model) => normalizeModelName(model)),
+  );
+  const scopedRuns =
+    normalizedScopedModels.size === 0
+      ? item.runs
+      : item.runs.filter((run) =>
+          normalizedScopedModels.has(normalizeModelName(run.model)),
+        );
+
+  const mentionRate =
+    scopedRuns.length > 0
+      ? Math.round(
+          (scopedRuns.filter((run) => run.mention).length / scopedRuns.length) *
+            100,
+        )
+      : 0;
+  const rankedRuns = scopedRuns.filter((run) => typeof run.rank === "number");
+  const rank =
+    rankedRuns.length > 0
+      ? Number(
+          (
+            rankedRuns.reduce((sum, run) => sum + (run.rank ?? 0), 0) /
+            rankedRuns.length
+          ).toFixed(1),
+        )
+      : 9.9;
+  const sov =
+    scopedRuns.length > 0
+      ? Math.round(
+          scopedRuns.reduce((sum, run) => sum + run.score, 0) /
+            scopedRuns.length,
+        )
+      : 0;
+  const lastRunMinutes =
+    scopedRuns.length > 0
+      ? Math.min(...scopedRuns.map((run) => run.minutesAgo))
+      : 999999;
+  const trendSeed = scopedRuns.slice(0, 7).map((run) => run.score);
+  const trend30d =
+    trendSeed.length > 0
+      ? Array.from(
+          { length: 7 },
+          (_, trendIndex) =>
+            trendSeed[trendIndex] ?? trendSeed[trendSeed.length - 1] ?? 0,
+        )
+      : [0, 0, 0, 0, 0, 0, 0];
+
+  return {
+    ...item,
+    models: scopedModels,
+    runs: scopedRuns,
+    effectiveCron: item.effectiveCron,
+    effectiveScheduleLabel: item.effectiveScheduleLabel,
+    effectiveScheduleSource: item.effectiveScheduleSource,
+    mentionRate,
+    rank,
+    sov,
+    lastRunMinutes,
+    trend30d,
+  };
+}
+
+function getPromptSelectionKey(item: PromptItem, rowMode: PromptRowMode) {
+  return rowMode === "model" ? item.id : item.sourcePromptId || item.id;
+}
+
 function readSelectedOrganizationId(): string {
   if (typeof window === "undefined") return "";
   try {
@@ -127,6 +248,13 @@ function normalizePromptPage(value: unknown): PromptPageResult {
       id: getString(getField(entry, ["id", "ID"])),
       text: getString(getField(entry, ["text", "Text"])),
       intent: getString(getField(entry, ["intent", "Intent"])) || undefined,
+      modelIds: dedupeModels(
+        (getField(entry, ["modelIds", "ModelIds"]) as unknown[] | undefined)?.filter(
+          (item): item is string => typeof item === "string",
+        ) ?? [],
+      ),
+      schedule: normalizePromptScheduleValue(getField(entry, ["schedule", "Schedule"])),
+      status: normalizePromptStatus(getField(entry, ["status", "Status"])),
       isActive: getBool(getField(entry, ["isActive", "IsActive"])),
       createdAt: getString(getField(entry, ["createdAt", "CreatedAt"])) || undefined,
       updatedAt: getString(getField(entry, ["updatedAt", "UpdatedAt"])) || undefined,
@@ -219,6 +347,48 @@ async function loadAllPromptPages(
   return [firstPage, ...remainingPages].flatMap((page) => page.items);
 }
 
+async function patchPromptModels(
+  apiBaseURL: string,
+  organizationId: string,
+  promptId: string,
+  modelIds: string[],
+): Promise<void> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.prompts.update(promptId),
+    {
+      method: "PATCH",
+      organizationId,
+      body: JSON.stringify({ modelIds }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Impossible de mettre a jour l'AI coverage du prompt.");
+  }
+}
+
+async function patchPromptSchedule(
+  apiBaseURL: string,
+  organizationId: string,
+  promptId: string,
+  schedule: PromptSchedule,
+): Promise<void> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.prompts.update(promptId),
+    {
+      method: "PATCH",
+      organizationId,
+      body: JSON.stringify({ schedule }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error("Impossible de mettre a jour la cadence d'analyse du prompt.");
+  }
+}
+
 function compareStrings(a: string, b: string): number {
   return a.localeCompare(b, "fr", { sensitivity: "base", numeric: true });
 }
@@ -272,10 +442,16 @@ function buildModelScopedPromptRows(prompts: PromptItem[]): PromptItem[] {
       return map;
     }, new Map<string, typeof prompt.runs>());
 
-    const models = runsByModel.size > 0 ? Array.from(runsByModel.keys()) : prompt.models;
+    const models =
+      prompt.models.length > 0
+        ? prompt.models
+        : runsByModel.size > 0
+          ? Array.from(runsByModel.keys())
+          : [];
 
     return models.map((model, index) => {
       const runs = [...(runsByModel.get(model) ?? [])].sort((a, b) => a.minutesAgo - b.minutesAgo);
+      const overrideCron = prompt.schedule.modelCrons[model];
       const mentionRate =
         runs.length > 0
           ? Math.round((runs.filter((item) => item.mention).length / runs.length) * 100)
@@ -312,6 +488,9 @@ function buildModelScopedPromptRows(prompts: PromptItem[]): PromptItem[] {
         sourcePromptId,
         rowMode: "model" as PromptRowMode,
         models: model ? [model] : [],
+        effectiveCron: overrideCron || prompt.schedule.cron,
+        effectiveScheduleLabel: promptScheduleLabel(prompt.schedule, overrideCron),
+        effectiveScheduleSource: overrideCron ? "override" : "global",
         mentionRate,
         rank,
         sov,
@@ -324,6 +503,7 @@ function buildModelScopedPromptRows(prompts: PromptItem[]): PromptItem[] {
 }
 
 export function usePromptsResponsesState(apiBaseURL: string) {
+  const queryClient = useQueryClient();
   const { data: dashboardData, mode, projectId } = useDashboardData();
   const activeProjectId = projectId || dashboardData.project.id || "";
   const liveModels = useMemo(() => dashboardData.models.filter((item) => item.live), [dashboardData.models]);
@@ -398,13 +578,15 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const [manualPrompts, setManualPrompts] = useState<PromptItem[]>([]);
   const [formPrompt, setFormPrompt] = useState("");
   const [formPersona, setFormPersona] = useState<Persona>("");
-  const [formModel, setFormModel] = useState<AIModel>("");
+  const [formModels, setFormModels] = useState<AIModel[]>([]);
   const [modelsPopoverOpen, setModelsPopoverOpen] = useState(false);
   const [promptPage, setPromptPage] = useState(1);
   const [promptRowMode, setPromptRowMode] = useState<PromptRowMode>("global");
+  const [showArchived, setShowArchived] = useState(false);
   const [responseVisibleCount, setResponseVisibleCount] = useState(RESPONSES_BATCH_SIZE);
-  const [promptStatusOverrides, setPromptStatusOverrides] = useState<Record<string, PromptItem["status"]>>({});
   const [hiddenPromptIds, setHiddenPromptIds] = useState<string[]>([]);
+  const [editingPromptModelsId, setEditingPromptModelsId] = useState<string | null>(null);
+  const [editingPromptScheduleId, setEditingPromptScheduleId] = useState<string | null>(null);
 
   useEffect(() => {
     setOrganizationId(readSelectedOrganizationId());
@@ -441,6 +623,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     persona,
     selectedModels.join("|"),
     promptRowMode,
+    showArchived,
     promptSort,
     promptSortDirection,
   ]);
@@ -452,7 +635,10 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       if (kept.length > 0) return kept;
       return availableModels;
     });
-    setFormModel((current) => (availableModels.includes(current) ? current : availableModels[0]));
+    setFormModels((current) => {
+      const kept = current.filter((model) => availableModels.includes(model));
+      return kept.length > 0 ? kept : availableModels.slice(0, 1);
+    });
     setFormPersona((current) => (availablePersonas.includes(current) ? current : availablePersonas[0] || ""));
   }, [availableModels, availablePersonas]);
 
@@ -473,6 +659,96 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     ],
   );
 
+  const bulkPromptStatusMutation = useMutation({
+    mutationFn: async ({
+      promptIds,
+      status,
+    }: {
+      promptIds: string[];
+      status: PromptItem["status"];
+    }) => {
+      const response = await gatewayJSON<unknown>(
+        apiBaseURL,
+        apiRoutes.projects.promptsStatus(activeProjectId),
+        {
+          method: "PATCH",
+          organizationId,
+          body: JSON.stringify({ promptIds, status }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("Impossible de mettre a jour le statut des prompts.");
+      }
+
+      return { promptIds, status };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.promptsCatalog(
+          apiBaseURL,
+          organizationId,
+          activeProjectId,
+          deferredSearch,
+          promptSort,
+          promptSortDirection,
+        ),
+      });
+    },
+  });
+
+  const updatePromptModelsMutation = useMutation({
+    mutationFn: async ({
+      promptId,
+      modelIds,
+    }: {
+      promptId: string;
+      modelIds: AIModel[];
+    }) => {
+      await patchPromptModels(apiBaseURL, organizationId, promptId, modelIds);
+      return { promptId, modelIds };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.promptsCatalog(
+          apiBaseURL,
+          organizationId,
+          activeProjectId,
+          deferredSearch,
+          promptSort,
+          promptSortDirection,
+        ),
+      });
+      setEditingPromptModelsId(null);
+    },
+  });
+
+  const updatePromptScheduleMutation = useMutation({
+    mutationFn: async ({
+      promptId,
+      schedule,
+    }: {
+      promptId: string;
+      schedule: PromptSchedule;
+    }) => {
+      await patchPromptSchedule(apiBaseURL, organizationId, promptId, schedule);
+      return { promptId, schedule };
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.promptsCatalog(
+          apiBaseURL,
+          organizationId,
+          activeProjectId,
+          deferredSearch,
+          promptSort,
+          promptSortDirection,
+        ),
+      });
+      setEditingPromptScheduleId(null);
+    },
+  });
+
   const basePrompts = useMemo(() => {
     const searchLower = deferredSearch.toLowerCase();
     const visibleManualPrompts = manualPrompts.filter((item) =>
@@ -481,11 +757,8 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     const merged = [...visibleManualPrompts, ...serverPromptItems];
     return merged
       .filter((item) => !hiddenPromptIds.includes(item.sourcePromptId || item.id))
-      .map((item) => {
-        const nextStatus = promptStatusOverrides[item.sourcePromptId || item.id];
-        return nextStatus ? { ...item, status: nextStatus } : item;
-      });
-  }, [deferredSearch, hiddenPromptIds, manualPrompts, promptStatusOverrides, serverPromptItems]);
+      .map((item) => buildScopedPromptMetrics(item, item.models));
+  }, [deferredSearch, hiddenPromptIds, manualPrompts, serverPromptItems]);
 
   const prompts = useMemo(
     () => (promptRowMode === "global" ? basePrompts : buildModelScopedPromptRows(basePrompts)),
@@ -519,11 +792,12 @@ export function usePromptsResponsesState(apiBaseURL: string) {
         selectedModels.length === 0 || item.models.length === 0 || item.models.some((model) => selectedModels.includes(model));
       const matchesPersona = persona === "all" || item.persona === persona;
       const matchesSearch = searchLower === "" || item.prompt.toLowerCase().includes(searchLower);
-      return matchesPeriod && matchesModel && matchesPersona && matchesSearch;
+      const matchesArchive = showArchived || item.status !== "archived";
+      return matchesPeriod && matchesModel && matchesPersona && matchesSearch && matchesArchive;
     });
 
     return sortPromptItems(rows, promptSort, promptSortDirection);
-  }, [deferredSearch, persona, promptSort, promptSortDirection, prompts, rangeMinutes, selectedModels]);
+  }, [deferredSearch, persona, promptSort, promptSortDirection, prompts, rangeMinutes, selectedModels, showArchived]);
 
   const promptTotalItems = filteredPromptRows.length;
   const promptTotalPages = Math.max(1, Math.ceil(promptTotalItems / PROMPTS_PAGE_SIZE));
@@ -579,12 +853,16 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   ]);
 
   useEffect(() => {
-    const selectablePromptIds = new Set(filteredPromptRows.map((item) => item.sourcePromptId || item.id));
+    const selectablePromptIds = new Set(
+      filteredPromptRows.map((item) =>
+        getPromptSelectionKey(item, promptRowMode),
+      ),
+    );
     setSelectedPromptIds((current) => current.filter((id) => selectablePromptIds.has(id)));
     setSelectedPromptId((current) =>
       current && filteredPromptRows.some((item) => item.id === current) ? current : filteredPromptRows[0]?.id ?? null,
     );
-  }, [filteredPromptRows]);
+  }, [filteredPromptRows, promptRowMode]);
 
   useEffect(() => {
     setResponseVisibleCount(RESPONSES_BATCH_SIZE);
@@ -621,6 +899,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const hasActiveGlobalFilters =
     period !== "7d" ||
     persona !== "all" ||
+    showArchived ||
     search.trim().length > 0 ||
     selectedModels.length !== availableModels.length ||
     availableModels.some((model) => !selectedModels.includes(model));
@@ -630,6 +909,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setDateRange(undefined);
     setSelectedModels(availableModels);
     setPersona("all");
+    setShowArchived(false);
     setSearch("");
     setOnlyErrors(false);
     setCriticalOnly(false);
@@ -657,7 +937,13 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       return;
     }
     setSelectedPromptIds(
-      Array.from(new Set(filteredPrompts.map((item) => item.sourcePromptId || item.id))),
+      Array.from(
+        new Set(
+          filteredPrompts.map((item) =>
+            getPromptSelectionKey(item, promptRowMode),
+          ),
+        ),
+      ),
     );
   };
 
@@ -673,23 +959,39 @@ export function usePromptsResponsesState(apiBaseURL: string) {
 
   const applyBulkStatus = (status: PromptItem["status"]) => {
     if (selectedPromptIds.length === 0) return;
-    setManualPrompts((prev) =>
-      prev.map((item) =>
-        selectedPromptIds.includes(item.sourcePromptId || item.id) ? { ...item, status } : item,
+    const targetPromptIds = Array.from(
+      new Set(
+        filteredPromptRows
+          .filter((item) =>
+            selectedPromptIds.includes(getPromptSelectionKey(item, promptRowMode)),
+          )
+          .map((item) => item.sourcePromptId || item.id),
       ),
     );
-    setPromptStatusOverrides((prev) => {
-      const next = { ...prev };
-      for (const id of selectedPromptIds) {
-        next[id] = status;
-      }
-      return next;
-    });
+    if (targetPromptIds.length === 0) return;
+    const manualPromptIds = new Set(manualPrompts.map((item) => item.sourcePromptId || item.id));
+    const localPromptIds = targetPromptIds.filter((id) => manualPromptIds.has(id));
+    const serverPromptIds = targetPromptIds.filter((id) => !manualPromptIds.has(id));
+
+    if (localPromptIds.length > 0) {
+      setManualPrompts((prev) =>
+        prev.map((item) =>
+          localPromptIds.includes(item.sourcePromptId || item.id)
+            ? { ...item, status }
+            : item,
+        ),
+      );
+    }
+
+    if (serverPromptIds.length > 0 && organizationId && activeProjectId) {
+      bulkPromptStatusMutation.mutate({ promptIds: serverPromptIds, status });
+    }
   };
 
   const createPrompt = () => {
     if (!formPrompt.trim()) return;
     const nextId = `p${Date.now()}`;
+    const schedule = defaultPromptSchedule();
     const newPrompt: PromptItem = {
       id: nextId,
       sourcePromptId: nextId,
@@ -697,7 +999,11 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       prompt: formPrompt.trim(),
       stage: "Awareness",
       persona: formPersona || undefined,
-      models: formModel ? [formModel] : [],
+      models: dedupeModels(formModels),
+      schedule,
+      effectiveCron: schedule.cron,
+      effectiveScheduleLabel: promptScheduleLabel(schedule),
+      effectiveScheduleSource: "global",
       mentionRate: 0,
       rank: 9.9,
       sov: 0,
@@ -710,7 +1016,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setPromptPage(1);
     setFormPrompt("");
     setFormPersona(availablePersonas[0] || "");
-    setFormModel(availableModels[0] || "");
+    setFormModels(availableModels.slice(0, 1));
     setIsCreateOpen(false);
   };
 
@@ -739,12 +1045,69 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     if (selectedPromptId === id) setSelectedPromptId(null);
   };
 
+  const updatePromptModels = (promptId: string, modelIds: AIModel[]) => {
+    const nextModels = dedupeModels(modelIds).filter((model) =>
+      availableModels.includes(model),
+    );
+    const resolvedModels =
+      nextModels.length > 0 ? nextModels : availableModels.slice(0, 1);
+    const manualPromptIds = new Set(
+      manualPrompts.map((item) => item.sourcePromptId || item.id),
+    );
+
+    if (manualPromptIds.has(promptId)) {
+      setManualPrompts((prev) =>
+        prev.map((item) =>
+          (item.sourcePromptId || item.id) === promptId
+            ? { ...item, models: resolvedModels }
+            : item,
+        ),
+      );
+      setEditingPromptModelsId(null);
+      return;
+    }
+
+    if (!organizationId || !activeProjectId) return;
+    updatePromptModelsMutation.mutate({ promptId, modelIds: resolvedModels });
+  };
+
+  const updatePromptSchedule = (promptId: string, schedule: PromptSchedule) => {
+    const manualPromptIds = new Set(
+      manualPrompts.map((item) => item.sourcePromptId || item.id),
+    );
+
+    if (manualPromptIds.has(promptId)) {
+      setManualPrompts((prev) =>
+        prev.map((item) =>
+          (item.sourcePromptId || item.id) === promptId
+            ? {
+                ...item,
+                schedule,
+                effectiveCron: schedule.cron,
+                effectiveScheduleLabel: promptScheduleLabel(schedule),
+                effectiveScheduleSource: "global",
+              }
+            : item,
+        ),
+      );
+      setEditingPromptScheduleId(null);
+      return;
+    }
+
+    if (!organizationId || !activeProjectId) return;
+    updatePromptScheduleMutation.mutate({ promptId, schedule });
+  };
+
   const loadMoreResponses = () => {
     setResponseVisibleCount((current) => Math.min(current + RESPONSES_BATCH_SIZE, filteredResponses.length));
   };
 
   const promptsLoading =
-    promptsCatalogQuery.isLoading || (promptsCatalogQuery.isFetching && !promptsCatalogQuery.data);
+    promptsCatalogQuery.isLoading ||
+    (promptsCatalogQuery.isFetching && !promptsCatalogQuery.data) ||
+    bulkPromptStatusMutation.isPending ||
+    updatePromptModelsMutation.isPending ||
+    updatePromptScheduleMutation.isPending;
 
   return {
     mode,
@@ -777,6 +1140,8 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     allModelsSelected,
     modelsPopoverOpen,
     setModelsPopoverOpen,
+    showArchived,
+    setShowArchived,
     hasActiveGlobalFilters,
     clearFilters,
     toggleModel,
@@ -785,6 +1150,8 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     changePromptSort,
     promptRowMode,
     setPromptRowMode,
+    getPromptSelectionKey: (item: PromptItem) =>
+      getPromptSelectionKey(item, promptRowMode),
     toggleSelectAllPrompts,
     togglePromptSelection,
     applyBulkStatus,
@@ -807,9 +1174,17 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setFormPrompt,
     formPersona,
     setFormPersona,
-    formModel,
-    setFormModel,
+    formModels,
+    setFormModels,
     createPrompt,
+    editingPromptModelsId,
+    setEditingPromptModelsId,
+    updatePromptModels,
+    updatingPromptModels: updatePromptModelsMutation.isPending,
+    editingPromptScheduleId,
+    setEditingPromptScheduleId,
+    updatePromptSchedule,
+    updatingPromptSchedule: updatePromptScheduleMutation.isPending,
     addAutoGeneratedPrompts,
     addImportedPrompts,
     getModelVisual,

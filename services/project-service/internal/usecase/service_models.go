@@ -91,14 +91,26 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 		}
 	}
 
-	previous := s.projectModels[projectID]
+	backup := s.snapshotLocked()
 	replacement := make(map[string]bool, len(normalized))
 	for _, modelID := range normalized {
 		replacement[modelID] = true
 	}
 	s.projectModels[projectID] = replacement
+	for _, prompt := range s.prompts {
+		if prompt.ProjectID != projectID {
+			continue
+		}
+		prompt.ModelIDs = effectivePromptModelIDs(prompt, normalized)
+		schedule, err := normalizePromptSchedule(prompt.Schedule, prompt.ModelIDs)
+		if err != nil {
+			s.restoreLocked(backup)
+			return ReplaceProjectModelsResult{}, err
+		}
+		prompt.Schedule = schedule
+	}
 	if err := s.persistLocked(ctx); err != nil {
-		s.projectModels[projectID] = previous
+		s.restoreLocked(backup)
 		return ReplaceProjectModelsResult{}, err
 	}
 
