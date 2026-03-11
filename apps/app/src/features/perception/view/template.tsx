@@ -62,16 +62,24 @@ function PerceptionLoadingState({ brandCanonMode }: { brandCanonMode: boolean })
           <Card>
             <CardContent className="space-y-4 p-6">
               <Skeleton className="h-8 w-48" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-28 w-full" />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
-                <Skeleton className="h-10 w-full" />
+              <div className="flex gap-2">
+                <Skeleton className="h-9 w-20 rounded-xl" />
+                <Skeleton className="h-9 w-24 rounded-xl" />
+                <Skeleton className="h-9 w-28 rounded-xl" />
               </div>
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-24 w-full" />
+              <div className="grid gap-4 lg:grid-cols-2">
+                <Skeleton className="h-28 w-full rounded-xl" />
+                <Skeleton className="h-28 w-full rounded-xl" />
+              </div>
+              <Skeleton className="h-44 w-full rounded-xl" />
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Skeleton className="h-56 w-full rounded-xl" />
+                <Skeleton className="h-56 w-full rounded-xl" />
+              </div>
+              <div className="flex items-center justify-between gap-4">
+                <Skeleton className="h-4 w-64" />
+                <Skeleton className="h-9 w-28 rounded-xl" />
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -243,21 +251,25 @@ function PerceptionUnavailableState({
             <CardHeader className="pb-3">
               <CardTitle>Éditeur du référentiel de marque</CardTitle>
               <CardDescription>
-                Modifiez la source de vérité de la marque : catégorie, audience, cas d'usage, pricing et fonctionnalités.
+                Modifiez la source de vérité de la marque : catégorie, audience, cas d'usage, fonctionnalités et concurrents.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 p-6 pt-0">
               <FiltersEmptyStateCard label={errorLabel} className="h-24 text-sm" />
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-28 text-sm" />
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
-                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
-                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
+              <div className="flex gap-3">
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 w-24 text-sm" />
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 w-28 text-sm" />
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-10 w-32 text-sm" />
               </div>
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-10 text-sm" />
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-24 text-sm" />
+              <div className="grid gap-3 lg:grid-cols-2">
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-28 text-sm" />
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-28 text-sm" />
+              </div>
+              <FiltersEmptyStateCard label="Aucune donnée" className="h-40 text-sm" />
+              <div className="grid gap-3 xl:grid-cols-2">
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-32 text-sm" />
+                <FiltersEmptyStateCard label="Aucune donnée" className="h-32 text-sm" />
+              </div>
             </CardContent>
           </Card>
         </div>

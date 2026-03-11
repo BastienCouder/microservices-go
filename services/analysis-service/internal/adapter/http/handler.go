@@ -81,6 +81,10 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getDashboard(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "perception" && r.Method == http.MethodGet:
 		h.getPerception(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
+		h.getBrandCanon(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
+		h.updateBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "alerts" && r.Method == http.MethodGet:
 		h.listAlerts(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "alerts" && r.Method == http.MethodPost:
@@ -271,6 +275,60 @@ func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectI
 		return
 	}
 	writeSuccess(w, http.StatusOK, perception)
+}
+
+func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	brandCanon, err := h.svc.GetBrandCanon(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, brandCanon)
+}
+
+type updateBrandCanonRequest struct {
+	BrandName   *string         `json:"brandName"`
+	Category    *string         `json:"category"`
+	Positioning *string         `json:"positioning"`
+	Audience    *[]string       `json:"audience"`
+	UseCases    *[]string       `json:"useCases"`
+	Pricing     *map[string]any `json:"pricing"`
+	Features    *[]string       `json:"features"`
+}
+
+func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req updateBrandCanonRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	brandCanon, err := h.svc.UpdateBrandCanon(r.Context(), projectID, organizationID, usecase.UpdateBrandCanonInput{
+		BrandName:   req.BrandName,
+		Category:    req.Category,
+		Positioning: req.Positioning,
+		Audience:    req.Audience,
+		UseCases:    req.UseCases,
+		Pricing:     req.Pricing,
+		Features:    req.Features,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, brandCanon)
 }
 
 type createAlertRequest struct {

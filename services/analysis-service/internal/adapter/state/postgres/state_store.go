@@ -16,17 +16,18 @@ import (
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq                int64                          `json:"seq"`
-	Runs               map[string]*usecase.AnalysisRun `json:"runs"`
-	RunsByProject      map[string][]string            `json:"runsByProject"`
-	PromptRuns         map[string]*usecase.PromptRun  `json:"promptRuns"`
-	PromptRunsByRun    map[string][]string            `json:"promptRunsByRun"`
-	Responses          map[string]*usecase.AIResponse `json:"responses"`
-	ResponsesByRun     map[string][]string            `json:"responsesByRun"`
-	ResponseIndexByRun map[string]map[string]string   `json:"responseIndexByRun"`
-	RunByRequest       map[string]string              `json:"runByRequest"`
-	Alerts             map[string]*usecase.Alert      `json:"alerts"`
-	AlertsByProject    map[string][]string            `json:"alertsByProject"`
+	Seq                 int64                           `json:"seq"`
+	Runs                map[string]*usecase.AnalysisRun `json:"runs"`
+	RunsByProject       map[string][]string             `json:"runsByProject"`
+	PromptRuns          map[string]*usecase.PromptRun   `json:"promptRuns"`
+	PromptRunsByRun     map[string][]string             `json:"promptRunsByRun"`
+	Responses           map[string]*usecase.AIResponse  `json:"responses"`
+	ResponsesByRun      map[string][]string             `json:"responsesByRun"`
+	ResponseIndexByRun  map[string]map[string]string    `json:"responseIndexByRun"`
+	RunByRequest        map[string]string               `json:"runByRequest"`
+	Alerts              map[string]*usecase.Alert       `json:"alerts"`
+	AlertsByProject     map[string][]string             `json:"alertsByProject"`
+	BrandCanonByProject map[string]*usecase.BrandCanon  `json:"brandCanonByProject"`
 }
 
 type StateStore struct {
@@ -39,16 +40,17 @@ func NewStateStore(db *pgxpool.Pool) *StateStore {
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	state := persistedState{
-		Runs:               make(map[string]*usecase.AnalysisRun),
-		RunsByProject:      make(map[string][]string),
-		PromptRuns:         make(map[string]*usecase.PromptRun),
-		PromptRunsByRun:    make(map[string][]string),
-		Responses:          make(map[string]*usecase.AIResponse),
-		ResponsesByRun:     make(map[string][]string),
-		ResponseIndexByRun: make(map[string]map[string]string),
-		RunByRequest:       make(map[string]string),
-		Alerts:             make(map[string]*usecase.Alert),
-		AlertsByProject:    make(map[string][]string),
+		Runs:                make(map[string]*usecase.AnalysisRun),
+		RunsByProject:       make(map[string][]string),
+		PromptRuns:          make(map[string]*usecase.PromptRun),
+		PromptRunsByRun:     make(map[string][]string),
+		Responses:           make(map[string]*usecase.AIResponse),
+		ResponsesByRun:      make(map[string][]string),
+		ResponseIndexByRun:  make(map[string]map[string]string),
+		RunByRequest:        make(map[string]string),
+		Alerts:              make(map[string]*usecase.Alert),
+		AlertsByProject:     make(map[string][]string),
+		BrandCanonByProject: make(map[string]*usecase.BrandCanon),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -73,6 +75,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadAlerts(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadBrandCanon(ctx, &state); err != nil {
 		return nil, false, err
 	}
 
@@ -109,6 +114,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	}
 
 	for _, statement := range []string{
+		`DELETE FROM brand_canon`,
 		`DELETE FROM alerts`,
 		`DELETE FROM ai_responses`,
 		`DELETE FROM prompt_runs`,
@@ -129,6 +135,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertAlerts(ctx, tx, state.Alerts); err != nil {
+		return err
+	}
+	if err := insertBrandCanon(ctx, tx, state.BrandCanonByProject); err != nil {
 		return err
 	}
 
@@ -286,6 +295,57 @@ func (s *StateStore) loadAlerts(ctx context.Context, state *persistedState) erro
 	return rows.Err()
 }
 
+func (s *StateStore) loadBrandCanon(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, brand_name, category, positioning, audience, use_cases, pricing, features, created_at, updated_at
+		FROM brand_canon
+		ORDER BY project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select brand canon: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item        usecase.BrandCanon
+			brandName   *string
+			category    *string
+			positioning *string
+			rawAudience []byte
+			rawUseCases []byte
+			rawPricing  []byte
+			rawFeatures []byte
+		)
+		if err := rows.Scan(
+			&item.ProjectID,
+			&brandName,
+			&category,
+			&positioning,
+			&rawAudience,
+			&rawUseCases,
+			&rawPricing,
+			&rawFeatures,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan brand canon: %w", err)
+		}
+
+		item.BrandName = stringValue(brandName)
+		item.Category = stringValue(category)
+		item.Positioning = stringValue(positioning)
+		item.Audience = decodeStringSlice(rawAudience)
+		item.UseCases = decodeStringSlice(rawUseCases)
+		item.Pricing = decodeMap(rawPricing)
+		item.Features = decodeStringSlice(rawFeatures)
+
+		canon := item
+		state.BrandCanonByProject[item.ProjectID] = &canon
+	}
+	return rows.Err()
+}
+
 func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase.AnalysisRun, runByRequest map[string]string) error {
 	requestIDs := reverseRunRequestMap(runByRequest)
 	for _, runID := range sortedAnalysisRunIDs(runs) {
@@ -344,6 +404,36 @@ func insertAlerts(ctx context.Context, tx pgx.Tx, alerts map[string]*usecase.Ale
 	return nil
 }
 
+func insertBrandCanon(ctx context.Context, tx pgx.Tx, canonByProject map[string]*usecase.BrandCanon) error {
+	for _, projectID := range sortedBrandCanonProjectIDs(canonByProject) {
+		canon := canonByProject[projectID]
+		audience, err := json.Marshal(canon.Audience)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon audience for project %s: %w", projectID, err)
+		}
+		useCases, err := json.Marshal(canon.UseCases)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon use cases for project %s: %w", projectID, err)
+		}
+		pricing, err := json.Marshal(canon.Pricing)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon pricing for project %s: %w", projectID, err)
+		}
+		features, err := json.Marshal(canon.Features)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon features for project %s: %w", projectID, err)
+		}
+
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO brand_canon (project_id, brand_name, category, positioning, audience, use_cases, pricing, features, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)
+		`, canon.ProjectID, nullIfEmpty(canon.BrandName), nullIfEmpty(canon.Category), nullIfEmpty(canon.Positioning), string(audience), string(useCases), string(pricing), string(features), canon.CreatedAt, canon.UpdatedAt); err != nil {
+			return fmt.Errorf("insert brand canon for project %s: %w", projectID, err)
+		}
+	}
+	return nil
+}
+
 func reverseRunRequestMap(runByRequest map[string]string) map[string]string {
 	reversed := make(map[string]string, len(runByRequest))
 	for key, runID := range runByRequest {
@@ -395,9 +485,58 @@ func sortedAlertIDs(items map[string]*usecase.Alert) []string {
 	return ids
 }
 
+func sortedBrandCanonProjectIDs(items map[string]*usecase.BrandCanon) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
 func nullableString(value string) any {
 	if value == "" {
 		return nil
 	}
 	return value
+}
+
+func nullIfEmpty(value string) any {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil
+	}
+	return trimmed
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
+}
+
+func decodeStringSlice(raw []byte) []string {
+	if len(raw) == 0 {
+		return []string{}
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return []string{}
+	}
+	return values
+}
+
+func decodeMap(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	var values map[string]any
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return map[string]any{}
+	}
+	if values == nil {
+		return map[string]any{}
+	}
+	return values
 }

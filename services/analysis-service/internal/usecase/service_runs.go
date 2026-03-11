@@ -337,8 +337,13 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	if err != nil {
 		return PerceptionData{}, err
 	}
+	brandCanon, err := s.GetBrandCanon(ctx, projectID, organizationID)
+	if err != nil {
+		return PerceptionData{}, err
+	}
 
 	var result PerceptionData
+	result.BrandCanon = brandCanon
 	result.Metadata = map[string]any{
 		"projectId":   projectID,
 		"generatedAt": time.Now().UTC().Format(time.RFC3339Nano),

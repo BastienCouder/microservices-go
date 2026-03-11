@@ -186,6 +186,23 @@ func copyAlert(alert *Alert) Alert {
 	return *alert
 }
 
+func copyBrandCanon(canon *BrandCanon) BrandCanon {
+	if canon == nil {
+		return BrandCanon{}
+	}
+	out := *canon
+	out.Audience = append([]string(nil), canon.Audience...)
+	out.UseCases = append([]string(nil), canon.UseCases...)
+	out.Features = append([]string(nil), canon.Features...)
+	if canon.Pricing != nil {
+		out.Pricing = make(map[string]any, len(canon.Pricing))
+		for key, value := range canon.Pricing {
+			out.Pricing[key] = value
+		}
+	}
+	return out
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -219,6 +236,18 @@ func nonNilAlertMap(input map[string]*Alert) map[string]*Alert {
 		return make(map[string]*Alert)
 	}
 	return input
+}
+
+func nonNilBrandCanonMap(input map[string]*BrandCanon) map[string]*BrandCanon {
+	if input == nil {
+		return make(map[string]*BrandCanon)
+	}
+	out := make(map[string]*BrandCanon, len(input))
+	for key, value := range input {
+		clone := copyBrandCanon(value)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilSliceMap(input map[string][]string) map[string][]string {

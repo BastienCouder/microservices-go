@@ -10,17 +10,18 @@ import (
 
 func NewService() *Service {
 	return &Service{
-		now:                time.Now,
-		runs:               make(map[string]*AnalysisRun),
-		runsByProject:      make(map[string][]string),
-		promptRuns:         make(map[string]*PromptRun),
-		promptRunsByRun:    make(map[string][]string),
-		responses:          make(map[string]*AIResponse),
-		responsesByRun:     make(map[string][]string),
-		responseIndexByRun: make(map[string]map[string]string),
-		runByRequest:       make(map[string]string),
-		alerts:             make(map[string]*Alert),
-		alertsByProject:    make(map[string][]string),
+		now:                 time.Now,
+		runs:                make(map[string]*AnalysisRun),
+		runsByProject:       make(map[string][]string),
+		promptRuns:          make(map[string]*PromptRun),
+		promptRunsByRun:     make(map[string][]string),
+		responses:           make(map[string]*AIResponse),
+		responsesByRun:      make(map[string][]string),
+		responseIndexByRun:  make(map[string]map[string]string),
+		runByRequest:        make(map[string]string),
+		alerts:              make(map[string]*Alert),
+		alertsByProject:     make(map[string][]string),
+		brandCanonByProject: make(map[string]*BrandCanon),
 	}
 }
 
@@ -67,17 +68,18 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 
 func (s *Service) snapshotLocked() *persistedState {
 	state := &persistedState{
-		Seq:                s.seq,
-		Runs:               make(map[string]*AnalysisRun, len(s.runs)),
-		RunsByProject:      make(map[string][]string, len(s.runsByProject)),
-		PromptRuns:         make(map[string]*PromptRun, len(s.promptRuns)),
-		PromptRunsByRun:    make(map[string][]string, len(s.promptRunsByRun)),
-		Responses:          make(map[string]*AIResponse, len(s.responses)),
-		ResponsesByRun:     make(map[string][]string, len(s.responsesByRun)),
-		ResponseIndexByRun: make(map[string]map[string]string, len(s.responseIndexByRun)),
-		RunByRequest:       make(map[string]string, len(s.runByRequest)),
-		Alerts:             make(map[string]*Alert, len(s.alerts)),
-		AlertsByProject:    make(map[string][]string, len(s.alertsByProject)),
+		Seq:                 s.seq,
+		Runs:                make(map[string]*AnalysisRun, len(s.runs)),
+		RunsByProject:       make(map[string][]string, len(s.runsByProject)),
+		PromptRuns:          make(map[string]*PromptRun, len(s.promptRuns)),
+		PromptRunsByRun:     make(map[string][]string, len(s.promptRunsByRun)),
+		Responses:           make(map[string]*AIResponse, len(s.responses)),
+		ResponsesByRun:      make(map[string][]string, len(s.responsesByRun)),
+		ResponseIndexByRun:  make(map[string]map[string]string, len(s.responseIndexByRun)),
+		RunByRequest:        make(map[string]string, len(s.runByRequest)),
+		Alerts:              make(map[string]*Alert, len(s.alerts)),
+		AlertsByProject:     make(map[string][]string, len(s.alertsByProject)),
+		BrandCanonByProject: make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 	}
 
 	for key, value := range s.runs {
@@ -119,6 +121,10 @@ func (s *Service) snapshotLocked() *persistedState {
 	for key, ids := range s.alertsByProject {
 		state.AlertsByProject[key] = append([]string(nil), ids...)
 	}
+	for key, value := range s.brandCanonByProject {
+		clone := copyBrandCanon(value)
+		state.BrandCanonByProject[key] = &clone
+	}
 
 	return state
 }
@@ -138,6 +144,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.runByRequest = nonNilRunByRequestMap(state.RunByRequest)
 	s.alerts = nonNilAlertMap(state.Alerts)
 	s.alertsByProject = nonNilSliceMap(state.AlertsByProject)
+	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 }
 
 func (s *Service) persistLocked(ctx context.Context) error {

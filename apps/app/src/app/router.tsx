@@ -73,10 +73,6 @@ const SIDEBAR_FEATURE_ROUTES = [
     View: PagesPage,
   },
   {
-    path: "/brands",
-    View: BrandsPage,
-  },
-  {
     path: "/optimize/actions",
     View: OptimizeActionsPage,
   },
@@ -134,6 +130,14 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         element={
           <Suspense fallback={null}>
             <PerceptionPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/brands"
+        element={
+          <Suspense fallback={null}>
+            <BrandsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

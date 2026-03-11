@@ -17,6 +17,7 @@ export const apiRoutes = {
   projects: {
     list: () => "/projects",
     get: (projectId: string) => `/projects/${projectId}`,
+    competitors: (projectId: string) => `/projects/${projectId}/competitors`,
     promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
     prompts: (
@@ -33,6 +34,10 @@ export const apiRoutes = {
   },
   prompts: {
     update: (promptId: string) => `/prompts/${promptId}`,
+  },
+  competitors: {
+    update: (competitorId: string) => `/competitors/${competitorId}`,
+    delete: (competitorId: string) => `/competitors/${competitorId}`,
   },
   aiModels: {
     list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,

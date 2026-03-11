@@ -36,6 +36,12 @@ export type BrandCanon = {
   features: string[];
 };
 
+export type BrandCompetitor = {
+  id?: string;
+  name: string;
+  website: string;
+};
+
 export type PerceptionRadarPoint = {
   axis: PerceptionAxisKey;
   label: string;
@@ -109,6 +115,7 @@ export type PerceptionResponseRecord = {
 export type PerceptionViewData = {
   source: "project" | "fallback" | "demo";
   brandCanon: BrandCanon;
+  competitors: BrandCompetitor[];
   radar: PerceptionRadarPoint[];
   scores: PerceptionScores;
   topErrors: PerceptionError[];
@@ -163,7 +170,7 @@ type ParsedResponse = {
   };
 };
 
-type DashboardRequestScope = "projects" | "project" | "models" | "dashboard" | "perception";
+type DashboardRequestScope = "projects" | "project" | "models" | "competitors" | "dashboard" | "perception";
 
 type TrendAccumulator = {
   positioning: number;
@@ -460,6 +467,19 @@ function deriveBrandCanon(projectPayload: unknown): BrandCanon {
     },
     features: [],
   };
+}
+
+function parseCompetitors(payload: unknown): BrandCompetitor[] {
+  return asArray(payload)
+    .map(asObject)
+    .map((row) => ({
+      id: asString(getField(row, ["id", "ID"])).trim() || undefined,
+      name: asString(getField(row, ["name", "Name"])).trim(),
+      website:
+        asString(getField(row, ["websiteUrl", "WebsiteURL"])).trim() ||
+        asString(getField(row, ["domain", "Domain"])).trim(),
+    }))
+    .filter((entry) => entry.name !== "");
 }
 
 function deriveRadar(
@@ -986,6 +1006,7 @@ export function derivePerceptionTrendSeries(
 
 function buildPerceptionBase(
   projectPayload: unknown,
+  competitorsPayload: unknown,
   dashboardPayload: unknown,
   perceptionPayload: PerceptionApiPayload,
   modelNamesById: Map<string, string>,
@@ -1004,6 +1025,7 @@ function buildPerceptionBase(
     new Date();
 
   const brandCanon = deriveBrandCanon(projectPayload);
+  const competitors = parseCompetitors(competitorsPayload);
   const scores = deriveScores(perceptionPayload, responses);
   const radar = deriveRadar(perceptionPayload, responses);
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, modelNamesById);
@@ -1016,6 +1038,7 @@ function buildPerceptionBase(
   return {
     source: "project",
     brandCanon,
+    competitors,
     radar,
     scores,
     topErrors,
@@ -1069,6 +1092,7 @@ function mergePerceptionData(
     ...base,
     source: "project",
     brandCanon,
+    competitors: base.competitors,
     radar,
     scores: {
       positioningAccuracy: clampScore(asNumber(payload.scores?.positioningAccuracy ?? base.scores.positioningAccuracy)),
@@ -1124,12 +1148,16 @@ export async function loadPerceptionData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [projectRes, modelsRes, dashboardRes, perceptionRes] = await Promise.all([
+  const [projectRes, modelsRes, competitorsRes, dashboardRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.get(encodedProjectId), {
       method: "GET",
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(encodedProjectId), {
+      method: "GET",
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.competitors(encodedProjectId), {
       method: "GET",
       signal: options?.signal,
     }),
@@ -1145,11 +1173,12 @@ export async function loadPerceptionData(
 
   const projectPayload = unwrapRequiredEnvelope(projectRes, "project");
   const modelsPayload = unwrapRequiredEnvelope(modelsRes, "models");
+  const competitorsPayload = unwrapRequiredEnvelope(competitorsRes, "competitors");
   const dashboardPayload = unwrapRequiredEnvelope(dashboardRes, "dashboard");
   const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayload;
 
   const modelNamesById = parseModels(modelsPayload);
-  const base = buildPerceptionBase(projectPayload, dashboardPayload, perceptionPayload, modelNamesById, mode, projectId);
+  const base = buildPerceptionBase(projectPayload, competitorsPayload, dashboardPayload, perceptionPayload, modelNamesById, mode, projectId);
 
   return {
     data: mergePerceptionData(base, perceptionPayload, mode, projectId),

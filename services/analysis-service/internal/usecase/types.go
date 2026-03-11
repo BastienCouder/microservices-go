@@ -57,13 +57,13 @@ type AIResponse struct {
 }
 
 type StartAnalysisInput struct {
-	RequestID   string
+	RequestID      string
 	OrganizationID int64
-	CreatedBy   int64
-	ProjectID   string
-	PromptTexts []PromptText
-	ModelIDs    []string
-	RunType     string
+	CreatedBy      int64
+	ProjectID      string
+	PromptTexts    []PromptText
+	ModelIDs       []string
+	RunType        string
 }
 
 type StartAnalysisResult struct {
@@ -97,7 +97,31 @@ type PerceptionData struct {
 		FactualAccuracy     int `json:"factualAccuracy"`
 		SentimentScore      int `json:"sentimentScore"`
 	} `json:"scores"`
-	Metadata map[string]any `json:"metadata"`
+	BrandCanon BrandCanon     `json:"brandCanon"`
+	Metadata   map[string]any `json:"metadata"`
+}
+
+type BrandCanon struct {
+	ProjectID   string         `json:"projectId,omitempty"`
+	BrandName   string         `json:"brandName,omitempty"`
+	Category    string         `json:"category,omitempty"`
+	Positioning string         `json:"positioning,omitempty"`
+	Audience    []string       `json:"audience,omitempty"`
+	UseCases    []string       `json:"useCases,omitempty"`
+	Pricing     map[string]any `json:"pricing,omitempty"`
+	Features    []string       `json:"features,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
+}
+
+type UpdateBrandCanonInput struct {
+	BrandName   *string
+	Category    *string
+	Positioning *string
+	Audience    *[]string
+	UseCases    *[]string
+	Pricing     *map[string]any
+	Features    *[]string
 }
 
 type AnalysisRunDetails struct {
@@ -141,43 +165,45 @@ type ProjectAccessVerifier interface {
 }
 
 type Dependencies struct {
-	Store           StateStore
-	DashboardCache  DashboardCache
+	Store             StateStore
+	DashboardCache    DashboardCache
 	DashboardCacheTTL time.Duration
-	ProjectVerifier ProjectAccessVerifier
+	ProjectVerifier   ProjectAccessVerifier
 }
 
 type persistedState struct {
-	Seq                int64                        `json:"seq"`
-	Runs               map[string]*AnalysisRun      `json:"runs"`
-	RunsByProject      map[string][]string          `json:"runsByProject"`
-	PromptRuns         map[string]*PromptRun        `json:"promptRuns"`
-	PromptRunsByRun    map[string][]string          `json:"promptRunsByRun"`
-	Responses          map[string]*AIResponse       `json:"responses"`
-	ResponsesByRun     map[string][]string          `json:"responsesByRun"`
-	ResponseIndexByRun map[string]map[string]string `json:"responseIndexByRun"`
-	RunByRequest       map[string]string            `json:"runByRequest"`
-	Alerts             map[string]*Alert            `json:"alerts"`
-	AlertsByProject    map[string][]string          `json:"alertsByProject"`
+	Seq                 int64                        `json:"seq"`
+	Runs                map[string]*AnalysisRun      `json:"runs"`
+	RunsByProject       map[string][]string          `json:"runsByProject"`
+	PromptRuns          map[string]*PromptRun        `json:"promptRuns"`
+	PromptRunsByRun     map[string][]string          `json:"promptRunsByRun"`
+	Responses           map[string]*AIResponse       `json:"responses"`
+	ResponsesByRun      map[string][]string          `json:"responsesByRun"`
+	ResponseIndexByRun  map[string]map[string]string `json:"responseIndexByRun"`
+	RunByRequest        map[string]string            `json:"runByRequest"`
+	Alerts              map[string]*Alert            `json:"alerts"`
+	AlertsByProject     map[string][]string          `json:"alertsByProject"`
+	BrandCanonByProject map[string]*BrandCanon       `json:"brandCanonByProject"`
 }
 
 type Service struct {
-	mu                 sync.RWMutex
-	now                func() time.Time
-	seq                int64
-	runs               map[string]*AnalysisRun
-	runsByProject      map[string][]string
-	promptRuns         map[string]*PromptRun
-	promptRunsByRun    map[string][]string
-	responses          map[string]*AIResponse
-	responsesByRun     map[string][]string
-	responseIndexByRun map[string]map[string]string
-	runByRequest       map[string]string
-	alerts             map[string]*Alert
-	alertsByProject    map[string][]string
+	mu                  sync.RWMutex
+	now                 func() time.Time
+	seq                 int64
+	runs                map[string]*AnalysisRun
+	runsByProject       map[string][]string
+	promptRuns          map[string]*PromptRun
+	promptRunsByRun     map[string][]string
+	responses           map[string]*AIResponse
+	responsesByRun      map[string][]string
+	responseIndexByRun  map[string]map[string]string
+	runByRequest        map[string]string
+	alerts              map[string]*Alert
+	alertsByProject     map[string][]string
+	brandCanonByProject map[string]*BrandCanon
 
-	store           StateStore
-	dashboardCache  DashboardCache
+	store             StateStore
+	dashboardCache    DashboardCache
 	dashboardCacheTTL time.Duration
-	projectVerifier ProjectAccessVerifier
+	projectVerifier   ProjectAccessVerifier
 }

@@ -267,6 +267,103 @@ func TestGetDashboardAggregatesAllProjectRuns(t *testing.T) {
 	}
 }
 
+func TestUpdateBrandCanonPersistsAndNormalizesLists(t *testing.T) {
+	store := &mutableAnalysisStore{}
+	ctx := context.Background()
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{Store: store})
+	if err != nil {
+		t.Fatalf("new service with store: %v", err)
+	}
+
+	brandName := " Acme "
+	category := " CRM "
+	positioning := " CRM simple pour PME "
+	audience := []string{"PME", " PME ", "", "Direction commerciale"}
+	useCases := []string{"Prospection", "prospection", "Pilotage"}
+	features := []string{"Automatisation", "automatisation", "Reporting"}
+	pricing := map[string]any{"plan": "pro", "amount": 49}
+
+	updated, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		Audience:    &audience,
+		UseCases:    &useCases,
+		Features:    &features,
+		Pricing:     &pricing,
+	})
+	if err != nil {
+		t.Fatalf("update brand canon: %v", err)
+	}
+
+	if updated.BrandName != "Acme" {
+		t.Fatalf("expected trimmed brand name, got %q", updated.BrandName)
+	}
+	if updated.Category != "CRM" {
+		t.Fatalf("expected trimmed category, got %q", updated.Category)
+	}
+	if len(updated.Audience) != 2 {
+		t.Fatalf("expected 2 normalized audience items, got %v", updated.Audience)
+	}
+	if len(updated.UseCases) != 2 {
+		t.Fatalf("expected 2 normalized use cases, got %v", updated.UseCases)
+	}
+	if len(updated.Features) != 2 {
+		t.Fatalf("expected 2 normalized features, got %v", updated.Features)
+	}
+
+	reloaded, err := NewServiceWithDependencies(ctx, Dependencies{Store: store})
+	if err != nil {
+		t.Fatalf("reload service with store: %v", err)
+	}
+
+	canon, err := reloaded.GetBrandCanon(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get brand canon after reload: %v", err)
+	}
+	if canon.BrandName != "Acme" {
+		t.Fatalf("expected persisted brand name, got %q", canon.BrandName)
+	}
+	if got := canon.Pricing["plan"]; got != "pro" {
+		t.Fatalf("expected persisted pricing plan, got %#v", got)
+	}
+}
+
+func TestGetPerceptionIncludesBrandCanon(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM pour PME"
+	audience := []string{"PME"}
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		Audience:    &audience,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+	if perception.BrandCanon.BrandName != "Acme" {
+		t.Fatalf("expected brand canon in perception response, got %+v", perception.BrandCanon)
+	}
+	if len(perception.BrandCanon.Audience) != 1 || perception.BrandCanon.Audience[0] != "PME" {
+		t.Fatalf("expected audience in perception response, got %+v", perception.BrandCanon.Audience)
+	}
+}
+
 func TestAlertsReadAll(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
