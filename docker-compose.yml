@@ -38,7 +38,7 @@ services:
     image: microservices-go/doc:prod
     restart: unless-stopped
     ports:
-      - "30001:8080"
+      - "30001:3000"
 
   email:
     profiles: ["email"]

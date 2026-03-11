@@ -6,7 +6,12 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { getModelIconForName, PERCEPTION_TEXT } from "@/lib/app-data";
+import {
+  formatPerceptionErrorTypeLabel,
+  formatPerceptionPriorityLabel,
+  getModelIconForName,
+  PERCEPTION_TEXT,
+} from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { PerceptionError } from "@/lib/perception-data";
 import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
@@ -35,7 +40,7 @@ export function TopErrorsPanel({
           </h4>
         </div>
         <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">
-          {PERCEPTION_TEXT.topErrors.totalPrefix} {errors.length}
+    {errors.length}
         </Badge>
       </div>
 
@@ -72,9 +77,9 @@ export function TopErrorsPanel({
             <div className="flex h-full flex-col">
               <SheetHeader className="border-b border-border/60 p-4 text-left">
                 <div className="mb-2 flex flex-wrap gap-1.5">
-                  <Badge variant="outline">{selectedError.type}</Badge>
+                  <Badge variant="outline">{formatPerceptionErrorTypeLabel(selectedError.type)}</Badge>
                   <Badge variant={selectedError.optimizePriority === "high" ? "destructive" : "secondary"}>
-                    {selectedError.optimizePriority}
+                    {formatPerceptionPriorityLabel(selectedError.optimizePriority)}
                   </Badge>
                   {selectedError.detectedInModels.map((model) => (
                     <Badge

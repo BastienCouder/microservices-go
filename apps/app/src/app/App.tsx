@@ -1,8 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useLocation } from "react-router-dom";
 
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
+import { redirectToWebAuth } from "@/shared/auth/web-auth";
+import { shouldRedirectUnauthenticated } from "./auth-guard";
 import { AppLayout } from "./layout";
 import { AppRouter } from "./router";
 
@@ -20,6 +22,15 @@ export default function App() {
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
+  const mustRedirectToAuth = shouldRedirectUnauthenticated({ apiBaseURL, busy, user });
+
+  useEffect(() => {
+    if (!mustRedirectToAuth) {
+      return;
+    }
+    redirectToWebAuth(window.location.href);
+  }, [mustRedirectToAuth]);
+
   if (!apiBaseURL) {
     return (
       <main className="app-root">
@@ -31,6 +42,10 @@ export default function App() {
         </section>
       </main>
     );
+  }
+
+  if (mustRedirectToAuth) {
+    return null;
   }
 
   if (isOnboardingRoute) {

@@ -64,13 +64,14 @@ export const PERCEPTION_VISIBLE_AXES = [
 
 export const PERCEPTION_AXIS_LABELS = {
   positioning: "Positionnement",
-  use_cases: "Use Cases",
-  features: "Features",
+  use_cases: "Cas d'usage",
+  features: "Fonctionnalités",
   sentiment: "Sentiment",
   competitors: "Concurrents",
 } as const;
 
 export const PERCEPTION_PERIOD_LABELS = {
+  all: "Depuis le début",
   "7d": "7 derniers jours",
   "30d": "30 derniers jours",
   "90d": "90 derniers jours",
@@ -80,12 +81,28 @@ export const PERCEPTION_PERIOD_LABELS = {
 export const PERCEPTION_TEXT = {
   donut: {
     title: "Perception de votre marque",
-    subtitle: "Ecart entre votre Brand Canon et ce que les IA expriment le plus souvent",
+    subtitle: "Lecture rapide du niveau d'alignement de votre marque dans les réponses IA.",
     scoreCaption: "score perception",
+    overallLabel: "Score global",
+    bestAxisLabel: "Point fort",
+    weakestAxisLabel: "Point à renforcer",
+    axisListTitle: "Classement des axes",
+    axisListDescription: "Du mieux compris au plus fragile pour repérer immédiatement où agir.",
+    alignedAxesLabel: "axes au niveau attendu",
+    targetLabel: "Objectif",
+    aboveTarget: "Objectif atteint",
+    belowTarget: "À renforcer",
+    grades: {
+      insufficient: "Insuffisant",
+      fragile: "Fragile",
+      good: "Bien",
+      veryGood: "Très bien",
+      excellent: "Excellent",
+    },
   },
   heatmap: {
-    title: "Heatmap Modèle × Axe",
-    description: "Compare quels modèles comprennent le mieux chaque axe de perception.",
+    title: "Carte de chaleur modèle × axe",
+    description: "Compare les modèles qui comprennent le mieux chaque axe de perception.",
     modelColumn: "Modèle",
     grades: {
       excellent: "Excellent",
@@ -95,37 +112,47 @@ export const PERCEPTION_TEXT = {
     },
   },
   trend: {
-    title: "Trend Perception",
-    descriptionPrefix: "Évolution de Positioning / Factual / Sentiment sur",
-    descriptionSuffix: "pour mesurer l'impact des actions Optimize.",
+    title: "Évolution de la perception",
+    descriptionPrefix: "Évolution de la clarté du positionnement, de la fiabilité des informations et de la tonalité des réponses sur la période",
+    descriptionSuffix: "pour mesurer l'impact des actions d'optimisation.",
     series: {
-      positioning: "Positioning",
-      factual: "Factual",
-      sentiment: "Sentiment",
+      positioning: "Clarté du positionnement",
+      factual: "Fiabilité des informations",
+      sentiment: "Tonalité des réponses",
+    },
+    definitions: {
+      positioning: "Capacité des IA à rattacher correctement la marque à sa catégorie et à sa promesse.",
+      factual: "Fiabilité des informations utilisées par les IA, avec des réponses exactes et vérifiables.",
+      sentiment: "Ton global employé par les IA quand elles parlent de votre marque, du négatif au positif.",
     },
   },
   scoreCards: {
     positioning: {
-      title: "Positioning Accuracy",
-      hint: "% IA qui catégorisent correctement",
+      title: "Clarté du positionnement",
+      hint: "Score moyen actuel sur 100 de la clarté avec laquelle les IA rattachent la marque à son positionnement",
     },
     factual: {
-      title: "Factual Accuracy",
-      hint: "% réponses sans erreur features",
+      title: "Fiabilité des informations",
+      hint: "Score moyen sur 100 du niveau de fiabilité et de vérifiabilité des informations utilisées",
     },
     sentiment: {
-      title: "Sentiment Score",
-      hint: "Score 0-100",
+      title: "Tonalité des réponses",
+      hint: "Score moyen sur 100 du ton employé par les IA quand elles parlent de votre marque",
     },
   },
   leftPanel: {
-    title: "Brand Canon",
+    title: "Référentiel de marque",
+    tabs: {
+      brand: "Marque",
+      filters: "Filtres",
+    },
     source: {
       project: "Projet",
-      fallback: "Fallback",
-      demo: "Demo",
+      fallback: "Repli",
+      demo: "Démo",
     },
-    helper: "Référence utilisée pour comparer ce que les IA disent vs la réalité de la marque.",
+    helper: "Référence utilisée pour comparer ce que les IA disent avec la réalité de la marque.",
+    responsesLabel: "réponses analysées",
   },
   brandCanon: {
     labels: {
@@ -133,43 +160,45 @@ export const PERCEPTION_TEXT = {
       category: "Catégorie réelle",
       positioning: "Positionnement de référence",
       audience: "Audience cible",
-      useCases: "Use Cases prioritaires",
-      features: "Fonctionnalités que l’IA doit citer",
+      useCases: "Cas d'usage prioritaires",
+      features: "Fonctionnalités que l'IA doit citer",
     },
     empty: "Non renseigné",
-    demoHint: "Mode demo : vous pouvez éditer le Brand Canon sur la page dédiée (non persisté).",
-    projectHint: "Astuce : mettez ici des formulations simples et factuelles pour réduire les erreurs IA.",
+    demoHint: "Mode démo : vous pouvez modifier le référentiel sur la page dédiée, sans sauvegarde serveur.",
+    projectHint: "Conseil : utilisez ici des formulations simples et factuelles pour réduire les erreurs des IA.",
   },
   filters: {
     title: "Filtres",
     models: "Modèles",
     all: "Tous",
-    clear: "Clear",
+    clear: "Effacer",
+    reset: "Réinitialiser",
+    groupedMode: "Regrouper IA",
+    uniqueMode: "Par IA",
     showMore: "Voir plus",
     showLess: "Voir moins",
     period: "Période",
-    businessOption: "Option métier Perception",
+    noModels: "Aucun modèle disponible",
   },
   optimizeActions: {
-    title: "Actions Optimize générées",
-    description: "Les boutons [Fix] à droite créent des brouillons d'actions exploitables.",
-    empty: "Aucune action générée pour le moment. Cliquez sur [Fix] dans la colonne de droite.",
-    statusPrefix: "status",
-    createActionError: "Impossible de créer l'action Optimize",
+    title: "Actions d'optimisation générées",
+    description: "Les boutons [Corriger] à droite créent des brouillons d'actions directement exploitables.",
+    empty: "Aucune action générée pour le moment. Cliquez sur [Corriger] dans la colonne de droite.",
+    statusPrefix: "Statut",
+    createActionError: "Impossible de créer l'action d'optimisation",
   },
   topErrors: {
-    title: "Top erreurs détectées",
-    totalPrefix: "total:",
+    title: "Principales erreurs détectées",
     emptyTitle: "Aucune erreur détectée",
-    emptyDescription: "Les réponses IA analysées sont alignées avec votre Brand Canon pour les filtres sélectionnés.",
+    emptyDescription: "Les réponses IA analysées sont alignées avec votre référentiel de marque pour les filtres sélectionnés.",
     seeMore: "Voir plus",
-    sheetDescription: "Détail de l'erreur détectée et action Optimize recommandée.",
-    aiClaim: "Ce que l’IA dit",
+    sheetDescription: "Détail de l'erreur détectée et action d'optimisation recommandée.",
+    aiClaim: "Ce que l'IA dit",
     impact: "Impact",
-    generatedFix: "Contenu généré (Fix)",
-    added: "Ajouté",
-    fix: "Fix",
-    errorPrefix: "Erreur #",
+    generatedFix: "Correction proposée",
+    added: "Ajoutée",
+    fix: "Corriger",
+    errorPrefix: "Erreur n°",
     severity: {
       high: "Critique",
       medium: "Moyenne",
@@ -197,27 +226,23 @@ export const PERCEPTION_SCORE_CARD_COLORS = {
   ringTrack: "hsl(var(--muted) / 0.5)",
 } as const;
 
+export const PERCEPTION_AXIS_COLORS = {
+  positioning: "hsl(var(--chart-perception-positioning))",
+  use_cases: "hsl(var(--chart-perception-use-cases))",
+  features: "hsl(var(--chart-perception-features))",
+  sentiment: "hsl(var(--chart-perception-sentiment))",
+  competitors: "hsl(var(--chart-perception-competitors))",
+} as const;
+
 export const PERCEPTION_DONUT_COLORS = {
-  axis: {
-    positioning: "hsl(var(--chart-perception-positioning))",
-    use_cases: "hsl(var(--chart-perception-use-cases))",
-    sentiment: "hsl(var(--chart-perception-sentiment))",
-    features: "hsl(var(--chart-perception-features))",
-    competitors: "hsl(var(--chart-perception-competitors))",
-  },
+  axis: PERCEPTION_AXIS_COLORS,
   primary: APP_CHART_UI_COLORS.primary,
   primaryMuted: APP_CHART_UI_COLORS.primaryMuted,
   background: APP_CHART_UI_COLORS.background,
   shadow: APP_CHART_UI_COLORS.primary,
 } as const;
 
-export const PERCEPTION_HEATMAP_AXIS_COLORS: Record<string, string> = {
-  positioning: "hsl(var(--chart-perception-positioning))",
-  use_cases: "hsl(var(--chart-perception-use-cases))",
-  features: "hsl(var(--chart-perception-features))",
-  sentiment: "hsl(var(--chart-perception-sentiment))",
-  competitors: "hsl(var(--chart-perception-competitors))",
-};
+export const PERCEPTION_HEATMAP_AXIS_COLORS: Record<string, string> = PERCEPTION_AXIS_COLORS;
 
 export const PERCEPTION_TREND_COLORS = {
   positioning: "hsl(var(--chart-perception-positioning))",
@@ -225,13 +250,89 @@ export const PERCEPTION_TREND_COLORS = {
   sentiment: "hsl(var(--chart-perception-sentiment))",
 } as const;
 
+export const PERCEPTION_PRIORITY_LABELS = {
+  high: "Élevée",
+  medium: "Moyenne",
+  low: "Faible",
+} as const;
+
+export const PERCEPTION_STATUS_LABELS = {
+  draft: "Brouillon",
+  published: "Publiée",
+  processing: "En cours",
+  done: "Terminée",
+} as const;
+
+export const PERCEPTION_FIX_TYPE_LABELS = {
+  prompt_patch: "Ajustement de prompt",
+  website_copy: "Mise à jour du site",
+  schema_update: "Mise à jour du schema",
+  faq_snippet: "Extrait de FAQ",
+} as const;
+
+export const PERCEPTION_ERROR_TYPE_LABELS = {
+  positioning_gap: "Écart de positionnement",
+  citation_gap: "Manque de citations",
+  use_case_gap: "Écart sur les cas d'usage",
+  sentiment_gap: "Écart de sentiment",
+  competitive_gap: "Écart concurrentiel",
+  pricing_gap: "Écart tarifaire",
+  wrong_category: "Mauvaise catégorie",
+  missing_feature: "Fonctionnalité absente",
+  competitor_misattribution: "Confusion concurrentielle",
+} as const;
+
+function sentenceCase(value: string): string {
+  if (!value) return "";
+  return `${value[0]?.toUpperCase() ?? ""}${value.slice(1)}`;
+}
+
+export function formatPerceptionPriorityLabel(value: string): string {
+  const normalized = value.trim().toLowerCase() as keyof typeof PERCEPTION_PRIORITY_LABELS;
+  return PERCEPTION_PRIORITY_LABELS[normalized] ?? sentenceCase(value);
+}
+
+export function formatPerceptionStatusLabel(value: string): string {
+  const normalized = value.trim().toLowerCase() as keyof typeof PERCEPTION_STATUS_LABELS;
+  return PERCEPTION_STATUS_LABELS[normalized] ?? sentenceCase(value.replace(/_/g, " "));
+}
+
+export function formatPerceptionFixTypeLabel(value: string): string {
+  const normalized = value.trim().toLowerCase() as keyof typeof PERCEPTION_FIX_TYPE_LABELS;
+  return PERCEPTION_FIX_TYPE_LABELS[normalized] ?? sentenceCase(value.replace(/_/g, " "));
+}
+
+export function formatPerceptionErrorTypeLabel(value: string): string {
+  const normalized = value.trim().toLowerCase() as keyof typeof PERCEPTION_ERROR_TYPE_LABELS;
+  return PERCEPTION_ERROR_TYPE_LABELS[normalized] ?? sentenceCase(value.replace(/_/g, " "));
+}
+
+export function getModelGroupForName(modelName: string): string {
+  const normalized = modelName.trim().toLowerCase();
+  if (
+    normalized.includes("chatgpt") ||
+    normalized.includes("openai") ||
+    normalized.includes("gpt") ||
+    normalized.startsWith("o1") ||
+    normalized.startsWith("o3")
+  ) {
+    return "ChatGPT";
+  }
+  if (normalized.includes("perplexity")) return "Perplexity";
+  if (normalized.includes("claude")) return "Claude";
+  if (normalized.includes("gemini")) return "Gemini";
+  if (normalized.includes("mistral")) return "Mistral";
+  if (normalized.includes("copilot")) return "Copilot";
+  return modelName;
+}
+
 export function getModelIconForName(modelName: string): string {
-  const normalized = modelName.toLowerCase();
-  if (normalized.includes("chatgpt") || normalized.includes("openai")) return "/models/openai.svg";
-  if (normalized.includes("perplexity")) return "/models/perplexity.svg";
-  if (normalized.includes("claude")) return "/models/claude.svg";
-  if (normalized.includes("gemini")) return "/models/gemini.svg";
-  if (normalized.includes("mistral")) return "/models/mistral.svg";
-  if (normalized.includes("copilot")) return "/models/copilot.svg";
+  const group = getModelGroupForName(modelName);
+  if (group === "ChatGPT") return "/models/openai.svg";
+  if (group === "Perplexity") return "/models/perplexity.svg";
+  if (group === "Claude") return "/models/claude.svg";
+  if (group === "Gemini") return "/models/gemini.svg";
+  if (group === "Mistral") return "/models/mistral.svg";
+  if (group === "Copilot") return "/models/copilot.svg";
   return "/models/openai.svg";
 }

@@ -1,0 +1,82 @@
+---
+title: backend_list_endpoints
+description: Reference for the endpoint catalog MCP tool.
+full: true
+---
+
+<ReferenceShell>
+  <ReferenceMain>
+    <OperationHeader
+      tag="MCP Tool"
+      title="backend_list_endpoints"
+      summary="Return the public endpoint catalog currently exposed by the MCP server."
+      method="TOOL"
+      path="backend_list_endpoints"
+    />
+
+    ## Authorizations
+
+    This tool is read-only and does not require arguments.
+
+    ## Arguments
+
+    No arguments are required.
+
+    ## Behavior
+
+    The tool returns a compact route list that currently covers gateway health plus selected auth,
+    user, organization, permission, billing and notification endpoints.
+
+    ## Response
+
+    | Field | Type | Description |
+    | --- | --- | --- |
+    | `base_url` | `string` | Default base URL embedded by the MCP server implementation. |
+    | `endpoints` | `Endpoint[]` | Array of endpoint objects with `service`, `method` and `path`. |
+
+    ## Notes
+
+    Use this tool for quick agent-side discovery. For complete business behavior, the HTTP API
+    reference pages in this docs portal remain the source of truth.
+  </ReferenceMain>
+
+  <ReferenceAside>
+    <ExamplePanel title="Call Tool" eyebrow="JSON">
+
+```json
+{
+  "name": "backend_list_endpoints",
+  "arguments": {}
+}
+```
+
+    </ExamplePanel>
+
+    <ExamplePanel title="Success Response" eyebrow="200">
+
+```json
+{
+  "base_url": "http://localhost:8080",
+  "endpoints": [
+    {
+      "service": "api-gateway",
+      "method": "GET",
+      "path": "/health"
+    },
+    {
+      "service": "auth-service",
+      "method": "GET",
+      "path": "/auth/validate"
+    },
+    {
+      "service": "billing-service",
+      "method": "GET",
+      "path": "/billing/quotas/{organization_id}"
+    }
+  ]
+}
+```
+
+    </ExamplePanel>
+  </ReferenceAside>
+</ReferenceShell>

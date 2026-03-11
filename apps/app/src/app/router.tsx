@@ -38,11 +38,9 @@ const BrandsPage = lazy(() =>
     default: module.BrandsPage,
   })),
 );
-const PerceptionPage = lazy(() =>
-  import("@/features/perception").then((module) => ({
-    default: module.PerceptionPage,
-  })),
-);
+
+import { PerceptionPage } from "@/features/perception";
+
 const PerceptionBrandCanonPage = lazy(() =>
   import("@/features/perception/view/brand-canon-page").then((module) => ({
     default: module.BrandCanonPage,

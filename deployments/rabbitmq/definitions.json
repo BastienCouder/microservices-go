@@ -1,6 +1,22 @@
 {
+  "users": [
+    {
+      "name": "app",
+      "password": "app",
+      "tags": ""
+    }
+  ],
   "vhosts": [
     {"name": "/"}
+  ],
+  "permissions": [
+    {
+      "user": "app",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
   ],
   "exchanges": [
     {

@@ -90,19 +90,22 @@ export function PerceptionTrendChart({
             </ResponsiveContainer>
           </ChartContainer>
         </div>
-        <div className="mt-3 flex flex-wrap gap-2 text-xs">
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2 py-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PERCEPTION_TREND_COLORS.positioning }} />
-            {PERCEPTION_TEXT.trend.series.positioning}
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2 py-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PERCEPTION_TREND_COLORS.factual }} />
-            {PERCEPTION_TEXT.trend.series.factual}
-          </div>
-          <div className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2 py-1">
-            <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PERCEPTION_TREND_COLORS.sentiment }} />
-            {PERCEPTION_TEXT.trend.series.sentiment}
-          </div>
+        <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+          <TrendDefinitionCard
+            color={PERCEPTION_TREND_COLORS.positioning}
+            title={PERCEPTION_TEXT.trend.series.positioning}
+            description={PERCEPTION_TEXT.trend.definitions.positioning}
+          />
+          <TrendDefinitionCard
+            color={PERCEPTION_TREND_COLORS.factual}
+            title={PERCEPTION_TEXT.trend.series.factual}
+            description={PERCEPTION_TEXT.trend.definitions.factual}
+          />
+          <TrendDefinitionCard
+            color={PERCEPTION_TREND_COLORS.sentiment}
+            title={PERCEPTION_TEXT.trend.series.sentiment}
+            description={PERCEPTION_TEXT.trend.definitions.sentiment}
+          />
         </div>
       </CardContent>
     </Card>
@@ -121,23 +124,41 @@ function PerceptionTrendTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="min-w-[190px] rounded-md border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur-sm">
-      <div className="mb-2 text-xs font-medium">{label}</div>
+    <div className="min-w-[340px] max-w-[370px] rounded-xl border border-border/60 bg-background/96 p-2.5 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] backdrop-blur-md">
+      <div className="mb-2.5 flex items-center justify-between gap-2">
+        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Point de mesure
+        </div>
+        <div className="rounded-full border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground">
+          {label}
+        </div>
+      </div>
       <div className="space-y-2">
         {payload.map((item) => {
           const value = typeof item.value === "number" ? item.value : 0;
           const color = item.color ?? APP_CHART_UI_COLORS.primary ?? "hsl(var(--primary))";
           const barValue = Math.max(0, Math.min(100, value));
+          const metric = getTrendTooltipMetric(item.name);
           return (
-            <div key={item.name} className="space-y-1">
-              <div className="flex items-center justify-between gap-2 text-[10px]">
-                <div className="flex min-w-0 items-center gap-1.5 text-muted-foreground">
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-                  <span className="truncate">{item.name}</span>
+            <div key={item.name} className="rounded-lg border border-border/50 bg-muted/15 p-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+                    <span className="truncate text-[13px] font-semibold text-foreground">{metric.label}</span>
+                  </div>
                 </div>
-                <span className="font-mono tabular-nums text-foreground">{value.toFixed(0)}/100</span>
+                <div className="flex gap-1 items-center shrink-0 text-right">
+                  <div className="text-base font-semibold tabular-nums text-foreground">{value.toFixed(0)}</div>
+                  <div className="text-[10px] text-muted-foreground">/100</div>
+                </div>
               </div>
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted/50">
+              <div className="flex items-center justify-between gap-2 text-[10px]">
+                <span className="font-medium" style={{ color }}>
+                  {scoreToTrendLabel(value)}
+                </span>
+              </div>
+              <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted/50">
                 <div className="h-full rounded-full" style={{ width: `${barValue}%`, backgroundColor: color }} />
               </div>
             </div>
@@ -146,4 +167,51 @@ function PerceptionTrendTooltip({
       </div>
     </div>
   );
+}
+
+function TrendDefinitionCard({
+  color,
+  title,
+  description,
+}: {
+  color: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/15 p-3">
+      <div className="flex items-center gap-2 text-xs font-medium text-foreground">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
+        {title}
+      </div>
+      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+function getTrendTooltipMetric(key?: string) {
+  if (key === "positioning") {
+    return {
+      label: PERCEPTION_TEXT.trend.series.positioning,
+      description: PERCEPTION_TEXT.trend.definitions.positioning,
+    };
+  }
+  if (key === "factual") {
+    return {
+      label: PERCEPTION_TEXT.trend.series.factual,
+      description: PERCEPTION_TEXT.trend.definitions.factual,
+    };
+  }
+  return {
+    label: PERCEPTION_TEXT.trend.series.sentiment,
+    description: PERCEPTION_TEXT.trend.definitions.sentiment,
+  };
+}
+
+function scoreToTrendLabel(score: number) {
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Très bien";
+  if (score >= 65) return "Bien";
+  if (score >= 50) return "Fragile";
+  return "Insuffisant";
 }

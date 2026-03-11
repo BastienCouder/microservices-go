@@ -82,29 +82,141 @@ function PerceptionLoadingState({ brandCanonMode }: { brandCanonMode: boolean })
   return (
     <PerceptionThreeColumnLayout
       left={
-        <Card className="h-full">
-          <CardContent className="space-y-4 p-4">
-            <Skeleton className="h-28 w-full" />
-            <Skeleton className="h-64 w-full" />
-          </CardContent>
-        </Card>
+        <div className="space-y-4 p-2">
+          <Card className="border-border/60">
+            <CardContent className="space-y-4 p-4">
+              <div className="space-y-3 rounded-md bg-primary/8 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-36" />
+                    <Skeleton className="h-3 w-44" />
+                  </div>
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-24 rounded-full" />
+                  <Skeleton className="h-5 w-28 rounded-full" />
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <Skeleton className="h-9 w-full rounded-md" />
+                <Skeleton className="h-8 w-20" />
+                <Skeleton className="h-10 w-full rounded-md" />
+                <Skeleton className="h-8 w-24" />
+                <div className="space-y-2">
+                  <Skeleton className="h-[92px] w-full rounded-md" />
+                  <Skeleton className="h-[92px] w-full rounded-md" />
+                  <Skeleton className="h-[92px] w-full rounded-md" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       }
       center={
         <div className="space-y-4 px-1 pb-4">
-          <Skeleton className="h-64 w-full rounded-md" />
-          <Skeleton className="h-72 w-full rounded-md" />
-          <Skeleton className="h-72 w-full rounded-md" />
+          <Card className="border-border/60 overflow-hidden py-4">
+            <CardContent className="space-y-4 px-5 py-0">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-40" />
+                  <Skeleton className="h-3 w-72 max-w-full" />
+                </div>
+                <Skeleton className="h-14 w-20 rounded-md" />
+              </div>
+              <div className="space-y-3">
+                <Skeleton className="h-[84px] w-full rounded-[20px]" />
+                <Skeleton className="h-[84px] w-full rounded-[20px]" />
+                <Skeleton className="h-[84px] w-full rounded-[20px]" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="min-w-0 border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle><Skeleton className="h-4 w-44" /></CardTitle>
+              <CardDescription><Skeleton className="h-3 w-72 max-w-full" /></CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <Skeleton className="h-8 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+            </CardContent>
+          </Card>
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle><Skeleton className="h-4 w-40" /></CardTitle>
+              <CardDescription><Skeleton className="h-3 w-80 max-w-full" /></CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-[230px] w-full rounded-md" />
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <Skeleton className="h-[74px] w-full rounded-md" />
+                <Skeleton className="h-[74px] w-full rounded-md" />
+                <Skeleton className="h-[74px] w-full rounded-md" />
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <Skeleton className="h-32 w-full rounded-md" />
-            <Skeleton className="h-32 w-full rounded-md" />
-            <Skeleton className="h-32 w-full rounded-md" />
+            <Card className="border-border/60">
+              <CardContent className="flex min-h-[170px] flex-col items-center gap-3 p-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-44" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/60">
+              <CardContent className="flex min-h-[170px] flex-col items-center gap-3 p-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-44" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
+            <Card className="border-border/60">
+              <CardContent className="flex min-h-[170px] flex-col items-center gap-3 p-4">
+                <Skeleton className="h-20 w-20 rounded-full" />
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-44" />
+                <Skeleton className="h-8 w-16" />
+              </CardContent>
+            </Card>
           </div>
-          <Skeleton className="h-64 w-full rounded-md" />
+
+          <Card className="border-border/60">
+            <CardHeader className="pb-2">
+              <CardTitle><Skeleton className="h-4 w-44" /></CardTitle>
+              <CardDescription><Skeleton className="h-3 w-72 max-w-full" /></CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-[88px] w-full rounded-md" />
+              <Skeleton className="h-[88px] w-full rounded-md" />
+              <Skeleton className="h-[88px] w-full rounded-md" />
+            </CardContent>
+          </Card>
         </div>
       }
       right={
         <div className="px-1 pb-4">
-          <Skeleton className="h-[520px] w-full rounded-md" />
+          <Card className="border-border/60">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between gap-2">
+                <CardTitle><Skeleton className="h-4 w-36" /></CardTitle>
+                <Skeleton className="h-5 w-8 rounded-full" />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Skeleton className="h-[116px] w-full rounded-md" />
+              <Skeleton className="h-[116px] w-full rounded-md" />
+              <Skeleton className="h-[116px] w-full rounded-md" />
+              <Skeleton className="h-9 w-full rounded-md" />
+            </CardContent>
+          </Card>
         </div>
       }
     />
@@ -129,9 +241,9 @@ function PerceptionUnavailableState({
         <div className="col-span-12 xl:col-span-8 xl:col-start-3">
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle>Brand Canon Editor</CardTitle>
+              <CardTitle>Éditeur du référentiel de marque</CardTitle>
               <CardDescription>
-                Editez la source de vérité de la marque (catégorie, audience, use cases, pricing, features).
+                Modifiez la source de vérité de la marque : catégorie, audience, cas d'usage, pricing et fonctionnalités.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 p-6 pt-0">
@@ -162,6 +274,15 @@ function PerceptionUnavailableState({
           windowLabel="--"
           analyzedResponses={0}
           selectedModels={[]}
+          modelOptions={[]}
+          selectedPeriod="30d"
+          onModelToggle={() => undefined}
+          onResetModels={() => undefined}
+          onPeriodChange={() => undefined}
+          showAllModels={false}
+          onToggleShowAllModels={() => undefined}
+          showUniqueModelFilters={false}
+          onToggleModelFilterMode={() => undefined}
           isDemo={false}
         />
       }

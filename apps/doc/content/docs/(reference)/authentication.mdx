@@ -1,0 +1,153 @@
+---
+title: Authentication
+description: Session flows, headers and auth endpoints for AI Reco Monitor.
+---
+
+<NoteBox title="Base URL" tone="primary">
+Replace `https://api.example.com` with the gateway URL assigned to your workspace. All HTTP routes
+in this documentation are described from that gateway root.
+</NoteBox>
+
+## Session model
+
+The gateway accepts either the browser `Cookie` header or an `X-Session-Token` header. You do not
+send internal headers such as `X-Authenticated-Identity-ID` or `X-Authenticated-User-ID`; the
+gateway injects them for downstream services after session validation.
+
+<Tabs items={["Cookie", "X-Session-Token"]} persist>
+  <Tab value="Cookie">
+
+```bash
+curl https://api.example.com/auth/validate \
+  --header "Cookie: ory_kratos_session=<session-cookie>"
+```
+
+  </Tab>
+  <Tab value="X-Session-Token">
+
+```bash
+curl https://api.example.com/auth/validate \
+  --header "X-Session-Token: <session-token>"
+```
+
+  </Tab>
+</Tabs>
+
+## Organization scope
+
+For organization-scoped integrations, send `X-Organization-ID` explicitly. The gateway can resolve
+an organization automatically for `/projects` and `/analysis`, but production clients should still
+set the header so the selected workspace is always explicit.
+
+```bash
+curl https://api.example.com/projects \
+  --header "X-Session-Token: <session-token>" \
+  --header "X-Organization-ID: 42"
+```
+
+## Route catalog
+
+<EndpointTable>
+  <EndpointRow method="GET" path="/health" auth="None" response="Gateway health payload">
+    Public health check for the API gateway.
+  </EndpointRow>
+
+  <EndpointRow method="GET" path="/auth/validate" auth="Cookie or X-Session-Token" response="Auth status">
+    Validates the current session and returns `authenticated`, `session_id` and `identity_id`.
+  </EndpointRow>
+
+  <EndpointRow method="GET" path="/auth/me" auth="Cookie or X-Session-Token" response="Identity profile">
+    Returns the current auth identity with email and display name.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/auth/password" auth="None" response="`{ ok, message, data }`">
+    Starts or completes a password flow. Use `mode: "login"` or `mode: "registration"`.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/auth/otp/start" auth="None" response="OTP flow data">
+    Starts an email OTP flow and returns the `flowId` and `csrfToken` required for verification.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/auth/otp/verify" auth="None" response="`{ ok, message, data }`">
+    Verifies the OTP code with the `flowId`, `csrfToken` and `code` returned by the start step.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/auth/logout" auth="Cookie or X-Session-Token" response="Logout confirmation">
+    Invalidates the current session and clears the auth cookies returned by Kratos.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/auth/oidc/google" auth="None" response="Redirect URL">
+    Creates a Google OIDC flow and returns the `redirectTo` URL to open in the browser.
+  </EndpointRow>
+</EndpointTable>
+
+## Password flow
+
+```bash
+curl https://api.example.com/auth/password \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "mode": "login",
+    "email": "ops@example.com",
+    "password": "secret"
+  }'
+```
+
+For registration, use `mode: "registration"` and add `name`.
+
+## OTP flow
+
+<Steps>
+  <Step>
+
+### Start the OTP flow
+
+```bash
+curl https://api.example.com/auth/otp/start \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "mode": "login",
+    "email": "ops@example.com"
+  }'
+```
+
+  </Step>
+  <Step>
+
+### Verify the code
+
+```bash
+curl https://api.example.com/auth/otp/verify \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "mode": "login",
+    "flowId": "<flow-id>",
+    "csrfToken": "<csrf-token>",
+    "code": "123456"
+  }'
+```
+
+  </Step>
+</Steps>
+
+## Google OIDC flow
+
+```bash
+curl https://api.example.com/auth/oidc/google \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --data '{
+    "mode": "login",
+    "returnTo": "https://app.example.com/auth/callback"
+  }'
+```
+
+Use the returned `redirectTo` URL in your frontend or identity orchestration.
+
+## Response shape
+
+Auth routes return raw JSON objects or `ok/message/data` payloads. They do not use the
+`{ success, data }` envelope used by the projects, analysis, AI and attribution services.

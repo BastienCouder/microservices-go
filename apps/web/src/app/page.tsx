@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { HomeSessionClient } from "./_components/home-session-client";
-
 type HomeRuntimeConfig = {
   gatewayURL: string;
   appURL: string;
@@ -27,7 +25,6 @@ export default function Home() {
       <p>
         <Link href="/auth">Ouvrir la page de test auth</Link>
       </p>
-      <HomeSessionClient appURL={config.appURL} gatewayURL={config.gatewayURL} />
     </main>
   );
 }

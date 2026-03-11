@@ -1,135 +1,129 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo } from "react";
 import type { PerceptionViewData } from "@/lib/perception-data";
-import { PERCEPTION_DONUT_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
+import { PERCEPTION_DONUT_COLORS, PERCEPTION_TEXT, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
 import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
+import { cn } from "@/lib/utils";
+
+type RankedPoint = PerceptionViewData["radar"][number] & {
+  color: string;
+};
 
 export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["radar"] }) {
-  const [hoveredAxis, setHoveredAxis] = useState<PerceptionViewData["radar"][number]["axis"] | null>(null);
-  const ordered = [
-    { axis: "positioning", color: PERCEPTION_DONUT_COLORS.axis.positioning },
-    { axis: "use_cases", color: PERCEPTION_DONUT_COLORS.axis.use_cases },
-    { axis: "sentiment", color: PERCEPTION_DONUT_COLORS.axis.sentiment },
-    { axis: "features", color: PERCEPTION_DONUT_COLORS.axis.features },
-    { axis: "competitors", color: PERCEPTION_DONUT_COLORS.axis.competitors },
-  ] as const;
-  const byAxis = new Map(points.map((p) => [p.axis, p] as const));
+  const rankedPoints = useMemo<RankedPoint[]>(() => {
+    const byAxis = new Map(points.map((point) => [point.axis, point] as const));
+    const orderedPoints: RankedPoint[] = [];
 
-  const cx = 260;
-  const cy = 210;
-  const baseOuterR = 98;
-  const outerRAmplitude = 34;
-  const innerR = 44;
-  const gap = 0;
+    for (const axis of PERCEPTION_VISIBLE_AXES) {
+      const point = byAxis.get(axis);
+      if (!point) continue;
+      orderedPoints.push({
+        ...point,
+        color: PERCEPTION_DONUT_COLORS.axis[axis],
+      });
+    }
 
-  const polar = (deg: number, r: number) => {
-    const rad = (deg * Math.PI) / 180;
-    return { x: cx + Math.cos(rad) * r, y: cy + Math.sin(rad) * r };
-  };
+    return [...orderedPoints].sort((left, right) => right.score - left.score);
+  }, [points]);
 
-  const arcPath = (startDeg: number, endDeg: number, rOuter: number, rInner: number) => {
-    const p1 = polar(startDeg, rOuter);
-    const p2 = polar(endDeg, rOuter);
-    const p3 = polar(endDeg, rInner);
-    const p4 = polar(startDeg, rInner);
-    const large = endDeg - startDeg > 180 ? 1 : 0;
-    return [
-      `M ${p1.x} ${p1.y}`,
-      `A ${rOuter} ${rOuter} 0 ${large} 1 ${p2.x} ${p2.y}`,
-      `L ${p3.x} ${p3.y}`,
-      `A ${rInner} ${rInner} 0 ${large} 0 ${p4.x} ${p4.y}`,
-      "Z",
-    ].join(" ");
-  };
+  const overallScore = useMemo(() => averageScore(rankedPoints.map((point) => point.score)), [rankedPoints]);
+  const alignedAxesCount = rankedPoints.filter((point) => point.score >= point.target).length;
+
+  if (rankedPoints.length === 0) {
+    return (
+      <div className="rounded-[28px] border border-border/60 bg-background px-5 py-6">
+        <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+        <p className="mt-2 text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-background px-4">
-      <div>
-        <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+    <div className="px-5 py-3">
+      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
+          <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
+        </div>
+
+       
       </div>
-      <div className="text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</div>
-      <div className="h-[390px] w-full">
-        <svg viewBox="0 0 520 390" className="h-full w-full">
-          <defs>
-            <filter id="perception-shadow" x="-50%" y="-50%" width="200%" height="200%">
-              <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor={PERCEPTION_DONUT_COLORS.shadow} floodOpacity="0.15" />
-            </filter>
-          </defs>
+        <div className="mt-3 space-y-3">
+          {rankedPoints.map((point, index) => (
+            <AxisProgressRow key={point.axis} point={point} rank={index + 1} />
+          ))}
+        </div>
+    </div>
+  );
+}
 
-          {ordered.map((slice, index) => {
-            const point = byAxis.get(slice.axis);
-            const span = 360 / ordered.length;
-            const start = -180 + index * span + gap / 2;
-            const end = start + span - gap;
-            const mid = (start + end) / 2;
-            const shift = polar(mid, 0);
-            const tx = shift.x - cx;
-            const ty = shift.y - cy;
-            const score = Math.max(0, Math.min(100, point?.score ?? 0));
-            const outerR = baseOuterR + (score / 100) * outerRAmplitude;
+function AxisProgressRow({
+  point,
+  rank,
+}: {
+  point: RankedPoint;
+  rank: number;
+}) {
+  const progressWidth = `${Math.max(6, Math.min(100, point.score))}%`;
+  const targetOffset = `calc(${Math.max(0, Math.min(100, point.target))}% - 1px)`;
+  const delta = point.score - point.target;
+  const statusLabel = delta >= 0 ? PERCEPTION_TEXT.donut.aboveTarget : PERCEPTION_TEXT.donut.belowTarget;
+  const gradeLabel = getPerceptionGradeLabel(point.score);
 
-            const scorePos = polar(mid, (outerR + innerR) / 2);
-            const dotPos = polar(mid, outerR - 10);
-            const c1 = polar(mid, outerR + 4);
-            const c2 = polar(mid, outerR + 28);
-            const rightSide = Math.cos((mid * Math.PI) / 180) >= 0;
-            const c3 = { x: c2.x + (rightSide ? 38 : -38), y: c2.y };
-            const isHovered = hoveredAxis === slice.axis;
-            const scale = isHovered ? 1.06 : 1;
+  return (
+    <div className="rounded-[20px] border border-border/60 bg-background/85 p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border text-sm font-semibold tabular-nums border-2"
+            style={{ borderColor: point.color, color: point.color }}
+          >
+            {rank}
+          </div>
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold text-foreground">{point.label}</div>
+            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+              <span className="font-medium text-foreground/80">{gradeLabel}</span>
+              <span className="text-muted-foreground">•</span>
+              <span className={cn(delta >= 0 ? "text-emerald-700" : "text-amber-700")}>{statusLabel}</span>
+            </div>
+          </div>
+        </div>
 
-            return (
-              <g
-                key={slice.axis}
-                onMouseEnter={() => setHoveredAxis(slice.axis)}
-                onMouseLeave={() => setHoveredAxis(null)}
-                style={{ cursor: "pointer" }}
-              >
-                <g
-                  transform={`translate(${tx},${ty}) translate(${cx},${cy}) scale(${scale}) translate(${-cx},${-cy})`}
-                  style={{ transition: "transform 180ms ease-out" }}
-                >
-                  <path d={arcPath(start, end, outerR, innerR)} fill={slice.color} filter="url(#perception-shadow)" opacity={isHovered ? 1 : 0.94} />
-                  <circle cx={dotPos.x} cy={dotPos.y} r="4.4" fill={PERCEPTION_DONUT_COLORS.background} />
-                  <text x={scorePos.x} y={scorePos.y} textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="14" fontWeight="700">
-                    {score}%
-                  </text>
-                </g>
-                <polyline
-                  points={`${c1.x},${c1.y} ${c2.x},${c2.y} ${c3.x},${c3.y}`}
-                  fill="none"
-                  stroke={PERCEPTION_DONUT_COLORS.primary}
-                  strokeWidth="2"
-                  opacity={isHovered ? 1 : 0.75}
-                />
-                <text
-                  x={rightSide ? c3.x + 6 : c3.x - 6}
-                  y={c3.y - 4}
-                  textAnchor={rightSide ? "start" : "end"}
-                  fill={PERCEPTION_DONUT_COLORS.primary}
-                  fontSize="14"
-                  fontWeight="700"
-                  opacity={isHovered ? 1 : 0.9}
-                >
-                  {point?.label ?? slice.axis}
-                </text>
-                <text
-                  x={rightSide ? c3.x + 6 : c3.x - 6}
-                  y={c3.y + 9}
-                  textAnchor={rightSide ? "start" : "end"}
-                  fill={PERCEPTION_DONUT_COLORS.primaryMuted}
-                  fontSize="9.5"
-                >
-                  {PERCEPTION_TEXT.donut.scoreCaption}
-                </text>
-              </g>
-            );
-          })}
+        <div className="shrink-0 text-right">
+          <div className="text-xl font-semibold tabular-nums" style={{ color: point.color }}>
+            {point.score}
+          </div>
+          <div className="text-[11px] text-muted-foreground">/100</div>
+        </div>
+      </div>
 
-          <circle cx={cx} cy={cy} r={innerR + 6} fill={PERCEPTION_DONUT_COLORS.primary} filter="url(#perception-shadow)" />
-          <circle cx={cx} cy={cy} r={innerR - 2} fill={PERCEPTION_DONUT_COLORS.background} />
-        </svg>
+      <div className="mt-3">
+        <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
+          <div
+            className="absolute inset-y-0 left-0 rounded-full"
+            style={{
+              width: progressWidth,
+              backgroundColor: point.color,
+            }}
+          />
+          <div className="absolute inset-y-[-3px] w-px bg-foreground/45" style={{ left: targetOffset }} />
+        </div>
       </div>
     </div>
   );
+}
+
+function averageScore(values: number[]): number {
+  if (values.length === 0) return 0;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+function getPerceptionGradeLabel(score: number): string {
+  if (score >= 90) return PERCEPTION_TEXT.donut.grades.excellent;
+  if (score >= 80) return PERCEPTION_TEXT.donut.grades.veryGood;
+  if (score >= 65) return PERCEPTION_TEXT.donut.grades.good;
+  if (score >= 50) return PERCEPTION_TEXT.donut.grades.fragile;
+  return PERCEPTION_TEXT.donut.grades.insufficient;
 }

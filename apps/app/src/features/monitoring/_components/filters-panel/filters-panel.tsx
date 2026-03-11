@@ -300,7 +300,7 @@ export function FiltersPanel() {
       onResetFilters={resetFilters}
       showResetFilters={hasActiveFilters}
       showUniqueModelFilters={showUniqueModelFilters}
-      onToggleModelFilterMode={() => setShowUniqueModelFilters(!showUniqueModelFilters)}
+      onModelFilterModeChange={setShowUniqueModelFilters}
     />
   );
 }

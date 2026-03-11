@@ -1,14 +1,14 @@
 # ── Stage 1 : Dépendances ─────────────────────────────────
 FROM oven/bun:alpine AS deps
 WORKDIR /app
-COPY package.json bun.lockb ./
+COPY apps/doc/package.json apps/doc/bun.lock ./
 RUN bun install --frozen-lockfile
 
 # ── Stage 2 : Build ───────────────────────────────────────
 FROM oven/bun:alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY apps/doc ./
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
@@ -26,6 +26,5 @@ ENV HOSTNAME=0.0.0.0
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public
 
 CMD ["server.js"]

@@ -3,6 +3,7 @@
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { DateRange } from "react-day-picker";
 import { DatePickerWithRange } from "@/components/dashboard/date-range-picker";
+import { ModelFilterModeTabs } from "@/components/dashboard/model-filter-mode-tabs";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -46,7 +47,7 @@ type FiltersPanelExpandedProps = {
   onResetFilters: () => void;
   showResetFilters: boolean;
   showUniqueModelFilters: boolean;
-  onToggleModelFilterMode: () => void;
+  onModelFilterModeChange: (value: boolean) => void;
 };
 
 const COMPETITORS_COUNT = 3;
@@ -146,30 +147,25 @@ export function FiltersPanelExpanded(props: FiltersPanelExpandedProps) {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs text-muted-foreground md:text-sm lg:text-xs">{content.models}</Label>
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      "h-8 min-w-[4.75rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[4rem] lg:px-2 lg:text-[10px]",
-                      props.selectedModels.length === 0 && "invisible pointer-events-none",
-                    )}
-                    onClick={props.clearModels}
-                  >
-                    {content.clear}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 min-w-[8.5rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[7rem] lg:px-2 lg:text-[10px]"
-                    onClick={props.onToggleModelFilterMode}
-                  >
-                    {props.showUniqueModelFilters ? "Regrouper" : "Modeles uniques"}
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={cn(
+                    "h-8 min-w-[4.75rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[4rem] lg:px-2 lg:text-[10px]",
+                    props.selectedModels.length === 0 && "invisible pointer-events-none",
+                  )}
+                  onClick={props.clearModels}
+                >
+                  {content.clear}
+                </Button>
               </div>
+
+              <ModelFilterModeTabs
+                value={props.showUniqueModelFilters ? "unique" : "grouped"}
+                onValueChange={(value) => props.onModelFilterModeChange(value === "unique")}
+                listClassName="h-8 w-full"
+              />
 
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {visibleModels.map((model) => {

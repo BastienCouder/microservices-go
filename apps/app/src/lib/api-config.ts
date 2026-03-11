@@ -16,6 +16,7 @@ export const apiRoutes = {
   },
   projects: {
     list: () => "/projects",
+    get: (projectId: string) => `/projects/${projectId}`,
     promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
     prompts: (
@@ -37,6 +38,7 @@ export const apiRoutes = {
     list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,
   },
   analysis: {
+    dashboard: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
     brandCanon: (projectId: string) => `/analysis/projects/${projectId}/brand-canon`,

@@ -1,0 +1,82 @@
+---
+title: Profile
+description: User profile routes and admin lifecycle actions.
+---
+
+<NoteBox title="Bootstrap rule" tone="primary">
+After authentication succeeds, create the product-side user with `POST /users`. The identity comes
+from the active session, not from a custom user ID header sent by the client.
+</NoteBox>
+
+## User profile routes
+
+<EndpointTable>
+  <EndpointRow method="POST" path="/users" auth="Session" response="User object">
+    Creates the application user profile for the authenticated identity. Body fields:
+    `email`, `first_name`, `last_name`.
+  </EndpointRow>
+
+  <EndpointRow method="GET" path="/users/me" auth="Session" response="User object">
+    Returns the current product user for the authenticated identity.
+  </EndpointRow>
+
+  <EndpointRow method="GET" path="/users/{id}" auth="Session" response="User object">
+    Reads a user by numeric ID. Through the gateway this route is self-scoped: the `{id}` must
+    match the current authenticated user.
+  </EndpointRow>
+
+  <EndpointRow method="GET" path="/users/by-auth/{auth_identity_id}" auth="Session" response="User object">
+    Reads a user by auth identity ID. Through the gateway this route is also self-scoped.
+  </EndpointRow>
+</EndpointTable>
+
+## Create the user profile
+
+```bash
+curl https://api.example.com/users \
+  --request POST \
+  --header "Content-Type: application/json" \
+  --header "X-Session-Token: <session-token>" \
+  --data '{
+    "email": "ops@example.com",
+    "first_name": "Ops",
+    "last_name": "Lead"
+  }'
+```
+
+## Read the current user
+
+```bash
+curl https://api.example.com/users/me \
+  --header "X-Session-Token: <session-token>"
+```
+
+## Admin user actions
+
+<EndpointTable>
+  <EndpointRow method="POST" path="/admin/users/{id}/ban" auth="Session" scope="Admin permission" response="204 No Content">
+    Bans a user account through the admin surface.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/admin/users/{id}/unban" auth="Session" scope="Admin permission" response="204 No Content">
+    Re-enables a previously banned user.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/admin/users/{id}/delete" auth="Session" scope="Admin permission" response="204 No Content">
+    Soft-deletes a user account.
+  </EndpointRow>
+
+  <EndpointRow method="POST" path="/admin/users/{id}/restore" auth="Session" scope="Admin permission" response="204 No Content">
+    Restores a previously deleted user account.
+  </EndpointRow>
+</EndpointTable>
+
+Admin user routes sit behind the same gateway auth flow plus a permission check on the `users`
+resource. Use them from trusted backoffice flows only.
+
+```bash
+curl https://api.example.com/admin/users/24/ban \
+  --request POST \
+  --header "X-Session-Token: <session-token>" \
+  --header "X-Organization-ID: 42"
+```

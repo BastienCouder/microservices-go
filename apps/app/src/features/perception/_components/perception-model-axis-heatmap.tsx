@@ -114,15 +114,6 @@ export function PerceptionModelAxisHeatmap({
               ))}
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            {axes.map((axis) => (
-              <div key={`legend-${axis.key}`} className="inline-flex items-center gap-1.5 rounded-full bg-muted/40 px-2 py-1 text-[10px]">
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: axis.color }} />
-                <span>{axis.label}</span>
-              </div>
-            ))}
-          </div>
         </div>
       </CardContent>
     </Card>

@@ -26,7 +26,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
   const handleSave = async () => {
     setMessage(null);
     if (!initialData.metadata.projectId) {
-      setMessage("Mode demo: aucune sauvegarde serveur.");
+      setMessage("Mode démo : aucune sauvegarde serveur.");
       return;
     }
 
@@ -41,7 +41,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
         pricing: canonDraft.pricing,
         features: canonDraft.features,
       });
-      setMessage("Brand Canon enregistré.");
+      setMessage("Référentiel de marque enregistré.");
       navigate(0);
     } catch (err) {
       setMessage(err instanceof Error ? err.message : "Erreur de sauvegarde");
@@ -65,13 +65,13 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
               <div className="flex items-center gap-2">
                 <Badge variant="secondary">{canonDraft.brandName}</Badge>
                 <Badge variant={initialData.metadata.projectId ? "default" : "outline"}>
-                  {initialData.metadata.projectId ? "Projet" : "Demo"}
+                  {initialData.metadata.projectId ? "Projet" : "Démo"}
                 </Badge>
               </div>
             </div>
-            <CardTitle>Brand Canon Editor</CardTitle>
+            <CardTitle>Éditeur du référentiel de marque</CardTitle>
             <CardDescription>
-              Editez la source de vérité de la marque (catégorie, audience, use cases, pricing, features).
+              Modifiez la source de vérité de la marque : catégorie, audience, cas d'usage, pricing et fonctionnalités.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -83,7 +83,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
               <Input value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
             </Field>
 
-            <Field label="Positioning">
+            <Field label="Positionnement">
               <Textarea
                 value={canonDraft.positioning}
                 onChange={(e) => update("positioning", e.target.value)}
@@ -92,7 +92,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
             </Field>
 
             <TagField label="Audience" value={canonDraft.audience} onChange={(next) => update("audience", next)} />
-            <TagField label="Use Cases" value={canonDraft.useCases} onChange={(next) => update("useCases", next)} />
+            <TagField label="Cas d'usage" value={canonDraft.useCases} onChange={(next) => update("useCases", next)} />
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <Field label="Prix">
@@ -132,7 +132,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
               </Field>
             </div>
 
-            <Field label="Note pricing">
+            <Field label="Note tarifaire">
               <Input
                 value={canonDraft.pricing.note ?? ""}
                 onChange={(e) =>
@@ -144,7 +144,7 @@ export function BrandCanonEditorPageClient({ initialData }: { initialData: Perce
               />
             </Field>
 
-            <TagField label="Features" value={canonDraft.features} onChange={(next) => update("features", next)} />
+            <TagField label="Fonctionnalités" value={canonDraft.features} onChange={(next) => update("features", next)} />
 
             <Separator />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
