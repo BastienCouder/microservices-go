@@ -1,8 +1,13 @@
 export const appQueryKeys = {
   session: (apiBaseURL: string) => ["session", apiBaseURL] as const,
-  dashboard: (apiBaseURL: string, projectId: string | null, mode: string) =>
-    ["dashboard", apiBaseURL, projectId ?? "__default__", mode] as const,
-  perception: (apiBaseURL: string, routeSearch: string) => ["perception", apiBaseURL, routeSearch] as const,
+  dashboard: (
+    apiBaseURL: string,
+    projectId: string | null,
+    mode: string,
+    historyScope = "active_only",
+  ) => ["dashboard", apiBaseURL, projectId ?? "__default__", mode, historyScope] as const,
+  perception: (apiBaseURL: string, projectId: string | null, mode: string) =>
+    ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
   modelsCatalog: (apiBaseURL: string, organizationId: string) =>
     ["models", "catalog", apiBaseURL, organizationId] as const,
   projectModels: (apiBaseURL: string, organizationId: string, projectId: string) =>

@@ -33,10 +33,10 @@ export function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan {
 }
 
 export function getPlanLabel(plan: SimulatedPlan): string {
-  if (plan === "starter") return "Starter";
-  if (plan === "growth") return "Growth";
+  if (plan === "starter") return "Demarrage";
+  if (plan === "growth") return "Croissance";
   if (plan === "pro") return "Pro";
-  return "Agency / Enterprise";
+  return "Agence / Entreprise";
 }
 
 export function getPlanLimit(plan: SimulatedPlan, availableModelsCount: number): number {

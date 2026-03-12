@@ -1,4 +1,4 @@
-import { PromptsClient } from "../prompts-client";
+import { PromptsClient } from "./client";
 
 type PromptsTemplateProps = {
   apiBaseURL: string;

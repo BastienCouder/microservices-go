@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ModelCard } from "@/features/monitoring/_components/filters-panel/model-card";
+import { ModelCard } from "@/features/monitoring/components/filters-panel/model-card";
 import { useOnboarding } from "@/hooks/use-onboarding";
 
 const AI_MODELS = [

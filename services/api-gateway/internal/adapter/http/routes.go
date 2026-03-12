@@ -46,6 +46,8 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications"), service: "notification-service"},
 		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
+		{match: matchPathPrefix("/prompts"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
+		{match: matchPathPrefix("/competitors"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
 		{match: matchPathPrefix("/ai-models"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
 		{match: matchPathPrefix("/analysis"), handler: h.withAuth(h.analysisProxy, "analysis-service", "analysis"), service: "analysis-service"},
 		{match: matchPathPrefix("/ai"), handler: h.withAuth(h.iaProxy, "ia-service", "ia"), service: "ia-service"},

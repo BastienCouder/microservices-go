@@ -1,15 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FiltersEmptyStateCard } from "@/features/monitoring/_components/filters-empty-state-card";
-import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
+import { FiltersEmptyStateCard } from "@/features/monitoring/components/filters-empty-state-card";
+import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon } from "@/lib/perception-data";
-import { BrandCanonEditorPageClient } from "../brand-canon/page-client";
+import { BrandCanonEditorPageClient } from "../brand-canon/view/client";
 import { usePerceptionData } from "../core/use-perception-data";
-import { PerceptionThreeColumnLayout } from "../_components/perception-three-column-layout";
-import { PerceptionLeftPanel } from "../_components/perception-left-panel";
-import { PerceptionClient } from "../perception-client";
+import { PerceptionThreeColumnLayout } from "../components/perception-three-column-layout";
+import { PerceptionLeftPanel } from "../components/perception-left-panel";
+import { PerceptionClient } from "./client";
 
 type PerceptionTemplateProps = {
   apiBaseURL: string;
@@ -48,7 +48,7 @@ export function PerceptionTemplate({
   }
 
   if (brandCanonMode) {
-    return <BrandCanonEditorPageClient initialData={data} />;
+    return <BrandCanonEditorPageClient initialData={data} apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
   }
 
   return <PerceptionClient initialData={data} />;

@@ -6,8 +6,9 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
@@ -40,7 +41,6 @@ export function BrandsTemplate({ apiBaseURL, routeSearch }: BrandsTemplateProps)
         actions={
           <Button asChild variant="default">
             <Link to={{ pathname: "/perception/brand-canon", search: buildBrandCanonSearch(routeSearch, "brand") }}>
-              <Edit3 className="mr-2 h-4 w-4" />
               Modifier le référentiel
             </Link>
           </Button>
@@ -169,6 +169,41 @@ function BrandListSection({
   variant: "badge" | "stack" | "numbered";
   action?: ReactNode;
 }) {
+  const content = items.length === 0 ? (
+    <div className="text-sm text-muted-foreground">{emptyLabel}</div>
+  ) : variant === "badge" ? (
+    <div className="flex flex-wrap gap-2">
+      {items.map((item) => (
+        <Badge key={item} variant="secondary" className="font-normal">
+          {item}
+        </Badge>
+      ))}
+    </div>
+  ) : variant === "numbered" ? (
+    <div className="space-y-2">
+      {items.map((item, index) => (
+        <div
+          key={item}
+          className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2 text-sm"
+        >
+          <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-medium">
+            {index + 1}
+          </span>
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <div key={item} className="flex items-start gap-2 rounded-lg bg-muted/15 px-3 py-2 text-sm">
+          <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          <span>{item}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <Card className="border-border/60">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
@@ -181,38 +216,11 @@ function BrandListSection({
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
-          <div className="text-sm text-muted-foreground">{emptyLabel}</div>
-        ) : variant === "badge" ? (
-          <div className="flex flex-wrap gap-2">
-            {items.map((item) => (
-              <Badge key={item} variant="secondary" className="font-normal">
-                {item}
-              </Badge>
-            ))}
-          </div>
-        ) : variant === "numbered" ? (
-          <div className="space-y-2">
-            {items.map((item, index) => (
-              <div
-                key={item}
-                className="flex items-start gap-2 rounded-lg border border-border/60 bg-muted/15 px-3 py-2 text-sm"
-              >
-                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-medium">
-                  {index + 1}
-                </span>
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
+          content
         ) : (
-          <div className="space-y-2">
-            {items.map((item) => (
-              <div key={item} className="flex items-start gap-2 rounded-lg bg-muted/15 px-3 py-2 text-sm">
-                <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                <span>{item}</span>
-              </div>
-            ))}
-          </div>
+          <ScrollArea className="h-[220px] pr-3 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+            {content}
+          </ScrollArea>
         )}
       </CardContent>
     </Card>
@@ -228,6 +236,24 @@ function BrandCompetitorsSection({
   emptyLabel: string;
   action?: ReactNode;
 }) {
+  const content = competitors.length === 0 ? (
+    <div className="text-sm text-muted-foreground">{emptyLabel}</div>
+  ) : (
+    <div className="space-y-2">
+      {competitors.map((competitor) => (
+        <div
+          key={`${competitor.name}-${competitor.website}`}
+          className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
+        >
+          <div className="text-sm font-medium text-foreground">{competitor.name}</div>
+          {competitor.website ? (
+            <div className="mt-1 text-xs text-muted-foreground">{competitor.website}</div>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <Card className="border-border/60">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
@@ -240,21 +266,11 @@ function BrandCompetitorsSection({
       </CardHeader>
       <CardContent>
         {competitors.length === 0 ? (
-          <div className="text-sm text-muted-foreground">{emptyLabel}</div>
+          content
         ) : (
-          <div className="space-y-2">
-            {competitors.map((competitor) => (
-              <div
-                key={`${competitor.name}-${competitor.website}`}
-                className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
-              >
-                <div className="text-sm font-medium text-foreground">{competitor.name}</div>
-                {competitor.website ? (
-                  <div className="mt-1 text-xs text-muted-foreground">{competitor.website}</div>
-                ) : null}
-              </div>
-            ))}
-          </div>
+          <ScrollArea className="h-[280px] pr-3 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+            {content}
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

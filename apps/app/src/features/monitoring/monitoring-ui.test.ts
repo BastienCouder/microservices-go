@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 const filtersPanelSource = await Bun.file(
-  new URL("./_components/filters-panel/filters-panel-expanded.tsx", import.meta.url),
+  new URL("../components/filters-panel/filters-panel-expanded.tsx", import.meta.url),
 ).text();
 
 describe("monitoring filters ui", () => {

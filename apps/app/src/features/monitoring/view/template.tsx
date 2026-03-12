@@ -1,4 +1,4 @@
-import { DashboardClient } from "../dashboard-client";
+import { DashboardClient } from "./client";
 
 type DashboardTemplateProps = {
   apiBaseURL: string;

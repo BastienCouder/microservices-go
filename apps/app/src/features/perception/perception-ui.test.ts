@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_HEATMAP_AXIS_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
 
-const donutSource = await Bun.file(new URL("./_components/perception-donut-visual.tsx", import.meta.url)).text();
-const leftPanelSource = await Bun.file(new URL("./_components/perception-left-panel.tsx", import.meta.url)).text();
+const donutSource = await Bun.file(new URL("../components/perception-donut-visual.tsx", import.meta.url)).text();
+const leftPanelSource = await Bun.file(new URL("../components/perception-left-panel.tsx", import.meta.url)).text();
 
 describe("perception ui copy", () => {
   test("uses French labels for the main perception page blocks", () => {

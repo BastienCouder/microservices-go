@@ -29,6 +29,7 @@ type DashboardDataContextValue = {
 type DashboardDataProviderProps = {
   apiBaseURL: string;
   routeSearch: string;
+  includeHistoricalModels?: boolean;
   children: ReactNode;
 };
 
@@ -74,6 +75,7 @@ const EMPTY_DASHBOARD_DATA: DashboardData = {
 export function DashboardDataProvider({
   apiBaseURL,
   routeSearch,
+  includeHistoricalModels = false,
   children,
 }: DashboardDataProviderProps) {
   const { projectId: queryProjectId, mode: queryMode } = useMemo(
@@ -81,9 +83,18 @@ export function DashboardDataProvider({
     [routeSearch],
   );
   const dashboardQuery = useQuery({
-    queryKey: appQueryKeys.dashboard(apiBaseURL, queryProjectId, queryMode),
+    queryKey: appQueryKeys.dashboard(
+      apiBaseURL,
+      queryProjectId,
+      queryMode,
+      includeHistoricalModels ? "include_historical_models" : "active_only",
+    ),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadDashboardData(apiBaseURL, routeSearch, { signal }),
+    queryFn: ({ signal }) =>
+      loadDashboardData(apiBaseURL, routeSearch, {
+        signal,
+        includeHistoricalModels,
+      }),
   });
 
   const refresh = useCallback(async () => {

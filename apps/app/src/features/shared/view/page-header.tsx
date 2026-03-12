@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { DashboardSectionTitle } from "@/features/monitoring/_components/dashboard-section-title";
+import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {

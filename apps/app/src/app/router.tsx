@@ -5,7 +5,7 @@ import type { AppRouterProps } from "./App";
 import { loadPromptsPageModule } from "./route-preloads";
 
 const ProfilePage = lazy(() =>
-  import("@/features/profile/views/profile-page").then((module) => ({
+  import("@/features/profile/view").then((module) => ({
     default: module.ProfilePage,
   })),
 );
@@ -42,7 +42,7 @@ const BrandsPage = lazy(() =>
 import { PerceptionPage } from "@/features/perception";
 
 const PerceptionBrandCanonPage = lazy(() =>
-  import("@/features/perception/view/brand-canon-page").then((module) => ({
+  import("@/features/perception/brand-canon").then((module) => ({
     default: module.BrandCanonPage,
   })),
 );
@@ -68,10 +68,6 @@ const SettingsPage = lazy(() =>
 );
 
 const SIDEBAR_FEATURE_ROUTES = [
-  {
-    path: "/pages",
-    View: PagesPage,
-  },
   {
     path: "/optimize/actions",
     View: OptimizeActionsPage,
@@ -114,6 +110,14 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         element={
           <Suspense fallback={null}>
             <PromptsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/pages"
+        element={
+          <Suspense fallback={null}>
+            <PagesPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

@@ -446,7 +446,7 @@ function computeKpis(prompts: DashboardPrompt[]): DashboardData["kpis"] {
 export async function loadDashboardData(
   apiBaseURL: string,
   routeSearch: string,
-  options?: { signal?: AbortSignal },
+  options?: { signal?: AbortSignal; includeHistoricalModels?: boolean },
 ): Promise<DashboardLoadResult> {
   const { mode, projectId: routeProjectId } = getDashboardQueryContext(routeSearch);
   const fallback = fallbackDashboardData();
@@ -522,9 +522,10 @@ export async function loadDashboardData(
     };
   });
 
-  const models = projectModels.filter((model) => model.live);
-  const modelById = new Map(models.map((model) => [model.id, model]));
-  const enabledModelIDs = new Set(models.map((model) => model.id));
+  const liveModels = projectModels.filter((model) => model.live);
+  const models = options?.includeHistoricalModels ? projectModels : liveModels;
+  const modelById = new Map(projectModels.map((model) => [model.id, model]));
+  const enabledModelIDs = new Set(liveModels.map((model) => model.id));
 
   const competitors: DashboardCompetitor[] = competitorsPayload.map((entry) => {
     const row = asObject(entry);
@@ -568,6 +569,9 @@ export async function loadDashboardData(
   const responses = asArray(getField(dashboardPayload, ["aiResponses", "responses", "Responses"]))
     .map(asObject)
     .filter((response) => {
+      if (options?.includeHistoricalModels) {
+        return true;
+      }
       const modelId =
         asString(getField(response, ["modelId", "ModelID"])) ||
         asString(getField(response, ["model", "Model"]));

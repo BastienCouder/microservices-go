@@ -1,1 +1,1 @@
-export { OrganizationsPage as default } from "./views/organizations-page";
+export { OrganizationsPage as default } from "./view";

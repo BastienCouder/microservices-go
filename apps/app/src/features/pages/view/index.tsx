@@ -1,5 +1,10 @@
 import { PagesTemplate } from "./template";
 
-export function PagesPage() {
-  return <PagesTemplate />;
+type PagesPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function PagesPage({ apiBaseURL, routeSearch }: PagesPageProps) {
+  return <PagesTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

@@ -1,1 +1,1 @@
-export { OrganizationsPage } from "./views/organizations-page";
+export { OrganizationsPage } from "./view";
