@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	projectclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/project"
 	httpadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/config"
@@ -36,6 +37,13 @@ func main() {
 
 	repo := postgres.NewRepository(db)
 	svc := usecase.NewService(repo)
+	if cfg.ProjectServiceURL != "" {
+		projectLister, err := projectclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init project client: %v", err)
+		}
+		svc.EnableProjectHierarchy(projectLister)
+	}
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()

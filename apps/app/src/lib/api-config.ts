@@ -8,6 +8,7 @@ export const apiRoutes = {
     create: () => "/organizations",
     delete: (id: string) => `/organizations/${id}`,
     get: (id: string) => `/organizations/${id}`,
+    hierarchy: (id: string) => `/organizations/${id}/hierarchy`,
     update: (id: string) => `/organizations/${id}`,
     inviteMember: (id: string) => `/organizations/${id}/invitations`,
     removeMember: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}`,
@@ -15,6 +16,7 @@ export const apiRoutes = {
     acceptInvitation: (token: string) => `/organizations/invitations/${token}/accept`,
   },
   projects: {
+    create: () => "/projects",
     list: () => "/projects",
     get: (projectId: string) => `/projects/${projectId}`,
     impactIntegrations: (projectId: string) => `/projects/${projectId}/impact-integrations`,

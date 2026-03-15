@@ -61,3 +61,27 @@ export type AcceptInvitationResponse = {
   invitation: OrganizationInvitation;
   member: OrganizationMember;
 };
+
+export type OrganizationHierarchyOrganization = {
+  id: string;
+  name: string;
+  ownerIdentityId: string;
+  createdAt: string;
+  deletedAt?: string | null;
+};
+
+export type OrganizationProjectSummary = {
+  id: string;
+  organizationId: string;
+  name: string;
+  status: string;
+  brandName: string;
+  brandDescription: string;
+  attributionSource: string;
+  createdAt: string;
+};
+
+export type OrganizationHierarchy = {
+  organization: OrganizationHierarchyOrganization;
+  projects: OrganizationProjectSummary[];
+};

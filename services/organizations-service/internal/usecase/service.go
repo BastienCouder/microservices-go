@@ -12,12 +12,17 @@ import (
 )
 
 type Service struct {
-	repo domain.Repository
-	now  func() time.Time
+	repo          domain.Repository
+	projectLister ProjectLister
+	now           func() time.Time
 }
 
 func NewService(repo domain.Repository) *Service {
 	return &Service{repo: repo, now: time.Now}
+}
+
+func (s *Service) EnableProjectHierarchy(projectLister ProjectLister) {
+	s.projectLister = projectLister
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIdentityID int64) (*domain.Organization, error) {
@@ -43,6 +48,29 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 		return nil, fmt.Errorf("get organization %d: %w", id, err)
 	}
 	return org, nil
+}
+
+func (s *Service) GetOrganizationHierarchy(ctx context.Context, organizationID int64) (OrganizationHierarchy, error) {
+	if organizationID <= 0 {
+		return OrganizationHierarchy{}, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidOrganization)
+	}
+
+	org, err := s.GetOrganization(ctx, organizationID)
+	if err != nil {
+		return OrganizationHierarchy{}, err
+	}
+
+	hierarchy := OrganizationHierarchy{Organization: *org}
+	if s.projectLister == nil {
+		return hierarchy, nil
+	}
+
+	projects, err := s.projectLister.ListProjectsByOrganization(ctx, organizationID)
+	if err != nil {
+		return OrganizationHierarchy{}, fmt.Errorf("list organization projects: %w", err)
+	}
+	hierarchy.Projects = projects
+	return hierarchy, nil
 }
 
 func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {

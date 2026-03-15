@@ -152,6 +152,9 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 
 func requiresOrganizationContext(r *http.Request) bool {
 	return strings.HasPrefix(r.URL.Path, "/projects") ||
+		strings.HasPrefix(r.URL.Path, "/prompts") ||
+		strings.HasPrefix(r.URL.Path, "/competitors") ||
+		strings.HasPrefix(r.URL.Path, "/ai-models") ||
 		strings.HasPrefix(r.URL.Path, "/analysis")
 }
 

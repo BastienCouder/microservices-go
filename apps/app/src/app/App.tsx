@@ -60,7 +60,7 @@ export default function App() {
   }
 
   return (
-    <AppLayout busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
+    <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
       <AppRouter
         apiBaseURL={apiBaseURL}
         routeSearch={routeSearch}

@@ -72,10 +72,6 @@ const SIDEBAR_FEATURE_ROUTES = [
     path: "/optimize/content-optimizer",
     View: ContentOptimizerPage,
   },
-  {
-    path: "/settings",
-    View: SettingsPage,
-  },
 ] as const;
 
 export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
@@ -172,6 +168,14 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
           }
         />
       ))}
+      <Route
+        path="/settings"
+        element={
+          <Suspense fallback={null}>
+            <SettingsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
       <Route
         path="/profile"
         element={

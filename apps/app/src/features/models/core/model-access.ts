@@ -1,3 +1,5 @@
+import { SELECTED_ORG_KEY } from "@/shared/selection";
+
 export type SimulatedPlan = "starter" | "growth" | "pro" | "agency-enterprise";
 
 export type ModelsProjectSummary = {
@@ -19,7 +21,7 @@ export type ModelCatalogItem = {
   supportsLiveSearch: boolean;
 };
 
-export const SELECTED_ORG_KEY = "selected-organization-id";
+export { SELECTED_ORG_KEY };
 export const SIM_PLAN_KEY_PREFIX = "simulated-billing-plan:";
 
 export function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan {

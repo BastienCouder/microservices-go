@@ -1,11 +1,20 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
-import type { OrganizationInvitation, OrganizationMember, Team, UserProfile } from "@/shared/models";
+import type { OrganizationHierarchy, OrganizationInvitation, OrganizationMember, Team, UserProfile } from "@/shared/models";
+import {
+  buildScopedHref,
+  readRouteQueryParam,
+  readSelectedOrganizationID,
+  storeSelectedOrganizationID,
+  storeSelectedProjectID,
+} from "@/shared/selection";
 import { Separator } from "@/components/ui/separator";
+import { countHierarchyBrands, groupProjectsByBrand, normalizeOrganizationHierarchy } from "../lib/hierarchy";
 import { OrganizationsMainPanel } from "../components/organizations-main-panel";
 import { OrganizationsSidebar } from "../components/organizations-sidebar";
 import type { OrganizationRole, OrganizationSummary, SimulatedPlan, OrganizationTab } from "../components/types";
@@ -23,7 +32,6 @@ type MembershipSummary = {
   role?: OrganizationRole;
 };
 
-const SELECTED_ORG_KEY = "selected-organization-id";
 const SIM_PLAN_KEY_PREFIX = "simulated-billing-plan:";
 
 function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan | null {
@@ -41,30 +49,6 @@ function buildApiUrl(baseURL: string, path: string): string {
   if (!base) return path;
   if (/^https?:\/\//.test(path)) return path;
   return `${base}${path}`;
-}
-
-function readRouteQueryParam(routeSearch: string, key: string): string {
-  const normalized = routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch;
-  const params = new URLSearchParams(normalized);
-  return params.get(key)?.trim() ?? "";
-}
-
-function readStoredOrganizationID(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return window.localStorage.getItem(SELECTED_ORG_KEY)?.trim() ?? "";
-  } catch {
-    return "";
-  }
-}
-
-function storeOrganizationID(value: string): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.setItem(SELECTED_ORG_KEY, value);
-  } catch {
-    // Ignore storage errors.
-  }
 }
 
 async function mutate(baseURL: string, path: string, init?: RequestInit): Promise<Response> {
@@ -156,20 +140,27 @@ function normalizeOrganizationDetails(
   };
 }
 
-function extractCreatedId(value: unknown): string | null {
+function extractCreatedProjectId(value: unknown): string | null {
   if (!isRecord(value)) return null;
   const data = isRecord(value.data) ? value.data : value;
-  const payload = isRecord(data.organization) ? data.organization : data;
-  const org = isRecord(payload.props) ? payload.props : payload;
-  const id = org.id;
+  const id = data.id;
   return typeof id === "string" && id ? id : null;
 }
 
-function generateSlug(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+function deriveDomainFromWebsiteURL(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed === "") return "";
+
+  const normalizedURL = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  try {
+    return new URL(normalizedURL).hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return normalizedURL
+      .replace(/^https?:\/\//i, "")
+      .split("/")[0]
+      ?.replace(/^www\./i, "")
+      .toLowerCase() ?? "";
+  }
 }
 
 function getPlanLabel(organizationId: string): string | null {
@@ -224,19 +215,25 @@ async function loadOrganizationResources(
   teams: Team[];
   members: OrganizationMember[];
   invitations: OrganizationInvitation[];
+  hierarchy: OrganizationHierarchy | null;
 }> {
-  const [teamsResponse, membersResponse, invitationsResponse] = await Promise.all([
-    gatewayJSON<Team[]>(apiBaseURL, `/organizations/${organizationId}/teams`, {
+  const [teamsResponse, membersResponse, invitationsResponse, hierarchyResponse] = await Promise.all([
+    gatewayJSON<Team[]>(apiBaseURL, `${apiRoutes.organizations.get(organizationId)}/teams`, {
       method: "GET",
       organizationId,
       signal,
     }),
-    gatewayJSON<OrganizationMember[]>(apiBaseURL, `/organizations/${organizationId}/members`, {
+    gatewayJSON<OrganizationMember[]>(apiBaseURL, `${apiRoutes.organizations.get(organizationId)}/members`, {
       method: "GET",
       organizationId,
       signal,
     }),
-    gatewayJSON<OrganizationInvitation[]>(apiBaseURL, `/organizations/${organizationId}/invitations`, {
+    gatewayJSON<OrganizationInvitation[]>(apiBaseURL, apiRoutes.organizations.inviteMember(organizationId), {
+      method: "GET",
+      organizationId,
+      signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.hierarchy(organizationId), {
       method: "GET",
       organizationId,
       signal,
@@ -247,29 +244,33 @@ async function loadOrganizationResources(
     teams: teamsResponse.ok ? teamsResponse.data : [],
     members: membersResponse.ok ? membersResponse.data : [],
     invitations: invitationsResponse.ok ? invitationsResponse.data : [],
+    hierarchy: hierarchyResponse.ok ? normalizeOrganizationHierarchy(hierarchyResponse.data, organizationId) : null,
   };
 }
 
 export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, user }: OrganizationsClientProps) {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const hintedOrganizationId = readRouteQueryParam(routeSearch, "org");
+  const shouldOpenCreateProject = readRouteQueryParam(routeSearch, "createProject") === "1";
 
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>(hintedOrganizationId || readStoredOrganizationID());
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<string>(hintedOrganizationId || readSelectedOrganizationID());
   const [search, setSearch] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const [showCreateWizard, setShowCreateWizard] = useState(false);
-  const [draftName, setDraftName] = useState("");
-  const [draftSlug, setDraftSlug] = useState("");
-  const [draftPlan, setDraftPlan] = useState<SimulatedPlan>("starter");
-  const [isCreatingOrganization, setIsCreatingOrganization] = useState(false);
+  const [showCreateProjectForm, setShowCreateProjectForm] = useState(shouldOpenCreateProject);
+  const [draftProjectName, setDraftProjectName] = useState("");
+  const [draftProjectWebsiteURL, setDraftProjectWebsiteURL] = useState("");
+  const [draftProjectDomain, setDraftProjectDomain] = useState("");
+  const [draftProjectBrandName, setDraftProjectBrandName] = useState("");
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
 
   const [editedName, setEditedName] = useState("");
   const [isUpdatingName, setIsUpdatingName] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
-  const [activeTab, setActiveTab] = useState<OrganizationTab>("members");
+  const [activeTab, setActiveTab] = useState<OrganizationTab>("overview");
   const deferredSearch = useDeferredValue(search);
 
   const organizationsQuery = useQuery({
@@ -287,6 +288,7 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
   const teams = organizationResourcesQuery.data?.teams ?? [];
   const members = organizationResourcesQuery.data?.members ?? [];
   const invitations = organizationResourcesQuery.data?.invitations ?? [];
+  const hierarchy = organizationResourcesQuery.data?.hierarchy ?? null;
 
   const filteredOrganizations = useMemo(() => {
     if (!deferredSearch.trim()) return organizations;
@@ -298,6 +300,8 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
     () => organizations.find((organization) => organization.id === selectedOrganizationId) || null,
     [organizations, selectedOrganizationId],
   );
+  const brandGroups = useMemo(() => groupProjectsByBrand(hierarchy?.projects ?? []), [hierarchy?.projects]);
+  const brandsCount = useMemo(() => countHierarchyBrands(hierarchy?.projects ?? []), [hierarchy?.projects]);
 
   const canManageOrganizationSettings = selectedOrganization?.role === "owner" || selectedOrganization?.role === "admin";
   const canDeleteOrganization = selectedOrganization?.role === "owner";
@@ -308,15 +312,23 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
         ? selectedOrganizationId
         : "") ||
       readRouteQueryParam(routeSearch, "org") ||
-      readStoredOrganizationID() ||
+      readSelectedOrganizationID() ||
       organizations[0]?.id ||
       "";
 
     setSelectedOrganizationId((current) => (current === nextSelectedId ? current : nextSelectedId));
     if (nextSelectedId) {
-      storeOrganizationID(nextSelectedId);
+      storeSelectedOrganizationID(nextSelectedId);
     }
   }, [organizations, routeSearch, selectedOrganizationId]);
+
+  useEffect(() => {
+    if (!shouldOpenCreateProject) {
+      return;
+    }
+    setActiveTab("overview");
+    setShowCreateProjectForm(true);
+  }, [shouldOpenCreateProject]);
 
   useEffect(() => {
     if (!selectedOrganizationId) {
@@ -330,7 +342,7 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
     setEditedName(selected?.name ?? "");
     setShowDeleteConfirm(false);
     setDeleteConfirmName("");
-    storeOrganizationID(selectedOrganizationId);
+    storeSelectedOrganizationID(selectedOrganizationId);
   }, [organizations, selectedOrganizationId]);
 
   useEffect(() => {
@@ -338,8 +350,12 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
       setError(organizationsQuery.error.message);
       return;
     }
+    if (organizationResourcesQuery.error instanceof Error) {
+      setError(organizationResourcesQuery.error.message);
+      return;
+    }
     setError(null);
-  }, [organizationsQuery.error]);
+  }, [organizationResourcesQuery.error, organizationsQuery.error]);
 
   const teamsByID = useMemo(() => {
     const map = new Map<number, string>();
@@ -353,47 +369,78 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
     setSelectedOrganizationId(organizationId);
   };
 
-  const handleCreateOnBilling = async () => {
-    const name = draftName.trim();
-    const slug = generateSlug(draftSlug.trim() || draftName.trim());
-    if (!name) {
-      setError("Organization name is required");
-      return;
-    }
-    if (!slug) {
-      setError("Please provide a valid slug");
+  const resetCreateProjectForm = () => {
+    setShowCreateProjectForm(false);
+    setDraftProjectName("");
+    setDraftProjectWebsiteURL("");
+    setDraftProjectDomain("");
+    setDraftProjectBrandName("");
+  };
+
+  const clearCreateProjectFlag = () => {
+    navigate(buildScopedHref("/organizations", { org: selectedOrganizationId, createProject: null }), { replace: true });
+  };
+
+  const handleCreateProject = async () => {
+    if (!selectedOrganizationId) {
+      setError("Select an organization before creating a project");
       return;
     }
 
-    setIsCreatingOrganization(true);
+    const name = draftProjectName.trim();
+    const websiteURL = draftProjectWebsiteURL.trim();
+    const domain = draftProjectDomain.trim() || deriveDomainFromWebsiteURL(websiteURL);
+    const brandName = draftProjectBrandName.trim() || name;
+
+    if (!name) {
+      setError("Project name is required");
+      return;
+    }
+    if (!websiteURL) {
+      setError("Website URL is required");
+      return;
+    }
+    if (!domain) {
+      setError("Domain is required");
+      return;
+    }
+
+    setIsCreatingProject(true);
     setError(null);
     try {
-      const response = await mutate(apiBaseURL, apiRoutes.organizations.create(), {
+      const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.create(), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, slug }),
+        organizationId: selectedOrganizationId,
+        body: JSON.stringify({
+          name,
+          domain,
+          websiteUrl: websiteURL,
+          brandName,
+        }),
       });
 
-      const json = await response.json();
-      const createdId = extractCreatedId(json);
-      if (createdId) {
-        window.localStorage.setItem(SELECTED_ORG_KEY, createdId);
-        window.localStorage.setItem(`${SIM_PLAN_KEY_PREFIX}${createdId}`, draftPlan);
-        setSelectedOrganizationId(createdId);
+      if (!response.ok) {
+        throw new Error(response.error || "Failed to create project");
       }
 
-      setShowCreateWizard(false);
-      setDraftName("");
-      setDraftSlug("");
-      setDraftPlan("starter");
+      const createdId = extractCreatedProjectId(response.data);
+      if (createdId) {
+        storeSelectedProjectID(createdId);
+      }
+
+      resetCreateProjectForm();
+      clearCreateProjectFlag();
       await queryClient.invalidateQueries({
-        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+        queryKey: appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
+      });
+      await queryClient.invalidateQueries({
+        queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrganizationId),
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to create organization";
+      const message = err instanceof Error ? err.message : "Failed to create project";
       setError(message);
     } finally {
-      setIsCreatingOrganization(false);
+      setIsCreatingProject(false);
     }
   };
 
@@ -439,11 +486,7 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
       const remaining = organizations.filter((org) => org.id !== selectedOrganization.id);
       const nextSelectedId = remaining[0]?.id ?? "";
       setSelectedOrganizationId(nextSelectedId);
-      if (nextSelectedId) {
-        window.localStorage.setItem(SELECTED_ORG_KEY, nextSelectedId);
-      } else {
-        window.localStorage.removeItem(SELECTED_ORG_KEY);
-      }
+      storeSelectedOrganizationID(nextSelectedId);
       await queryClient.invalidateQueries({
         queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
       });
@@ -461,7 +504,7 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
         <div className="mb-6 shrink-0">
           <h1 className="text-3xl font-semibold tracking-tight">Organizations</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Create organizations from billing simulation, then manage team and org settings.
+            Manage tenant isolation at the org level, then explore brands and projects inside each organization.
           </p>
         </div>
 
@@ -473,24 +516,37 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
           <OrganizationsSidebar
             search={search}
             onSearchChange={setSearch}
-            showCreateWizard={showCreateWizard}
-            onToggleCreateWizard={() => setShowCreateWizard((prev) => !prev)}
-            draftName={draftName}
-            onDraftNameChange={(value) => {
-              setDraftName(value);
-              setDraftSlug(generateSlug(value));
+            selectedOrganization={selectedOrganization}
+            showCreateProjectForm={showCreateProjectForm}
+            onToggleCreateProjectForm={() => {
+              setShowCreateProjectForm((prev) => !prev);
+              if (showCreateProjectForm) {
+                clearCreateProjectFlag();
+              }
             }}
-            draftSlug={draftSlug}
-            onDraftSlugChange={(value) => setDraftSlug(generateSlug(value))}
-            draftPlan={draftPlan}
-            onDraftPlanChange={setDraftPlan}
-            isCreatingOrganization={isCreatingOrganization}
-            onCreate={() => void handleCreateOnBilling()}
-            onCancelCreate={() => {
-              setShowCreateWizard(false);
-              setDraftName("");
-              setDraftSlug("");
-              setDraftPlan("starter");
+            draftProjectName={draftProjectName}
+            onDraftProjectNameChange={(value) => {
+              setDraftProjectName(value);
+              if (draftProjectBrandName.trim() === "") {
+                setDraftProjectBrandName(value);
+              }
+            }}
+            draftProjectWebsiteURL={draftProjectWebsiteURL}
+            onDraftProjectWebsiteURLChange={(value) => {
+              setDraftProjectWebsiteURL(value);
+              if (draftProjectDomain.trim() === "") {
+                setDraftProjectDomain(deriveDomainFromWebsiteURL(value));
+              }
+            }}
+            draftProjectDomain={draftProjectDomain}
+            onDraftProjectDomainChange={setDraftProjectDomain}
+            draftProjectBrandName={draftProjectBrandName}
+            onDraftProjectBrandNameChange={setDraftProjectBrandName}
+            isCreatingProject={isCreatingProject}
+            onCreateProject={() => void handleCreateProject()}
+            onCancelCreateProject={() => {
+              resetCreateProjectForm();
+              clearCreateProjectFlag();
             }}
             organizations={filteredOrganizations}
             selectedOrganizationId={selectedOrganizationId}
@@ -524,6 +580,14 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
             members={members}
             invitations={invitations}
             teamsByID={teamsByID}
+            hierarchy={hierarchy}
+            brandGroups={brandGroups}
+            brandsCount={brandsCount}
+            onOpenCreateProject={() => {
+              setShowCreateProjectForm(true);
+              setActiveTab("overview");
+              navigate(buildScopedHref("/organizations", { org: selectedOrganizationId, createProject: "1" }), { replace: true });
+            }}
             loading={
               organizationsQuery.isLoading ||
               (organizationsQuery.isFetching && !organizationsQuery.data) ||

@@ -32,6 +32,10 @@ export const appQueryKeys = {
   ) => ["prompts", "catalog", apiBaseURL, organizationId, projectId, search, sort, direction] as const,
   organizations: (apiBaseURL: string, userId: number | null) =>
     ["organizations", apiBaseURL, userId] as const,
+  organizationHierarchy: (apiBaseURL: string, organizationId: string) =>
+    ["organizations", "hierarchy", apiBaseURL, organizationId] as const,
   organizationResources: (apiBaseURL: string, organizationId: string) =>
     ["organizations", "resources", apiBaseURL, organizationId] as const,
+  projectDetails: (apiBaseURL: string, organizationId: string, projectId: string) =>
+    ["projects", "details", apiBaseURL, organizationId, projectId] as const,
 };

@@ -15,6 +15,7 @@ import { useDashboardStore } from "@/lib/dashboard-store";
 import { useDashboardData } from "@/hooks/use-dashboard-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { shallow } from "zustand/shallow";
+import { buildFallbackSovPercentages } from "./brand-visibility-utils";
 import { matchesPromptAudienceFilters, promptIsInPeriodWithDateRange } from "./analytics-utils";
 import { DashboardSectionTitle } from "../dashboard-section-title";
 import { FiltersEmptyStateCard } from "../filters-empty-state-card";
@@ -124,17 +125,16 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
     const totalMentions = brands.reduce((acc, brand) => acc + brand.mentions, 0);
     const totalScopedPrompts = Math.max(filteredPrompts.length, 1);
     const hasFilteredData = totalMentions > 0;
-    const fallbackSovByBrand = new Map<string, number>([
-        ...(projectBrandName !== ""
-          ? [[projectBrandName, 100 - project.competitors.reduce((acc, c) => acc + c.sov, 0)] as [string, number]]
-          : []),
-        ...project.competitors
+    const fallbackSovByBrand = buildFallbackSovPercentages(
+      brands.map((brand) => ({
+        name: brand.name,
+        isCompetitor: brand.isCompetitor,
+      })),
+      new Map(
+        competitorSelection
           .filter((competitor) => competitor.name.trim() !== "")
           .map((competitor): [string, number] => [competitor.name, competitor.sov]),
-    ]);
-    const fallbackVisibleTotal = brands.reduce(
-        (acc, brand) => acc + (fallbackSovByBrand.get(brand.name) ?? 0),
-        0
+      ),
     );
 
     const brandsWithPercentages = brands.map((brand) => {
@@ -142,7 +142,7 @@ export const BrandVisibilityChart = memo(function BrandVisibilityChart() {
         const mentionRate = Number(((brand.mentions / totalScopedPrompts) * 100).toFixed(1));
         const sovPercentage = hasFilteredData
           ? Number(((brand.mentions / totalMentions) * 100).toFixed(1))
-          : Number(((fallbackSov / Math.max(fallbackVisibleTotal, 1)) * 100).toFixed(1));
+          : fallbackSov;
 
         return {
             ...brand,

@@ -1,8 +1,10 @@
 import { memo } from "react";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { OrganizationInvitation, OrganizationMember } from "@/shared/models";
+import type { OrganizationHierarchy, OrganizationInvitation, OrganizationMember } from "@/shared/models";
 import { formatDateTime } from "@/shared/utils";
+import type { OrganizationBrandGroup } from "../lib/hierarchy";
+import { OrganizationOverviewPanel } from "./organization-overview-panel";
 import { OrganizationSettingsPanel } from "./organization-settings-panel";
 import type { OrganizationSummary, OrganizationTab } from "./types";
 
@@ -27,6 +29,10 @@ export function OrganizationsMainPanel({
   members,
   invitations,
   teamsByID,
+  hierarchy,
+  brandGroups,
+  brandsCount,
+  onOpenCreateProject,
   loading,
 }: {
   activeTab: OrganizationTab;
@@ -49,6 +55,10 @@ export function OrganizationsMainPanel({
   members: OrganizationMember[];
   invitations: OrganizationInvitation[];
   teamsByID: Map<number, string>;
+  hierarchy: OrganizationHierarchy | null;
+  brandGroups: OrganizationBrandGroup[];
+  brandsCount: number;
+  onOpenCreateProject: () => void;
   loading: boolean;
 }) {
   return (
@@ -62,10 +72,16 @@ export function OrganizationsMainPanel({
           <h2 className="text-xl font-semibold">{selectedOrganization?.name || "No organization selected"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {selectedOrganization
-              ? "Manage members, invitations and settings from one place."
+              ? "Review tenant scope, brands, members, invitations and settings from one place."
               : "Select an organization in the left panel."}
           </p>
           <TabsList className="mt-4 h-auto w-fit gap-5 rounded-none bg-transparent p-0">
+            <TabsTrigger
+              value="overview"
+              className="relative h-auto rounded-none px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:after:scale-x-100"
+            >
+              Overview
+            </TabsTrigger>
             <TabsTrigger
               value="members"
               className="relative h-auto rounded-none px-0 pb-2 pt-0 text-sm font-medium text-muted-foreground transition-colors duration-200 after:absolute after:-bottom-0.5 after:left-0 after:h-0.5 after:w-full after:origin-left after:scale-x-0 after:bg-primary after:transition-transform after:duration-200 data-[state=active]:bg-transparent data-[state=active]:text-primary data-[state=active]:after:scale-x-100"
@@ -88,6 +104,21 @@ export function OrganizationsMainPanel({
         </div>
 
         <Separator className="my-4 shrink-0" />
+
+        <TabsContent
+          value="overview"
+          className="mt-0 min-h-0 flex-1 overflow-y-auto [scrollbar-gutter:stable]"
+        >
+          <OrganizationOverviewPanel
+            selectedOrganizationId={selectedOrganizationId}
+            selectedOrganization={selectedOrganization}
+            hierarchy={hierarchy}
+            brandGroups={brandGroups}
+            brandsCount={brandsCount}
+            onOpenCreateProject={onOpenCreateProject}
+            loading={loading}
+          />
+        </TabsContent>
 
         <TabsContent
           value="members"

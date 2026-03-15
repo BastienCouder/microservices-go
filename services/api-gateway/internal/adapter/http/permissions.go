@@ -65,6 +65,11 @@ func shouldEnforcePermission(r *http.Request) bool {
 		return false
 	}
 	return strings.HasPrefix(r.URL.Path, "/organizations/") ||
+		strings.HasPrefix(r.URL.Path, "/projects") ||
+		strings.HasPrefix(r.URL.Path, "/prompts") ||
+		strings.HasPrefix(r.URL.Path, "/competitors") ||
+		strings.HasPrefix(r.URL.Path, "/ai-models") ||
+		strings.HasPrefix(r.URL.Path, "/analysis") ||
 		strings.HasPrefix(r.URL.Path, "/permissions") ||
 		strings.HasPrefix(r.URL.Path, "/billing") ||
 		strings.HasPrefix(r.URL.Path, "/notifications")

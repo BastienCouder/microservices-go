@@ -3,6 +3,7 @@ import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileFloatingNav } from "@/components/sidebar/mobile-floating-nav";
 
 type AppLayoutProps = {
+  apiBaseURL: string;
   busy: boolean;
   children: ReactNode;
   feedback: string;
@@ -10,11 +11,11 @@ type AppLayoutProps = {
   onRefresh: () => Promise<void>;
 };
 
-export function AppLayout({ busy, children, feedback, onLogout, onRefresh }: AppLayoutProps) {
+export function AppLayout({ apiBaseURL, busy, children, feedback, onLogout, onRefresh }: AppLayoutProps) {
   return (
         <div className="flex h-screen w-full bg-muted/10">
             {/* Desktop Sidebar */}
-            <Sidebar busy={busy} className="hidden lg:flex" onLogout={onLogout} />
+            <Sidebar apiBaseURL={apiBaseURL} busy={busy} className="hidden lg:flex" onLogout={onLogout} />
 
 
             <div className="flex flex-col flex-1 overflow-hidden">

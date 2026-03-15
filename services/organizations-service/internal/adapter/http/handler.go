@@ -130,10 +130,17 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid organization id"})
 		return
 	}
+	if err := enforceScopedOrganization(r, organizationID); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return
+	}
 
 	switch {
 	case len(parts) == 1 && r.Method == http.MethodGet:
 		h.getOrganizationByID(w, r, organizationID)
+		return
+	case len(parts) == 2 && parts[1] == "hierarchy" && r.Method == http.MethodGet:
+		h.getOrganizationHierarchy(w, r, organizationID)
 		return
 	case len(parts) == 2 && parts[1] == "invitations" && r.Method == http.MethodPost:
 		h.createInvitation(w, r, organizationID)
@@ -219,6 +226,15 @@ func (h *Handler) getOrganizationByID(w http.ResponseWriter, r *http.Request, or
 		return
 	}
 	writeJSON(w, http.StatusOK, organization)
+}
+
+func (h *Handler) getOrganizationHierarchy(w http.ResponseWriter, r *http.Request, organizationID int64) {
+	hierarchy, err := h.svc.GetOrganizationHierarchy(r.Context(), organizationID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, hierarchy)
 }
 
 type createTeamRequest struct {
@@ -503,13 +519,8 @@ type assignRoleRequest struct {
 }
 
 func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
-	authUserID, ok := authenticatedUserID(r)
-	if !ok {
+	if _, ok := authenticatedUserID(r); !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
-		return
-	}
-	if userID != authUserID {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden target user"})
 		return
 	}
 
@@ -577,6 +588,21 @@ func authenticatedUserID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func enforceScopedOrganization(r *http.Request, organizationID int64) error {
+	raw := strings.TrimSpace(r.Header.Get("X-Organization-ID"))
+	if raw == "" {
+		return nil
+	}
+	scopedID, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || scopedID <= 0 {
+		return errors.New("invalid organization scope")
+	}
+	if scopedID != organizationID {
+		return errors.New("organization scope mismatch")
+	}
+	return nil
 }
 
 func parseOptionalRFC3339(raw string) (*time.Time, error) {

@@ -3,24 +3,26 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
 import { OrganizationItem } from "./organization-item";
-import type { OrganizationSummary, SimulatedPlan } from "./types";
+import type { OrganizationSummary } from "./types";
 
 export function OrganizationsSidebar({
   search,
   onSearchChange,
-  showCreateWizard,
-  onToggleCreateWizard,
-  draftName,
-  onDraftNameChange,
-  draftSlug,
-  onDraftSlugChange,
-  draftPlan,
-  onDraftPlanChange,
-  isCreatingOrganization,
-  onCreate,
-  onCancelCreate,
+  selectedOrganization,
+  showCreateProjectForm,
+  onToggleCreateProjectForm,
+  draftProjectName,
+  onDraftProjectNameChange,
+  draftProjectWebsiteURL,
+  onDraftProjectWebsiteURLChange,
+  draftProjectDomain,
+  onDraftProjectDomainChange,
+  draftProjectBrandName,
+  onDraftProjectBrandNameChange,
+  isCreatingProject,
+  onCreateProject,
+  onCancelCreateProject,
   organizations,
   selectedOrganizationId,
   onSelectOrganization,
@@ -28,17 +30,20 @@ export function OrganizationsSidebar({
 }: {
   search: string;
   onSearchChange: (value: string) => void;
-  showCreateWizard: boolean;
-  onToggleCreateWizard: () => void;
-  draftName: string;
-  onDraftNameChange: (value: string) => void;
-  draftSlug: string;
-  onDraftSlugChange: (value: string) => void;
-  draftPlan: SimulatedPlan;
-  onDraftPlanChange: (value: SimulatedPlan) => void;
-  isCreatingOrganization: boolean;
-  onCreate: () => void;
-  onCancelCreate: () => void;
+  selectedOrganization: OrganizationSummary | null;
+  showCreateProjectForm: boolean;
+  onToggleCreateProjectForm: () => void;
+  draftProjectName: string;
+  onDraftProjectNameChange: (value: string) => void;
+  draftProjectWebsiteURL: string;
+  onDraftProjectWebsiteURLChange: (value: string) => void;
+  draftProjectDomain: string;
+  onDraftProjectDomainChange: (value: string) => void;
+  draftProjectBrandName: string;
+  onDraftProjectBrandNameChange: (value: string) => void;
+  isCreatingProject: boolean;
+  onCreateProject: () => void;
+  onCancelCreateProject: () => void;
   organizations: OrganizationSummary[];
   selectedOrganizationId: string;
   onSelectOrganization: (organizationId: string) => void;
@@ -50,66 +55,53 @@ export function OrganizationsSidebar({
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>Your Organizations</CardTitle>
-            <CardDescription>Pick one org to manage team and settings.</CardDescription>
+            <CardDescription>Pick one tenant to manage brands, projects, members and settings.</CardDescription>
           </div>
-          <Button size="sm" onClick={onToggleCreateWizard}>
-            New
+          <Button size="sm" onClick={onToggleCreateProjectForm} disabled={!selectedOrganizationId}>
+            New project
           </Button>
         </div>
         <Input placeholder="Search organization..." value={search} onChange={(event) => onSearchChange(event.target.value)} />
       </CardHeader>
 
       <CardContent className="space-y-3 overflow-y-auto px-2">
-        {showCreateWizard ? (
+        {showCreateProjectForm ? (
           <div className="space-y-3 rounded-md border p-4">
-            <p className="text-sm font-semibold">New Organization: Billing Simulation First</p>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold">Create project</p>
+              <p className="text-xs text-muted-foreground">
+                {selectedOrganization
+                  ? `This project will be created inside ${selectedOrganization.name}.`
+                  : "Select an organization before creating a project."}
+              </p>
+            </div>
             <div className="space-y-2">
               <Input
-                placeholder="Organization name"
-                value={draftName}
-                onChange={(event) => onDraftNameChange(event.target.value)}
+                placeholder="Project name"
+                value={draftProjectName}
+                onChange={(event) => onDraftProjectNameChange(event.target.value)}
               />
               <Input
-                placeholder="slug-name"
-                value={draftSlug}
-                onChange={(event) => onDraftSlugChange(event.target.value)}
+                placeholder="https://your-website.com"
+                value={draftProjectWebsiteURL}
+                onChange={(event) => onDraftProjectWebsiteURLChange(event.target.value)}
+              />
+              <Input
+                placeholder="domain.com"
+                value={draftProjectDomain}
+                onChange={(event) => onDraftProjectDomainChange(event.target.value)}
+              />
+              <Input
+                placeholder="Brand name"
+                value={draftProjectBrandName}
+                onChange={(event) => onDraftProjectBrandNameChange(event.target.value)}
               />
             </div>
-            <div className="grid gap-2">
-              <button
-                type="button"
-                onClick={() => onDraftPlanChange("starter")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "starter" && "border-primary bg-primary/5")}
-              >
-                Starter
-              </button>
-              <button
-                type="button"
-                onClick={() => onDraftPlanChange("growth")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "growth" && "border-primary bg-primary/5")}
-              >
-                Growth
-              </button>
-              <button
-                type="button"
-                onClick={() => onDraftPlanChange("pro")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "pro" && "border-primary bg-primary/5")}
-              >
-                Pro
-              </button>
-              <button
-                type="button"
-                onClick={() => onDraftPlanChange("agency-enterprise")}
-                className={cn("rounded-md border p-3 text-left text-sm", draftPlan === "agency-enterprise" && "border-primary bg-primary/5")}
-              >
-                Agency / Enterprise
-              </button>
-            </div>
             <div className="flex gap-2">
-              <Button size="sm" onClick={onCreate} disabled={isCreatingOrganization}>
-                {isCreatingOrganization ? "Creating..." : "Complete Billing & Create Org"}
+              <Button size="sm" onClick={onCreateProject} disabled={isCreatingProject || !selectedOrganizationId}>
+                {isCreatingProject ? "Creating..." : "Create project"}
               </Button>
-              <Button size="sm" variant="ghost" onClick={onCancelCreate}>
+              <Button size="sm" variant="ghost" onClick={onCancelCreateProject}>
                 Cancel
               </Button>
             </div>

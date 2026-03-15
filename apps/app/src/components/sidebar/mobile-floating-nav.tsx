@@ -5,6 +5,13 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import {
+  buildScopedHref,
+  readOrganizationIdFromSearch,
+  readProjectIdFromSearch,
+  readSelectedOrganizationID,
+  readSelectedProjectID,
+} from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import { MONITORING_ITEMS, ORGANIZATION_ITEMS } from "./sidebar-constants";
 
@@ -30,24 +37,29 @@ type MobileFloatingNavProps = {
 export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavProps) {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const activeProjectId = readProjectIdFromSearch(location.search) || readSelectedProjectID();
+  const activeOrganizationId = readOrganizationIdFromSearch(location.search) || readSelectedOrganizationID();
 
   const navigationItems = useMemo(
     () => [
-      { href: "/monitoring", label: "Monitoring" },
+      { href: buildScopedHref("/monitoring", { projectId: activeProjectId }), label: "Monitoring" },
       ...MONITORING_ITEMS.map((item) => ({
-        href: item.href,
+        href: buildScopedHref(item.href, { projectId: activeProjectId }),
         label: item.labelKey.charAt(0).toUpperCase() + item.labelKey.slice(1),
       })),
-      { href: "/perception", label: "Perception" },
-      { href: "/optimize/actions", label: "Optimize actions" },
-      { href: "/optimize/content-optimizer", label: "Content optimizer" },
-      { href: "/impact", label: "Impact" },
+      { href: buildScopedHref("/perception", { projectId: activeProjectId }), label: "Perception" },
+      { href: buildScopedHref("/optimize/actions", { projectId: activeProjectId }), label: "Optimize actions" },
+      { href: buildScopedHref("/optimize/content-optimizer", { projectId: activeProjectId }), label: "Content optimizer" },
+      { href: buildScopedHref("/impact", { projectId: activeProjectId }), label: "Impact" },
       ...ORGANIZATION_ITEMS.map((item) => ({
-        href: item.href,
+        href: buildScopedHref(item.href, {
+          org: activeOrganizationId,
+          projectId: activeProjectId,
+        }),
         label: item.labelKey.charAt(0).toUpperCase() + item.labelKey.slice(1),
       })),
     ],
-    [],
+    [activeOrganizationId, activeProjectId],
   );
 
   return (

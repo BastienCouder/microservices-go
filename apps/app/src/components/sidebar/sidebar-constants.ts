@@ -1,7 +1,10 @@
-export type SidebarOrg = {
+export type SidebarProjectOption = {
   id: string;
   name: string;
-  domain: string;
+  organizationId: string;
+  organizationName: string;
+  brandName: string;
+  status: string;
   initials: string;
 };
 
@@ -9,10 +12,6 @@ export type SidebarItem = {
   href: string;
   labelKey: "prompts" | "pages" | "brands" | "models" | "organizations" | "team" | "settings";
 };
-
-export const ORGS: SidebarOrg[] = [
-  { id: "bco", name: "BCO", domain: "bastiencouder.com", initials: "BC" },
-];
 
 export const MONITORING_ITEMS: SidebarItem[] = [
   { href: "/prompts", labelKey: "prompts" },
