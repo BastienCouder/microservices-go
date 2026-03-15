@@ -12,6 +12,7 @@ export const projects = pgTable("projects", {
     name: text("name").notNull(),
     domain: text("domain").notNull(),
     websiteUrl: text("website_url").notNull(),
+    attributionSource: text("attribution_source"),
 
     // Marque (auto-détection + éditable)
     brandName: text("brand_name"),

@@ -53,6 +53,8 @@ type upsertSubscriptionRequest struct {
 
 type createStripeCheckoutSessionRequest struct {
 	OrganizationID    int64  `json:"organization_id"`
+	ProjectID         string `json:"project_id"`
+	AttributionSource string `json:"attribution_source"`
 	Plan              string `json:"plan"`
 	BillingCycle      string `json:"billing_cycle"`
 	Seats             int    `json:"seats"`
@@ -143,6 +145,8 @@ func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Req
 
 	out, err := h.svc.CreateStripeCheckoutSession(r.Context(), usecase.CreateStripeCheckoutSessionInput{
 		OrganizationID:    organizationID,
+		ProjectID:         req.ProjectID,
+		AttributionSource: req.AttributionSource,
 		Plan:              req.Plan,
 		BillingCycle:      req.BillingCycle,
 		Seats:             req.Seats,

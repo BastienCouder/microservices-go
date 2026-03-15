@@ -18,6 +18,8 @@ var (
 
 type CreateStripeCheckoutSessionInput struct {
 	OrganizationID    int64
+	ProjectID         string
+	AttributionSource string
 	Plan              string
 	BillingCycle      string
 	Seats             int
@@ -44,6 +46,8 @@ type CreateStripeCustomerPortalSessionOutput struct {
 
 type StripeCheckoutSessionRequest struct {
 	OrganizationID    int64
+	ProjectID         string
+	AttributionSource string
 	Plan              string
 	BillingCycle      string
 	Seats             int
@@ -68,11 +72,14 @@ type StripeWebhookEvent struct {
 	Type                   string
 	Handled                bool
 	OrganizationID         int64
+	ProjectID              string
+	AttributionSource      string
 	Plan                   string
 	BillingCycle           string
 	Seats                  int
 	MonthlyQuota           int
 	CorrectionCreditsDelta int
+	RevenueCents           int64
 	StripeCustomerID       string
 	StripeSubscriptionID   string
 	StripePriceID          string
@@ -95,4 +102,30 @@ type StripeCatalog struct {
 	ProMonthlyPriceID        string
 	ProYearlyPriceID         string
 	CorrectionCreditsPriceID string
+}
+
+type AttributionEventInput struct {
+	ProjectID      string
+	OrganizationID int64
+	Stage          string
+	Source         string
+	Count          int64
+	RevenueCents   int64
+	OccurredAt     time.Time
+}
+
+type AttributionClient interface {
+	RecordEvent(ctx context.Context, input AttributionEventInput) error
+}
+
+type ProjectSummary struct {
+	ID                string
+	OrganizationID    int64
+	Status            string
+	AttributionSource string
+	CreatedAt         time.Time
+}
+
+type ProjectResolver interface {
+	ListProjectsByOrganization(ctx context.Context, organizationID int64) ([]ProjectSummary, error)
 }

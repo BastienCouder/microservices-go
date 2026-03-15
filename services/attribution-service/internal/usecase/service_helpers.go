@@ -15,6 +15,13 @@ func (s *Service) ensureProjectAccess(ctx context.Context, projectID, userID str
 	return s.projectVerifier.EnsureProjectOwnedByUser(ctx, projectID, userID)
 }
 
+func (s *Service) ensureProjectOrganizationAccess(ctx context.Context, projectID string, organizationID int64) error {
+	if s.projectVerifier == nil {
+		return nil
+	}
+	return s.projectVerifier.EnsureProjectInOrganization(ctx, projectID, organizationID)
+}
+
 func normalizeStage(value string) string {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case StageVisit:

@@ -63,12 +63,16 @@ func (c *Client) CreateSubscriptionCheckoutSession(ctx context.Context, req usec
 	form.Set("line_items[0][price]", strings.TrimSpace(req.PriceID))
 	form.Set("line_items[0][quantity]", strconv.Itoa(req.Seats))
 	form.Set("metadata[organization_id]", strconv.FormatInt(req.OrganizationID, 10))
+	form.Set("metadata[project_id]", strings.TrimSpace(req.ProjectID))
+	form.Set("metadata[attribution_source]", strings.TrimSpace(req.AttributionSource))
 	form.Set("metadata[plan]", domain.NormalizePlan(req.Plan))
 	form.Set("metadata[billing_cycle]", domain.NormalizeBillingCycle(req.BillingCycle))
 	form.Set("metadata[seats]", strconv.Itoa(req.Seats))
 	form.Set("metadata[monthly_quota]", strconv.Itoa(req.MonthlyQuota))
 	form.Set("metadata[correction_credits]", strconv.Itoa(req.CorrectionCredits))
 	form.Set("subscription_data[metadata][organization_id]", strconv.FormatInt(req.OrganizationID, 10))
+	form.Set("subscription_data[metadata][project_id]", strings.TrimSpace(req.ProjectID))
+	form.Set("subscription_data[metadata][attribution_source]", strings.TrimSpace(req.AttributionSource))
 	form.Set("subscription_data[metadata][plan]", domain.NormalizePlan(req.Plan))
 	form.Set("subscription_data[metadata][billing_cycle]", domain.NormalizeBillingCycle(req.BillingCycle))
 	form.Set("subscription_data[metadata][seats]", strconv.Itoa(req.Seats))
@@ -163,6 +167,8 @@ func (c *Client) ParseWebhookEvent(payload []byte, signature string) (usecase.St
 		}
 		event.Handled = true
 		event.OrganizationID = parsed.OrganizationID
+		event.ProjectID = parsed.ProjectID
+		event.AttributionSource = parsed.AttributionSource
 		event.Plan = parsed.Plan
 		event.BillingCycle = parsed.BillingCycle
 		event.Seats = parsed.Seats
@@ -182,6 +188,8 @@ func (c *Client) ParseWebhookEvent(payload []byte, signature string) (usecase.St
 		}
 		event.Handled = true
 		event.OrganizationID = parsed.OrganizationID
+		event.ProjectID = parsed.ProjectID
+		event.AttributionSource = parsed.AttributionSource
 		event.Plan = parsed.Plan
 		event.BillingCycle = parsed.BillingCycle
 		event.Seats = parsed.Seats
@@ -192,6 +200,19 @@ func (c *Client) ParseWebhookEvent(payload []byte, signature string) (usecase.St
 		event.Status = parsed.Status
 		event.CancelAtPeriodEnd = parsed.CancelAtPeriodEnd
 		event.CurrentPeriodEnd = parsed.CurrentPeriodEnd
+	case "invoice.paid":
+		parsed, err := parseInvoicePaidEvent(eventEnvelope.Data.Raw)
+		if err != nil {
+			return usecase.StripeWebhookEvent{}, err
+		}
+		event.Handled = true
+		event.OrganizationID = parsed.OrganizationID
+		event.ProjectID = parsed.ProjectID
+		event.AttributionSource = parsed.AttributionSource
+		event.StripeCustomerID = parsed.StripeCustomerID
+		event.StripeSubscriptionID = parsed.StripeSubscriptionID
+		event.RevenueCents = parsed.RevenueCents
+		event.Status = domain.SubscriptionStatusActive
 	default:
 		event.Handled = false
 	}
@@ -290,6 +311,8 @@ func expandableID(raw json.RawMessage) string {
 
 type parsedCheckoutSession struct {
 	OrganizationID       int64
+	ProjectID            string
+	AttributionSource    string
 	Plan                 string
 	BillingCycle         string
 	Seats                int
@@ -312,6 +335,8 @@ func parseCheckoutSessionCompleted(raw json.RawMessage) (parsedCheckoutSession, 
 	}
 	return parsedCheckoutSession{
 		OrganizationID:       metadataInt64(payload.Metadata, "organization_id"),
+		ProjectID:            metadataString(payload.Metadata, "project_id"),
+		AttributionSource:    metadataString(payload.Metadata, "attribution_source"),
 		Plan:                 metadataString(payload.Metadata, "plan"),
 		BillingCycle:         metadataString(payload.Metadata, "billing_cycle"),
 		Seats:                metadataInt(payload.Metadata, "seats"),
@@ -325,6 +350,8 @@ func parseCheckoutSessionCompleted(raw json.RawMessage) (parsedCheckoutSession, 
 
 type parsedSubscription struct {
 	OrganizationID       int64
+	ProjectID            string
+	AttributionSource    string
 	Plan                 string
 	BillingCycle         string
 	Seats                int
@@ -370,6 +397,8 @@ func parseSubscriptionEvent(raw json.RawMessage) (parsedSubscription, error) {
 
 	return parsedSubscription{
 		OrganizationID:       metadataInt64(payload.Metadata, "organization_id"),
+		ProjectID:            metadataString(payload.Metadata, "project_id"),
+		AttributionSource:    metadataString(payload.Metadata, "attribution_source"),
 		Plan:                 metadataString(payload.Metadata, "plan"),
 		BillingCycle:         metadataString(payload.Metadata, "billing_cycle"),
 		Seats:                metadataInt(payload.Metadata, "seats"),
@@ -380,6 +409,48 @@ func parseSubscriptionEvent(raw json.RawMessage) (parsedSubscription, error) {
 		Status:               strings.TrimSpace(payload.Status),
 		CancelAtPeriodEnd:    payload.CancelAtPeriodEnd,
 		CurrentPeriodEnd:     currentPeriodEnd,
+	}, nil
+}
+
+type parsedInvoice struct {
+	OrganizationID       int64
+	ProjectID            string
+	AttributionSource    string
+	StripeCustomerID     string
+	StripeSubscriptionID string
+	RevenueCents         int64
+}
+
+func parseInvoicePaidEvent(raw json.RawMessage) (parsedInvoice, error) {
+	var payload struct {
+		Customer     json.RawMessage `json:"customer"`
+		Subscription json.RawMessage `json:"subscription"`
+		AmountPaid   int64           `json:"amount_paid"`
+		Parent       struct {
+			SubscriptionDetails struct {
+				Metadata map[string]string `json:"metadata"`
+			} `json:"subscription_details"`
+		} `json:"parent"`
+		SubscriptionDetails struct {
+			Metadata map[string]string `json:"metadata"`
+		} `json:"subscription_details"`
+	}
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return parsedInvoice{}, fmt.Errorf("decode invoice.paid object: %w", err)
+	}
+
+	metadata := payload.SubscriptionDetails.Metadata
+	if len(metadata) == 0 {
+		metadata = payload.Parent.SubscriptionDetails.Metadata
+	}
+
+	return parsedInvoice{
+		OrganizationID:       metadataInt64(metadata, "organization_id"),
+		ProjectID:            metadataString(metadata, "project_id"),
+		AttributionSource:    metadataString(metadata, "attribution_source"),
+		StripeCustomerID:     expandableID(payload.Customer),
+		StripeSubscriptionID: expandableID(payload.Subscription),
+		RevenueCents:         payload.AmountPaid,
 	}, nil
 }
 

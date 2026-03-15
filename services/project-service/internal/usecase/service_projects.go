@@ -25,28 +25,28 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 	}
 
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
 		return Project{}, err
 	}
 
 	now := s.now().UTC()
 	project := &Project{
-		ID:               s.nextID("prj"),
-		OrganizationID:   input.OrganizationID,
-		CreatedBy:        input.CreatedBy,
-		Name:             name,
-		Domain:           domain,
-		WebsiteURL:       websiteURL,
-		BrandName:        strings.TrimSpace(input.BrandName),
-		BrandDescription: strings.TrimSpace(input.BrandDescription),
-		Industry:         strings.TrimSpace(input.Industry),
-		PrimaryLanguage:  primaryLanguage,
-		Country:          country,
-		Status:           "draft",
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:                s.nextID("prj"),
+		OrganizationID:    input.OrganizationID,
+		CreatedBy:         input.CreatedBy,
+		Name:              name,
+		Domain:            domain,
+		WebsiteURL:        websiteURL,
+		AttributionSource: normalizeAttributionSource(input.AttributionSource),
+		BrandName:         strings.TrimSpace(input.BrandName),
+		BrandDescription:  strings.TrimSpace(input.BrandDescription),
+		Industry:          strings.TrimSpace(input.Industry),
+		PrimaryLanguage:   primaryLanguage,
+		Country:           country,
+		Status:            "draft",
+		CreatedAt:         now,
+		UpdatedAt:         now,
 	}
 	s.projects[project.ID] = project
 
@@ -60,10 +60,15 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 	if err := s.persistLocked(ctx); err != nil {
 		delete(s.projects, project.ID)
 		delete(s.projectModels, project.ID)
+		s.mu.Unlock()
 		return Project{}, err
 	}
 
-	return copyProject(project), nil
+	created := copyProject(project)
+	s.mu.Unlock()
+
+	s.emitProjectSignupAttribution(ctx, created)
+	return created, nil
 }
 
 func (s *Service) ListProjects(ctx context.Context, organizationID int64) ([]Project, error) {
@@ -139,6 +144,9 @@ func (s *Service) UpdateProject(ctx context.Context, projectID string, organizat
 			return Project{}, fmt.Errorf("%w: websiteUrl cannot be empty", ErrValidation)
 		}
 		project.WebsiteURL = value
+	}
+	if input.AttributionSource != nil {
+		project.AttributionSource = normalizeAttributionSource(*input.AttributionSource)
 	}
 	if input.BrandName != nil {
 		project.BrandName = strings.TrimSpace(*input.BrandName)

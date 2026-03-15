@@ -19,6 +19,7 @@ import (
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
+	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/http"
@@ -66,10 +67,25 @@ func main() {
 	}
 	defer iaGRPCClient.Close()
 
+	var attributionHTTPClient usecase.AttributionClient
+	if cfg.AttributionServiceURL != "" {
+		client, err := attributionclient.NewClient(cfg.AttributionServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init attribution http client: %v", err)
+		}
+		attributionHTTPClient = client
+	}
+
+	store, err := projectstate.NewStateStore(db, cfg.SecretEncryptionKey)
+	if err != nil {
+		log.Fatalf("init project state store: %v", err)
+	}
+
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:          projectstate.NewStateStore(db),
-		AnalysisClient: analysisGRPCClient,
-		IAClient:       iaGRPCClient,
+		Store:             store,
+		AnalysisClient:    analysisGRPCClient,
+		IAClient:          iaGRPCClient,
+		AttributionClient: attributionHTTPClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)

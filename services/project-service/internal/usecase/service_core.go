@@ -11,32 +11,35 @@ import (
 )
 
 type Service struct {
-	mu            sync.RWMutex
-	now           func() time.Time
-	seq           int64
-	projects      map[string]*Project
-	prompts       map[string]*Prompt
-	competitors   map[string]*Competitor
-	models        map[string]AIModel
-	projectModels map[string]map[string]bool
-	outbox        map[string]*OutboxEvent
-	outboxOrder   []string
+	mu                 sync.RWMutex
+	now                func() time.Time
+	seq                int64
+	projects           map[string]*Project
+	prompts            map[string]*Prompt
+	competitors        map[string]*Competitor
+	models             map[string]AIModel
+	projectModels      map[string]map[string]bool
+	impactIntegrations map[string]*ProjectImpactIntegrations
+	outbox             map[string]*OutboxEvent
+	outboxOrder        []string
 
-	store          StateStore
-	analysisClient AnalysisClient
-	iaClient       IAClient
+	store             StateStore
+	analysisClient    AnalysisClient
+	iaClient          IAClient
+	attributionClient AttributionClient
 }
 
 func NewService() *Service {
 	svc := &Service{
-		now:           time.Now,
-		projects:      make(map[string]*Project),
-		prompts:       make(map[string]*Prompt),
-		competitors:   make(map[string]*Competitor),
-		models:        make(map[string]AIModel),
-		projectModels: make(map[string]map[string]bool),
-		outbox:        make(map[string]*OutboxEvent),
-		outboxOrder:   make([]string, 0),
+		now:                time.Now,
+		projects:           make(map[string]*Project),
+		prompts:            make(map[string]*Prompt),
+		competitors:        make(map[string]*Competitor),
+		models:             make(map[string]AIModel),
+		projectModels:      make(map[string]map[string]bool),
+		impactIntegrations: make(map[string]*ProjectImpactIntegrations),
+		outbox:             make(map[string]*OutboxEvent),
+		outboxOrder:        make([]string, 0),
 	}
 	svc.seedDefaultModels()
 	return svc
@@ -47,6 +50,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.store = deps.Store
 	svc.analysisClient = deps.AnalysisClient
 	svc.iaClient = deps.IAClient
+	svc.attributionClient = deps.AttributionClient
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err
@@ -84,6 +88,7 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
+	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 	if len(s.models) == 0 {
@@ -106,14 +111,15 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 
 func (s *Service) snapshotLocked() *persistedState {
 	state := &persistedState{
-		Seq:           s.seq,
-		Projects:      make(map[string]*Project, len(s.projects)),
-		Prompts:       make(map[string]*Prompt, len(s.prompts)),
-		Competitors:   make(map[string]*Competitor, len(s.competitors)),
-		Models:        make(map[string]AIModel, len(s.models)),
-		ProjectModels: make(map[string]map[string]bool, len(s.projectModels)),
-		Outbox:        make(map[string]*OutboxEvent, len(s.outbox)),
-		OutboxOrder:   append([]string(nil), s.outboxOrder...),
+		Seq:                s.seq,
+		Projects:           make(map[string]*Project, len(s.projects)),
+		Prompts:            make(map[string]*Prompt, len(s.prompts)),
+		Competitors:        make(map[string]*Competitor, len(s.competitors)),
+		Models:             make(map[string]AIModel, len(s.models)),
+		ProjectModels:      make(map[string]map[string]bool, len(s.projectModels)),
+		ImpactIntegrations: make(map[string]*ProjectImpactIntegrations, len(s.impactIntegrations)),
+		Outbox:             make(map[string]*OutboxEvent, len(s.outbox)),
+		OutboxOrder:        append([]string(nil), s.outboxOrder...),
 	}
 	for key, value := range s.projects {
 		clone := *value
@@ -137,6 +143,10 @@ func (s *Service) snapshotLocked() *persistedState {
 		}
 		state.ProjectModels[projectID] = copied
 	}
+	for key, value := range s.impactIntegrations {
+		clone := copyProjectImpactIntegrations(value)
+		state.ImpactIntegrations[key] = &clone
+	}
 	for key, value := range s.outbox {
 		clone := copyOutboxEvent(value)
 		state.Outbox[key] = &clone
@@ -154,6 +164,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
+	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 }
@@ -215,6 +226,13 @@ func copyProject(project *Project) Project {
 		return Project{}
 	}
 	return *project
+}
+
+func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpactIntegrations {
+	if value == nil {
+		return ProjectImpactIntegrations{}
+	}
+	return *value
 }
 
 func copyPrompt(prompt *Prompt) Prompt {
@@ -279,6 +297,18 @@ func nonNilProjectModelMap(input map[string]map[string]bool) map[string]map[stri
 		return make(map[string]map[string]bool)
 	}
 	return input
+}
+
+func nonNilProjectImpactIntegrationMap(input map[string]*ProjectImpactIntegrations) map[string]*ProjectImpactIntegrations {
+	if input == nil {
+		return make(map[string]*ProjectImpactIntegrations)
+	}
+	out := make(map[string]*ProjectImpactIntegrations, len(input))
+	for key, value := range input {
+		clone := copyProjectImpactIntegrations(value)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilOutboxMap(input map[string]*OutboxEvent) map[string]*OutboxEvent {

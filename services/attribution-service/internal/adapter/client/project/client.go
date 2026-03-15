@@ -189,6 +189,56 @@ func (c *Client) EnsureProjectOwnedByUser(ctx context.Context, projectID, userID
 	return fmt.Errorf("%w: project access denied", usecase.ErrUnauthorized)
 }
 
+func (c *Client) EnsureProjectInOrganization(ctx context.Context, projectID string, organizationID int64) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return fmt.Errorf("%w: projectId is required", usecase.ErrValidation)
+	}
+	if organizationID <= 0 {
+		return fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
+	}
+
+	token, err := security.SignInternalJWT(
+		c.jwtSecret,
+		c.jwtIssuer,
+		"project-service",
+		"attribution-service",
+		security.OutboundTokenClaims{Organization: organizationID},
+	)
+	if err != nil {
+		return fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	var grpcResp *projectv1.CheckProjectAccessResponse
+	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
+		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		resp, callErr := c.client.CheckProjectAccess(callCtx, &projectv1.CheckProjectAccessRequest{
+			ProjectId: projectID,
+			UserId:    0,
+		})
+		if callErr != nil {
+			return isTransientGRPCError(callErr), callErr
+		}
+		grpcResp = resp
+		return false, nil
+	})
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.InvalidArgument {
+			return fmt.Errorf("%w: %s", usecase.ErrValidation, st.Message())
+		}
+		return err
+	}
+
+	if grpcResp.GetAllowed() {
+		return nil
+	}
+	if !grpcResp.GetExists() {
+		return fmt.Errorf("%w: project", usecase.ErrNotFound)
+	}
+	return fmt.Errorf("%w: project access denied", usecase.ErrUnauthorized)
+}
+
 func (c *Client) executeWithResilience(
 	ctx context.Context,
 	attempts int,

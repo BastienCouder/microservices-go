@@ -182,54 +182,9 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
   );
 
   const modelAxisHeatmap = useMemo(() => {
-    const filteredHeatmap = derivePerceptionHeatmapFromResponses(filteredResponses);
-    const scopedRows = filteredHeatmap.rows;
-
-    if (showUniqueModelFilters) {
-      return {
-        axes: filteredHeatmap.axes,
-        rows: scopedRows,
-      };
-    }
-
-    const groupedRows = new Map<
-      string,
-      {
-        count: number;
-        values: Record<string, number[]>;
-      }
-    >();
-
-    for (const row of scopedRows) {
-      const groupName = getModelGroupForName(row.model);
-      const current = groupedRows.get(groupName) ?? {
-        count: 0,
-        values: Object.fromEntries(
-          filteredHeatmap.axes.map((axis) => [axis.key, [] as number[]]),
-        ) as Record<string, number[]>,
-      };
-
-      current.count += 1;
-      for (const axis of filteredHeatmap.axes) {
-        current.values[axis.key]?.push(row.values[axis.key] ?? 0);
-      }
-      groupedRows.set(groupName, current);
-    }
-
-    const rows = Array.from(groupedRows.entries()).map(([model, aggregate]) => ({
-      model,
-      values: Object.fromEntries(
-        filteredHeatmap.axes.map((axis) => [
-          axis.key,
-          averageNumbers(aggregate.values[axis.key] ?? []),
-        ]),
-      ),
-    }));
-
-    return {
-      axes: filteredHeatmap.axes,
-      rows,
-    };
+    return derivePerceptionHeatmapFromResponses(filteredResponses, {
+      groupModelName: showUniqueModelFilters ? undefined : getModelGroupForName,
+    });
   }, [filteredResponses, showUniqueModelFilters]);
 
   const perceptionTrend = useMemo(() => {
@@ -457,9 +412,4 @@ async function getJson<T>(path: string): Promise<T> {
   const json = (await res.json()) as { data?: T; message?: string };
   if (json?.data !== undefined) return json.data;
   throw new Error(json?.message || "Réponse API invalide");
-}
-
-function averageNumbers(values: number[]): number {
-  if (values.length === 0) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }

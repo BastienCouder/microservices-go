@@ -13,6 +13,8 @@ type Config struct {
 	DatabaseURL              string
 	AnalysisServiceGRPCAddr  string
 	IAServiceGRPCAddr        string
+	AttributionServiceURL    string
+	SecretEncryptionKey      string
 	RabbitMQURL              string
 	RabbitMQExchange         string
 	RabbitMQFinalizeQueue    string
@@ -73,6 +75,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	secretEncryptionKey, err := requiredEnvOrFile("PROJECT_SECRET_ENCRYPTION_KEY", "PROJECT_SECRET_ENCRYPTION_KEY_FILE")
+	if err != nil {
+		return Config{}, err
+	}
 	grpcAllowInsecure, err := optionalBoolEnv("GRPC_ALLOW_INSECURE", false)
 	if err != nil {
 		return Config{}, err
@@ -88,6 +94,8 @@ func Load() (Config, error) {
 		DatabaseURL:              databaseURL,
 		AnalysisServiceGRPCAddr:  analysisServiceGRPCAddr,
 		IAServiceGRPCAddr:        iaServiceGRPCAddr,
+		AttributionServiceURL:    optionalEnv("ATTRIBUTION_SERVICE_URL"),
+		SecretEncryptionKey:      secretEncryptionKey,
 		RabbitMQURL:              rabbitMQURL,
 		RabbitMQExchange:         rabbitMQExchange,
 		RabbitMQFinalizeQueue:    rabbitMQFinalizeQueue,

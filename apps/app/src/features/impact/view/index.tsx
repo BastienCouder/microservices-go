@@ -1,5 +1,10 @@
 import { ImpactTemplate } from "./template";
 
-export function ImpactPage() {
-  return <ImpactTemplate />;
+type ImpactPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function ImpactPage({ apiBaseURL, routeSearch }: ImpactPageProps) {
+  return <ImpactTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

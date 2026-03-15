@@ -19,8 +19,8 @@ const (
 
 	PromptScheduleModeGlobal   = "global"
 	PromptScheduleModePerModel = "per_model"
-	DefaultPromptCron         = "0 */6 * * *"
-	DefaultPromptTimezone     = "UTC"
+	DefaultPromptCron          = "0 */6 * * *"
+	DefaultPromptTimezone      = "UTC"
 
 	OutboxEventTypeProjectFinalized = "project.finalized"
 
@@ -31,33 +31,100 @@ const (
 )
 
 type Project struct {
-	ID               string    `json:"id"`
-	OrganizationID   int64     `json:"organizationId"`
-	CreatedBy        int64     `json:"createdBy"`
-	Name             string    `json:"name"`
-	Domain           string    `json:"domain"`
-	WebsiteURL       string    `json:"websiteUrl"`
-	BrandName        string    `json:"brandName,omitempty"`
-	BrandDescription string    `json:"brandDescription,omitempty"`
-	Industry         string    `json:"industry,omitempty"`
-	PrimaryLanguage  string    `json:"primaryLanguage"`
-	Country          string    `json:"country"`
-	Status           string    `json:"status"`
-	CreatedAt        time.Time `json:"createdAt"`
-	UpdatedAt        time.Time `json:"updatedAt"`
+	ID                string    `json:"id"`
+	OrganizationID    int64     `json:"organizationId"`
+	CreatedBy         int64     `json:"createdBy"`
+	Name              string    `json:"name"`
+	Domain            string    `json:"domain"`
+	WebsiteURL        string    `json:"websiteUrl"`
+	AttributionSource string    `json:"attributionSource,omitempty"`
+	BrandName         string    `json:"brandName,omitempty"`
+	BrandDescription  string    `json:"brandDescription,omitempty"`
+	Industry          string    `json:"industry,omitempty"`
+	PrimaryLanguage   string    `json:"primaryLanguage"`
+	Country           string    `json:"country"`
+	Status            string    `json:"status"`
+	CreatedAt         time.Time `json:"createdAt"`
+	UpdatedAt         time.Time `json:"updatedAt"`
+}
+
+type ProjectImpactIntegrations struct {
+	ProjectID string                      `json:"projectId"`
+	GA4       ProjectGA4Integration       `json:"ga4"`
+	Stripe    ProjectStripeIntegration    `json:"stripe"`
+	Ingestion ProjectIngestionIntegration `json:"ingestion"`
+}
+
+type ProjectGA4Integration struct {
+	PropertyID         string    `json:"propertyId,omitempty"`
+	ServiceAccountJSON string    `json:"serviceAccountJSON,omitempty"`
+	ConnectedAt        time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
+}
+
+type ProjectStripeIntegration struct {
+	WebhookSecret string    `json:"webhookSecret,omitempty"`
+	ConnectedAt   time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt     time.Time `json:"updatedAt,omitempty"`
+}
+
+type ProjectIngestionIntegration struct {
+	SigningToken string    `json:"signingToken,omitempty"`
+	ConnectedAt  time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
+}
+
+type ProjectImpactIntegrationsView struct {
+	ProjectID string                          `json:"projectId"`
+	GA4       ProjectGA4IntegrationView       `json:"ga4"`
+	Stripe    ProjectStripeIntegrationView    `json:"stripe"`
+	Ingestion ProjectIngestionIntegrationView `json:"ingestion"`
+}
+
+type ProjectGA4IntegrationView struct {
+	PropertyID        string    `json:"propertyId,omitempty"`
+	HasServiceAccount bool      `json:"hasServiceAccount"`
+	IsConnected       bool      `json:"isConnected"`
+	ConnectedAt       time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
+}
+
+type ProjectStripeIntegrationView struct {
+	HasWebhookSecret bool      `json:"hasWebhookSecret"`
+	IsConnected      bool      `json:"isConnected"`
+	WebhookPath      string    `json:"webhookPath"`
+	ConnectedAt      time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt        time.Time `json:"updatedAt,omitempty"`
+}
+
+type ProjectIngestionIntegrationView struct {
+	HasSigningToken bool      `json:"hasSigningToken"`
+	IsConnected     bool      `json:"isConnected"`
+	IngestPath      string    `json:"ingestPath"`
+	ConnectedAt     time.Time `json:"connectedAt,omitempty"`
+	UpdatedAt       time.Time `json:"updatedAt,omitempty"`
+	GeneratedToken  string    `json:"generatedToken,omitempty"`
+}
+
+type ProjectImpactContext struct {
+	ProjectID      string                    `json:"projectId"`
+	OrganizationID int64                     `json:"organizationId"`
+	Domain         string                    `json:"domain"`
+	WebsiteURL     string                    `json:"websiteUrl"`
+	Integrations   ProjectImpactIntegrations `json:"integrations"`
 }
 
 type Prompt struct {
-	ID        string    `json:"id"`
-	ProjectID string    `json:"projectId"`
-	Text      string    `json:"text"`
-	Intent    string    `json:"intent,omitempty"`
-	ModelIDs  []string  `json:"modelIds,omitempty"`
+	ID        string         `json:"id"`
+	ProjectID string         `json:"projectId"`
+	Text      string         `json:"text"`
+	Intent    string         `json:"intent,omitempty"`
+	ModelIDs  []string       `json:"modelIds,omitempty"`
 	Schedule  PromptSchedule `json:"schedule"`
-	Status    string    `json:"status"`
-	IsActive  bool      `json:"isActive"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Status    string         `json:"status"`
+	IsActive  bool           `json:"isActive"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
 type PromptSchedule struct {
@@ -96,25 +163,49 @@ type ProjectModelSelection struct {
 }
 
 type CreateProjectInput struct {
-	OrganizationID   int64
-	CreatedBy        int64
-	Name             string
-	Domain           string
-	WebsiteURL       string
-	BrandName        string
-	BrandDescription string
-	Industry         string
-	PrimaryLanguage  string
-	Country          string
+	OrganizationID    int64
+	CreatedBy         int64
+	Name              string
+	Domain            string
+	WebsiteURL        string
+	AttributionSource string
+	BrandName         string
+	BrandDescription  string
+	Industry          string
+	PrimaryLanguage   string
+	Country           string
 }
 
 type UpdateProjectInput struct {
-	Name             *string
-	Domain           *string
-	WebsiteURL       *string
-	BrandName        *string
-	BrandDescription *string
-	Industry         *string
+	Name              *string
+	Domain            *string
+	WebsiteURL        *string
+	AttributionSource *string
+	BrandName         *string
+	BrandDescription  *string
+	Industry          *string
+}
+
+type UpdateProjectImpactIntegrationsInput struct {
+	GA4       *UpdateProjectGA4IntegrationInput
+	Stripe    *UpdateProjectStripeIntegrationInput
+	Ingestion *UpdateProjectIngestionIntegrationInput
+}
+
+type UpdateProjectGA4IntegrationInput struct {
+	PropertyID         *string
+	ServiceAccountJSON *string
+	Disconnect         bool
+}
+
+type UpdateProjectStripeIntegrationInput struct {
+	WebhookSecret *string
+	Disconnect    bool
+}
+
+type UpdateProjectIngestionIntegrationInput struct {
+	Rotate     bool
+	Disconnect bool
 }
 
 type UpdatePromptInput struct {
@@ -185,13 +276,13 @@ type AnalysisPromptRun struct {
 }
 
 type AnalysisStartRequest struct {
-	RequestID   string
+	RequestID      string
 	OrganizationID int64
-	CreatedBy   int64
-	ProjectID   string
-	PromptTexts []AnalysisPromptText
-	ModelIDs    []string
-	RunType     string
+	CreatedBy      int64
+	ProjectID      string
+	PromptTexts    []AnalysisPromptText
+	ModelIDs       []string
+	RunType        string
 }
 
 type AnalysisStartResponse struct {
@@ -254,24 +345,41 @@ type IAClient interface {
 	ExecutePrompt(ctx context.Context, input IAExecutePromptInput) (IAExecutePromptResult, error)
 }
 
+type AttributionEventInput struct {
+	ProjectID      string
+	OrganizationID int64
+	UserID         int64
+	Stage          string
+	Source         string
+	Count          int64
+	RevenueCents   int64
+	OccurredAt     time.Time
+}
+
+type AttributionClient interface {
+	RecordEvent(ctx context.Context, input AttributionEventInput) error
+}
+
 type StateStore interface {
 	Load(ctx context.Context) ([]byte, bool, error)
 	Save(ctx context.Context, payload []byte) error
 }
 
 type Dependencies struct {
-	Store          StateStore
-	AnalysisClient AnalysisClient
-	IAClient       IAClient
+	Store             StateStore
+	AnalysisClient    AnalysisClient
+	IAClient          IAClient
+	AttributionClient AttributionClient
 }
 
 type persistedState struct {
-	Seq           int64                      `json:"seq"`
-	Projects      map[string]*Project        `json:"projects"`
-	Prompts       map[string]*Prompt         `json:"prompts"`
-	Competitors   map[string]*Competitor     `json:"competitors"`
-	Models        map[string]AIModel         `json:"models"`
-	ProjectModels map[string]map[string]bool `json:"projectModels"`
-	Outbox        map[string]*OutboxEvent    `json:"outbox"`
-	OutboxOrder   []string                   `json:"outboxOrder"`
+	Seq                int64                                 `json:"seq"`
+	Projects           map[string]*Project                   `json:"projects"`
+	Prompts            map[string]*Prompt                    `json:"prompts"`
+	Competitors        map[string]*Competitor                `json:"competitors"`
+	Models             map[string]AIModel                    `json:"models"`
+	ProjectModels      map[string]map[string]bool            `json:"projectModels"`
+	ImpactIntegrations map[string]*ProjectImpactIntegrations `json:"impactIntegrations"`
+	Outbox             map[string]*OutboxEvent               `json:"outbox"`
+	OutboxOrder        []string                              `json:"outboxOrder"`
 }

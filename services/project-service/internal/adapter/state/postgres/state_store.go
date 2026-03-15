@@ -5,43 +5,52 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq           int64                       `json:"seq"`
-	Projects      map[string]*usecase.Project `json:"projects"`
-	Prompts       map[string]*usecase.Prompt  `json:"prompts"`
-	Competitors   map[string]*usecase.Competitor `json:"competitors"`
-	Models        map[string]usecase.AIModel  `json:"models"`
-	ProjectModels map[string]map[string]bool  `json:"projectModels"`
-	Outbox        map[string]*usecase.OutboxEvent `json:"outbox"`
-	OutboxOrder   []string                    `json:"outboxOrder"`
+	Seq                int64                                         `json:"seq"`
+	Projects           map[string]*usecase.Project                   `json:"projects"`
+	Prompts            map[string]*usecase.Prompt                    `json:"prompts"`
+	Competitors        map[string]*usecase.Competitor                `json:"competitors"`
+	Models             map[string]usecase.AIModel                    `json:"models"`
+	ProjectModels      map[string]map[string]bool                    `json:"projectModels"`
+	ImpactIntegrations map[string]*usecase.ProjectImpactIntegrations `json:"impactIntegrations"`
+	Outbox             map[string]*usecase.OutboxEvent               `json:"outbox"`
+	OutboxOrder        []string                                      `json:"outboxOrder"`
 }
 
 type StateStore struct {
-	db *pgxpool.Pool
+	db    *pgxpool.Pool
+	codec *security.SecretCodec
 }
 
-func NewStateStore(db *pgxpool.Pool) *StateStore {
-	return &StateStore{db: db}
+func NewStateStore(db *pgxpool.Pool, secretEncryptionKey string) (*StateStore, error) {
+	codec, err := security.NewSecretCodec(secretEncryptionKey)
+	if err != nil {
+		return nil, err
+	}
+	return &StateStore{db: db, codec: codec}, nil
 }
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	state := persistedState{
-		Projects:      make(map[string]*usecase.Project),
-		Prompts:       make(map[string]*usecase.Prompt),
-		Competitors:   make(map[string]*usecase.Competitor),
-		Models:        make(map[string]usecase.AIModel),
-		ProjectModels: make(map[string]map[string]bool),
-		Outbox:        make(map[string]*usecase.OutboxEvent),
-		OutboxOrder:   make([]string, 0),
+		Projects:           make(map[string]*usecase.Project),
+		Prompts:            make(map[string]*usecase.Prompt),
+		Competitors:        make(map[string]*usecase.Competitor),
+		Models:             make(map[string]usecase.AIModel),
+		ProjectModels:      make(map[string]map[string]bool),
+		ImpactIntegrations: make(map[string]*usecase.ProjectImpactIntegrations),
+		Outbox:             make(map[string]*usecase.OutboxEvent),
+		OutboxOrder:        make([]string, 0),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -75,6 +84,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadProjectModels(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadImpactIntegrations(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadOutbox(ctx, &state); err != nil {
@@ -118,6 +130,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		`DELETE FROM prompt_model_schedules`,
 		`DELETE FROM prompt_models`,
 		`DELETE FROM project_models`,
+		`DELETE FROM project_impact_integrations`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
 		`DELETE FROM projects`,
@@ -149,6 +162,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	if err := insertProjectSelections(ctx, tx, state.ProjectModels); err != nil {
 		return err
 	}
+	if err := s.insertImpactIntegrations(ctx, tx, state.ImpactIntegrations); err != nil {
+		return err
+	}
 	if err := insertOutboxEvents(ctx, tx, state.Outbox, state.OutboxOrder); err != nil {
 		return err
 	}
@@ -162,7 +178,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, organization_id, created_by, name, domain, website_url, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at
+		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at
 		FROM projects
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -173,10 +189,11 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 
 	for rows.Next() {
 		var (
-			item             usecase.Project
-			brandName        *string
-			brandDescription *string
-			industry         *string
+			item              usecase.Project
+			attributionSource *string
+			brandName         *string
+			brandDescription  *string
+			industry          *string
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -185,6 +202,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			&item.Name,
 			&item.Domain,
 			&item.WebsiteURL,
+			&attributionSource,
 			&brandName,
 			&brandDescription,
 			&industry,
@@ -196,6 +214,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		); err != nil {
 			return fmt.Errorf("scan project: %w", err)
 		}
+		item.AttributionSource = stringValue(attributionSource)
 		item.BrandName = stringValue(brandName)
 		item.BrandDescription = stringValue(brandDescription)
 		item.Industry = stringValue(industry)
@@ -426,6 +445,94 @@ func (s *StateStore) loadProjectModels(ctx context.Context, state *persistedStat
 	return rows.Err()
 }
 
+func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id,
+		       ga4_property_id,
+		       ga4_service_account_ciphertext,
+		       ga4_connected_at,
+		       ga4_updated_at,
+		       stripe_webhook_secret_ciphertext,
+		       stripe_connected_at,
+		       stripe_updated_at,
+		       ingestion_signing_token_ciphertext,
+		       ingestion_connected_at,
+		       ingestion_updated_at
+		FROM project_impact_integrations
+		ORDER BY project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select project impact integrations: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			projectID               string
+			ga4PropertyID           *string
+			ga4ServiceAccountCipher *string
+			ga4ConnectedAt          *time.Time
+			ga4UpdatedAt            *time.Time
+			stripeWebhookCipher     *string
+			stripeConnectedAt       *time.Time
+			stripeUpdatedAt         *time.Time
+			ingestionSigningCipher  *string
+			ingestionConnectedAt    *time.Time
+			ingestionUpdatedAt      *time.Time
+		)
+		if err := rows.Scan(
+			&projectID,
+			&ga4PropertyID,
+			&ga4ServiceAccountCipher,
+			&ga4ConnectedAt,
+			&ga4UpdatedAt,
+			&stripeWebhookCipher,
+			&stripeConnectedAt,
+			&stripeUpdatedAt,
+			&ingestionSigningCipher,
+			&ingestionConnectedAt,
+			&ingestionUpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan project impact integration: %w", err)
+		}
+
+		ga4ServiceAccountJSON, err := s.codec.Decrypt(stringValue(ga4ServiceAccountCipher))
+		if err != nil {
+			return fmt.Errorf("decrypt ga4 service account for project %s: %w", projectID, err)
+		}
+		stripeWebhookSecret, err := s.codec.Decrypt(stringValue(stripeWebhookCipher))
+		if err != nil {
+			return fmt.Errorf("decrypt stripe webhook secret for project %s: %w", projectID, err)
+		}
+		ingestionSigningToken, err := s.codec.Decrypt(stringValue(ingestionSigningCipher))
+		if err != nil {
+			return fmt.Errorf("decrypt ingestion signing token for project %s: %w", projectID, err)
+		}
+
+		value := usecase.ProjectImpactIntegrations{
+			ProjectID: projectID,
+			GA4: usecase.ProjectGA4Integration{
+				PropertyID:         stringValue(ga4PropertyID),
+				ServiceAccountJSON: ga4ServiceAccountJSON,
+				ConnectedAt:        timeValue(ga4ConnectedAt),
+				UpdatedAt:          timeValue(ga4UpdatedAt),
+			},
+			Stripe: usecase.ProjectStripeIntegration{
+				WebhookSecret: stripeWebhookSecret,
+				ConnectedAt:   timeValue(stripeConnectedAt),
+				UpdatedAt:     timeValue(stripeUpdatedAt),
+			},
+			Ingestion: usecase.ProjectIngestionIntegration{
+				SigningToken: ingestionSigningToken,
+				ConnectedAt:  timeValue(ingestionConnectedAt),
+				UpdatedAt:    timeValue(ingestionUpdatedAt),
+			},
+		}
+		state.ImpactIntegrations[projectID] = &value
+	}
+	return rows.Err()
+}
+
 func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, event_type, status, payload, sort_order, created_at, updated_at
@@ -439,8 +546,8 @@ func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) erro
 
 	for rows.Next() {
 		var (
-			item     usecase.OutboxEvent
-			raw      []byte
+			item      usecase.OutboxEvent
+			raw       []byte
 			sortOrder int
 		)
 		if err := rows.Scan(&item.ID, &item.EventType, &item.Status, &raw, &sortOrder, &item.CreatedAt, &item.UpdatedAt); err != nil {
@@ -475,9 +582,9 @@ func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
 		}
 	}
@@ -564,6 +671,72 @@ func insertProjectSelections(ctx context.Context, tx pgx.Tx, selections map[stri
 			`, projectID, modelID, selections[projectID][modelID]); err != nil {
 				return fmt.Errorf("insert project model %s/%s: %w", projectID, modelID, err)
 			}
+		}
+	}
+	return nil
+}
+
+func (s *StateStore) insertImpactIntegrations(
+	ctx context.Context,
+	tx pgx.Tx,
+	items map[string]*usecase.ProjectImpactIntegrations,
+) error {
+	projectIDs := make([]string, 0, len(items))
+	for projectID := range items {
+		projectIDs = append(projectIDs, projectID)
+	}
+	sort.Strings(projectIDs)
+
+	for _, projectID := range projectIDs {
+		item := items[projectID]
+		if item == nil {
+			continue
+		}
+
+		ga4ServiceAccountCipher, err := s.codec.Encrypt(item.GA4.ServiceAccountJSON)
+		if err != nil {
+			return fmt.Errorf("encrypt ga4 service account for project %s: %w", projectID, err)
+		}
+		stripeWebhookCipher, err := s.codec.Encrypt(item.Stripe.WebhookSecret)
+		if err != nil {
+			return fmt.Errorf("encrypt stripe webhook secret for project %s: %w", projectID, err)
+		}
+		ingestionSigningCipher, err := s.codec.Encrypt(item.Ingestion.SigningToken)
+		if err != nil {
+			return fmt.Errorf("encrypt ingestion signing token for project %s: %w", projectID, err)
+		}
+
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO project_impact_integrations (
+				project_id,
+				ga4_property_id,
+				ga4_service_account_ciphertext,
+				ga4_connected_at,
+				ga4_updated_at,
+				stripe_webhook_secret_ciphertext,
+				stripe_connected_at,
+				stripe_updated_at,
+				ingestion_signing_token_ciphertext,
+				ingestion_connected_at,
+				ingestion_updated_at,
+				created_at,
+				updated_at
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+		`,
+			projectID,
+			nullIfEmpty(item.GA4.PropertyID),
+			nullIfEmpty(ga4ServiceAccountCipher),
+			nullIfZeroTime(item.GA4.ConnectedAt),
+			nullIfZeroTime(item.GA4.UpdatedAt),
+			nullIfEmpty(stripeWebhookCipher),
+			nullIfZeroTime(item.Stripe.ConnectedAt),
+			nullIfZeroTime(item.Stripe.UpdatedAt),
+			nullIfEmpty(ingestionSigningCipher),
+			nullIfZeroTime(item.Ingestion.ConnectedAt),
+			nullIfZeroTime(item.Ingestion.UpdatedAt),
+		); err != nil {
+			return fmt.Errorf("insert project impact integration %s: %w", projectID, err)
 		}
 	}
 	return nil
@@ -679,6 +852,20 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func timeValue(value *time.Time) time.Time {
+	if value == nil {
+		return time.Time{}
+	}
+	return value.UTC()
+}
+
+func nullIfZeroTime(value time.Time) any {
+	if value.IsZero() {
+		return nil
+	}
+	return value
 }
 
 func iconPathFromKey(iconKey string) string {

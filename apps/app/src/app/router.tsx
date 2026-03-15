@@ -69,16 +69,8 @@ const SettingsPage = lazy(() =>
 
 const SIDEBAR_FEATURE_ROUTES = [
   {
-    path: "/optimize/actions",
-    View: OptimizeActionsPage,
-  },
-  {
     path: "/optimize/content-optimizer",
     View: ContentOptimizerPage,
-  },
-  {
-    path: "/impact",
-    View: ImpactPage,
   },
   {
     path: "/settings",
@@ -150,6 +142,22 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         element={
           <Suspense fallback={null}>
             <PerceptionBrandCanonPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/impact"
+        element={
+          <Suspense fallback={null}>
+            <ImpactPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/optimize/actions"
+        element={
+          <Suspense fallback={null}>
+            <OptimizeActionsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

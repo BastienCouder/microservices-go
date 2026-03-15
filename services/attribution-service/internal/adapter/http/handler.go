@@ -3,6 +3,7 @@ package http
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,6 +23,9 @@ func NewHandler(svc *usecase.Service) *Handler {
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
+	mux.HandleFunc("/internal/attribution/projects/", h.internalAttributionProjectRoutes)
+	mux.HandleFunc("/attribution/ingest/", h.ingestionRoutes)
+	mux.HandleFunc("/attribution/stripe/webhook/", h.stripeWebhookRoutes)
 	mux.HandleFunc("/attribution/projects/", h.attributionProjectRoutes)
 
 	// Compatibility alias.
@@ -40,8 +44,38 @@ func (h *Handler) attributionProjectRoutes(w http.ResponseWriter, r *http.Reques
 	h.projectRoutesWithPrefix(w, r, "/attribution/projects/")
 }
 
+func (h *Handler) internalAttributionProjectRoutes(w http.ResponseWriter, r *http.Request) {
+	h.internalProjectRoutesWithPrefix(w, r, "/internal/attribution/projects/")
+}
+
 func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	h.projectRoutesWithPrefix(w, r, "/projects/")
+}
+
+func (h *Handler) stripeWebhookRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/attribution/stripe/webhook/")
+	if len(parts) != 1 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	h.handleStripeWebhook(w, r, parts[0])
+}
+
+func (h *Handler) ingestionRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/attribution/ingest/")
+	if len(parts) != 1 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	h.recordIngestionEvent(w, r, parts[0])
 }
 
 func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
@@ -59,6 +93,22 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.listEvents(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "funnel" && r.Method == http.MethodGet:
 		h.getFunnel(w, r, projectID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+func (h *Handler) internalProjectRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
+	parts := splitPathAfter(r.URL.Path, prefix)
+	if len(parts) < 2 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	projectID := parts[0]
+
+	switch {
+	case len(parts) == 2 && parts[1] == "events" && r.Method == http.MethodPost:
+		h.recordInternalEvent(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -107,6 +157,84 @@ func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request, projectID 
 	writeSuccess(w, http.StatusCreated, event)
 }
 
+func (h *Handler) recordInternalEvent(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req recordEventRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	event, err := h.svc.RecordInternalEvent(r.Context(), usecase.RecordInternalEventInput{
+		ProjectID:      projectID,
+		OrganizationID: organizationID,
+		Stage:          req.Stage,
+		Source:         req.Source,
+		Count:          req.Count,
+		RevenueCents:   req.RevenueCents,
+		OccurredAt:     occurredAt,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, event)
+}
+
+func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request, projectID string) {
+	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid webhook payload"})
+		return
+	}
+
+	if err := h.svc.RecordStripeWebhook(r.Context(), projectID, payload, strings.TrimSpace(r.Header.Get("Stripe-Signature"))); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) recordIngestionEvent(w http.ResponseWriter, r *http.Request, projectID string) {
+	var req recordEventRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	event, err := h.svc.RecordIngestionEvent(r.Context(), usecase.RecordIngestionEventInput{
+		ProjectID:    projectID,
+		SigningToken: ingestionSigningToken(r),
+		Stage:        req.Stage,
+		Source:       req.Source,
+		Count:        req.Count,
+		RevenueCents: req.RevenueCents,
+		OccurredAt:   occurredAt,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, event)
+}
+
 func (h *Handler) listEvents(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
@@ -141,6 +269,7 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
 		return
 	}
+	organizationID, _ := authenticatedOrganizationID(r)
 
 	from, to, err := parseWindow(r)
 	if err != nil {
@@ -148,7 +277,7 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 		return
 	}
 
-	funnel, err := h.svc.GetFunnel(r.Context(), projectID, userID, from, to)
+	funnel, err := h.svc.GetFunnel(r.Context(), projectID, userID, organizationID, from, to)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -212,6 +341,29 @@ func authenticatedUserID(r *http.Request) (string, bool) {
 		return "", false
 	}
 	return value, true
+}
+
+func authenticatedOrganizationID(r *http.Request) (int64, bool) {
+	value := strings.TrimSpace(r.Header.Get("X-Organization-ID"))
+	if value == "" {
+		value = strings.TrimSpace(r.Header.Get("x-organization-id"))
+	}
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil || parsed <= 0 {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func ingestionSigningToken(r *http.Request) string {
+	authz := strings.TrimSpace(r.Header.Get("Authorization"))
+	if strings.HasPrefix(authz, "Bearer ") {
+		return strings.TrimSpace(strings.TrimPrefix(authz, "Bearer "))
+	}
+	return strings.TrimSpace(r.Header.Get("X-Attribution-Key"))
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {

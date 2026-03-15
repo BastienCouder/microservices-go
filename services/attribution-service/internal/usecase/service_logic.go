@@ -12,6 +12,11 @@ func NewService(repo Repository, projectVerifier ProjectAccessVerifier) *Service
 	return &Service{repo: repo, projectVerifier: projectVerifier, now: time.Now}
 }
 
+func (s *Service) EnableVisitProvider(projectResolver ProjectMetadataResolver, visitProvider VisitProvider) {
+	s.projectResolver = projectResolver
+	s.visitProvider = visitProvider
+}
+
 func (s *Service) RecordEvent(ctx context.Context, input RecordEventInput) (Event, error) {
 	projectID := strings.TrimSpace(input.ProjectID)
 	userID := strings.TrimSpace(input.UserID)
@@ -22,25 +27,48 @@ func (s *Service) RecordEvent(ctx context.Context, input RecordEventInput) (Even
 		return Event{}, err
 	}
 
-	stage := normalizeStage(input.Stage)
+	return s.recordValidatedEvent(ctx, projectID, input.Stage, input.Source, input.Count, input.RevenueCents, input.OccurredAt)
+}
+
+func (s *Service) RecordInternalEvent(ctx context.Context, input RecordInternalEventInput) (Event, error) {
+	projectID := strings.TrimSpace(input.ProjectID)
+	if projectID == "" || input.OrganizationID <= 0 {
+		return Event{}, fmt.Errorf("%w: projectId and organizationId are required", ErrValidation)
+	}
+	if err := s.ensureProjectOrganizationAccess(ctx, projectID, input.OrganizationID); err != nil {
+		return Event{}, err
+	}
+
+	return s.recordValidatedEvent(ctx, projectID, input.Stage, input.Source, input.Count, input.RevenueCents, input.OccurredAt)
+}
+
+func (s *Service) recordValidatedEvent(
+	ctx context.Context,
+	projectID string,
+	stageValue string,
+	sourceValue string,
+	count int64,
+	revenueCents int64,
+	occurredAt time.Time,
+) (Event, error) {
+	stage := normalizeStage(stageValue)
 	if stage == "" {
 		return Event{}, fmt.Errorf("%w: stage must be visit, signup, trial or paid", ErrValidation)
 	}
-	source := strings.ToLower(strings.TrimSpace(input.Source))
+	source := strings.ToLower(strings.TrimSpace(sourceValue))
 	if source == "" {
 		source = "unknown"
 	}
-	if input.Count <= 0 {
+	if count <= 0 {
 		return Event{}, fmt.Errorf("%w: count must be a positive integer", ErrValidation)
 	}
-	if input.RevenueCents < 0 {
+	if revenueCents < 0 {
 		return Event{}, fmt.Errorf("%w: revenueCents cannot be negative", ErrValidation)
 	}
 	if stage != StagePaid {
-		input.RevenueCents = 0
+		revenueCents = 0
 	}
 
-	occurredAt := input.OccurredAt
 	if occurredAt.IsZero() {
 		occurredAt = s.now().UTC()
 	} else {
@@ -51,8 +79,8 @@ func (s *Service) RecordEvent(ctx context.Context, input RecordEventInput) (Even
 		ProjectID:    projectID,
 		Stage:        stage,
 		Source:       source,
-		Count:        input.Count,
-		RevenueCents: input.RevenueCents,
+		Count:        count,
+		RevenueCents: revenueCents,
 		OccurredAt:   occurredAt,
 	})
 	if err != nil {
@@ -92,7 +120,14 @@ func (s *Service) ListEvents(ctx context.Context, projectID, userID string, from
 	return events, nil
 }
 
-func (s *Service) GetFunnel(ctx context.Context, projectID, userID string, from, to time.Time) (FunnelData, error) {
+func (s *Service) GetFunnel(
+	ctx context.Context,
+	projectID,
+	userID string,
+	organizationID int64,
+	from,
+	to time.Time,
+) (FunnelData, error) {
 	projectID = strings.TrimSpace(projectID)
 	userID = strings.TrimSpace(userID)
 	if projectID == "" || userID == "" {
@@ -111,6 +146,23 @@ func (s *Service) GetFunnel(ctx context.Context, projectID, userID string, from,
 	if err != nil {
 		return FunnelData{}, err
 	}
+	sources, err := s.repo.GetSourceTotals(ctx, projectID, windowFrom, windowTo)
+	if err != nil {
+		return FunnelData{}, err
+	}
+
+	visitsSource := "events"
+	if organizationID > 0 && s.projectResolver != nil && s.visitProvider != nil {
+		project, projectErr := s.projectResolver.GetProject(ctx, projectID, organizationID)
+		if projectErr == nil {
+			visitSources, visitErr := s.visitProvider.ListVisitsBySource(ctx, project, windowFrom, windowTo)
+			if visitErr == nil {
+				sources = mergeVisitSources(sources, visitSources)
+				totals.Visits = sumSourceVisits(sources)
+				visitsSource = "ga4"
+			}
+		}
+	}
 
 	return FunnelData{
 		ProjectID:         projectID,
@@ -124,5 +176,50 @@ func (s *Service) GetFunnel(ctx context.Context, projectID, userID string, from,
 		TrialToPaidRate:   percent(totals.Paid, totals.Trials),
 		WindowStart:       windowFrom.Format(time.RFC3339),
 		WindowEnd:         windowTo.Format(time.RFC3339),
+		Sources:           sources,
+		VisitsSource:      visitsSource,
 	}, nil
+}
+
+func mergeVisitSources(base, visits []FunnelSource) []FunnelSource {
+	merged := make(map[string]FunnelSource, len(base)+len(visits))
+	for _, item := range base {
+		key := strings.TrimSpace(item.Source)
+		if key == "" {
+			continue
+		}
+		item.Visits = 0
+		merged[key] = item
+	}
+	for _, item := range visits {
+		key := strings.TrimSpace(item.Source)
+		if key == "" {
+			continue
+		}
+		current := merged[key]
+		current.Source = key
+		current.Visits = item.Visits
+		merged[key] = current
+	}
+	out := make([]FunnelSource, 0, len(merged))
+	for _, item := range merged {
+		out = append(out, item)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		left := out[i].Visits + out[i].Signups + out[i].Trials + out[i].Paid
+		right := out[j].Visits + out[j].Signups + out[j].Trials + out[j].Paid
+		if left == right {
+			return out[i].Source < out[j].Source
+		}
+		return left > right
+	})
+	return out
+}
+
+func sumSourceVisits(items []FunnelSource) int64 {
+	var total int64
+	for _, item := range items {
+		total += item.Visits
+	}
+	return total
 }

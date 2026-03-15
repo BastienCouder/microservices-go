@@ -120,3 +120,46 @@ func (r *Repository) GetFunnelTotals(ctx context.Context, projectID string, from
 	}
 	return totals, nil
 }
+
+func (r *Repository) GetSourceTotals(ctx context.Context, projectID string, from, to time.Time) ([]usecase.FunnelSource, error) {
+	const query = `
+		SELECT
+			source,
+			COALESCE(SUM(count) FILTER (WHERE stage = 'visit'), 0) AS visits,
+			COALESCE(SUM(count) FILTER (WHERE stage = 'signup'), 0) AS signups,
+			COALESCE(SUM(count) FILTER (WHERE stage = 'trial'), 0) AS trials,
+			COALESCE(SUM(count) FILTER (WHERE stage = 'paid'), 0) AS paid,
+			COALESCE(SUM(revenue_cents) FILTER (WHERE stage = 'paid'), 0) AS revenue_cents
+		FROM attribution_events
+		WHERE project_id = $1
+		  AND occurred_at >= $2
+		  AND occurred_at <= $3
+		GROUP BY source
+	`
+
+	rows, err := r.db.Query(ctx, query, strings.TrimSpace(projectID), from.UTC(), to.UTC())
+	if err != nil {
+		return nil, fmt.Errorf("query attribution source totals: %w", err)
+	}
+	defer rows.Close()
+
+	sources := make([]usecase.FunnelSource, 0)
+	for rows.Next() {
+		var item usecase.FunnelSource
+		if err := rows.Scan(
+			&item.Source,
+			&item.Visits,
+			&item.Signups,
+			&item.Trials,
+			&item.Paid,
+			&item.RevenueCents,
+		); err != nil {
+			return nil, fmt.Errorf("scan attribution source totals: %w", err)
+		}
+		sources = append(sources, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate attribution source totals: %w", err)
+	}
+	return sources, nil
+}

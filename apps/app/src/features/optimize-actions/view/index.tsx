@@ -1,5 +1,10 @@
 import { OptimizeActionsTemplate } from "./template";
 
-export function OptimizeActionsPage() {
-  return <OptimizeActionsTemplate />;
+type OptimizeActionsPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function OptimizeActionsPage({ apiBaseURL, routeSearch }: OptimizeActionsPageProps) {
+  return <OptimizeActionsTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

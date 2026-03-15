@@ -62,6 +62,51 @@ func (r *testRepo) GetFunnelTotals(_ context.Context, projectID string, from, to
 	return totals, nil
 }
 
+func (r *testRepo) GetSourceTotals(_ context.Context, projectID string, from, to time.Time) ([]FunnelSource, error) {
+	items := make(map[string]*FunnelSource)
+	for _, event := range r.events {
+		if event.ProjectID != projectID {
+			continue
+		}
+		if event.OccurredAt.Before(from) || event.OccurredAt.After(to) {
+			continue
+		}
+		current := items[event.Source]
+		if current == nil {
+			current = &FunnelSource{Source: event.Source}
+			items[event.Source] = current
+		}
+		switch event.Stage {
+		case StageVisit:
+			current.Visits += event.Count
+		case StageSignup:
+			current.Signups += event.Count
+		case StageTrial:
+			current.Trials += event.Count
+		case StagePaid:
+			current.Paid += event.Count
+			current.RevenueCents += event.RevenueCents
+		}
+	}
+
+	out := make([]FunnelSource, 0, len(items))
+	for _, item := range items {
+		out = append(out, *item)
+	}
+	return out, nil
+}
+
+type staticProjectResolver struct {
+	project ProjectMetadata
+}
+
+func (r staticProjectResolver) GetProject(_ context.Context, projectID string, _ int64) (ProjectMetadata, error) {
+	if projectID != r.project.ID {
+		return ProjectMetadata{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
+	return r.project, nil
+}
+
 type allowVerifier struct{}
 
 func (allowVerifier) EnsureProjectOwnedByUser(_ context.Context, projectID, userID string) error {
@@ -70,6 +115,16 @@ func (allowVerifier) EnsureProjectOwnedByUser(_ context.Context, projectID, user
 	}
 	if userID == "" {
 		return fmt.Errorf("%w: userId is required", ErrValidation)
+	}
+	return nil
+}
+
+func (allowVerifier) EnsureProjectInOrganization(_ context.Context, projectID string, organizationID int64) error {
+	if projectID == "project-denied" {
+		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
+	}
+	if organizationID <= 0 {
+		return fmt.Errorf("%w: organizationId is required", ErrValidation)
 	}
 	return nil
 }
@@ -92,7 +147,7 @@ func TestRecordEventAndGetFunnel(t *testing.T) {
 		}
 	}
 
-	funnel, err := svc.GetFunnel(ctx, "project-1", "user-1", now.Add(-24*time.Hour), now)
+	funnel, err := svc.GetFunnel(ctx, "project-1", "user-1", 0, now.Add(-24*time.Hour), now)
 	if err != nil {
 		t.Fatalf("get funnel: %v", err)
 	}
@@ -123,8 +178,36 @@ func TestRecordEventRejectsInvalidStage(t *testing.T) {
 
 func TestGetFunnelRequiresAccess(t *testing.T) {
 	svc := NewService(&testRepo{}, allowVerifier{})
-	_, err := svc.GetFunnel(context.Background(), "project-denied", "user-1", time.Time{}, time.Time{})
+	_, err := svc.GetFunnel(context.Background(), "project-denied", "user-1", 0, time.Time{}, time.Time{})
 	if err == nil {
 		t.Fatalf("expected access error")
+	}
+}
+
+func TestRecordIngestionEvent(t *testing.T) {
+	repo := &testRepo{}
+	svc := NewService(repo, allowVerifier{})
+	svc.projectResolver = staticProjectResolver{
+		project: ProjectMetadata{
+			ID: "project-1",
+			Ingestion: ProjectIngestionIntegration{
+				SigningToken: "iat_test",
+			},
+		},
+	}
+
+	event, err := svc.RecordIngestionEvent(context.Background(), RecordIngestionEventInput{
+		ProjectID:    "project-1",
+		SigningToken: "iat_test",
+		Stage:        StageSignup,
+		Source:       "chatgpt",
+		Count:        1,
+		OccurredAt:   time.Now().UTC(),
+	})
+	if err != nil {
+		t.Fatalf("record ingestion event: %v", err)
+	}
+	if event.Stage != StageSignup {
+		t.Fatalf("expected signup stage, got %s", event.Stage)
 	}
 }

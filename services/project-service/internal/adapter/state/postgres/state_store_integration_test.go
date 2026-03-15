@@ -12,6 +12,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const testSecretEncryptionKey = "project-state-test-encryption-key"
+
 func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	dsn := os.Getenv("PROJECT_TEST_DATABASE_URL")
 	if dsn == "" {
@@ -32,7 +34,10 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	}
 	defer db.Close()
 
-	store := NewStateStore(db)
+	store, err := NewStateStore(db, testSecretEncryptionKey)
+	if err != nil {
+		t.Fatalf("init state store: %v", err)
+	}
 	payload := []byte(`{
 		"seq": 7,
 		"projects": {
@@ -254,7 +259,10 @@ func TestRunMigrationsMigratesLegacyProjectPayload(t *testing.T) {
 		t.Fatalf("run migrations: %v", err)
 	}
 
-	store := NewStateStore(db)
+	store, err := NewStateStore(db, testSecretEncryptionKey)
+	if err != nil {
+		t.Fatalf("init state store: %v", err)
+	}
 	loaded, ok, err := store.Load(ctx)
 	if err != nil {
 		t.Fatalf("load state after migration: %v", err)

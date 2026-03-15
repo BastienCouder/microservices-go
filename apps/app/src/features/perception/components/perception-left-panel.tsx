@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 import { ModelFilterModeTabs } from "@/components/dashboard/model-filter-mode-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,14 @@ export function PerceptionLeftPanel({
   onToggleModelFilterMode: (value: boolean) => void;
   isDemo: boolean;
 }) {
+  const location = useLocation();
+  const brandEditSearch = useMemo(() => {
+    const params = new URLSearchParams(location.search.startsWith("?") ? location.search.slice(1) : location.search);
+    params.set("tab", "brand");
+    const search = params.toString();
+    return search ? `?${search}` : "";
+  }, [location.search]);
+
   return (
     <div className="flex h-auto flex-col xl:h-full">
       <div className="m-2 mb-4 shrink-0 rounded-md bg-primary p-4 text-primary-foreground">
@@ -97,6 +106,13 @@ export function PerceptionLeftPanel({
         </div>
 
         <TabsContent value="brand" className="m-0 min-h-0 flex-1 overflow-y-auto px-2 pb-4 no-scrollbar">
+          <div className="mb-3 flex justify-end">
+            <Button asChild variant="outline" size="sm">
+              <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
+                Modifier la marque
+              </Link>
+            </Button>
+          </div>
           <BrandCanonSummary canon={canon} isDemo={isDemo} />
         </TabsContent>
 

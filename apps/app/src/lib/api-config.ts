@@ -17,6 +17,7 @@ export const apiRoutes = {
   projects: {
     list: () => "/projects",
     get: (projectId: string) => `/projects/${projectId}`,
+    impactIntegrations: (projectId: string) => `/projects/${projectId}/impact-integrations`,
     competitors: (projectId: string) => `/projects/${projectId}/competitors`,
     promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
@@ -47,6 +48,18 @@ export const apiRoutes = {
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
     brandCanon: (projectId: string) => `/analysis/projects/${projectId}/brand-canon`,
+  },
+  attribution: {
+    funnel: (projectId: string) => `/attribution/projects/${projectId}/funnel`,
+    ingest: (projectId: string) => `/attribution/ingest/${projectId}`,
+    stripeWebhook: (projectId: string) => `/attribution/stripe/webhook/${projectId}`,
+    events: (projectId: string, options?: { limit?: number }) => {
+      const params = new URLSearchParams();
+      if (options?.limit && options.limit > 0) params.set("limit", String(options.limit));
+      const query = params.toString();
+      return `/attribution/projects/${projectId}/events${query ? `?${query}` : ""}`;
+    },
+    recordEvent: (projectId: string) => `/attribution/projects/${projectId}/events`,
   },
 } as const;
 

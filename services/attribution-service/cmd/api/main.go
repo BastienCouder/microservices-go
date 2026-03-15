@@ -13,7 +13,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	ga4client "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/ga4"
 	projectclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/project"
+	projectapiclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/projectapi"
 	httpadapter "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/http"
 	attributionrepo "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/config"
@@ -55,6 +57,14 @@ func main() {
 
 	repo := attributionrepo.NewRepository(db)
 	svc := usecase.NewService(repo, projectVerifier)
+	if cfg.ProjectServiceURL != "" {
+		projectResolver, err := projectapiclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init project api client: %v", err)
+		}
+		visitProvider := ga4client.NewClient()
+		svc.EnableVisitProvider(projectResolver, visitProvider)
+	}
 	h := httpadapter.NewHandler(svc)
 
 	mux := http.NewServeMux()

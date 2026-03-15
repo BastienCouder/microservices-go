@@ -61,6 +61,8 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 
 	session, err := s.stripe.CreateSubscriptionCheckoutSession(ctx, StripeCheckoutSessionRequest{
 		OrganizationID:    input.OrganizationID,
+		ProjectID:         input.ProjectID,
+		AttributionSource: normalizeAttributionSource(input.AttributionSource),
 		Plan:              plan,
 		BillingCycle:      cycle,
 		Seats:             seats,
@@ -173,11 +175,14 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 	}
 
 	sub, err := s.repo.GetByOrganizationID(ctx, event.OrganizationID)
+	previousStatus := ""
 	if err != nil {
 		if !errors.Is(err, domain.ErrSubscriptionMissing) {
 			return fmt.Errorf("%w: load subscription: %v", ErrStripeWebhookProcessing, err)
 		}
 		sub = newSubscriptionFromWebhook(event, s.now().UTC())
+	} else {
+		previousStatus = sub.Status
 	}
 
 	mergeWebhookIntoSubscription(sub, event)
@@ -188,6 +193,8 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 	if err := s.repo.Upsert(ctx, sub); err != nil {
 		return fmt.Errorf("%w: save subscription update: %v", ErrStripeWebhookProcessing, err)
 	}
+
+	s.emitStripeAttribution(ctx, previousStatus, event)
 	return nil
 }
 

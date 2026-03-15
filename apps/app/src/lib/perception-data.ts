@@ -550,19 +550,12 @@ function deriveModelAxisHeatmap(
 
   const rows: PerceptionHeatmapRow[] = orderedModelNames.map((modelName) => {
     const modelResponses = responseGroups.get(modelName) ?? [];
-    const promptCoverage = uniqueStrings(
-      modelResponses.filter((response) => response.brandMentioned).map((response) => response.promptRunId),
-    );
-    const promptUniverse = uniqueStrings(modelResponses.map((response) => response.promptRunId));
 
     return {
       model: modelName,
       values: {
         positioning: clampScore(average(modelResponses.map((response) => response.metrics.positioning))),
-        use_cases:
-          promptUniverse.length === 0
-            ? 0
-            : clampScore((promptCoverage.length / promptUniverse.length) * 100),
+        use_cases: clampScore(average(modelResponses.map((response) => response.metrics.use_cases))),
         features: clampScore(average(modelResponses.map((response) => response.metrics.features))),
         sentiment: clampScore(average(modelResponses.map((response) => response.metrics.sentiment))),
         competitors: clampScore(average(modelResponses.map((response) => response.metrics.competitors))),
@@ -594,19 +587,11 @@ function deriveModelAxisHeatmapFromParsedResponses(
   }
 
   const rows: PerceptionHeatmapRow[] = Array.from(responseGroups.entries()).map(([modelName, modelResponses]) => {
-    const promptCoverage = uniqueStrings(
-      modelResponses.filter((response) => response.brandMentioned).map((response) => response.promptRunId),
-    );
-    const promptUniverse = uniqueStrings(modelResponses.map((response) => response.promptRunId));
-
     return {
       model: modelName,
       values: {
         positioning: clampScore(average(modelResponses.map((response) => response.metrics.positioning))),
-        use_cases:
-          promptUniverse.length === 0
-            ? 0
-            : clampScore((promptCoverage.length / promptUniverse.length) * 100),
+        use_cases: clampScore(average(modelResponses.map((response) => response.metrics.use_cases))),
         features: clampScore(average(modelResponses.map((response) => response.metrics.features))),
         sentiment: clampScore(average(modelResponses.map((response) => response.metrics.sentiment))),
         competitors: clampScore(average(modelResponses.map((response) => response.metrics.competitors))),
@@ -971,8 +956,21 @@ export function derivePerceptionRadarFromResponses(
 
 export function derivePerceptionHeatmapFromResponses(
   responses: PerceptionResponseRecord[],
+  {
+    groupModelName,
+  }: {
+    groupModelName?: (modelName: string) => string;
+  } = {},
 ): PerceptionViewData["modelAxisHeatmap"] {
-  return deriveModelAxisHeatmapFromParsedResponses(responses.map(parseResponseRecord));
+  const parsedResponses = responses.map(parseResponseRecord);
+  const groupedResponses = groupModelName
+    ? parsedResponses.map((response) => ({
+        ...response,
+        modelName: groupModelName(response.modelName || response.modelId) || response.modelName || response.modelId,
+      }))
+    : parsedResponses;
+
+  return deriveModelAxisHeatmapFromParsedResponses(groupedResponses);
 }
 
 export function derivePerceptionTopErrorsFromResponses(

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { SELECTED_ORG_KEY } from "@/features/models/core/model-access";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { API_CONFIG, apiRoutes, buildApiPath } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
@@ -214,19 +214,35 @@ export function BrandCanonEditorPageClient({
                 <CompetitorEditor value={competitorsDraft} onChange={setCompetitorsDraft} />
               </TabsContent>
             </Tabs>
-
-            <Separator />
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-xs text-muted-foreground">
-                {message ?? "Sauvegarde du référentiel de marque et des concurrents."}
-              </div>
-              <Button onClick={() => void handleSave()} disabled={isSaving}>
-                {isSaving ? "Enregistrement..." : "Enregistrer"}
-              </Button>
-            </div>
           </CardContent>
         </Card>
       </ScrollArea>
+
+      <div className="border-t px-2 pt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-xs text-muted-foreground">
+            {message ?? "Sauvegarde du référentiel de marque et des concurrents."}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() =>
+                navigate({
+                  pathname: "/brands",
+                  search: buildBackSearch(location.search),
+                })
+              }
+              disabled={isSaving}
+            >
+              Annuler
+            </Button>
+            <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
+              {isSaving ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -599,10 +615,18 @@ async function deleteJson(path: string): Promise<void> {
 async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
   const base = API_CONFIG.BASE_URL?.trim();
   const url = base ? `${base}${buildApiPath(path)}` : buildApiPath(path);
+  const organizationId = readSelectedOrganizationId();
+  const headers = new Headers(init.headers ?? undefined);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  if (organizationId) {
+    headers.set("X-Organization-ID", organizationId);
+  }
   const res = await fetch(url, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
     ...init,
+    credentials: "include",
+    headers,
   });
 
   if (!res.ok) {
@@ -624,4 +648,13 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     return (json as { data: T }).data;
   }
   return json as T;
+}
+
+function readSelectedOrganizationId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(SELECTED_ORG_KEY)?.trim() ?? "";
+  } catch {
+    return "";
+  }
 }

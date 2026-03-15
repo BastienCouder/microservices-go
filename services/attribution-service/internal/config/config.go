@@ -11,13 +11,21 @@ type Config struct {
 	HTTPAddr               string
 	DatabaseURL            string
 	ProjectServiceGRPCAddr string
+	ProjectServiceURL      string
 	InternalJWTSecret      string
 	InternalJWTIssuer      string
+	GA4                    GA4Config
 	GRPCAllowInsecure      bool
 	GRPCTLSCAFile          string
 	GRPCTLSCertFile        string
 	GRPCTLSKeyFile         string
 	GRPCTLSServerName      string
+}
+
+type GA4Config struct {
+	Enabled            bool
+	PropertyID         string
+	ServiceAccountJSON string
 }
 
 func Load() (Config, error) {
@@ -41,6 +49,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	ga4Config, err := loadGA4Config()
+	if err != nil {
+		return Config{}, err
+	}
 	grpcAllowInsecure, err := optionalBoolEnv("GRPC_ALLOW_INSECURE", false)
 	if err != nil {
 		return Config{}, err
@@ -50,8 +62,10 @@ func Load() (Config, error) {
 		HTTPAddr:               httpAddr,
 		DatabaseURL:            databaseURL,
 		ProjectServiceGRPCAddr: projectServiceGRPCAddr,
+		ProjectServiceURL:      optionalEnv("PROJECT_SERVICE_URL"),
 		InternalJWTSecret:      internalJWTSecret,
 		InternalJWTIssuer:      internalJWTIssuer,
+		GA4:                    ga4Config,
 		GRPCAllowInsecure:      grpcAllowInsecure,
 		GRPCTLSCAFile:          optionalEnv("GRPC_TLS_CA_FILE"),
 		GRPCTLSCertFile:        optionalEnv("GRPC_TLS_CERT_FILE"),
@@ -124,8 +138,46 @@ func requiredEnv(key string) (string, error) {
 	return value, nil
 }
 
+func loadGA4Config() (GA4Config, error) {
+	enabled, err := optionalBoolEnv("GA4_ENABLED", false)
+	if err != nil {
+		return GA4Config{}, err
+	}
+	serviceAccountJSON, err := optionalEnvOrFile("GA4_SERVICE_ACCOUNT_JSON", "GA4_SERVICE_ACCOUNT_JSON_FILE")
+	if err != nil {
+		return GA4Config{}, err
+	}
+	cfg := GA4Config{
+		Enabled:            enabled,
+		PropertyID:         optionalEnv("GA4_PROPERTY_ID"),
+		ServiceAccountJSON: serviceAccountJSON,
+	}
+	if !enabled {
+		return cfg, nil
+	}
+	if strings.TrimSpace(cfg.PropertyID) == "" || strings.TrimSpace(cfg.ServiceAccountJSON) == "" {
+		return GA4Config{}, fmt.Errorf("missing required ga4 configuration when GA4_ENABLED=true")
+	}
+	return cfg, nil
+}
+
 func optionalEnv(key string) string {
 	return strings.TrimSpace(os.Getenv(key))
+}
+
+func optionalEnvOrFile(valueKey, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(valueKey)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", nil
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read value file %s for %s: %w", filePath, valueKey, err)
+	}
+	return strings.TrimSpace(string(raw)), nil
 }
 
 func optionalBoolEnv(key string, defaultValue bool) (bool, error) {

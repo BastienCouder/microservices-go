@@ -23,6 +23,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /projects", h.createProject)
 	mux.HandleFunc("GET /projects", h.listProjects)
+	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
 	mux.HandleFunc("GET /projects/ai-models", h.listModels)
 	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
 	mux.HandleFunc("/projects/", h.projectRoutes)
@@ -30,6 +31,22 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/competitors/", h.competitorRoutes)
 	mux.HandleFunc("GET /ai-models", h.listModels)
 	mux.HandleFunc("POST /ai-models/seed", h.seedModels)
+}
+
+func (h *Handler) internalProjectRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/internal/projects/")
+	if len(parts) < 2 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	projectID := parts[0]
+
+	switch {
+	case len(parts) == 2 && parts[1] == "impact-context" && r.Method == http.MethodGet:
+		h.getProjectImpactContext(w, r, projectID)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
@@ -41,14 +58,15 @@ func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
 }
 
 type createProjectRequest struct {
-	Name             string `json:"name"`
-	Domain           string `json:"domain"`
-	WebsiteURL       string `json:"websiteUrl"`
-	BrandName        string `json:"brandName"`
-	BrandDescription string `json:"brandDescription"`
-	Industry         string `json:"industry"`
-	PrimaryLanguage  string `json:"primaryLanguage"`
-	Country          string `json:"country"`
+	Name              string `json:"name"`
+	Domain            string `json:"domain"`
+	WebsiteURL        string `json:"websiteUrl"`
+	AttributionSource string `json:"attributionSource"`
+	BrandName         string `json:"brandName"`
+	BrandDescription  string `json:"brandDescription"`
+	Industry          string `json:"industry"`
+	PrimaryLanguage   string `json:"primaryLanguage"`
+	Country           string `json:"country"`
 }
 
 func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
@@ -70,16 +88,17 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	project, err := h.svc.CreateProject(r.Context(), usecase.CreateProjectInput{
-		OrganizationID:   organizationID,
-		CreatedBy:        createdBy,
-		Name:             req.Name,
-		Domain:           req.Domain,
-		WebsiteURL:       req.WebsiteURL,
-		BrandName:        req.BrandName,
-		BrandDescription: req.BrandDescription,
-		Industry:         req.Industry,
-		PrimaryLanguage:  req.PrimaryLanguage,
-		Country:          req.Country,
+		OrganizationID:    organizationID,
+		CreatedBy:         createdBy,
+		Name:              req.Name,
+		Domain:            req.Domain,
+		WebsiteURL:        req.WebsiteURL,
+		AttributionSource: req.AttributionSource,
+		BrandName:         req.BrandName,
+		BrandDescription:  req.BrandDescription,
+		Industry:          req.Industry,
+		PrimaryLanguage:   req.PrimaryLanguage,
+		Country:           req.Country,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -135,6 +154,10 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.listProjectModels(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodPatch:
 		h.replaceProjectModels(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodGet:
+		h.getProjectImpactIntegrations(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodPatch:
+		h.updateProjectImpactIntegrations(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -191,12 +214,13 @@ func (h *Handler) getProject(w http.ResponseWriter, r *http.Request, projectID s
 }
 
 type updateProjectRequest struct {
-	Name             *string `json:"name"`
-	Domain           *string `json:"domain"`
-	WebsiteURL       *string `json:"websiteUrl"`
-	BrandName        *string `json:"brandName"`
-	BrandDescription *string `json:"brandDescription"`
-	Industry         *string `json:"industry"`
+	Name              *string `json:"name"`
+	Domain            *string `json:"domain"`
+	WebsiteURL        *string `json:"websiteUrl"`
+	AttributionSource *string `json:"attributionSource"`
+	BrandName         *string `json:"brandName"`
+	BrandDescription  *string `json:"brandDescription"`
+	Industry          *string `json:"industry"`
 }
 
 func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -213,12 +237,13 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 	}
 
 	project, err := h.svc.UpdateProject(r.Context(), projectID, organizationID, usecase.UpdateProjectInput{
-		Name:             req.Name,
-		Domain:           req.Domain,
-		WebsiteURL:       req.WebsiteURL,
-		BrandName:        req.BrandName,
-		BrandDescription: req.BrandDescription,
-		Industry:         req.Industry,
+		Name:              req.Name,
+		Domain:            req.Domain,
+		WebsiteURL:        req.WebsiteURL,
+		AttributionSource: req.AttributionSource,
+		BrandName:         req.BrandName,
+		BrandDescription:  req.BrandDescription,
+		Industry:          req.Industry,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -239,6 +264,93 @@ func (h *Handler) activateProject(w http.ResponseWriter, r *http.Request, projec
 		return
 	}
 	writeSuccess(w, http.StatusOK, project)
+}
+
+func (h *Handler) getProjectImpactContext(w http.ResponseWriter, r *http.Request, projectID string) {
+	contextValue, err := h.svc.GetProjectImpactContext(r.Context(), projectID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, contextValue)
+}
+
+func (h *Handler) getProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	value, err := h.svc.GetProjectImpactIntegrations(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, value)
+}
+
+type updateProjectImpactIntegrationsRequest struct {
+	GA4       *updateProjectGA4IntegrationRequest       `json:"ga4"`
+	Stripe    *updateProjectStripeIntegrationRequest    `json:"stripe"`
+	Ingestion *updateProjectIngestionIntegrationRequest `json:"ingestion"`
+}
+
+type updateProjectGA4IntegrationRequest struct {
+	PropertyID         *string `json:"propertyId"`
+	ServiceAccountJSON *string `json:"serviceAccountJSON"`
+	Disconnect         bool    `json:"disconnect"`
+}
+
+type updateProjectStripeIntegrationRequest struct {
+	WebhookSecret *string `json:"webhookSecret"`
+	Disconnect    bool    `json:"disconnect"`
+}
+
+type updateProjectIngestionIntegrationRequest struct {
+	Rotate     bool `json:"rotate"`
+	Disconnect bool `json:"disconnect"`
+}
+
+func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req updateProjectImpactIntegrationsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	var input usecase.UpdateProjectImpactIntegrationsInput
+	if req.GA4 != nil {
+		input.GA4 = &usecase.UpdateProjectGA4IntegrationInput{
+			PropertyID:         req.GA4.PropertyID,
+			ServiceAccountJSON: req.GA4.ServiceAccountJSON,
+			Disconnect:         req.GA4.Disconnect,
+		}
+	}
+	if req.Stripe != nil {
+		input.Stripe = &usecase.UpdateProjectStripeIntegrationInput{
+			WebhookSecret: req.Stripe.WebhookSecret,
+			Disconnect:    req.Stripe.Disconnect,
+		}
+	}
+	if req.Ingestion != nil {
+		input.Ingestion = &usecase.UpdateProjectIngestionIntegrationInput{
+			Rotate:     req.Ingestion.Rotate,
+			Disconnect: req.Ingestion.Disconnect,
+		}
+	}
+
+	value, err := h.svc.UpdateProjectImpactIntegrations(r.Context(), projectID, organizationID, input)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, value)
 }
 
 func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -302,10 +414,10 @@ func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID 
 type updatePromptRequest struct {
 	Text     *string                 `json:"text"`
 	Intent   *string                 `json:"intent"`
-	ModelIDs *[]string `json:"modelIds"`
+	ModelIDs *[]string               `json:"modelIds"`
 	Schedule *usecase.PromptSchedule `json:"schedule"`
-	Status   *string `json:"status"`
-	IsActive *bool   `json:"isActive"`
+	Status   *string                 `json:"status"`
+	IsActive *bool                   `json:"isActive"`
 }
 
 func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID string) {

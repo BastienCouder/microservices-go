@@ -8,11 +8,13 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	DatabaseURL       string
-	InternalJWTSecret string
-	InternalJWTIssuer string
-	Stripe            StripeConfig
+	HTTPAddr              string
+	DatabaseURL           string
+	InternalJWTSecret     string
+	InternalJWTIssuer     string
+	AttributionServiceURL string
+	ProjectServiceURL     string
+	Stripe                StripeConfig
 }
 
 type StripeConfig struct {
@@ -53,11 +55,13 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		HTTPAddr:          httpAddr,
-		DatabaseURL:       databaseURL,
-		InternalJWTSecret: internalJWTSecret,
-		InternalJWTIssuer: internalJWTIssuer,
-		Stripe:            stripeCfg,
+		HTTPAddr:              httpAddr,
+		DatabaseURL:           databaseURL,
+		InternalJWTSecret:     internalJWTSecret,
+		InternalJWTIssuer:     internalJWTIssuer,
+		AttributionServiceURL: optionalEnv("ATTRIBUTION_SERVICE_URL"),
+		ProjectServiceURL:     optionalEnv("PROJECT_SERVICE_URL"),
+		Stripe:                stripeCfg,
 	}, nil
 }
 

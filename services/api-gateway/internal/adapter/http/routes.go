@@ -19,6 +19,16 @@ func isBillingStripeWebhookRequest(r *http.Request) bool {
 	return r.Method == http.MethodPost && r.URL.Path == "/billing/stripe/webhook"
 }
 
+func isAttributionStripeWebhookRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost &&
+		(r.URL.Path == "/attribution/stripe/webhook" || strings.HasPrefix(r.URL.Path, "/attribution/stripe/webhook/"))
+}
+
+func isAttributionIngestionRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost &&
+		(r.URL.Path == "/attribution/ingest" || strings.HasPrefix(r.URL.Path, "/attribution/ingest/"))
+}
+
 func (h *Handler) buildRoutes() []routeEntry {
 	authHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.authProxy, "auth-service", internalTokenClaims{})
@@ -26,6 +36,17 @@ func (h *Handler) buildRoutes() []routeEntry {
 	userHandler := h.withAuth(h.userProxy, "user-service", "users")
 	billingStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.billingProxy, "billing-service", internalTokenClaims{})
+	})
+	attributionStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.serveProxyWithInternalAuth(w, r, h.attributionProxy, "attribution-service", internalTokenClaims{})
+	})
+	attributionIngestionHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := r.Clone(r.Context())
+		r2.Header = r.Header.Clone()
+		if authz := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(authz, "Bearer ") {
+			r2.Header.Set("X-Attribution-Key", strings.TrimSpace(strings.TrimPrefix(authz, "Bearer ")))
+		}
+		h.serveProxyWithInternalAuth(w, r2, h.attributionProxy, "attribution-service", internalTokenClaims{})
 	})
 
 	routes := []routeEntry{
@@ -43,6 +64,8 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/invitations"), handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations"), service: "organizations-service"},
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions"), service: "permission-service"},
 		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler, service: "billing-service"},
+		{match: isAttributionStripeWebhookRequest, handler: attributionStripeWebhookHandler, service: "attribution-service"},
+		{match: isAttributionIngestionRequest, handler: attributionIngestionHandler, service: "attribution-service"},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications"), service: "notification-service"},
 		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
