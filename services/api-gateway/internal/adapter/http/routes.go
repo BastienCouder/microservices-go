@@ -48,6 +48,9 @@ func (h *Handler) buildRoutes() []routeEntry {
 		}
 		h.serveProxyWithInternalAuth(w, r2, h.attributionProxy, "attribution-service", internalTokenClaims{})
 	})
+	projectShareHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.serveProxyWithInternalAuth(w, r, h.projectProxy, "project-service", internalTokenClaims{})
+	})
 
 	routes := []routeEntry{
 		{
@@ -66,6 +69,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler, service: "billing-service"},
 		{match: isAttributionStripeWebhookRequest, handler: attributionStripeWebhookHandler, service: "attribution-service"},
 		{match: isAttributionIngestionRequest, handler: attributionIngestionHandler, service: "attribution-service"},
+		{match: matchPathPrefix("/reports/share"), handler: projectShareHandler, service: "project-service"},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications"), service: "notification-service"},
 		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},

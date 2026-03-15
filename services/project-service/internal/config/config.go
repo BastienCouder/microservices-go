@@ -12,8 +12,12 @@ type Config struct {
 	GRPCAddr                 string
 	DatabaseURL              string
 	AnalysisServiceGRPCAddr  string
+	AnalysisServiceURL       string
 	IAServiceGRPCAddr        string
 	AttributionServiceURL    string
+	NotificationServiceURL   string
+	ReportsPublicBaseURL     string
+	ReportShareSigningSecret string
 	SecretEncryptionKey      string
 	RabbitMQURL              string
 	RabbitMQExchange         string
@@ -75,6 +79,13 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	reportShareSigningSecret, err := optionalEnvOrFile("REPORT_SHARE_SIGNING_SECRET", "REPORT_SHARE_SIGNING_SECRET_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	if strings.TrimSpace(reportShareSigningSecret) == "" {
+		reportShareSigningSecret = internalJWTSecret
+	}
 	secretEncryptionKey, err := requiredEnvOrFile("PROJECT_SECRET_ENCRYPTION_KEY", "PROJECT_SECRET_ENCRYPTION_KEY_FILE")
 	if err != nil {
 		return Config{}, err
@@ -93,8 +104,12 @@ func Load() (Config, error) {
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
 		AnalysisServiceGRPCAddr:  analysisServiceGRPCAddr,
+		AnalysisServiceURL:       optionalEnv("ANALYSIS_SERVICE_URL"),
 		IAServiceGRPCAddr:        iaServiceGRPCAddr,
 		AttributionServiceURL:    optionalEnv("ATTRIBUTION_SERVICE_URL"),
+		NotificationServiceURL:   optionalEnv("NOTIFICATION_SERVICE_URL"),
+		ReportsPublicBaseURL:     optionalEnv("REPORTS_PUBLIC_BASE_URL"),
+		ReportShareSigningSecret: reportShareSigningSecret,
 		SecretEncryptionKey:      secretEncryptionKey,
 		RabbitMQURL:              rabbitMQURL,
 		RabbitMQExchange:         rabbitMQExchange,
@@ -193,6 +208,21 @@ func requiredEnvOrFile(key, fileKey string) (string, error) {
 		return "", fmt.Errorf("value file %s is empty", filePath)
 	}
 	return value, nil
+}
+
+func optionalEnvOrFile(key, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", nil
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read value file %s: %w", filePath, err)
+	}
+	return strings.TrimSpace(string(raw)), nil
 }
 
 func optionalEnv(key string) string {

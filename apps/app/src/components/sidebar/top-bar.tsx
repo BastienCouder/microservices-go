@@ -2,11 +2,13 @@
 
 import { Bell, User as UserIcon } from "lucide-react";
 
+import { BrandLockup } from "@/components/branding/brand-lockup";
 import { Button } from "@/components/ui/button";
 
 export function TopBar() {
   return (
-    <header className="fixed inset-x-0 top-0 z-50 flex h-12 items-center justify-end border-b border-white/60 bg-background/65 px-6 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-50 flex h-12 items-center justify-between border-b border-white/60 bg-background/65 px-6 backdrop-blur-xl">
+      <BrandLockup compact className="max-w-[15rem]" />
       <div className="flex items-center gap-3">
         <Button variant="ghost" size="icon" className="text-muted-foreground">
           <Bell className="h-5 w-5" />

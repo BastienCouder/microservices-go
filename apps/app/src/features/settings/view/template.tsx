@@ -5,8 +5,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 
 import { normalizeOrganizationHierarchy } from "@/features/organizations/lib/hierarchy";
+import { WhiteLabelWorkspace } from "@/features/settings/components/white-label-workspace";
 import { PageHeader } from "@/features/shared/view/page-header";
+import { useWhiteLabel } from "@/features/white-label/context/white-label-provider";
 import { apiRoutes } from "@/lib/api-config";
+import { buildDefaultWhiteLabelSettings, loadProjectDetailsRecord, serializeWhiteLabelSettings } from "@/lib/project-details";
 import { appQueryKeys } from "@/lib/query-keys";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,73 +33,6 @@ type SettingsTemplateProps = {
   apiBaseURL: string;
   routeSearch: string;
 };
-
-type ProjectSettingsRecord = {
-  id: string;
-  name: string;
-  status: string;
-  domain: string;
-  websiteUrl: string;
-  brandName: string;
-  brandDescription: string;
-  attributionSource: string;
-  industry: string;
-  createdAt: string;
-  updatedAt: string;
-};
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.success === true && "data" in value) {
-    return value.data;
-  }
-  return value;
-}
-
-function getField<T = unknown>(value: Record<string, unknown>, keys: string[]): T | undefined {
-  for (const key of keys) {
-    if (key in value) {
-      return value[key] as T;
-    }
-  }
-  return undefined;
-}
-
-function getString(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function getIDString(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return "";
-}
-
-function normalizeProjectRecord(value: unknown): ProjectSettingsRecord | null {
-  const payload = unwrapSuccessEnvelope(value);
-  if (!isRecord(payload)) return null;
-
-  const id = getIDString(getField(payload, ["id", "ID"]));
-  if (id === "") return null;
-
-  return {
-    id,
-    name: getString(getField(payload, ["name", "Name"])) || "Project",
-    status: getString(getField(payload, ["status", "Status"])) || "draft",
-    domain: getString(getField(payload, ["domain", "Domain"])),
-    websiteUrl: getString(getField(payload, ["websiteUrl", "WebsiteURL"])),
-    brandName: getString(getField(payload, ["brandName", "BrandName"])),
-    brandDescription: getString(getField(payload, ["brandDescription", "BrandDescription"])),
-    attributionSource: getString(getField(payload, ["attributionSource", "AttributionSource"])),
-    industry: getString(getField(payload, ["industry", "Industry"])),
-    createdAt: getString(getField(payload, ["createdAt", "CreatedAt"])),
-    updatedAt: getString(getField(payload, ["updatedAt", "UpdatedAt"])),
-  };
-}
 
 function formatLabel(value: string): string {
   const normalized = value.trim().replace(/[_-]+/g, " ");
@@ -122,28 +58,10 @@ async function loadOrganizationHierarchy(
   return normalizeOrganizationHierarchy(response.data, organizationId);
 }
 
-async function loadProjectDetails(
-  apiBaseURL: string,
-  organizationId: string,
-  projectId: string,
-  signal?: AbortSignal,
-): Promise<ProjectSettingsRecord | null> {
-  const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.get(encodeURIComponent(projectId)), {
-    method: "GET",
-    organizationId,
-    signal,
-  });
-
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de charger ce projet.");
-  }
-
-  return normalizeProjectRecord(response.data);
-}
-
 export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplateProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { projectId: themedProjectId, setPreviewTheme, clearPreviewTheme } = useWhiteLabel();
 
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(
     readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
@@ -161,6 +79,7 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
   const [industry, setIndustry] = useState("");
   const [attributionSource, setAttributionSource] = useState("");
   const [brandDescription, setBrandDescription] = useState("");
+  const [whiteLabel, setWhiteLabel] = useState(() => buildDefaultWhiteLabelSettings());
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -198,7 +117,7 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
   const projectQuery = useQuery({
     queryKey: appQueryKeys.projectDetails(apiBaseURL, selectedOrganizationId, selectedProjectId),
     enabled: apiBaseURL.trim() !== "" && selectedOrganizationId !== "" && selectedProjectId !== "",
-    queryFn: ({ signal }) => loadProjectDetails(apiBaseURL, selectedOrganizationId, selectedProjectId, signal),
+    queryFn: ({ signal }) => loadProjectDetailsRecord(apiBaseURL, selectedOrganizationId, selectedProjectId, signal),
   });
   const project = projectQuery.data ?? null;
 
@@ -214,7 +133,19 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
     setIndustry(project.industry);
     setAttributionSource(project.attributionSource);
     setBrandDescription(project.brandDescription);
+    setWhiteLabel(project.whiteLabel);
   }, [project]);
+
+  useEffect(() => {
+    if (!project || project.id !== themedProjectId) {
+      return;
+    }
+
+    setPreviewTheme(whiteLabel);
+    return () => {
+      clearPreviewTheme();
+    };
+  }, [clearPreviewTheme, project, setPreviewTheme, themedProjectId, whiteLabel]);
 
   useEffect(() => {
     if (hierarchyQuery.error instanceof Error) {
@@ -237,9 +168,10 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
       websiteUrl.trim() !== project.websiteUrl ||
       industry.trim() !== project.industry ||
       attributionSource.trim() !== project.attributionSource ||
-      brandDescription.trim() !== project.brandDescription
+      brandDescription.trim() !== project.brandDescription ||
+      serializeWhiteLabelSettings(whiteLabel) !== serializeWhiteLabelSettings(project.whiteLabel)
     );
-  }, [attributionSource, brandDescription, brandName, domain, industry, name, project, websiteUrl]);
+  }, [attributionSource, brandDescription, brandName, domain, industry, name, project, websiteUrl, whiteLabel]);
 
   const handleSave = async () => {
     if (!project || selectedOrganizationId === "") return;
@@ -259,6 +191,7 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
           industry,
           attributionSource,
           brandDescription,
+          whiteLabel,
         }),
       });
 
@@ -326,98 +259,111 @@ export function SettingsTemplate({ apiBaseURL, routeSearch }: SettingsTemplatePr
       ) : null}
 
       <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_340px]">
-        <Card className="min-h-0 border">
-          <CardHeader>
-            <CardTitle>Project configuration</CardTitle>
-            <CardDescription>
-              Update the name, routing and brand context used across monitoring, prompts and perception.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {!selectedOrganizationId ? (
-              <p className="text-sm text-muted-foreground">
-                Select an organization first to load project settings.
-              </p>
-            ) : hierarchyQuery.isLoading && !hierarchy ? (
-              <p className="text-sm text-muted-foreground">Loading organization projects...</p>
-            ) : !selectedProjectId ? (
-              <div className="rounded-xl border border-dashed px-4 py-8 text-center">
-                <p className="text-sm font-medium">No project selected.</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  This organization has no project yet, or none is currently selected.
+        <div className="min-h-0 space-y-4">
+          <Card className="min-h-0 border">
+            <CardHeader>
+              <CardTitle>Project configuration</CardTitle>
+              <CardDescription>
+                Update the name, routing and brand context used across monitoring, prompts and perception.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {!selectedOrganizationId ? (
+                <p className="text-sm text-muted-foreground">
+                  Select an organization first to load project settings.
                 </p>
-                <Button className="mt-4" onClick={openCreateProject}>
-                  Create project
-                </Button>
-              </div>
-            ) : projectQuery.isLoading && !project ? (
-              <p className="text-sm text-muted-foreground">Loading project settings...</p>
-            ) : !project ? (
-              <p className="text-sm text-muted-foreground">Project not found for the current organization.</p>
-            ) : (
-              <>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Project name</label>
-                    <Input value={name} onChange={(event) => setName(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Brand name</label>
-                    <Input value={brandName} onChange={(event) => setBrandName(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Domain</label>
-                    <Input value={domain} onChange={(event) => setDomain(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Website URL</label>
-                    <Input value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Attribution source</label>
-                    <Input value={attributionSource} onChange={(event) => setAttributionSource(event.target.value)} placeholder="ga4, stripe..." />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Industry</label>
-                    <Input value={industry} onChange={(event) => setIndustry(event.target.value)} />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Brand description</label>
-                  <Textarea
-                    value={brandDescription}
-                    onChange={(event) => setBrandDescription(event.target.value)}
-                    placeholder="Short positioning summary used by downstream analyses."
-                  />
-                </div>
-
-                <div className="flex justify-end gap-2 border-t pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (!project) return;
-                      setName(project.name);
-                      setBrandName(project.brandName);
-                      setDomain(project.domain);
-                      setWebsiteUrl(project.websiteUrl);
-                      setIndustry(project.industry);
-                      setAttributionSource(project.attributionSource);
-                      setBrandDescription(project.brandDescription);
-                    }}
-                    disabled={!isDirty || isSaving}
-                  >
-                    Reset
-                  </Button>
-                  <Button type="button" onClick={() => void handleSave()} disabled={!isDirty || isSaving}>
-                    {isSaving ? "Saving..." : "Save changes"}
+              ) : hierarchyQuery.isLoading && !hierarchy ? (
+                <p className="text-sm text-muted-foreground">Loading organization projects...</p>
+              ) : !selectedProjectId ? (
+                <div className="rounded-xl border border-dashed px-4 py-8 text-center">
+                  <p className="text-sm font-medium">No project selected.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    This organization has no project yet, or none is currently selected.
+                  </p>
+                  <Button className="mt-4" onClick={openCreateProject}>
+                    Create project
                   </Button>
                 </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
+              ) : projectQuery.isLoading && !project ? (
+                <p className="text-sm text-muted-foreground">Loading project settings...</p>
+              ) : !project ? (
+                <p className="text-sm text-muted-foreground">Project not found for the current organization.</p>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Project name</label>
+                      <Input value={name} onChange={(event) => setName(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Brand name</label>
+                      <Input value={brandName} onChange={(event) => setBrandName(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Domain</label>
+                      <Input value={domain} onChange={(event) => setDomain(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Website URL</label>
+                      <Input value={websiteUrl} onChange={(event) => setWebsiteUrl(event.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Attribution source</label>
+                      <Input value={attributionSource} onChange={(event) => setAttributionSource(event.target.value)} placeholder="ga4, stripe..." />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Industry</label>
+                      <Input value={industry} onChange={(event) => setIndustry(event.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Brand description</label>
+                    <Textarea
+                      value={brandDescription}
+                      onChange={(event) => setBrandDescription(event.target.value)}
+                      placeholder="Short positioning summary used by downstream analyses."
+                    />
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {project ? (
+            <WhiteLabelWorkspace
+              projectName={name.trim() || project.name}
+              value={whiteLabel}
+              onChange={setWhiteLabel}
+            />
+          ) : null}
+
+          {project ? (
+            <div className="flex justify-end gap-2 border-t pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if (!project) return;
+                  setName(project.name);
+                  setBrandName(project.brandName);
+                  setDomain(project.domain);
+                  setWebsiteUrl(project.websiteUrl);
+                  setIndustry(project.industry);
+                  setAttributionSource(project.attributionSource);
+                  setBrandDescription(project.brandDescription);
+                  setWhiteLabel(project.whiteLabel);
+                }}
+                disabled={!isDirty || isSaving}
+              >
+                Reset
+              </Button>
+              <Button type="button" onClick={() => void handleSave()} disabled={!isDirty || isSaving}>
+                {isSaving ? "Saving..." : "Save changes"}
+              </Button>
+            </div>
+          ) : null}
+        </div>
 
         <Card className="border">
           <CardHeader>

@@ -17,15 +17,18 @@ import (
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq                int64                                         `json:"seq"`
-	Projects           map[string]*usecase.Project                   `json:"projects"`
-	Prompts            map[string]*usecase.Prompt                    `json:"prompts"`
-	Competitors        map[string]*usecase.Competitor                `json:"competitors"`
-	Models             map[string]usecase.AIModel                    `json:"models"`
-	ProjectModels      map[string]map[string]bool                    `json:"projectModels"`
-	ImpactIntegrations map[string]*usecase.ProjectImpactIntegrations `json:"impactIntegrations"`
-	Outbox             map[string]*usecase.OutboxEvent               `json:"outbox"`
-	OutboxOrder        []string                                      `json:"outboxOrder"`
+	Seq                 int64                                         `json:"seq"`
+	Projects            map[string]*usecase.Project                   `json:"projects"`
+	Prompts             map[string]*usecase.Prompt                    `json:"prompts"`
+	Competitors         map[string]*usecase.Competitor                `json:"competitors"`
+	Models              map[string]usecase.AIModel                    `json:"models"`
+	ProjectModels       map[string]map[string]bool                    `json:"projectModels"`
+	ImpactIntegrations  map[string]*usecase.ProjectImpactIntegrations `json:"impactIntegrations"`
+	Reports             map[string]*usecase.ProjectReport             `json:"reports"`
+	ReportAuditEvents   map[string]*usecase.ReportAuditEvent          `json:"reportAuditEvents"`
+	ReportAuditByReport map[string][]string                           `json:"reportAuditByReport"`
+	Outbox              map[string]*usecase.OutboxEvent               `json:"outbox"`
+	OutboxOrder         []string                                      `json:"outboxOrder"`
 }
 
 type StateStore struct {
@@ -43,14 +46,17 @@ func NewStateStore(db *pgxpool.Pool, secretEncryptionKey string) (*StateStore, e
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	state := persistedState{
-		Projects:           make(map[string]*usecase.Project),
-		Prompts:            make(map[string]*usecase.Prompt),
-		Competitors:        make(map[string]*usecase.Competitor),
-		Models:             make(map[string]usecase.AIModel),
-		ProjectModels:      make(map[string]map[string]bool),
-		ImpactIntegrations: make(map[string]*usecase.ProjectImpactIntegrations),
-		Outbox:             make(map[string]*usecase.OutboxEvent),
-		OutboxOrder:        make([]string, 0),
+		Projects:            make(map[string]*usecase.Project),
+		Prompts:             make(map[string]*usecase.Prompt),
+		Competitors:         make(map[string]*usecase.Competitor),
+		Models:              make(map[string]usecase.AIModel),
+		ProjectModels:       make(map[string]map[string]bool),
+		ImpactIntegrations:  make(map[string]*usecase.ProjectImpactIntegrations),
+		Reports:             make(map[string]*usecase.ProjectReport),
+		ReportAuditEvents:   make(map[string]*usecase.ReportAuditEvent),
+		ReportAuditByReport: make(map[string][]string),
+		Outbox:              make(map[string]*usecase.OutboxEvent),
+		OutboxOrder:         make([]string, 0),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -87,6 +93,12 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadImpactIntegrations(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadReports(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadReportAuditEvents(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadOutbox(ctx, &state); err != nil {
@@ -126,6 +138,8 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	}
 
 	for _, statement := range []string{
+		`DELETE FROM project_report_audit_events`,
+		`DELETE FROM project_reports`,
 		`DELETE FROM outbox_events`,
 		`DELETE FROM prompt_model_schedules`,
 		`DELETE FROM prompt_models`,
@@ -145,6 +159,12 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertProjects(ctx, tx, state.Projects); err != nil {
+		return err
+	}
+	if err := s.insertProjectReports(ctx, tx, state.Reports); err != nil {
+		return err
+	}
+	if err := insertReportAuditEvents(ctx, tx, state.ReportAuditEvents, state.ReportAuditByReport); err != nil {
 		return err
 	}
 	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
@@ -178,7 +198,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at
+		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, white_label, status, created_at, updated_at
 		FROM projects
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -194,6 +214,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			brandName         *string
 			brandDescription  *string
 			industry          *string
+			whiteLabelRaw     []byte
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -208,6 +229,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			&industry,
 			&item.PrimaryLanguage,
 			&item.Country,
+			&whiteLabelRaw,
 			&item.Status,
 			&item.CreatedAt,
 			&item.UpdatedAt,
@@ -218,6 +240,10 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		item.BrandName = stringValue(brandName)
 		item.BrandDescription = stringValue(brandDescription)
 		item.Industry = stringValue(industry)
+		item.WhiteLabel, err = decodeWhiteLabelSettings(whiteLabelRaw)
+		if err != nil {
+			return fmt.Errorf("decode white label for project %s: %w", item.ID, err)
+		}
 		project := item
 		state.Projects[item.ID] = &project
 	}
@@ -581,10 +607,14 @@ func insertProjectModelsCatalog(ctx context.Context, tx pgx.Tx, models map[strin
 func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase.Project) error {
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
+		whiteLabelJSON, err := encodeWhiteLabelSettings(project.WhiteLabel)
+		if err != nil {
+			return fmt.Errorf("encode white label for project %s: %w", project.ID, err)
+		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, white_label, status, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), whiteLabelJSON, project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
 		}
 	}
@@ -852,6 +882,22 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func decodeWhiteLabelSettings(raw []byte) (usecase.WhiteLabelSettings, error) {
+	if len(raw) == 0 {
+		return usecase.WhiteLabelSettings{}, nil
+	}
+
+	var value usecase.WhiteLabelSettings
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return usecase.WhiteLabelSettings{}, err
+	}
+	return value, nil
+}
+
+func encodeWhiteLabelSettings(value usecase.WhiteLabelSettings) ([]byte, error) {
+	return json.Marshal(value)
 }
 
 func timeValue(value *time.Time) time.Time {

@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
+import { WhiteLabelProvider } from "@/features/white-label/context/white-label-provider";
 import { shouldRedirectUnauthenticated } from "./auth-guard";
 import { AppLayout } from "./layout";
 import { AppRouter } from "./router";
@@ -50,24 +51,28 @@ export default function App() {
 
   if (isOnboardingRoute) {
     return (
-      <AppRouter
-        apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
-        user={user}
-        busy={busy}
-      />
+      <WhiteLabelProvider apiBaseURL={apiBaseURL}>
+        <AppRouter
+          apiBaseURL={apiBaseURL}
+          routeSearch={routeSearch}
+          user={user}
+          busy={busy}
+        />
+      </WhiteLabelProvider>
     );
   }
 
   return (
-    <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
-      <AppRouter
-        apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
-        user={user}
-        busy={busy}
-      />
-    </AppLayout>
+    <WhiteLabelProvider apiBaseURL={apiBaseURL}>
+      <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
+        <AppRouter
+          apiBaseURL={apiBaseURL}
+          routeSearch={routeSearch}
+          user={user}
+          busy={busy}
+        />
+      </AppLayout>
+    </WhiteLabelProvider>
   );
 }
 

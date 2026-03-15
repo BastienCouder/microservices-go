@@ -21,6 +21,8 @@ import (
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
 	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
+	notificationclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/notification"
+	reportanalyticsclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/reportanalytics"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/http"
 	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/messaging/rabbitmq"
@@ -76,16 +78,38 @@ func main() {
 		attributionHTTPClient = client
 	}
 
+	var reportAnalyticsHTTPClient usecase.ReportAnalyticsClient
+	if cfg.AnalysisServiceURL != "" {
+		client, err := reportanalyticsclient.NewClient(cfg.AnalysisServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init analysis report http client: %v", err)
+		}
+		reportAnalyticsHTTPClient = client
+	}
+
+	var notificationHTTPClient usecase.NotificationClient
+	if cfg.NotificationServiceURL != "" {
+		client, err := notificationclient.NewClient(cfg.NotificationServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init notification http client: %v", err)
+		}
+		notificationHTTPClient = client
+	}
+
 	store, err := projectstate.NewStateStore(db, cfg.SecretEncryptionKey)
 	if err != nil {
 		log.Fatalf("init project state store: %v", err)
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:             store,
-		AnalysisClient:    analysisGRPCClient,
-		IAClient:          iaGRPCClient,
-		AttributionClient: attributionHTTPClient,
+		Store:                 store,
+		AnalysisClient:        analysisGRPCClient,
+		IAClient:              iaGRPCClient,
+		AttributionClient:     attributionHTTPClient,
+		ReportAnalyticsClient: reportAnalyticsHTTPClient,
+		NotificationClient:    notificationHTTPClient,
+		ReportsPublicBaseURL:  cfg.ReportsPublicBaseURL,
+		ReportSigningSecret:   cfg.ReportShareSigningSecret,
 	})
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)
@@ -95,6 +119,7 @@ func main() {
 	defer stopBackground()
 	go runOutboxPublisherLoop(backgroundCtx, cfg, svc)
 	go runOutboxConsumerLoop(backgroundCtx, cfg, svc)
+	go runScheduledReportsLoop(backgroundCtx, svc)
 
 	h := httpadapter.NewHandler(svc)
 	g := grpcadapter.NewServer(svc)
@@ -342,6 +367,29 @@ func runOutboxConsumerLoop(ctx context.Context, cfg config.Config, svc *usecase.
 		}
 		if sleepErr := sleepWithContext(ctx, time.Second); sleepErr != nil {
 			return
+		}
+	}
+}
+
+func runScheduledReportsLoop(ctx context.Context, svc *usecase.Service) {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	runOnce := func() {
+		runCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+		defer cancel()
+		if err := svc.RunScheduledProjectReports(runCtx, 25); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("scheduled reports loop error: %v", err)
+		}
+	}
+
+	runOnce()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			runOnce()
 		}
 	}
 }

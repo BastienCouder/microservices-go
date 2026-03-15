@@ -20,13 +20,20 @@ type Service struct {
 	models             map[string]AIModel
 	projectModels      map[string]map[string]bool
 	impactIntegrations map[string]*ProjectImpactIntegrations
+	reports            map[string]*ProjectReport
+	reportAuditEvents  map[string]*ReportAuditEvent
+	reportAuditByReport map[string][]string
 	outbox             map[string]*OutboxEvent
 	outboxOrder        []string
 
-	store             StateStore
-	analysisClient    AnalysisClient
-	iaClient          IAClient
-	attributionClient AttributionClient
+	store                 StateStore
+	analysisClient        AnalysisClient
+	iaClient              IAClient
+	attributionClient     AttributionClient
+	reportAnalyticsClient ReportAnalyticsClient
+	notificationClient    NotificationClient
+	reportsPublicBaseURL  string
+	reportSigningSecret   string
 }
 
 func NewService() *Service {
@@ -38,6 +45,9 @@ func NewService() *Service {
 		models:             make(map[string]AIModel),
 		projectModels:      make(map[string]map[string]bool),
 		impactIntegrations: make(map[string]*ProjectImpactIntegrations),
+		reports:            make(map[string]*ProjectReport),
+		reportAuditEvents:  make(map[string]*ReportAuditEvent),
+		reportAuditByReport: make(map[string][]string),
 		outbox:             make(map[string]*OutboxEvent),
 		outboxOrder:        make([]string, 0),
 	}
@@ -51,6 +61,10 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.analysisClient = deps.AnalysisClient
 	svc.iaClient = deps.IAClient
 	svc.attributionClient = deps.AttributionClient
+	svc.reportAnalyticsClient = deps.ReportAnalyticsClient
+	svc.notificationClient = deps.NotificationClient
+	svc.reportsPublicBaseURL = deps.ReportsPublicBaseURL
+	svc.reportSigningSecret = deps.ReportSigningSecret
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err
@@ -89,6 +103,9 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
+	s.reports = nonNilProjectReportMap(state.Reports)
+	s.reportAuditEvents = nonNilReportAuditEventMap(state.ReportAuditEvents)
+	s.reportAuditByReport = nonNilStringSliceMap(state.ReportAuditByReport)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 	if len(s.models) == 0 {
@@ -118,11 +135,15 @@ func (s *Service) snapshotLocked() *persistedState {
 		Models:             make(map[string]AIModel, len(s.models)),
 		ProjectModels:      make(map[string]map[string]bool, len(s.projectModels)),
 		ImpactIntegrations: make(map[string]*ProjectImpactIntegrations, len(s.impactIntegrations)),
+		Reports:            make(map[string]*ProjectReport, len(s.reports)),
+		ReportAuditEvents:  make(map[string]*ReportAuditEvent, len(s.reportAuditEvents)),
+		ReportAuditByReport: make(map[string][]string, len(s.reportAuditByReport)),
 		Outbox:             make(map[string]*OutboxEvent, len(s.outbox)),
 		OutboxOrder:        append([]string(nil), s.outboxOrder...),
 	}
 	for key, value := range s.projects {
 		clone := *value
+		clone.WhiteLabel = copyWhiteLabelSettings(value.WhiteLabel)
 		state.Projects[key] = &clone
 	}
 	for key, value := range s.prompts {
@@ -147,6 +168,17 @@ func (s *Service) snapshotLocked() *persistedState {
 		clone := copyProjectImpactIntegrations(value)
 		state.ImpactIntegrations[key] = &clone
 	}
+	for key, value := range s.reports {
+		clone := copyProjectReport(value)
+		state.Reports[key] = &clone
+	}
+	for key, value := range s.reportAuditEvents {
+		clone := copyReportAuditEvent(value)
+		state.ReportAuditEvents[key] = &clone
+	}
+	for key, value := range s.reportAuditByReport {
+		state.ReportAuditByReport[key] = nonNilStringSlice(value)
+	}
 	for key, value := range s.outbox {
 		clone := copyOutboxEvent(value)
 		state.Outbox[key] = &clone
@@ -165,6 +197,9 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
+	s.reports = nonNilProjectReportMap(state.Reports)
+	s.reportAuditEvents = nonNilReportAuditEventMap(state.ReportAuditEvents)
+	s.reportAuditByReport = nonNilStringSliceMap(state.ReportAuditByReport)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 }
@@ -225,7 +260,9 @@ func copyProject(project *Project) Project {
 	if project == nil {
 		return Project{}
 	}
-	return *project
+	out := *project
+	out.WhiteLabel = copyWhiteLabelSettings(project.WhiteLabel)
+	return out
 }
 
 func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpactIntegrations {
@@ -268,21 +305,46 @@ func nonNilProjectMap(input map[string]*Project) map[string]*Project {
 	if input == nil {
 		return make(map[string]*Project)
 	}
-	return input
+	out := make(map[string]*Project, len(input))
+	for key, value := range input {
+		if value == nil {
+			continue
+		}
+		clone := *value
+		clone.WhiteLabel = copyWhiteLabelSettings(value.WhiteLabel)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilPromptMap(input map[string]*Prompt) map[string]*Prompt {
 	if input == nil {
 		return make(map[string]*Prompt)
 	}
-	return input
+	out := make(map[string]*Prompt, len(input))
+	for key, value := range input {
+		if value == nil {
+			continue
+		}
+		clone := copyPrompt(value)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilCompetitorMap(input map[string]*Competitor) map[string]*Competitor {
 	if input == nil {
 		return make(map[string]*Competitor)
 	}
-	return input
+	out := make(map[string]*Competitor, len(input))
+	for key, value := range input {
+		if value == nil {
+			continue
+		}
+		clone := copyCompetitor(value)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilModelMap(input map[string]AIModel) map[string]AIModel {
@@ -306,6 +368,36 @@ func nonNilProjectImpactIntegrationMap(input map[string]*ProjectImpactIntegratio
 	out := make(map[string]*ProjectImpactIntegrations, len(input))
 	for key, value := range input {
 		clone := copyProjectImpactIntegrations(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilProjectReportMap(input map[string]*ProjectReport) map[string]*ProjectReport {
+	if input == nil {
+		return make(map[string]*ProjectReport)
+	}
+	out := make(map[string]*ProjectReport, len(input))
+	for key, value := range input {
+		if value == nil {
+			continue
+		}
+		clone := copyProjectReport(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilReportAuditEventMap(input map[string]*ReportAuditEvent) map[string]*ReportAuditEvent {
+	if input == nil {
+		return make(map[string]*ReportAuditEvent)
+	}
+	out := make(map[string]*ReportAuditEvent, len(input))
+	for key, value := range input {
+		if value == nil {
+			continue
+		}
+		clone := copyReportAuditEvent(value)
 		out[key] = &clone
 	}
 	return out
@@ -337,6 +429,17 @@ func copyStringMap(input map[string]string) map[string]string {
 	out := make(map[string]string, len(input))
 	for key, value := range input {
 		out[key] = value
+	}
+	return out
+}
+
+func nonNilStringSliceMap(input map[string][]string) map[string][]string {
+	if input == nil {
+		return map[string][]string{}
+	}
+	out := make(map[string][]string, len(input))
+	for key, value := range input {
+		out[key] = nonNilStringSlice(value)
 	}
 	return out
 }

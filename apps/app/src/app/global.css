@@ -349,13 +349,15 @@
 @layer base {
   * {
     @apply border-border;
-    scrollbar-color: hsl(var(--scrollbar-thumb)) hsl(var(--scrollbar-track));
-    scrollbar-width: thin;
+    @media (min-width: 768px) {
+      scrollbar-color: hsl(var(--scrollbar-thumb)) hsl(var(--scrollbar-track));
+      scrollbar-width: thin;
+    }
   }
 
   body {
     @apply bg-background text-foreground;
-    font-family: "Manrope", Arial, Helvetica, sans-serif;
+    font-family: var(--white-label-font-family, "Manrope", Arial, Helvetica, sans-serif);
   }
 
   /* Mapping des classes H1, H2 pour cohérence automatique si tu utilises les balises HTML */
@@ -379,6 +381,7 @@
     @apply text-sm font-medium;
   }
 
+  @media (min-width: 768px) {
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
@@ -403,6 +406,8 @@
     background: hsl(var(--scrollbar-track));
   }
 }
+}
+
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;

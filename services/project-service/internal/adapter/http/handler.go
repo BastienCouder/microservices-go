@@ -24,6 +24,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects", h.createProject)
 	mux.HandleFunc("GET /projects", h.listProjects)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
+	mux.HandleFunc("/reports/share/", h.sharedReportRoutes)
 	mux.HandleFunc("GET /projects/ai-models", h.listModels)
 	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
 	mux.HandleFunc("/projects/", h.projectRoutes)
@@ -58,15 +59,16 @@ func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
 }
 
 type createProjectRequest struct {
-	Name              string `json:"name"`
-	Domain            string `json:"domain"`
-	WebsiteURL        string `json:"websiteUrl"`
-	AttributionSource string `json:"attributionSource"`
-	BrandName         string `json:"brandName"`
-	BrandDescription  string `json:"brandDescription"`
-	Industry          string `json:"industry"`
-	PrimaryLanguage   string `json:"primaryLanguage"`
-	Country           string `json:"country"`
+	Name              string                     `json:"name"`
+	Domain            string                     `json:"domain"`
+	WebsiteURL        string                     `json:"websiteUrl"`
+	AttributionSource string                     `json:"attributionSource"`
+	BrandName         string                     `json:"brandName"`
+	BrandDescription  string                     `json:"brandDescription"`
+	Industry          string                     `json:"industry"`
+	PrimaryLanguage   string                     `json:"primaryLanguage"`
+	Country           string                     `json:"country"`
+	WhiteLabel        usecase.WhiteLabelSettings `json:"whiteLabel"`
 }
 
 func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
@@ -99,6 +101,7 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 		Industry:          req.Industry,
 		PrimaryLanguage:   req.PrimaryLanguage,
 		Country:           req.Country,
+		WhiteLabel:        req.WhiteLabel,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -154,6 +157,18 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.listProjectModels(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodPatch:
 		h.replaceProjectModels(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "reports" && r.Method == http.MethodPost:
+		h.generateProjectReport(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "reports" && r.Method == http.MethodGet:
+		h.listProjectReports(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "reports" && r.Method == http.MethodGet:
+		h.getProjectReport(w, r, projectID, parts[2])
+	case len(parts) == 4 && parts[1] == "reports" && parts[3] == "pdf" && r.Method == http.MethodGet:
+		h.downloadProjectReportPDF(w, r, projectID, parts[2])
+	case len(parts) == 4 && parts[1] == "reports" && parts[3] == "send" && r.Method == http.MethodPost:
+		h.sendProjectReport(w, r, projectID, parts[2])
+	case len(parts) == 4 && parts[1] == "reports" && parts[3] == "share" && r.Method == http.MethodPost:
+		h.createProjectReportShareLink(w, r, projectID, parts[2])
 	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodGet:
 		h.getProjectImpactIntegrations(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodPatch:
@@ -214,13 +229,14 @@ func (h *Handler) getProject(w http.ResponseWriter, r *http.Request, projectID s
 }
 
 type updateProjectRequest struct {
-	Name              *string `json:"name"`
-	Domain            *string `json:"domain"`
-	WebsiteURL        *string `json:"websiteUrl"`
-	AttributionSource *string `json:"attributionSource"`
-	BrandName         *string `json:"brandName"`
-	BrandDescription  *string `json:"brandDescription"`
-	Industry          *string `json:"industry"`
+	Name              *string                     `json:"name"`
+	Domain            *string                     `json:"domain"`
+	WebsiteURL        *string                     `json:"websiteUrl"`
+	AttributionSource *string                     `json:"attributionSource"`
+	BrandName         *string                     `json:"brandName"`
+	BrandDescription  *string                     `json:"brandDescription"`
+	Industry          *string                     `json:"industry"`
+	WhiteLabel        *usecase.WhiteLabelSettings `json:"whiteLabel"`
 }
 
 func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -244,6 +260,7 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 		BrandName:         req.BrandName,
 		BrandDescription:  req.BrandDescription,
 		Industry:          req.Industry,
+		WhiteLabel:        req.WhiteLabel,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)

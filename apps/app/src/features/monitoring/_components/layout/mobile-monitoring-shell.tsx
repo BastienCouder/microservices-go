@@ -26,7 +26,6 @@ import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
 import { MobileMonitoringFiltersSheet } from "../filters/mobile-monitoring-filters-sheet";
 import { MobileCustomRangePanel } from "./mobile-custom-range-panel";
 import { MobileMonitoringPeriodCarousel } from "./mobile-monitoring-period-carousel";
-import { MobileMonitoringTopNav } from "./mobile-monitoring-top-nav";
 
 export function MobileMonitoringShell() {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -80,33 +79,16 @@ export function MobileMonitoringShell() {
 
   return (
     <>
-      <MobileMonitoringTopNav
-        projectName={monitoringData.project.name}
-        periodLabel={getMonitoringPeriodLabel(filters.period)}
-        activeFilterCount={activeFilterCount}
-        onOpenFilters={() => setFiltersOpen(true)}
-      />
-
-      <div className="min-h-full bg-[linear-gradient(180deg,#f5f2ea_0%,#f8fafc_42%,#f8fafc_100%)] px-3 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(5.75rem+env(safe-area-inset-top))] md:hidden">
-        <div className="mx-auto max-w-md space-y-4">
-          <section className="overflow-hidden rounded-[32px] border border-white/70 bg-[linear-gradient(145deg,rgba(255,255,255,0.96),rgba(241,245,249,0.94))] p-5 shadow-[0_28px_60px_-42px_rgba(15,23,42,0.45)]">
+      <div className="min-h-full px-3 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-[calc(6.75rem+env(safe-area-inset-top))] md:hidden">
+        <div className="mx-auto max-w-md space-y-4 pb-8">
+          <section className="overflow-hidden rounded-[32px] bg-background p-3 px-5">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
-                <Waves className="h-3.5 w-3.5 text-primary" />
-                Monitoring mobile
-              </div>
               <h1 className="mt-4 text-[2rem] font-semibold tracking-tight text-slate-950">
-                {monitoringData.project.name || "Votre monitoring"}
+                {monitoringData.project.name}
               </h1>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                {monitoringData.project.tagline || "Gardez une lecture claire de votre visibilité IA, même en déplacement."}
+                {monitoringData.project.tagline}
               </p>
-            </div>
-
-            <div className="mt-5 grid grid-cols-3 gap-2">
-              <SummaryCard label="Réponses" value={activityViewModel.filteredPrompts.length} />
-              <SummaryCard label="Alertes" value={activityViewModel.filteredAlerts.length} tone="warm" />
-              <SummaryCard label="Filtres" value={activeFilterCount} tone="dark" />
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3">
@@ -114,11 +96,7 @@ export function MobileMonitoringShell() {
                 <Badge variant="secondary" className="rounded-full bg-white/80 px-3 py-1 text-xs text-slate-700">
                   Période {getMonitoringPeriodLabel(filters.period)}
                 </Badge>
-                {activeFilterLabels.length === 0 ? (
-                  <Badge variant="secondary" className="rounded-full bg-slate-950 px-3 py-1 text-xs text-white">
-                    Aucun filtre avancé
-                  </Badge>
-                ) : (
+                {activeFilterLabels.length !== 0 && (
                   activeFilterLabels.slice(0, 2).map((label) => (
                     <Badge
                       key={label}
@@ -176,16 +154,10 @@ export function MobileMonitoringShell() {
             <AutomaticInsights autoInsights={analyticsViewModel.autoInsights} />
           </section>
 
-          <section className="space-y-4">
-            <SectionTitle
-              eyebrow="Activité"
-              title="Signaux récents"
-              description="Alertes critiques et derniers prompts restent accessibles sans quitter le monitoring."
-              trailing={activityViewModel.filteredAlerts.length + activityViewModel.filteredPrompts.length}
-            />
+    {/*       <section className="space-y-4">
             <ActivityAlerts filteredAlerts={activityViewModel.filteredAlerts} previewCount={2} onSelectAlert={activityViewModel.selectAlert} />
             <ActivityPromptsStream filteredPrompts={activityViewModel.filteredPrompts} previewCount={4} onSelectPrompt={activityViewModel.selectPrompt} />
-          </section>
+          </section> */}
         </div>
       </div>
 

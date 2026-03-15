@@ -31,21 +31,22 @@ const (
 )
 
 type Project struct {
-	ID                string    `json:"id"`
-	OrganizationID    int64     `json:"organizationId"`
-	CreatedBy         int64     `json:"createdBy"`
-	Name              string    `json:"name"`
-	Domain            string    `json:"domain"`
-	WebsiteURL        string    `json:"websiteUrl"`
-	AttributionSource string    `json:"attributionSource,omitempty"`
-	BrandName         string    `json:"brandName,omitempty"`
-	BrandDescription  string    `json:"brandDescription,omitempty"`
-	Industry          string    `json:"industry,omitempty"`
-	PrimaryLanguage   string    `json:"primaryLanguage"`
-	Country           string    `json:"country"`
-	Status            string    `json:"status"`
-	CreatedAt         time.Time `json:"createdAt"`
-	UpdatedAt         time.Time `json:"updatedAt"`
+	ID                string             `json:"id"`
+	OrganizationID    int64              `json:"organizationId"`
+	CreatedBy         int64              `json:"createdBy"`
+	Name              string             `json:"name"`
+	Domain            string             `json:"domain"`
+	WebsiteURL        string             `json:"websiteUrl"`
+	AttributionSource string             `json:"attributionSource,omitempty"`
+	BrandName         string             `json:"brandName,omitempty"`
+	BrandDescription  string             `json:"brandDescription,omitempty"`
+	Industry          string             `json:"industry,omitempty"`
+	PrimaryLanguage   string             `json:"primaryLanguage"`
+	Country           string             `json:"country"`
+	WhiteLabel        WhiteLabelSettings `json:"whiteLabel"`
+	Status            string             `json:"status"`
+	CreatedAt         time.Time          `json:"createdAt"`
+	UpdatedAt         time.Time          `json:"updatedAt"`
 }
 
 type ProjectImpactIntegrations struct {
@@ -174,6 +175,7 @@ type CreateProjectInput struct {
 	Industry          string
 	PrimaryLanguage   string
 	Country           string
+	WhiteLabel        WhiteLabelSettings
 }
 
 type UpdateProjectInput struct {
@@ -184,6 +186,7 @@ type UpdateProjectInput struct {
 	BrandName         *string
 	BrandDescription  *string
 	Industry          *string
+	WhiteLabel        *WhiteLabelSettings
 }
 
 type UpdateProjectImpactIntegrationsInput struct {
@@ -363,23 +366,31 @@ type AttributionClient interface {
 type StateStore interface {
 	Load(ctx context.Context) ([]byte, bool, error)
 	Save(ctx context.Context, payload []byte) error
+	TryAcquireSchedulerLease(ctx context.Context, name string) (SchedulerLease, bool, error)
 }
 
 type Dependencies struct {
-	Store             StateStore
-	AnalysisClient    AnalysisClient
-	IAClient          IAClient
-	AttributionClient AttributionClient
+	Store                 StateStore
+	AnalysisClient        AnalysisClient
+	IAClient              IAClient
+	AttributionClient     AttributionClient
+	ReportAnalyticsClient ReportAnalyticsClient
+	NotificationClient    NotificationClient
+	ReportsPublicBaseURL  string
+	ReportSigningSecret   string
 }
 
 type persistedState struct {
-	Seq                int64                                 `json:"seq"`
-	Projects           map[string]*Project                   `json:"projects"`
-	Prompts            map[string]*Prompt                    `json:"prompts"`
-	Competitors        map[string]*Competitor                `json:"competitors"`
-	Models             map[string]AIModel                    `json:"models"`
-	ProjectModels      map[string]map[string]bool            `json:"projectModels"`
-	ImpactIntegrations map[string]*ProjectImpactIntegrations `json:"impactIntegrations"`
-	Outbox             map[string]*OutboxEvent               `json:"outbox"`
-	OutboxOrder        []string                              `json:"outboxOrder"`
+	Seq                 int64                                 `json:"seq"`
+	Projects            map[string]*Project                   `json:"projects"`
+	Prompts             map[string]*Prompt                    `json:"prompts"`
+	Competitors         map[string]*Competitor                `json:"competitors"`
+	Models              map[string]AIModel                    `json:"models"`
+	ProjectModels       map[string]map[string]bool            `json:"projectModels"`
+	ImpactIntegrations  map[string]*ProjectImpactIntegrations `json:"impactIntegrations"`
+	Reports             map[string]*ProjectReport             `json:"reports"`
+	ReportAuditEvents   map[string]*ReportAuditEvent          `json:"reportAuditEvents"`
+	ReportAuditByReport map[string][]string                   `json:"reportAuditByReport"`
+	Outbox              map[string]*OutboxEvent               `json:"outbox"`
+	OutboxOrder         []string                              `json:"outboxOrder"`
 }

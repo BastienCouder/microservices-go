@@ -25,6 +25,10 @@ func (s *mutableProjectStore) Save(_ context.Context, payload []byte) error {
 	return nil
 }
 
+func (s *mutableProjectStore) TryAcquireSchedulerLease(_ context.Context, _ string) (SchedulerLease, bool, error) {
+	return noopSchedulerLease{}, true, nil
+}
+
 func TestProjectFlowCreateFinalize(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -175,17 +179,17 @@ func TestListProjectsReloadsStateFromStore(t *testing.T) {
 		Seq: 1,
 		Projects: map[string]*Project{
 			"seed-demo-project": {
-				ID:             "seed-demo-project",
-				OrganizationID: 1,
-				CreatedBy:      1,
-				Name:           "Seed Demo Project",
-				Domain:         "seed-demo.local",
-				WebsiteURL:     "https://seed-demo.local",
-				PrimaryLanguage:"fr",
-				Country:        "FR",
-				Status:         "active",
-				CreatedAt:      now,
-				UpdatedAt:      now,
+				ID:              "seed-demo-project",
+				OrganizationID:  1,
+				CreatedBy:       1,
+				Name:            "Seed Demo Project",
+				Domain:          "seed-demo.local",
+				WebsiteURL:      "https://seed-demo.local",
+				PrimaryLanguage: "fr",
+				Country:         "FR",
+				Status:          "active",
+				CreatedAt:       now,
+				UpdatedAt:       now,
 			},
 		},
 		Prompts:       map[string]*Prompt{},

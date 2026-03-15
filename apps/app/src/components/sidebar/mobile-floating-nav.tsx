@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
+import { BrandLockup } from "@/components/branding/brand-lockup";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import {
@@ -14,20 +15,6 @@ import {
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import { MONITORING_ITEMS, ORGANIZATION_ITEMS } from "./sidebar-constants";
-
-function BrandLockup() {
-  return (
-    <div className="flex items-center gap-3">
-      <div className="relative h-10 w-10 shrink-0">
-        <span className="absolute left-0 top-3 block h-6 w-4 rounded-[8px] bg-foreground" />
-        <span className="absolute left-3 top-0 block h-4 w-5 rounded-[7px] bg-foreground" />
-      </div>
-      <div className="leading-none">
-        <div className="text-[1.7rem] font-black tracking-[-0.06em] text-foreground">bco</div>
-      </div>
-    </div>
-  );
-}
 
 type MobileFloatingNavProps = {
   busy?: boolean;
@@ -67,7 +54,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
       <header className="fixed inset-x-0 top-0 z-50 px-3 pb-1 pt-3 lg:hidden">
         <div className="rounded-[28px] border border-white/55 bg-background/42 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
           <div className="flex items-center justify-between px-5 py-4">
-            <BrandLockup />
+            <BrandLockup compact />
 
             <Sheet open={open} onOpenChange={setOpen}>
               <SheetTrigger asChild>

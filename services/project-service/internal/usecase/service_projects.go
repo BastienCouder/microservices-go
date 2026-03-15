@@ -48,6 +48,7 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
+	project.WhiteLabel = normalizeWhiteLabelSettings(input.WhiteLabel, *project)
 	s.projects[project.ID] = project
 
 	enabled := make(map[string]bool)
@@ -156,6 +157,9 @@ func (s *Service) UpdateProject(ctx context.Context, projectID string, organizat
 	}
 	if input.Industry != nil {
 		project.Industry = strings.TrimSpace(*input.Industry)
+	}
+	if input.WhiteLabel != nil {
+		project.WhiteLabel = normalizeWhiteLabelSettings(*input.WhiteLabel, *project)
 	}
 	project.UpdatedAt = s.now().UTC()
 

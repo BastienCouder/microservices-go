@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, integer, index, jsonb } from "drizzle-orm/pg-core";
 
 /**
  * Projects - Site + marque à monitorer
@@ -18,6 +18,7 @@ export const projects = pgTable("projects", {
     brandName: text("brand_name"),
     brandDescription: text("brand_description"),
     industry: text("industry"),
+    whiteLabel: jsonb("white_label").$type<Record<string, unknown>>(),
 
     // Localisation
     primaryLanguage: text("primary_language").default("fr"),

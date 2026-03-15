@@ -4,9 +4,11 @@ import { memo, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
+import { BrandMark } from "@/components/branding/brand-lockup";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { normalizeOrganizationHierarchy } from "@/features/organizations/lib/hierarchy";
+import { useWhiteLabel } from "@/features/white-label/context/white-label-provider";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
@@ -166,6 +168,7 @@ function SidebarComponent({
   });
   const hierarchy = hierarchyQuery.data ?? null;
   const projects = useMemo(() => normalizeSidebarProjects(hierarchy), [hierarchy]);
+  const { theme } = useWhiteLabel();
 
   useEffect(() => {
     const routeProjectId = readProjectIdFromSearch(location.search);
@@ -267,14 +270,17 @@ function SidebarComponent({
           className,
         )}
       >
-        <div className={cn("h-12 flex items-center px-3", collapsed ? "justify-center" : "gap-2")}>
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary">
-            <span className="text-sm font-bold text-primary-foreground">logo</span>
-          </div>
+        <div className={cn("min-h-12 px-3 py-2", collapsed ? "flex items-center justify-center" : "flex items-center gap-3")}>
+          <BrandMark className={collapsed ? "h-8 w-8 rounded-xl" : "h-9 w-9 rounded-xl"} />
           {!collapsed ? (
-            <span className="line-clamp-1 text-[15px] font-semibold tracking-tight text-foreground">
-              {activeProject?.name || activeOrganizationName || "projects"}
-            </span>
+            <div className="min-w-0">
+              <p className="line-clamp-1 text-[13px] font-black tracking-[-0.04em] text-foreground">
+                {theme.branding.platformName || "Client Workspace"}
+              </p>
+              <p className="line-clamp-1 text-[11px] uppercase tracking-[0.16em] text-muted-foreground">
+                {activeProject?.name || activeOrganizationName || "workspace"}
+              </p>
+            </div>
           ) : null}
         </div>
 
