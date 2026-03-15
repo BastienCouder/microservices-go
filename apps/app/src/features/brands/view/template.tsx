@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
@@ -51,7 +51,7 @@ export function BrandsTemplate({ apiBaseURL, routeSearch }: BrandsTemplateProps)
         <Card className="border-border/60 rounded-tr-none">
           <CardHeader>
             <CardTitle className="text-base">
-              <DashboardSectionTitle>Résumé rapide</DashboardSectionTitle>
+              <MonitoringSectionTitle>Résumé rapide</MonitoringSectionTitle>
             </CardTitle>
             <CardDescription>
               Les informations les plus utiles pour comprendre la marque immédiatement.
@@ -67,7 +67,7 @@ export function BrandsTemplate({ apiBaseURL, routeSearch }: BrandsTemplateProps)
         <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-base">
-              <DashboardSectionTitle>Description de référence</DashboardSectionTitle>
+              <MonitoringSectionTitle>Description de référence</MonitoringSectionTitle>
             </CardTitle>
             <CardDescription>
               La formulation qui décrit précisément la marque et son positionnement.
@@ -209,7 +209,7 @@ function BrandListSection({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <CardTitle className="text-base">
-            <DashboardSectionTitle>{label}</DashboardSectionTitle>
+            <MonitoringSectionTitle>{label}</MonitoringSectionTitle>
           </CardTitle>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}
@@ -259,7 +259,7 @@ function BrandCompetitorsSection({
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
           <CardTitle className="text-base">
-            <DashboardSectionTitle>Concurrents</DashboardSectionTitle>
+            <MonitoringSectionTitle>Concurrents</MonitoringSectionTitle>
           </CardTitle>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

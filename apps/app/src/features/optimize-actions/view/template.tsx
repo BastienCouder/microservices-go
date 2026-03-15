@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 import { PageHeader } from "@/features/shared/view/page-header";
 import {
@@ -242,7 +242,7 @@ export function OptimizeActionsTemplate({ apiBaseURL, routeSearch }: OptimizeAct
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <CardTitle className="text-base">
-                      <DashboardSectionTitle>{getPriorityColumnTitle(priority)}</DashboardSectionTitle>
+                      <MonitoringSectionTitle>{getPriorityColumnTitle(priority)}</MonitoringSectionTitle>
                     </CardTitle>
                     <CardDescription>{getPriorityColumnDescription(priority)}</CardDescription>
                   </div>
@@ -344,7 +344,7 @@ export function OptimizeActionsTemplate({ apiBaseURL, routeSearch }: OptimizeAct
       <Card className="mt-4 border-border/60">
         <CardHeader className="pb-3">
           <CardTitle className="text-base">
-            <DashboardSectionTitle>Détail de l’élément sélectionné</DashboardSectionTitle>
+            <MonitoringSectionTitle>Détail de l’élément sélectionné</MonitoringSectionTitle>
           </CardTitle>
           <CardDescription>
             Cliquez sur une carte du kanban pour relire le problème exact et le contenu recommandé.

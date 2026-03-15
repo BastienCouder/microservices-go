@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import type { PerceptionViewData } from "@/lib/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_TEXT, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { cn } from "@/lib/utils";
 
 type RankedPoint = PerceptionViewData["radar"][number] & {
@@ -33,7 +33,7 @@ export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["
   if (rankedPoints.length === 0) {
     return (
       <div className="rounded-[28px] border border-border/60 bg-background px-5 py-6">
-        <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+        <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
         <p className="mt-2 text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
       </div>
     );
@@ -43,7 +43,7 @@ export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["
     <div className="px-5 py-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
-          <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+          <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
         </div>
 

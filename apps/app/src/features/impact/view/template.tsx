@@ -24,11 +24,11 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { KpiCard } from "@/features/monitoring/components/analytics-panel/kpi-card";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { KpiCard } from "@/features/monitoring/_components/shared/kpi-card";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { apiRoutes } from "@/lib/api-config";
-import { getDashboardQueryContext } from "@/lib/dashboard-data";
+import { getMonitoringQueryContext } from "@/lib/monitoring-data";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { cn } from "@/shared/utils";
 
@@ -136,7 +136,7 @@ class ImpactRequestError extends Error {
 }
 
 export function ImpactTemplate({ apiBaseURL, routeSearch }: ImpactTemplateProps) {
-  const queryContext = useMemo(() => getDashboardQueryContext(routeSearch), [routeSearch]);
+  const queryContext = useMemo(() => getMonitoringQueryContext(routeSearch), [routeSearch]);
 
   const impactQuery = useQuery({
     queryKey: ["impact", apiBaseURL, queryContext.projectId ?? "__default__"],
@@ -269,7 +269,7 @@ export function ImpactTemplate({ apiBaseURL, routeSearch }: ImpactTemplateProps)
           <Card className="border-border/60 rounded-tr-none">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>Funnel IA</DashboardSectionTitle>
+                <MonitoringSectionTitle>Funnel IA</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 Lecture directe du chemin visites {"->"} inscriptions {"->"} essais {"->"} paye sur les donnees d’attribution reelles.
@@ -307,7 +307,7 @@ export function ImpactTemplate({ apiBaseURL, routeSearch }: ImpactTemplateProps)
           <Card className="min-h-0 border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>Événements récents</DashboardSectionTitle>
+                <MonitoringSectionTitle>Événements récents</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 Derniers événements business remontés par le backend pour ce projet.
@@ -365,7 +365,7 @@ export function ImpactTemplate({ apiBaseURL, routeSearch }: ImpactTemplateProps)
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>Sources IA</DashboardSectionTitle>
+                <MonitoringSectionTitle>Sources IA</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 Repartition du trafic et des conversions par source IA sur la fenetre affichee.
@@ -414,7 +414,7 @@ export function ImpactTemplate({ apiBaseURL, routeSearch }: ImpactTemplateProps)
           <Card className="border-border/60">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>Lecture business</DashboardSectionTitle>
+                <MonitoringSectionTitle>Lecture business</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 Synthese rapide pour piloter l’impact business des IA.
@@ -638,7 +638,7 @@ function ImpactConnectionsPanel({
     <Card className="border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">
-          <DashboardSectionTitle>Connexions du projet</DashboardSectionTitle>
+          <MonitoringSectionTitle>Connexions du projet</MonitoringSectionTitle>
         </CardTitle>
         <CardDescription>
           Activez `Impact` étape par étape. Le panneau masque la technique et vous guide sur l’ordre le plus simple.
@@ -1161,7 +1161,7 @@ async function loadImpactData(
   routeSearch: string,
   signal?: AbortSignal,
 ): Promise<ImpactData> {
-  const { projectId: routeProjectId } = getDashboardQueryContext(routeSearch);
+  const { projectId: routeProjectId } = getMonitoringQueryContext(routeSearch);
   let projectId = routeProjectId;
 
   if (!projectId) {

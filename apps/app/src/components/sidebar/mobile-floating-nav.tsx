@@ -64,7 +64,6 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
 
   return (
     <>
-      <div className="h-[92px] shrink-0 lg:hidden" aria-hidden="true" />
       <header className="fixed inset-x-0 top-0 z-50 px-3 pb-1 pt-3 lg:hidden">
         <div className="rounded-[28px] border border-white/55 bg-background/42 shadow-[0_18px_60px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
           <div className="flex items-center justify-between px-5 py-4">

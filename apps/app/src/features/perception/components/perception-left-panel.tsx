@@ -3,14 +3,14 @@
 import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { ModelFilterModeTabs } from "@/components/dashboard/model-filter-mode-tabs";
+import { ModelFilterModeTabs } from "@/components/monitoring/model-filter-mode-tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
-import { FiltersEmptyStateCard } from "@/features/monitoring/components/filters-empty-state-card";
-import { ModelCard } from "@/features/monitoring/components/filters-panel/model-card";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { FiltersEmptyStateCard } from "@/features/monitoring/_components/shared/filters-empty-state-card";
+import { ModelCard } from "@/features/monitoring/_components/shared/model-card";
 import { getModelGroupForName, getModelIconForName, PERCEPTION_PERIOD_LABELS, PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon, PerceptionTrendPeriodKey, PerceptionViewData } from "@/lib/perception-data";
 import { cn } from "@/lib/utils";
@@ -73,9 +73,9 @@ export function PerceptionLeftPanel({
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <h4 className="mt-1 leading-tight">
-              <DashboardSectionTitle className="text-primary-foreground [&>span:first-child]:text-primary-foreground">
+              <MonitoringSectionTitle className="text-primary-foreground [&>span:first-child]:text-primary-foreground">
                 {PERCEPTION_TEXT.leftPanel.title}
-              </DashboardSectionTitle>
+              </MonitoringSectionTitle>
             </h4>
             <p className="mt-3 text-xs text-primary-foreground/85">{PERCEPTION_TEXT.leftPanel.helper}</p>
           </div>

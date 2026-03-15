@@ -15,7 +15,7 @@ const OrganizationsPage = lazy(() =>
   })),
 );
 
-import { DashboardPage } from "@/features/monitoring";
+import { MonitoringPage } from "@/features/monitoring";
 
 const PromptsPage = lazy(loadPromptsPageModule);
 const OnboardingPage = lazy(() =>
@@ -89,7 +89,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         path="/monitoring"
         element={
           <Suspense fallback={null}>
-            <DashboardPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+            <MonitoringPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

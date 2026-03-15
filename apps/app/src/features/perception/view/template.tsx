@@ -1,8 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FiltersEmptyStateCard } from "@/features/monitoring/components/filters-empty-state-card";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { FiltersEmptyStateCard } from "@/features/monitoring/_components/shared/filters-empty-state-card";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon } from "@/lib/perception-data";
 import { BrandCanonEditorPageClient } from "../brand-canon/view/client";
@@ -303,7 +303,7 @@ function PerceptionUnavailableState({
           <Card className="border-border/60 overflow-hidden py-4">
             <CardContent className="space-y-3 px-4">
               <div>
-                <DashboardSectionTitle>{PERCEPTION_TEXT.donut.title}</DashboardSectionTitle>
+                <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
               </div>
               <div className="text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</div>
               <FiltersEmptyStateCard label={errorLabel} className="h-[320px] text-sm" />
@@ -313,7 +313,7 @@ function PerceptionUnavailableState({
           <Card className="min-w-0 border-border/60">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>{PERCEPTION_TEXT.heatmap.title}</DashboardSectionTitle>
+                <MonitoringSectionTitle>{PERCEPTION_TEXT.heatmap.title}</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>{PERCEPTION_TEXT.heatmap.description}</CardDescription>
             </CardHeader>
@@ -325,7 +325,7 @@ function PerceptionUnavailableState({
           <Card className="border-border/60">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>{PERCEPTION_TEXT.trend.title}</DashboardSectionTitle>
+                <MonitoringSectionTitle>{PERCEPTION_TEXT.trend.title}</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 {PERCEPTION_TEXT.trend.descriptionPrefix} -- {PERCEPTION_TEXT.trend.descriptionSuffix}
@@ -366,7 +366,7 @@ function PerceptionUnavailableState({
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>{PERCEPTION_TEXT.optimizeActions.title}</DashboardSectionTitle>
+                <MonitoringSectionTitle>{PERCEPTION_TEXT.optimizeActions.title}</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>{PERCEPTION_TEXT.optimizeActions.description}</CardDescription>
             </CardHeader>
@@ -383,7 +383,7 @@ function PerceptionUnavailableState({
               <div className="flex items-center justify-between">
                 <div className="min-w-0">
                   <CardTitle className="text-sm font-semibold">
-                    <DashboardSectionTitle>{PERCEPTION_TEXT.topErrors.title}</DashboardSectionTitle>
+                    <MonitoringSectionTitle>{PERCEPTION_TEXT.topErrors.title}</MonitoringSectionTitle>
                   </CardTitle>
                 </div>
               </div>

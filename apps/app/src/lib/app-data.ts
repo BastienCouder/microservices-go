@@ -20,7 +20,7 @@ export const AI_SENTIMENT_COLORS = {
   legendFallback: "hsl(var(--chart-axis))",
 } as const;
 
-export const DASHBOARD_TEXT = {
+export const MONITORING_TEXT = {
   chartConfig: {
     models: {
       chatgpt: "ChatGPT",

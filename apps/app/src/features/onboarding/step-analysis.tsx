@@ -49,7 +49,7 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
 
             <div className="flex items-center justify-between border-t border-border/70 pt-4">
                 {hideBack ? <div /> : <Button variant="outline" onClick={prevStep}>Back</Button>}
-                <Button onClick={() => navigate("/monitoring")} disabled={progress < 95}>Go to dashboard</Button>
+                <Button onClick={() => navigate("/monitoring")} disabled={progress < 95}>Go to monitoring</Button>
             </div>
         </div>
     );

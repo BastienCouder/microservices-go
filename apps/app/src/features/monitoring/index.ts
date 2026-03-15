@@ -1,1 +1,1 @@
-export { DashboardPage } from "./view";
+export { MonitoringPage } from "./view";

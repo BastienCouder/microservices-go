@@ -14,7 +14,7 @@ import {
 } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { PerceptionError } from "@/lib/perception-data";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 
 export function TopErrorsPanel({
   errors,
@@ -36,7 +36,7 @@ export function TopErrorsPanel({
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h4>
-            <DashboardSectionTitle>{PERCEPTION_TEXT.topErrors.title}</DashboardSectionTitle>
+            <MonitoringSectionTitle>{PERCEPTION_TEXT.topErrors.title}</MonitoringSectionTitle>
           </h4>
         </div>
         <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">

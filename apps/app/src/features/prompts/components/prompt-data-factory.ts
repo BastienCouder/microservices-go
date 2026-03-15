@@ -6,7 +6,7 @@ import {
   promptScheduleLabel,
 } from "./prompts-workspace-utils";
 
-type DashboardPromptInput = {
+type MonitoringPromptInput = {
   responseId: string;
   promptId: string;
   text: string;
@@ -23,7 +23,7 @@ type DashboardPromptInput = {
   response: string;
 };
 
-type DashboardCompetitor = {
+type MonitoringCompetitor = {
   name: string;
 };
 
@@ -39,13 +39,13 @@ type ProjectPromptInput = {
 
 type BuildPromptPageItemsParams = {
   projectPrompts: ProjectPromptInput[];
-  recentPrompts: DashboardPromptInput[];
-  competitors: DashboardCompetitor[];
+  recentPrompts: MonitoringPromptInput[];
+  competitors: MonitoringCompetitor[];
   availableModels: string[];
   stages: Stage[];
 };
 
-function resolveKnownModel(item: DashboardPromptInput, availableModels: string[]) {
+function resolveKnownModel(item: MonitoringPromptInput, availableModels: string[]) {
   const normalizedModel = normalizeModelName(
     item.modelId || item.modelProviderModelId || item.modelGroupName,
   );
@@ -69,7 +69,7 @@ function toPromptStage(intent: string | null | undefined, fallbackStage: Stage):
   return fallbackStage;
 }
 
-function buildHighlights(item: DashboardPromptInput, score: number, competitor: string) {
+function buildHighlights(item: MonitoringPromptInput, score: number, competitor: string) {
   return [
     item.mention ? "Marque mentionnee" : "Marque absente",
     item.rank ? `Classement #${item.rank}` : "Aucun classement disponible",
@@ -117,7 +117,7 @@ export function buildPromptPageItems({
       map.set(item.promptId, bucket);
       return map;
     },
-    new Map<string, DashboardPromptInput[]>(),
+    new Map<string, MonitoringPromptInput[]>(),
   );
 
   return projectPrompts.map((projectPrompt, index) => {
@@ -218,8 +218,8 @@ export function buildResponseRows({
   availableModels,
   stages,
 }: {
-  recentPrompts: DashboardPromptInput[];
-  competitors: DashboardCompetitor[];
+  recentPrompts: MonitoringPromptInput[];
+  competitors: MonitoringCompetitor[];
   availableModels: string[];
   stages: Stage[];
 }): PromptRunRow[] {

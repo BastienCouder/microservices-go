@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {
@@ -31,9 +31,9 @@ export function PageHeader({
       <div className="min-w-0 space-y-0 px-2">
         <div className="flex items-end gap-2.5 ">
           <h1>
-            <DashboardSectionTitle className={cn("text-base md:text-lg", titleClassName)}>
+            <MonitoringSectionTitle className={cn("text-base md:text-lg", titleClassName)}>
               {title}
-            </DashboardSectionTitle>
+            </MonitoringSectionTitle>
           </h1>
           {meta ? <div className="flex flex-wrap items-center gap-2.5 mb-1">{meta}</div> : null}
         </div>

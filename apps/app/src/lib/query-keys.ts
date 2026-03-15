@@ -1,11 +1,11 @@
 export const appQueryKeys = {
   session: (apiBaseURL: string) => ["session", apiBaseURL] as const,
-  dashboard: (
+  monitoring: (
     apiBaseURL: string,
     projectId: string | null,
     mode: string,
     historyScope = "active_only",
-  ) => ["dashboard", apiBaseURL, projectId ?? "__default__", mode, historyScope] as const,
+  ) => ["monitoring", apiBaseURL, projectId ?? "__default__", mode, historyScope] as const,
   perception: (apiBaseURL: string, projectId: string | null, mode: string) =>
     ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
   optimizeActions: (apiBaseURL: string, projectId: string | null) =>

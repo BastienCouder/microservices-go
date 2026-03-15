@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { DatePickerWithRange } from "@/components/dashboard/date-range-picker";
+import { DatePickerWithRange } from "@/components/monitoring/date-range-picker";
 import { Search } from "lucide-react";
 import { ModelsFilterPopover } from "./models-filter-popover";
 

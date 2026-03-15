@@ -170,7 +170,7 @@ type ParsedResponse = {
   };
 };
 
-type DashboardRequestScope = "projects" | "project" | "models" | "competitors" | "dashboard" | "perception";
+type MonitoringRequestScope = "projects" | "project" | "models" | "competitors" | "monitoring" | "perception";
 
 type TrendAccumulator = {
   positioning: number;
@@ -234,7 +234,7 @@ function unwrapSuccessEnvelope(value: unknown): unknown {
 
 function unwrapRequiredEnvelope<T>(
   result: Awaited<ReturnType<typeof gatewayJSON<T>>>,
-  scope: DashboardRequestScope,
+  scope: MonitoringRequestScope,
 ): unknown {
   if (!result.ok) {
     throw new PerceptionRequestError(result.status, `${scope}: ${result.error}`);
@@ -362,8 +362,8 @@ function parseResponses(
   payload: unknown,
   modelNamesById: Map<string, string>,
 ): ParsedResponse[] {
-  const dashboard = asObject(payload);
-  const responses = asArray(getField(dashboard, ["aiResponses", "responses", "Responses"])).map(asObject);
+  const monitoring = asObject(payload);
+  const responses = asArray(getField(monitoring, ["aiResponses", "responses", "Responses"])).map(asObject);
 
   return responses.map((response) => {
     const modelId =
@@ -686,11 +686,11 @@ function buildLastRunTrendData(
 
 function deriveTrend(
   responses: ParsedResponse[],
-  dashboardPayload: unknown,
+  monitoringPayload: unknown,
   referenceDate: Date,
 ): PerceptionViewData["trend"] {
-  const dashboard = asObject(dashboardPayload);
-  const latestRun = asObject(getField(dashboard, ["latestRun", "LatestRun"]));
+  const monitoring = asObject(monitoringPayload);
+  const latestRun = asObject(getField(monitoring, ["latestRun", "LatestRun"]));
   const latestRunId = asString(getField(latestRun, ["id", "ID"]));
 
   return buildTrendSeriesByPeriod(responses, referenceDate, latestRunId);
@@ -1005,13 +1005,13 @@ export function derivePerceptionTrendSeries(
 function buildPerceptionBase(
   projectPayload: unknown,
   competitorsPayload: unknown,
-  dashboardPayload: unknown,
+  monitoringPayload: unknown,
   perceptionPayload: PerceptionApiPayload,
   modelNamesById: Map<string, string>,
   runtimeMode: RuntimeMode,
   projectId: string,
 ): PerceptionViewData {
-  const responses = parseResponses(dashboardPayload, modelNamesById);
+  const responses = parseResponses(monitoringPayload, modelNamesById);
   const generatedAtValue = asString(perceptionPayload.metadata?.generatedAt);
   const generatedAt = parseISODate(generatedAtValue);
   const referenceDate =
@@ -1027,7 +1027,7 @@ function buildPerceptionBase(
   const scores = deriveScores(perceptionPayload, responses);
   const radar = deriveRadar(perceptionPayload, responses);
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, modelNamesById);
-  const trend = deriveTrend(responses, dashboardPayload, referenceDate);
+  const trend = deriveTrend(responses, monitoringPayload, referenceDate);
   const topErrors = deriveTopErrors(perceptionPayload, brandCanon, scores, radar, modelAxisHeatmap);
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
@@ -1050,7 +1050,7 @@ function buildPerceptionBase(
       windowLabel: deriveWindowLabel(responses, referenceDate),
       analyzedResponses: responses.length,
       models,
-      latestRunId: asString(getField(asObject(getField(asObject(dashboardPayload), ["latestRun", "LatestRun"])), ["id", "ID"])),
+      latestRunId: asString(getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"])),
       generatedAt: (generatedAt || referenceDate).toISOString(),
     },
   };
@@ -1146,7 +1146,7 @@ export async function loadPerceptionData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [projectRes, modelsRes, competitorsRes, dashboardRes, perceptionRes] = await Promise.all([
+  const [projectRes, modelsRes, competitorsRes, monitoringRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.get(encodedProjectId), {
       method: "GET",
       signal: options?.signal,
@@ -1159,7 +1159,7 @@ export async function loadPerceptionData(
       method: "GET",
       signal: options?.signal,
     }),
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.dashboard(encodedProjectId), {
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.monitoring(encodedProjectId), {
       method: "GET",
       signal: options?.signal,
     }),
@@ -1172,11 +1172,11 @@ export async function loadPerceptionData(
   const projectPayload = unwrapRequiredEnvelope(projectRes, "project");
   const modelsPayload = unwrapRequiredEnvelope(modelsRes, "models");
   const competitorsPayload = unwrapRequiredEnvelope(competitorsRes, "competitors");
-  const dashboardPayload = unwrapRequiredEnvelope(dashboardRes, "dashboard");
+  const monitoringPayload = unwrapRequiredEnvelope(monitoringRes, "monitoring");
   const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayload;
 
   const modelNamesById = parseModels(modelsPayload);
-  const base = buildPerceptionBase(projectPayload, competitorsPayload, dashboardPayload, perceptionPayload, modelNamesById, mode, projectId);
+  const base = buildPerceptionBase(projectPayload, competitorsPayload, monitoringPayload, perceptionPayload, modelNamesById, mode, projectId);
 
   return {
     data: mergePerceptionData(base, perceptionPayload, mode, projectId),

@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ModelCard } from "@/features/monitoring/components/filters-panel/model-card";
+import { ModelCard } from "@/features/monitoring/_components/shared/model-card";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";

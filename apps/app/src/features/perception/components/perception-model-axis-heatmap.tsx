@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERCEPTION_HEATMAP_AXIS_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 
 type HeatmapAxis = {
   key: string;
@@ -41,7 +41,7 @@ export function PerceptionModelAxisHeatmap({
     <Card className="min-w-0 border-border/60">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          <DashboardSectionTitle>{PERCEPTION_TEXT.heatmap.title}</DashboardSectionTitle>
+          <MonitoringSectionTitle>{PERCEPTION_TEXT.heatmap.title}</MonitoringSectionTitle>
         </CardTitle>
         <CardDescription>{PERCEPTION_TEXT.heatmap.description}</CardDescription>
       </CardHeader>

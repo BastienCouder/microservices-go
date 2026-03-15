@@ -11,7 +11,7 @@ export type ActionNavItem = {
 };
 
 export const MAIN_NAV_LINKS: MainNavLink[] = [
-  { label: "Dashboard", href: "/dashboard" },
+  { label: "Monitoring", href: "/monitoring" },
   { label: "Projects", href: "/projects" },
   { label: "Analysis", href: "/analysis" },
 ];

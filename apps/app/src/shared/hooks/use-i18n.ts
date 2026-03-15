@@ -1,6 +1,6 @@
 type Dictionary = Record<string, string>;
 
-const DASHBOARD_ANALYTICS_PANEL: Dictionary = {
+const MONITORING_ANALYTICS_PANEL: Dictionary = {
   autoInsightsTitle: "Insights automatiques",
   autoInsightsDescription: "Observations clés détectées à partir des tendances de visibilité et de citations.",
   kpiMentionRateTitle: "Taux de mention",
@@ -33,7 +33,7 @@ const DASHBOARD_ANALYTICS_PANEL: Dictionary = {
   noDataAvailable: "Aucune donnée disponible",
 };
 
-const DASHBOARD_FILTERS_PANEL: Dictionary = {
+const MONITORING_FILTERS_PANEL: Dictionary = {
   filters: "Filtres",
   period: "Période",
   personas: "Personas",
@@ -48,7 +48,7 @@ const DASHBOARD_FILTERS_PANEL: Dictionary = {
   noDataAvailable: "Aucune donnée disponible",
 };
 
-const DASHBOARD_ACTIVITY_PANEL: Dictionary = {
+const MONITORING_ACTIVITY_PANEL: Dictionary = {
   criticalUpdates: "Mises à jour critiques",
   promptsStream: "Flux de prompts",
   noPromptsFound: "Aucun prompt trouvé.",
@@ -90,9 +90,9 @@ const DASHBOARD_ACTIVITY_PANEL: Dictionary = {
 };
 
 const CONTENT_BY_NAMESPACE: Record<string, Dictionary> = {
-  "dashboard-analytics-panel": DASHBOARD_ANALYTICS_PANEL,
-  "dashboard-filters-panel": DASHBOARD_FILTERS_PANEL,
-  "dashboard-activity-panel": DASHBOARD_ACTIVITY_PANEL,
+  "monitoring-analytics-panel": MONITORING_ANALYTICS_PANEL,
+  "monitoring-filters-panel": MONITORING_FILTERS_PANEL,
+  "monitoring-activity-panel": MONITORING_ACTIVITY_PANEL,
 };
 
 function humanizeKey(value: string): string {

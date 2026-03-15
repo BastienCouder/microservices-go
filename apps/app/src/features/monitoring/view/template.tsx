@@ -1,10 +1,10 @@
-import { DashboardClient } from "./client";
+import { MonitoringClient } from "./client";
 
-type DashboardTemplateProps = {
+type MonitoringTemplateProps = {
   apiBaseURL: string;
   routeSearch: string;
 };
 
-export function DashboardTemplate({ apiBaseURL, routeSearch }: DashboardTemplateProps) {
-  return <DashboardClient apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
+export function MonitoringTemplate({ apiBaseURL, routeSearch }: MonitoringTemplateProps) {
+  return <MonitoringClient apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { APP_CHART_UI_COLORS, PERCEPTION_TEXT, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 
 type TrendPoint = {
   label: string;
@@ -30,7 +30,7 @@ export function PerceptionTrendChart({
     <Card className="border-border/60">
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          <DashboardSectionTitle>{PERCEPTION_TEXT.trend.title}</DashboardSectionTitle>
+          <MonitoringSectionTitle>{PERCEPTION_TEXT.trend.title}</MonitoringSectionTitle>
         </CardTitle>
         <CardDescription>
           {PERCEPTION_TEXT.trend.descriptionPrefix} {periodLabel} {PERCEPTION_TEXT.trend.descriptionSuffix}

@@ -10,15 +10,15 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { PageHeader } from "@/features/shared/view/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
 import {
-  getDashboardQueryContext,
-  loadDashboardData,
-  type DashboardData,
-  type DashboardPrompt,
-} from "@/lib/dashboard-data";
+  getMonitoringQueryContext,
+  loadMonitoringData,
+  type MonitoringData,
+  type MonitoringPrompt,
+} from "@/lib/monitoring-data";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { cn } from "@/lib/utils";
 
@@ -58,20 +58,20 @@ type PageInsight = {
 };
 
 export function PagesTemplate({ apiBaseURL, routeSearch }: PagesTemplateProps) {
-  const queryContext = useMemo(() => getDashboardQueryContext(routeSearch), [routeSearch]);
+  const queryContext = useMemo(() => getMonitoringQueryContext(routeSearch), [routeSearch]);
   const [search, setSearch] = useState("");
   const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
 
-  const dashboardQuery = useQuery({
-    queryKey: appQueryKeys.dashboard(apiBaseURL, queryContext.projectId, queryContext.mode),
+  const monitoringQuery = useQuery({
+    queryKey: appQueryKeys.monitoring(apiBaseURL, queryContext.projectId, queryContext.mode),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadDashboardData(apiBaseURL, routeSearch, { signal }),
+    queryFn: ({ signal }) => loadMonitoringData(apiBaseURL, routeSearch, { signal }),
   });
 
-  const dashboard = dashboardQuery.data?.data ?? null;
+  const monitoring = monitoringQuery.data?.data ?? null;
   const pageInsights = useMemo(
-    () => (dashboard ? buildPageInsights(dashboard) : []),
-    [dashboard],
+    () => (monitoring ? buildPageInsights(monitoring) : []),
+    [monitoring],
   );
 
   const filteredPages = useMemo(() => {
@@ -104,18 +104,18 @@ export function PagesTemplate({ apiBaseURL, routeSearch }: PagesTemplateProps) {
   }, [filteredPages, selectedPageUrl]);
 
   const selectedPage = filteredPages.find((page) => page.url === selectedPageUrl) ?? filteredPages[0] ?? null;
-  const metrics = useMemo(() => buildPageMetrics(pageInsights, dashboard), [pageInsights, dashboard]);
+  const metrics = useMemo(() => buildPageMetrics(pageInsights, monitoring), [pageInsights, monitoring]);
 
-  if (dashboardQuery.isLoading && !dashboard) {
+  if (monitoringQuery.isLoading && !monitoring) {
     return <PagesLoadingState />;
   }
 
-  if (!dashboard) {
+  if (!monitoring) {
     return (
       <PagesUnavailableState
-        error={dashboardQuery.error instanceof Error ? dashboardQuery.error.message : null}
+        error={monitoringQuery.error instanceof Error ? monitoringQuery.error.message : null}
         onReload={async () => {
-          await dashboardQuery.refetch();
+          await monitoringQuery.refetch();
         }}
       />
     );
@@ -167,13 +167,13 @@ export function PagesTemplate({ apiBaseURL, routeSearch }: PagesTemplateProps) {
       </div>
 
       {pageInsights.length === 0 ? (
-        <PagesEmptyState projectName={dashboard.project.name} />
+        <PagesEmptyState projectName={monitoring.project.name} />
       ) : (
         <div className="mt-4 grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.55fr)]">
           <Card className="min-h-0 border-border/60">
             <CardHeader>
               <CardTitle className="text-base">
-                <DashboardSectionTitle>Pages citées</DashboardSectionTitle>
+                <MonitoringSectionTitle>Pages citées</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 Classement des URLs qui servent réellement de source aux IA.
@@ -251,7 +251,7 @@ export function PagesTemplate({ apiBaseURL, routeSearch }: PagesTemplateProps) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <CardTitle className="text-base">
-                        <DashboardSectionTitle>Détail de la page</DashboardSectionTitle>
+                        <MonitoringSectionTitle>Détail de la page</MonitoringSectionTitle>
                       </CardTitle>
                       <CardDescription className="truncate">{selectedPage.url}</CardDescription>
                     </div>
@@ -587,7 +587,7 @@ function PagesEmptyState({ projectName }: { projectName: string }) {
   );
 }
 
-function buildPageMetrics(pages: PageInsight[], dashboard: DashboardData | null) {
+function buildPageMetrics(pages: PageInsight[], monitoring: MonitoringData | null) {
   const citationCount = pages.reduce((sum, page) => sum + page.citationCount, 0);
   const topThreeShare = Number(
     pages
@@ -595,7 +595,7 @@ function buildPageMetrics(pages: PageInsight[], dashboard: DashboardData | null)
       .reduce((sum, page) => sum + page.citationShare, 0)
       .toFixed(1),
   );
-  const promptCount = dashboard?.recent_prompts.filter((prompt) => prompt.citedUrls.length > 0).length ?? 0;
+  const promptCount = monitoring?.recent_prompts.filter((prompt) => prompt.citedUrls.length > 0).length ?? 0;
 
   return {
     pageCount: pages.length,
@@ -605,7 +605,7 @@ function buildPageMetrics(pages: PageInsight[], dashboard: DashboardData | null)
   };
 }
 
-function buildPageInsights(dashboard: DashboardData): PageInsight[] {
+function buildPageInsights(monitoring: MonitoringData): PageInsight[] {
   const byUrl = new Map<
     string,
     {
@@ -621,9 +621,9 @@ function buildPageInsights(dashboard: DashboardData): PageInsight[] {
     }
   >();
 
-  const totalResponses = Math.max(1, dashboard.recent_prompts.length);
+  const totalResponses = Math.max(1, monitoring.recent_prompts.length);
 
-  for (const prompt of dashboard.recent_prompts) {
+  for (const prompt of monitoring.recent_prompts) {
     const citationCounts = countCitationsByUrl(prompt);
 
     for (const [url, citationCount] of citationCounts.entries()) {
@@ -684,7 +684,7 @@ function buildPageInsights(dashboard: DashboardData): PageInsight[] {
     });
 }
 
-function countCitationsByUrl(prompt: DashboardPrompt): Map<string, number> {
+function countCitationsByUrl(prompt: MonitoringPrompt): Map<string, number> {
   const counts = new Map<string, number>();
 
   for (const rawUrl of prompt.citedUrls) {
@@ -716,7 +716,7 @@ function comparePromptHitDates(a: PagePromptHit, b: PagePromptHit) {
   return 0;
 }
 
-function toPageModelBadge(prompt: DashboardPrompt): PageModelBadge | null {
+function toPageModelBadge(prompt: MonitoringPrompt): PageModelBadge | null {
   const label =
     prompt.modelDisplayName.trim() ||
     prompt.modelGroupName.trim() ||

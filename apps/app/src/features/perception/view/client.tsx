@@ -24,7 +24,7 @@ import {
   type PerceptionTrendPeriodKey,
   type PerceptionViewData,
 } from "@/lib/perception-data";
-import { DashboardSectionTitle } from "@/features/monitoring/components/dashboard-section-title";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { PerceptionThreeColumnLayout } from "../components/perception-three-column-layout";
 import { PerceptionDonutVisual } from "../components/perception-donut-visual";
 import { PerceptionLeftPanel } from "../components/perception-left-panel";
@@ -323,7 +323,7 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                <DashboardSectionTitle>{PERCEPTION_TEXT.optimizeActions.title}</DashboardSectionTitle>
+                <MonitoringSectionTitle>{PERCEPTION_TEXT.optimizeActions.title}</MonitoringSectionTitle>
               </CardTitle>
               <CardDescription>
                 {PERCEPTION_TEXT.optimizeActions.description}

@@ -1,10 +1,10 @@
-import { DashboardTemplate } from "./template";
+import { MonitoringTemplate } from "./template";
 
-type DashboardPageProps = {
+type MonitoringPageProps = {
   apiBaseURL: string;
   routeSearch: string;
 };
 
-export function DashboardPage({ apiBaseURL, routeSearch }: DashboardPageProps) {
-  return <DashboardTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
+export function MonitoringPage({ apiBaseURL, routeSearch }: MonitoringPageProps) {
+  return <MonitoringTemplate apiBaseURL={apiBaseURL} routeSearch={routeSearch} />;
 }

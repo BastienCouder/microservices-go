@@ -4,7 +4,7 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DateRange } from "react-day-picker";
 import { differenceInCalendarDays } from "date-fns";
-import { useDashboardData } from "@/hooks/use-dashboard-data";
+import { useMonitoringData } from "@/hooks/use-monitoring-data";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
@@ -615,9 +615,9 @@ function buildModelScopedPromptRows(prompts: PromptItem[]): PromptItem[] {
 
 export function usePromptsResponsesState(apiBaseURL: string) {
   const queryClient = useQueryClient();
-  const { data: dashboardData, mode, projectId } = useDashboardData();
-  const activeProjectId = projectId || dashboardData.project.id || "";
-  const projectModels = dashboardData.models;
+  const { data: monitoringData, mode, projectId } = useMonitoringData();
+  const activeProjectId = projectId || monitoringData.project.id || "";
+  const projectModels = monitoringData.models;
   const liveModels = useMemo(
     () => projectModels.filter((item) => item.live),
     [projectModels],
@@ -660,7 +660,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     () =>
       dedupeModels([
         ...liveModels.map((item) => item.providerModelId),
-        ...dashboardData.recent_prompts.map(
+        ...monitoringData.recent_prompts.map(
           (item) =>
             item.modelProviderModelId ||
             item.modelDisplayName ||
@@ -668,7 +668,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
             item.modelId,
         ),
       ]),
-    [dashboardData.recent_prompts, liveModels],
+    [monitoringData.recent_prompts, liveModels],
   );
   const promptAvailableModels = useMemo(
     () => dedupeModels(liveModels.map((item) => item.providerModelId)),
@@ -692,16 +692,16 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     () =>
       Array.from(
         new Set(
-          dashboardData.recent_prompts
+          monitoringData.recent_prompts
             .map((item) => item.persona?.trim() || "")
             .filter(Boolean),
         ),
       ),
-    [dashboardData.recent_prompts],
+    [monitoringData.recent_prompts],
   );
   const availableCompetitors = useMemo(
-    () => dashboardData.project.competitors.map((item) => item.name),
-    [dashboardData.project.competitors],
+    () => monitoringData.project.competitors.map((item) => item.name),
+    [monitoringData.project.competitors],
   );
 
   const [organizationId, setOrganizationId] = useState("");
@@ -803,17 +803,17 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     () =>
       buildPromptPageItems({
         projectPrompts: promptsCatalogQuery.data ?? [],
-        recentPrompts: dashboardData.recent_prompts.filter((item) =>
+        recentPrompts: monitoringData.recent_prompts.filter((item) =>
           activeModelKeys.has(normalizeModelName(item.modelId || item.modelProviderModelId)),
         ),
-        competitors: dashboardData.project.competitors,
+        competitors: monitoringData.project.competitors,
         availableModels: promptAvailableModels,
         stages: STAGES,
       }),
     [
       promptsCatalogQuery.data,
-      dashboardData.recent_prompts,
-      dashboardData.project.competitors,
+      monitoringData.recent_prompts,
+      monitoringData.project.competitors,
       activeModelKeys,
       promptAvailableModels,
     ],
@@ -1061,8 +1061,8 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const allResponses = useMemo(
     () =>
       buildResponseRows({
-        recentPrompts: dashboardData.recent_prompts,
-        competitors: dashboardData.project.competitors,
+        recentPrompts: monitoringData.recent_prompts,
+        competitors: monitoringData.project.competitors,
         availableModels: responseAvailableModels,
         stages: STAGES,
       }).map((item) => ({
@@ -1071,8 +1071,8 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       })),
     [
       activeModelKeys,
-      dashboardData.project.competitors,
-      dashboardData.recent_prompts,
+      monitoringData.project.competitors,
+      monitoringData.recent_prompts,
       responseAvailableModels,
     ],
   );

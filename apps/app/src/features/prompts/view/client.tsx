@@ -1,5 +1,5 @@
 import { PromptsResponsesWorkspace } from "../components/prompts-workspace";
-import { DashboardDataProvider } from "@/hooks/use-dashboard-data";
+import { MonitoringDataProvider } from "@/hooks/use-monitoring-data";
 
 type PromptsClientProps = {
   apiBaseURL: string;
@@ -8,12 +8,12 @@ type PromptsClientProps = {
 
 export function PromptsClient({ apiBaseURL, routeSearch }: PromptsClientProps) {
   return (
-    <DashboardDataProvider
+    <MonitoringDataProvider
       apiBaseURL={apiBaseURL}
       routeSearch={routeSearch}
       includeHistoricalModels
     >
       <PromptsResponsesWorkspace apiBaseURL={apiBaseURL} />
-    </DashboardDataProvider>
+    </MonitoringDataProvider>
   );
 }
