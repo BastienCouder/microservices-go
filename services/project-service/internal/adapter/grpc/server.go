@@ -45,3 +45,104 @@ func (s *Server) CheckProjectAccess(ctx context.Context, req *projectv1.CheckPro
 	}
 	return nil, status.Error(codes.Internal, err.Error())
 }
+
+func (s *Server) ListProjectCompetitors(ctx context.Context, req *projectv1.ListProjectCompetitorsRequest) (*projectv1.ListProjectCompetitorsResponse, error) {
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+
+	claims, ok := security.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
+	}
+
+	competitors, err := s.svc.ListActiveCompetitors(ctx, req.GetProjectId(), claims.Organization)
+	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUnauthorized) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if errors.Is(err, usecase.ErrValidation) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &projectv1.ListProjectCompetitorsResponse{
+		Competitors: append([]string(nil), competitors...),
+	}, nil
+}
+
+func (s *Server) ListProjectEnabledModels(ctx context.Context, req *projectv1.ListProjectEnabledModelsRequest) (*projectv1.ListProjectEnabledModelsResponse, error) {
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+
+	claims, ok := security.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
+	}
+
+	modelIDs, err := s.svc.ListEnabledProjectModelIDs(ctx, req.GetProjectId(), claims.Organization)
+	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUnauthorized) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if errors.Is(err, usecase.ErrValidation) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &projectv1.ListProjectEnabledModelsResponse{
+		ModelIds: append([]string(nil), modelIDs...),
+	}, nil
+}
+
+func (s *Server) ListScheduledAnalysisJobs(ctx context.Context, _ *projectv1.ListScheduledAnalysisJobsRequest) (*projectv1.ListScheduledAnalysisJobsResponse, error) {
+	jobs, err := s.svc.ListScheduledAnalysisJobs(ctx)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	response := &projectv1.ListScheduledAnalysisJobsResponse{
+		Jobs: make([]*projectv1.ScheduledAnalysisJob, 0, len(jobs)),
+	}
+	for _, job := range jobs {
+		response.Jobs = append(response.Jobs, &projectv1.ScheduledAnalysisJob{
+			ProjectId:      job.ProjectID,
+			ProjectName:    job.ProjectName,
+			OrganizationId: job.OrganizationID,
+			CreatedBy:      job.CreatedBy,
+			BrandName:      job.BrandName,
+			Competitors:    append([]string(nil), job.Competitors...),
+			PromptId:       job.PromptID,
+			PromptText:     job.PromptText,
+			ModelIds:       append([]string(nil), job.ModelIDs...),
+			Schedule: &projectv1.PromptSchedule{
+				Mode:       job.Schedule.Mode,
+				Cron:       job.Schedule.Cron,
+				Timezone:   job.Schedule.Timezone,
+				ModelCrons: copyStringMap(job.Schedule.ModelCrons),
+			},
+		})
+	}
+
+	return response, nil
+}
+
+func copyStringMap(input map[string]string) map[string]string {
+	if len(input) == 0 {
+		return nil
+	}
+	cloned := make(map[string]string, len(input))
+	for key, value := range input {
+		cloned[key] = value
+	}
+	return cloned
+}

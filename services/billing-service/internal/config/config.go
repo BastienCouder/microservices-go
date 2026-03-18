@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	HTTPAddr              string
+	MetricsAddr           string
 	DatabaseURL           string
 	InternalJWTSecret     string
 	InternalJWTIssuer     string
@@ -56,6 +57,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		HTTPAddr:              httpAddr,
+		MetricsAddr:           optionalEnv("METRICS_ADDR"),
 		DatabaseURL:           databaseURL,
 		InternalJWTSecret:     internalJWTSecret,
 		InternalJWTIssuer:     internalJWTIssuer,

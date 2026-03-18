@@ -31,6 +31,8 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.dashboardCache = deps.DashboardCache
 	svc.dashboardCacheTTL = deps.DashboardCacheTTL
 	svc.projectVerifier = deps.ProjectVerifier
+	svc.projectCompetitors = deps.ProjectCompetitors
+	svc.projectModels = deps.ProjectModels
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err
@@ -176,4 +178,73 @@ func (s *Service) verifyProjectAccess(ctx context.Context, projectID string, org
 		return err
 	}
 	return nil
+}
+
+func (s *Service) listProjectCompetitors(ctx context.Context, projectID string, organizationID int64) ([]string, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if organizationID <= 0 {
+		return nil, fmt.Errorf("%w: organizationId must be positive", ErrValidation)
+	}
+	if s.projectCompetitors == nil {
+		return nil, nil
+	}
+
+	competitors, err := s.projectCompetitors.ListProjectCompetitors(ctx, projectID, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	normalized := make([]string, 0, len(competitors))
+	seen := make(map[string]struct{}, len(competitors))
+	for _, competitor := range competitors {
+		name := strings.TrimSpace(competitor)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		normalized = append(normalized, name)
+	}
+
+	return normalized, nil
+}
+
+func (s *Service) listProjectEnabledModels(ctx context.Context, projectID string, organizationID int64) ([]string, bool, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, false, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if organizationID <= 0 {
+		return nil, false, fmt.Errorf("%w: organizationId must be positive", ErrValidation)
+	}
+	if s.projectModels == nil {
+		return nil, false, nil
+	}
+
+	modelIDs, err := s.projectModels.ListProjectEnabledModels(ctx, projectID, organizationID)
+	if err != nil {
+		return nil, false, err
+	}
+
+	normalized := make([]string, 0, len(modelIDs))
+	seen := make(map[string]struct{}, len(modelIDs))
+	for _, modelID := range modelIDs {
+		value := strings.TrimSpace(modelID)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		normalized = append(normalized, value)
+	}
+
+	return normalized, true, nil
 }

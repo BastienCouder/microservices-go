@@ -175,17 +175,17 @@ func TestListProjectsReloadsStateFromStore(t *testing.T) {
 		Seq: 1,
 		Projects: map[string]*Project{
 			"seed-demo-project": {
-				ID:             "seed-demo-project",
-				OrganizationID: 1,
-				CreatedBy:      1,
-				Name:           "Seed Demo Project",
-				Domain:         "seed-demo.local",
-				WebsiteURL:     "https://seed-demo.local",
-				PrimaryLanguage:"fr",
-				Country:        "FR",
-				Status:         "active",
-				CreatedAt:      now,
-				UpdatedAt:      now,
+				ID:              "seed-demo-project",
+				OrganizationID:  1,
+				CreatedBy:       1,
+				Name:            "Seed Demo Project",
+				Domain:          "seed-demo.local",
+				WebsiteURL:      "https://seed-demo.local",
+				PrimaryLanguage: "fr",
+				Country:         "FR",
+				Status:          "active",
+				CreatedAt:       now,
+				UpdatedAt:       now,
 			},
 		},
 		Prompts:       map[string]*Prompt{},
@@ -431,5 +431,75 @@ func TestUpdatePromptRejectsInvalidCronSchedule(t *testing.T) {
 	_, err = svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestListActiveCompetitorsReturnsOnlyActiveNames(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	created, err := svc.AddCompetitors(ctx, project.ID, 42, []AddCompetitorInput{
+		{Name: "HubSpot"},
+		{Name: "Salesforce"},
+		{Name: "Pipedrive"},
+	})
+	if err != nil {
+		t.Fatalf("add competitors: %v", err)
+	}
+
+	disabled := false
+	if _, err := svc.UpdateCompetitor(ctx, created[1].ID, 42, UpdateCompetitorInput{IsActive: &disabled}); err != nil {
+		t.Fatalf("disable competitor: %v", err)
+	}
+
+	activeCompetitors, err := svc.ListActiveCompetitors(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("list active competitors: %v", err)
+	}
+
+	expected := []string{"HubSpot", "Pipedrive"}
+	if !reflect.DeepEqual(activeCompetitors, expected) {
+		t.Fatalf("expected active competitors %v, got %v", expected, activeCompetitors)
+	}
+}
+
+func TestListEnabledProjectModelIDsReturnsOnlyCurrentProjectModels(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	modelIDs, err := svc.ListEnabledProjectModelIDs(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("list enabled project model ids: %v", err)
+	}
+
+	expected := []string{"gpt-4o", "sonar"}
+	if !reflect.DeepEqual(modelIDs, expected) {
+		t.Fatalf("expected enabled project model ids %v, got %v", expected, modelIDs)
 	}
 }

@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	HTTPAddr                 string
+	MetricsAddr              string
 	GRPCAddr                 string
 	InternalJWTSecret        string
 	InternalJWTIssuer        string
@@ -22,6 +23,8 @@ type Config struct {
 	ExecutionMode            string
 	ProviderBaseURL          string
 	ProviderAPIKey           string
+	ProviderHTTPReferer      string
+	ProviderAppName          string
 	ProviderTimeoutMS        int
 }
 
@@ -58,15 +61,19 @@ func Load() (Config, error) {
 
 	providerBaseURL := ""
 	providerAPIKey := ""
+	providerHTTPReferer := ""
+	providerAppName := ""
 	if executionMode == "provider" {
-		providerBaseURL, err = requiredEnv("IA_PROVIDER_BASE_URL")
-		if err != nil {
-			return Config{}, err
+		providerBaseURL = optionalEnv("IA_PROVIDER_BASE_URL")
+		if providerBaseURL == "" {
+			providerBaseURL = "https://openrouter.ai/api/v1"
 		}
 		providerAPIKey, err = passwordFromEnv("IA_PROVIDER_API_KEY", "IA_PROVIDER_API_KEY_FILE")
 		if err != nil {
 			return Config{}, err
 		}
+		providerHTTPReferer = optionalEnv("IA_PROVIDER_HTTP_REFERER")
+		providerAppName = optionalEnv("IA_PROVIDER_APP_NAME")
 	}
 	grpcAllowInsecure, err := optionalBoolEnv("GRPC_ALLOW_INSECURE", false)
 	if err != nil {
@@ -79,6 +86,7 @@ func Load() (Config, error) {
 
 	return Config{
 		HTTPAddr:                 httpAddr,
+		MetricsAddr:              optionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
 		InternalJWTSecret:        internalJWTSecret,
 		InternalJWTIssuer:        internalJWTIssuer,
@@ -92,6 +100,8 @@ func Load() (Config, error) {
 		ExecutionMode:            executionMode,
 		ProviderBaseURL:          providerBaseURL,
 		ProviderAPIKey:           providerAPIKey,
+		ProviderHTTPReferer:      providerHTTPReferer,
+		ProviderAppName:          providerAppName,
 		ProviderTimeoutMS:        providerTimeoutMS,
 	}, nil
 }

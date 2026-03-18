@@ -131,6 +131,7 @@ export type PerceptionViewData = {
     windowLabel: string;
     analyzedResponses: number;
     models: string[];
+    projectModels?: string[];
     generatedAt: string;
     latestRunId?: string;
     runtimeMode: RuntimeMode;
@@ -397,6 +398,25 @@ function parseResponses(
   });
 }
 
+function parseProjectModelFilter(value: unknown): Set<string> {
+  const modelIDs = asArray(value)
+    .map((item) => (typeof item === "string" ? item.trim() : ""))
+    .filter(Boolean);
+
+  return new Set(modelIDs);
+}
+
+function filterResponsesToProjectModels(
+  responses: ParsedResponse[],
+  projectModelFilter: Set<string>,
+): ParsedResponse[] {
+  if (projectModelFilter.size === 0) {
+    return responses;
+  }
+
+  return responses.filter((response) => projectModelFilter.has(response.modelId));
+}
+
 function deriveScores(
   payload: PerceptionApiPayload,
   responses: ParsedResponse[],
@@ -440,6 +460,29 @@ function deriveWindowLabel(responses: ParsedResponse[], referenceDate: Date): st
   if (diffDays <= 30) return PERCEPTION_PERIOD_LABELS["30d"];
   if (diffDays <= 90) return PERCEPTION_PERIOD_LABELS["90d"];
   return "Historique complet";
+}
+
+function deriveLatestRunIdFromResponses(
+  responses: ParsedResponse[],
+  fallbackLatestRunId: string,
+): string {
+  let latestRunId = "";
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+
+  for (const response of responses) {
+    if (!response.runId) {
+      continue;
+    }
+    const timestamp = response.createdAt?.getTime() ?? Number.NEGATIVE_INFINITY;
+    if (timestamp >= latestTimestamp) {
+      latestTimestamp = timestamp;
+      latestRunId = response.runId;
+    } else if (latestRunId === "") {
+      latestRunId = response.runId;
+    }
+  }
+
+  return latestRunId || fallbackLatestRunId;
 }
 
 function deriveBrandCanon(projectPayload: unknown): BrandCanon {
@@ -686,13 +729,9 @@ function buildLastRunTrendData(
 
 function deriveTrend(
   responses: ParsedResponse[],
-  monitoringPayload: unknown,
+  latestRunId: string,
   referenceDate: Date,
 ): PerceptionViewData["trend"] {
-  const monitoring = asObject(monitoringPayload);
-  const latestRun = asObject(getField(monitoring, ["latestRun", "LatestRun"]));
-  const latestRunId = asString(getField(latestRun, ["id", "ID"]));
-
   return buildTrendSeriesByPeriod(responses, referenceDate, latestRunId);
 }
 
@@ -1011,7 +1050,12 @@ function buildPerceptionBase(
   runtimeMode: RuntimeMode,
   projectId: string,
 ): PerceptionViewData {
-  const responses = parseResponses(monitoringPayload, modelNamesById);
+  const projectModelFilter = parseProjectModelFilter(perceptionPayload.metadata?.projectModels);
+  const responses = filterResponsesToProjectModels(parseResponses(monitoringPayload, modelNamesById), projectModelFilter);
+  const monitoringLatestRunId = asString(
+    getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"]),
+  );
+  const latestRunId = deriveLatestRunIdFromResponses(responses, monitoringLatestRunId);
   const generatedAtValue = asString(perceptionPayload.metadata?.generatedAt);
   const generatedAt = parseISODate(generatedAtValue);
   const referenceDate =
@@ -1027,7 +1071,7 @@ function buildPerceptionBase(
   const scores = deriveScores(perceptionPayload, responses);
   const radar = deriveRadar(perceptionPayload, responses);
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, modelNamesById);
-  const trend = deriveTrend(responses, monitoringPayload, referenceDate);
+  const trend = deriveTrend(responses, latestRunId, referenceDate);
   const topErrors = deriveTopErrors(perceptionPayload, brandCanon, scores, radar, modelAxisHeatmap);
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
@@ -1050,7 +1094,7 @@ function buildPerceptionBase(
       windowLabel: deriveWindowLabel(responses, referenceDate),
       analyzedResponses: responses.length,
       models,
-      latestRunId: asString(getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"])),
+      latestRunId,
       generatedAt: (generatedAt || referenceDate).toISOString(),
     },
   };

@@ -114,6 +114,14 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
               setTabResponses={() => state.setTab("responses")}
               deletePrompt={state.deletePrompt}
               onEditPrompt={state.openEditPromptEditor}
+              canRunPrompt={state.canRunPrompt}
+              runPrompt={state.runPrompt}
+              isPromptRunning={state.isPromptRunning}
+              canRunSelectedPrompts={state.canRunSelectedPrompts}
+              selectedRunnablePromptCount={state.selectedRunnablePromptCount}
+              runningSelectedPrompts={state.runningSelectedPrompts}
+              runningAnyPrompts={state.runningAnyPrompts}
+              runSelectedPrompts={state.runSelectedPrompts}
               getModelVisual={state.getModelVisual}
               rankTone={rankTone}
               statusBadgeVariant={statusBadgeVariant}

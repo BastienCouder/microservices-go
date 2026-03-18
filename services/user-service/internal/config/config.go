@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	HTTPAddr          string
+	MetricsAddr       string
 	DatabaseURL       string
 	InternalJWTSecret string
 	InternalJWTIssuer string
@@ -35,6 +36,7 @@ func Load() (Config, error) {
 
 	return Config{
 		HTTPAddr:          httpAddr,
+		MetricsAddr:       optionalEnv("METRICS_ADDR"),
 		DatabaseURL:       databaseURL,
 		InternalJWTSecret: internalJWTSecret,
 		InternalJWTIssuer: internalJWTIssuer,
@@ -103,4 +105,8 @@ func requiredEnv(key string) (string, error) {
 		return "", fmt.Errorf("missing required environment variable %s", key)
 	}
 	return value, nil
+}
+
+func optionalEnv(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
 }

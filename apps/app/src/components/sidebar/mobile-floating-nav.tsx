@@ -13,7 +13,11 @@ import {
   readSelectedProjectID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
-import { MONITORING_ITEMS, ORGANIZATION_ITEMS } from "./sidebar-constants";
+import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS } from "./sidebar-constants";
+
+function formatMobileLabel(label: string): string {
+  return label.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 function BrandLockup() {
   return (
@@ -45,7 +49,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
       { href: buildScopedHref("/monitoring", { projectId: activeProjectId }), label: "Monitoring" },
       ...MONITORING_ITEMS.map((item) => ({
         href: buildScopedHref(item.href, { projectId: activeProjectId }),
-        label: item.labelKey.charAt(0).toUpperCase() + item.labelKey.slice(1),
+        label: formatMobileLabel(SIDEBAR_LABELS[item.labelKey]),
       })),
       { href: buildScopedHref("/perception", { projectId: activeProjectId }), label: "Perception" },
       { href: buildScopedHref("/optimize/actions", { projectId: activeProjectId }), label: "Optimize actions" },
@@ -56,7 +60,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
           org: activeOrganizationId,
           projectId: activeProjectId,
         }),
-        label: item.labelKey.charAt(0).toUpperCase() + item.labelKey.slice(1),
+        label: formatMobileLabel(SIDEBAR_LABELS[item.labelKey]),
       })),
     ],
     [activeOrganizationId, activeProjectId],
@@ -108,7 +112,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                   <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-10">
                     <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2">
                       {navigationItems.map((item) => {
-                        const active = location.pathname === item.href;
+                        const active = location.pathname === item.href.split("?", 1)[0];
 
                         return (
                           <SheetClose asChild key={item.href}>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Bot, Globe2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -94,10 +94,6 @@ export function PromptEditorPage({
   const [status, setStatus] = useState<PromptItem["status"]>("active");
 
   const promptModelKey = prompt?.models.join("|") ?? "";
-  const defaultModels = useMemo(
-    () => (prompt?.models.length ? prompt.models : availableModels.slice(0, 1)),
-    [availableModels, prompt?.models],
-  );
 
   useEffect(() => {
     const nextModels = prompt?.models.length ? prompt.models : availableModels.slice(0, 1);

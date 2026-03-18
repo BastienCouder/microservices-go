@@ -134,6 +134,19 @@ type PromptSchedule struct {
 	ModelCrons map[string]string `json:"modelCrons,omitempty"`
 }
 
+type ScheduledAnalysisJob struct {
+	ProjectID      string         `json:"projectId"`
+	ProjectName    string         `json:"projectName"`
+	OrganizationID int64          `json:"organizationId"`
+	CreatedBy      int64          `json:"createdBy"`
+	BrandName      string         `json:"brandName"`
+	Competitors    []string       `json:"competitors"`
+	PromptID       string         `json:"promptId"`
+	PromptText     string         `json:"promptText"`
+	ModelIDs       []string       `json:"modelIds"`
+	Schedule       PromptSchedule `json:"schedule"`
+}
+
 type Competitor struct {
 	ID         string    `json:"id"`
 	ProjectID  string    `json:"projectId"`

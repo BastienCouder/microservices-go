@@ -37,6 +37,7 @@ import {
   buildPromptPageItems,
   buildResponseRows,
 } from "./prompt-data-factory";
+import { startPromptAnalyses } from "./prompt-run";
 
 const PROMPTS_PAGE_SIZE = 25;
 const PROMPTS_CATALOG_PAGE_SIZE = 100;
@@ -736,6 +737,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const [promptEditorState, setPromptEditorState] = useState<{ mode: PromptEditorMode; promptId?: string } | null>(null);
   const [editingPromptModelsId, setEditingPromptModelsId] = useState<string | null>(null);
   const [editingPromptScheduleId, setEditingPromptScheduleId] = useState<string | null>(null);
+  const [runningPromptRowIds, setRunningPromptRowIds] = useState<string[]>([]);
 
   useEffect(() => {
     setOrganizationId(readSelectedOrganizationId());
@@ -817,6 +819,10 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       activeModelKeys,
       promptAvailableModels,
     ],
+  );
+  const persistedPromptIds = useMemo(
+    () => new Set((promptsCatalogQuery.data ?? []).map((item) => item.id)),
+    [promptsCatalogQuery.data],
   );
 
   const bulkPromptStatusMutation = useMutation({
@@ -1042,6 +1048,34 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     },
   });
 
+  const runPromptsMutation = useMutation({
+    mutationFn: async (promptsToRun: PromptItem[]) => {
+      await startPromptAnalyses({
+        apiBaseURL,
+        organizationId,
+        projectId: activeProjectId,
+        prompts: promptsToRun.map((prompt) => ({
+          id: prompt.id,
+          sourcePromptId: prompt.sourcePromptId || prompt.id,
+          prompt: prompt.prompt,
+          models: prompt.models,
+        })),
+      });
+      return promptsToRun.map((prompt) => prompt.id);
+    },
+    onMutate: (promptsToRun) => {
+      setRunningPromptRowIds(promptsToRun.map((prompt) => prompt.id));
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["monitoring", apiBaseURL, activeProjectId],
+      });
+    },
+    onSettled: () => {
+      setRunningPromptRowIds([]);
+    },
+  });
+
   const basePrompts = useMemo(() => {
     const searchLower = deferredSearch.toLowerCase();
     const visibleManualPrompts = manualPrompts.filter((item) =>
@@ -1110,6 +1144,13 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     selectedPromptModels,
     showArchived,
   ]);
+  const selectedPromptRows = useMemo(
+    () =>
+      filteredPromptRows.filter((item) =>
+        selectedPromptIds.includes(getPromptSelectionKey(item, promptRowMode)),
+      ),
+    [filteredPromptRows, promptRowMode, selectedPromptIds],
+  );
 
   const promptTotalItems = filteredPromptRows.length;
   const promptTotalPages = Math.max(1, Math.ceil(promptTotalItems / PROMPTS_PAGE_SIZE));
@@ -1387,6 +1428,32 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     deletePromptMutation.mutate(id);
   };
 
+  const canRunPrompt = (prompt?: Pick<PromptItem, "id" | "sourcePromptId"> | null) =>
+    Boolean(
+      prompt &&
+        organizationId &&
+        activeProjectId &&
+        persistedPromptIds.has(prompt.sourcePromptId || prompt.id),
+    );
+
+  const runPrompt = (prompt: PromptItem) => {
+    if (!canRunPrompt(prompt) || runPromptsMutation.isPending) return;
+    runPromptsMutation.mutate([prompt]);
+  };
+
+  const runnableSelectedPrompts = selectedPromptRows.filter((item) => canRunPrompt(item));
+  const runningSelectedPrompts =
+    runnableSelectedPrompts.length > 0 &&
+    runnableSelectedPrompts.every((item) => runningPromptRowIds.includes(item.id));
+
+  const runSelectedPrompts = () => {
+    if (runnableSelectedPrompts.length === 0 || runPromptsMutation.isPending) return;
+    runPromptsMutation.mutate(runnableSelectedPrompts);
+  };
+
+  const isPromptRunning = (prompt: Pick<PromptItem, "id"> | null | undefined) =>
+    Boolean(prompt && runningPromptRowIds.includes(prompt.id));
+
   const updatePromptModels = (promptId: string, modelIds: AIModel[]) => {
     const nextModels = dedupeModels(modelIds).filter((model) =>
       promptAvailableModels.includes(model),
@@ -1502,6 +1569,14 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     applyBulkStatus,
     setFocusPromptId,
     deletePrompt,
+    canRunPrompt,
+    runPrompt,
+    runSelectedPrompts,
+    canRunSelectedPrompts: runnableSelectedPrompts.length > 0,
+    selectedRunnablePromptCount: runnableSelectedPrompts.length,
+    runningSelectedPrompts,
+    runningAnyPrompts: runPromptsMutation.isPending,
+    isPromptRunning,
     viewMode,
     setViewMode,
     onlyErrors,

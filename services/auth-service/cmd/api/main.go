@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -11,6 +12,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	kratosclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/kratos"
 	userclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/user"
 	httpadapter "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/http"
@@ -31,17 +33,20 @@ func main() {
 	h := httpadapter.NewHandler(svc, cfg.AllowedOrigin, cfg.KratosBrowserURL)
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
-	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "auth-service")(mux),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10, // 64 KiB
+	server := httpsrv.NewServer(cfg.HTTPAddr, security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "auth-service")(mux))
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("auth-service metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
 	}
 
 	go func() {
@@ -57,6 +62,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}

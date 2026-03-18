@@ -11,6 +11,22 @@ type mutableAnalysisStore struct {
 	payload []byte
 }
 
+type staticProjectCompetitorsProvider struct {
+	competitors []string
+}
+
+func (p staticProjectCompetitorsProvider) ListProjectCompetitors(_ context.Context, _ string, _ int64) ([]string, error) {
+	return append([]string(nil), p.competitors...), nil
+}
+
+type staticProjectModelsProvider struct {
+	modelIDs []string
+}
+
+func (p staticProjectModelsProvider) ListProjectEnabledModels(_ context.Context, _ string, _ int64) ([]string, error) {
+	return append([]string(nil), p.modelIDs...), nil
+}
+
 func (s *mutableAnalysisStore) Load(_ context.Context) ([]byte, bool, error) {
 	if s.payload == nil {
 		return nil, false, nil
@@ -361,6 +377,282 @@ func TestGetPerceptionIncludesBrandCanon(t *testing.T) {
 	}
 	if len(perception.BrandCanon.Audience) != 1 || perception.BrandCanon.Audience[0] != "PME" {
 		t.Fatalf("expected audience in perception response, got %+v", perception.BrandCanon.Audience)
+	}
+}
+
+func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME de services"
+	useCases := []string{"Prospection", "Suivi commercial"}
+	features := []string{"Automatisation", "Reporting"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini", "sonar"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est un CRM simple pour PME avec automatisation et reporting. Source: https://acme.com/crm",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://acme.com/crm"},
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record first response: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "sonar",
+		RawResponse:    "Acme existe pour les PME, mais la reponse reste vague et sans source claire.",
+		BrandMentioned: true,
+		BrandPosition:  "mid",
+		CitationFound:  false,
+		CitedURLs:      nil,
+		Sentiment:      "neutral",
+	}); err != nil {
+		t.Fatalf("record second response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+
+	payload, err := json.Marshal(perception)
+	if err != nil {
+		t.Fatalf("marshal perception: %v", err)
+	}
+
+	var decoded map[string]any
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatalf("decode perception json: %v", err)
+	}
+
+	radar, ok := decoded["radar"].([]any)
+	if !ok || len(radar) == 0 {
+		t.Fatalf("expected non-empty radar payload, got %#v", decoded["radar"])
+	}
+
+	topErrors, ok := decoded["topErrors"].([]any)
+	if !ok || len(topErrors) == 0 {
+		t.Fatalf("expected non-empty top errors payload, got %#v", decoded["topErrors"])
+	}
+
+	metadata, ok := decoded["metadata"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected metadata map, got %#v", decoded["metadata"])
+	}
+	if metadata["latestRunId"] != started.AnalysisRun.ID {
+		t.Fatalf("expected latestRunId %s, got %#v", started.AnalysisRun.ID, metadata["latestRunId"])
+	}
+
+	models, ok := metadata["models"].([]any)
+	if !ok || len(models) != 2 {
+		t.Fatalf("expected 2 models in metadata, got %#v", metadata["models"])
+	}
+	if metadata["responses"] != float64(2) {
+		t.Fatalf("expected metadata responses 2, got %#v", metadata["responses"])
+	}
+}
+
+func TestGetPerceptionUsesProjectCompetitorsForCompetitiveAxis(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectCompetitors: staticProjectCompetitorsProvider{competitors: []string{"HubSpot", "Salesforce"}},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation", "Reporting"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "HubSpot reste la meilleure option pour les PME. Acme est un CRM avec automatisation et reporting, mais reste derriere HubSpot. Source: https://acme.com/crm",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://acme.com/crm"},
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+
+	var competitorsScore int
+	for _, point := range perception.Radar {
+		if point.Axis == "competitors" {
+			competitorsScore = point.Score
+			break
+		}
+	}
+
+	if competitorsScore == 0 {
+		t.Fatalf("expected competitors score to be present, got %#v", perception.Radar)
+	}
+	if competitorsScore >= 60 {
+		t.Fatalf("expected competitors score below 60 when a real competitor dominates the answer, got %d", competitorsScore)
+	}
+
+	foundCompetitiveGap := false
+	for _, item := range perception.TopErrors {
+		if item.Type == "competitive_gap" {
+			foundCompetitiveGap = true
+			break
+		}
+	}
+	if !foundCompetitiveGap {
+		t.Fatalf("expected competitive_gap to be surfaced, got %#v", perception.TopErrors)
+	}
+}
+
+func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectModels: staticProjectModelsProvider{modelIDs: []string{"gpt-4o-mini"}},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini", "sonar"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est un CRM simple pour PME avec automatisation. Source: https://acme.com/crm",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://acme.com/crm"},
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record enabled model response: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "sonar",
+		RawResponse:    "Acme est rarement recommandee et reste derriere HubSpot.",
+		BrandMentioned: true,
+		BrandPosition:  "bottom",
+		CitationFound:  false,
+		CitedURLs:      nil,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record disabled model response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+
+	if perception.Scores.SentimentScore != 100 {
+		t.Fatalf("expected only the enabled project model to contribute to sentiment score, got %d", perception.Scores.SentimentScore)
+	}
+	if got := perception.Metadata["responses"]; got != 1 {
+		t.Fatalf("expected 1 filtered response, got %#v", got)
+	}
+	if got := perception.Metadata["projectModels"]; got == nil {
+		t.Fatalf("expected projectModels metadata to be populated")
+	}
+	models, ok := perception.Metadata["models"].([]string)
+	if !ok || len(models) != 1 || models[0] != "gpt-4o-mini" {
+		t.Fatalf("expected filtered metadata models to only include gpt-4o-mini, got %#v", perception.Metadata["models"])
 	}
 }
 

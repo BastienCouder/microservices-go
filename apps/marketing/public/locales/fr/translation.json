@@ -1,0 +1,257 @@
+{
+  "navigation": {
+    "features": "Fonctionnalités",
+    "howItWorks": "Comment ça marche",
+    "developers": "Développeurs",
+    "pricing": "Tarifs",
+    "signIn": "Se connecter",
+    "startCreating": "Commencer à créer"
+  },
+  "hero": {
+    "eyebrow": "La plateforme pour les équipes modernes",
+    "title1": "La solution ",
+    "title2": "pour être mentionné dans",
+    "words": ["chatgpt", "perplexity", "claude", "gemini"],
+    "description": "Votre boîte à outils pour arrêter de configurer et commencer à innover. Construisez, déployez et mettez à l'échelle les meilleures expériences en toute sécurité.",
+    "startTrial": "Commencer l'essai gratuit",
+    "watchDemo": "Voir la démo",
+    "stats": {
+      "netflix": { "value": "20 jours", "label": "gagnés sur les builds" },
+      "stripe": { "value": "98%", "label": "déploiement plus rapide" },
+      "linear": { "value": "300%", "label": "augmentation du débit" },
+      "notion": { "value": "6x", "label": "plus rapide à livrer" }
+    }
+  },
+  "features": {
+    "eyebrow": "Capacités",
+    "title": "Tout ce dont vous avez besoin",
+    "subtitle": "Rien de superflu.",
+    "list": {
+      "01": {
+        "title": "Déploiement Instantané",
+        "description": "Poussez en production en quelques secondes. Notre réseau edge garantit que vos applications se chargent instantanément, partout dans le monde."
+      },
+      "02": {
+        "title": "Workflows AI-Natifs",
+        "description": "Construisez des applications intelligentes avec des capacités AI intégrées. De l'inférence à l'entraînement, tout se met à l'échelle automatiquement."
+      },
+      "03": {
+        "title": "Collaboration en Temps Réel",
+        "description": "Travaillez ensemble de manière fluide. Prévisualisation en direct, retour instantané et contrôle de version qui a du sens."
+      },
+      "04": {
+        "title": "Sécurité Entreprise",
+        "description": "Chiffrement bancaire, conformité SOC 2 et contrôles d'accès granulaires. Vos données vous appartiennent."
+      }
+    }
+  },
+  "howItWorks": {
+    "eyebrow": "Processus",
+    "title": "Trois étapes.",
+    "subtitle": "Des possibilités infinies.",
+    "status": "Prêt",
+    "filename": "workflow.ts",
+    "steps": {
+      "1": {
+        "number": "I",
+        "title": "Connectez vos outils",
+        "description": "Intégrez votre stack existant en quelques minutes. Nous supportons plus de 200 sources de données."
+      },
+      "2": {
+        "number": "II",
+        "title": "Construisez votre workflow",
+        "description": "Concevez des automatisations puissantes avec notre constructeur visuel ou écrivez directement du code."
+      },
+      "3": {
+        "number": "III",
+        "title": "Livrez en production",
+        "description": "Déployez globalement sans configuration. Votre application est en ligne en moins de 30 secondes."
+      }
+    }
+  },
+  "infrastructure": {
+    "eyebrow": "Infrastructure",
+    "title": "Global par",
+    "title2": "défaut.",
+    "description": "Déployez une fois, exécutez partout. Notre réseau edge s'étend sur 17 centres de données sur 6 continents, offrant une latence inférieure à 50ms à 99% du monde.",
+    "header": "Réseau Edge",
+    "status": "Tout opérationnel",
+    "stats": {
+      "datacenters": { "value": "17", "label": "Centres de données" },
+      "uptime": { "value": "99,99%", "label": "SLA de disponibilité" },
+      "latency": { "value": "<50ms", "label": "Latence globale" }
+    },
+    "locations": {
+      "sanFrancisco": { "city": "San Francisco", "region": "Ouest US" },
+      "newYork": { "city": "New York", "region": "Est US" },
+      "london": { "city": "Londres", "region": "Europe" },
+      "tokyo": { "city": "Tokyo", "region": "Pacifique Asie" },
+      "sydney": { "city": "Sydney", "region": "Océanie" },
+      "saoPaulo": { "city": "Sao Paulo", "region": "Amérique du Sud" }
+    }
+  },
+  "metrics": {
+    "eyebrow": "Métriques en direct",
+    "title": "Des performances que",
+    "title2": "vous pouvez mesurer.",
+    "live": "En direct",
+    "metrics": {
+      "requests": { "value": 2847392, "label": "Requêtes API aujourd'hui" },
+      "uptime": { "value": 99, "suffix": ",99%", "label": "Disponibilité ce trimestre" },
+      "responseTime": { "value": 23, "suffix": "ms", "label": "Temps de réponse moyen" },
+      "countries": { "value": 184, "label": "Pays desservis" }
+    }
+  },
+  "integrations": {
+    "eyebrow": "Intégrations",
+    "title": "Fonctionne avec vos",
+    "title2": "outils préférés.",
+    "description": "Connectez-vous à plus de 200 services instantanément. Si vous pouvez le nommer, nous l'intégrons.",
+    "cta": "Voir toutes les intégrations"
+  },
+  "security": {
+    "eyebrow": "Sécurité",
+    "title": "La confiance est",
+    "title2": "non négociable.",
+    "description": "La sécurité de niveau entreprise n'est pas optionnelle. Elle est intégrée à chaque couche de notre plateforme, de l'infrastructure à l'application.",
+    "soc2": "SOC 2 Type II",
+    "soc2Desc": "Contrôles de sécurité audités indépendamment avec surveillance continue.",
+    "encryption": "Chiffrement de bout en bout",
+    "encryptionDesc": "Chiffrement AES-256 pour les données au repos et TLS 1.3 en transit.",
+    "zeroTrust": "Architecture Zero-trust",
+    "zeroTrustDesc": "Chaque requête est authentifiée et autorisée. Sans exception.",
+    "compliance": "RGPD & HIPAA",
+    "complianceDesc": "Conformité totale avec les réglementations sur la protection des données et la santé."
+  },
+  "developers": {
+    "eyebrow": "Pour les développeurs",
+    "title": "Conçu par des devs.",
+    "title2": "Pour des devs.",
+    "description": "Un SDK pensé pour vous faciliter la vie. Livrez plus vite avec des APIs intuitives et une documentation exceptionnelle.",
+    "features": {
+      "typescript": { "title": "TypeScript natif", "description": "Sécurité de types complète avec types auto-générés." },
+      "zeroconfig": { "title": "Zéro configuration", "description": "Valeurs par défaut sensées qui fonctionnent." },
+      "edge": { "title": "Prêt pour l'edge", "description": "Fonctionne partout : Node, Deno, Bun, navigateurs." },
+      "lightweight": { "title": "12KB gzippé", "description": "Léger avec zéro dépendance." }
+    },
+    "tabs": {
+      "install": "Installer",
+      "initialize": "Initialiser",
+      "deploy": "Déployer"
+    },
+    "links": {
+      "docs": "Lire la documentation",
+      "github": "Voir sur GitHub"
+    }
+  },
+  "testimonials": {
+    "eyebrow": "Clients",
+    "title": "Adoré par des équipes",
+    "title2": "dans le monde entier."
+  },
+  "pricing": {
+    "eyebrow": "Tarifs",
+    "title": "Des tarifs simples et",
+    "title2": "transparents",
+    "description": "Commencez gratuitement et évoluez selon vos besoins. Pas de frais cachés, pas de surprises.",
+    "monthly": "Mensuel",
+    "annual": "Annuel",
+    "save": "Économisez 17%",
+    "mostPopular": "Plus Populaire",
+    "perMonth": "/mois",
+    "custom": "Sur mesure",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "description": "Pour les particuliers et petits projets",
+        "cta": "Commencer gratuit",
+        "features": {
+          "0": "Jusqu'à 3 projets",
+          "1": "1Go de stockage",
+          "2": "Support communautaire",
+          "3": "Analyses de base",
+          "4": "Certificats SSL"
+        }
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Pour les équipes en croissance",
+        "cta": "Commencer l'essai",
+        "features": {
+          "0": "Projets illimités",
+          "1": "100Go de stockage",
+          "2": "Support prioritaire",
+          "3": "Analyses avancées",
+          "4": "Domaines personnalisés",
+          "5": "Collaboration d'équipe",
+          "6": "Accès API"
+        }
+      },
+      "enterprise": {
+        "name": "Entreprise",
+        "description": "Pour les opérations à grande échelle",
+        "cta": "Contacter les ventes",
+        "features": {
+          "0": "Tout dans Pro",
+          "1": "Stockage illimité",
+          "2": "Support dédié 24/7",
+          "3": "Intégrations personnalisées",
+          "4": "Garantie SLA",
+          "5": "Option on-premise",
+          "6": "Audit sécurité",
+          "7": "Contrats sur mesure"
+        }
+      }
+    },
+    "footer": "Tous les plans incluent les mises à jour automatiques, HTTPS, et protection DDoS. {{compare}}",
+    "compare": "Comparer toutes les fonctionnalités"
+  },
+  "cta": {
+    "title": "Prêt à construire",
+    "title2": "quelque chose de grand ?",
+    "description": "Rejoignez des milliers d'équipes qui livrent plus vite avec Visia. Commencez gratuitement, évoluez à l'infini.",
+    "startBuilding": "Commencer à construire gratuit",
+    "talkToSales": "Parler aux ventes",
+    "noCreditCard": "Pas de carte de crédit requise"
+  },
+  "footer": {
+    "description": "La plateforme pour les équipes qui livrent. Construisez, déployez et mettez à l'échelle avec une vélocité sans précédent.",
+    "links": {
+      "product": "Produit",
+      "developers": "Développeurs",
+      "company": "Entreprise",
+      "legal": "Mentions légales"
+    },
+    "product": {
+      "features": "Fonctionnalités",
+      "howItWorks": "Comment ça marche",
+      "pricing": "Tarifs",
+      "integrations": "Intégrations"
+    },
+    "developers": {
+      "documentation": "Documentation",
+      "apiReference": "Référence API",
+      "sdk": "SDK",
+      "status": "Statut"
+    },
+    "company": {
+      "about": "À propos",
+      "blog": "Blog",
+      "careers": "Carrières",
+      "hiring": "Recrutement",
+      "contact": "Contact"
+    },
+    "legal": {
+      "privacy": "Confidentialité",
+      "terms": "Conditions",
+      "security": "Sécurité"
+    },
+    "social": {
+      "twitter": "Twitter",
+      "github": "GitHub",
+      "linkedin": "LinkedIn"
+    },
+    "copyright": "2025 Optimus. Tous droits réservés.",
+    "status": "Tous les systèmes opérationnels"
+  }
+}

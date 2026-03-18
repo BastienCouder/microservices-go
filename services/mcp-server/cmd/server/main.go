@@ -10,6 +10,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	"github.com/bastiencouder/microservices-go/services/mcp-server/internal/tools"
 )
 
@@ -43,14 +44,15 @@ func main() {
 
 	transport := flag.String("transport", "", "transport mode: stdio or http")
 	httpAddr := flag.String("http-addr", "", "http listen address, required when --transport=http")
+	metricsAddr := flag.String("metrics-addr", "", "http listen address for metrics; empty disables metrics")
 	flag.Parse()
 
-	if err := run(server, *transport, *httpAddr); err != nil {
+	if err := run(server, *transport, *httpAddr, *metricsAddr); err != nil {
 		log.Fatalf("run mcp server: %v", err)
 	}
 }
 
-func run(server *mcp.Server, transport, httpAddr string) error {
+func run(server *mcp.Server, transport, httpAddr, metricsAddr string) error {
 	switch transport {
 	case "stdio":
 		return server.Run(context.Background(), &mcp.StdioTransport{})
@@ -63,9 +65,19 @@ func run(server *mcp.Server, transport, httpAddr string) error {
 		}, nil)
 		mux := http.NewServeMux()
 		mux.Handle("/mcp", handler)
-		mux.Handle("/metrics", promhttp.Handler())
+		if metricsAddr != "" {
+			metricsMux := http.NewServeMux()
+			metricsMux.Handle("/metrics", promhttp.Handler())
+			metricsServer := httpsrv.NewServer(metricsAddr, metricsMux)
+			go func() {
+				log.Printf("mcp server metrics listening on %s", metricsAddr)
+				if err := metricsServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+					log.Fatalf("metrics listen error: %v", err)
+				}
+			}()
+		}
 		log.Printf("mcp server listening on %s (path /mcp)", httpAddr)
-		return http.ListenAndServe(httpAddr, mux)
+		return httpsrv.NewServer(httpAddr, mux).ListenAndServe()
 	default:
 		return fmt.Errorf("--transport must be stdio or http")
 	}

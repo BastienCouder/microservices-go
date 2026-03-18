@@ -66,6 +66,11 @@ const SettingsPage = lazy(() =>
     default: module.SettingsPage,
   })),
 );
+const BillingPage = lazy(() =>
+  import("@/features/billing").then((module) => ({
+    default: module.BillingPage,
+  })),
+);
 
 const SIDEBAR_FEATURE_ROUTES = [
   {
@@ -173,6 +178,14 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         element={
           <Suspense fallback={null}>
             <SettingsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/billing"
+        element={
+          <Suspense fallback={null}>
+            <BillingPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

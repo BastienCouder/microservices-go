@@ -1,0 +1,253 @@
+{
+  "navigation": {
+    "features": "Features",
+    "howItWorks": "How it works",
+    "developers": "Developers",
+    "pricing": "Pricing",
+    "signIn": "Sign in",
+    "startCreating": "Start creating"
+  },
+  "hero": {
+    "eyebrow": "The platform for modern teams",
+    "title1": "The platform",
+    "title2": "to rank in",
+    "words": ["chatgpt", "perplexity", "claude", "gemini"],
+    "description": "Your toolkit to stop configuring and start innovating. Securely build, deploy, and scale the best experiences.",
+    "startTrial": "Start free trial",
+    "watchDemo": "Watch demo",
+    "stats": {
+      "netflix": { "value": "20 days", "label": "saved on builds" },
+      "stripe": { "value": "98%", "label": "faster deployment" },
+      "linear": { "value": "300%", "label": "throughput increase" },
+      "notion": { "value": "6x", "label": "faster to ship" }
+    }
+  },
+  "features": {
+    "eyebrow": "Capabilities",
+    "title": "Everything you need.",
+    "subtitle": "Nothing you don't.",
+    "list": {
+      "01": {
+        "title": "Instant Deployment",
+        "description": "Push to production in seconds. Our edge network ensures your applications load instantly, anywhere in the world."
+      },
+      "02": {
+        "title": "AI-Native Workflows",
+        "description": "Build intelligent applications with built-in AI capabilities. From inference to training, everything scales automatically."
+      },
+      "03": {
+        "title": "Real-time Collaboration",
+        "description": "Work together seamlessly. Live preview, instant feedback, and version control that actually makes sense."
+      },
+      "04": {
+        "title": "Enterprise Security",
+        "description": "Bank-grade encryption, SOC 2 compliance, and granular access controls. Your data stays yours."
+      }
+    }
+  },
+  "howItWorks": {
+    "eyebrow": "Process",
+    "title": "Three steps.",
+    "subtitle": "Infinite possibilities.",
+    "status": "Ready",
+    "filename": "workflow.ts",
+    "steps": {
+      "1": {
+        "number": "I",
+        "title": "Connect your tools",
+        "description": "Integrate with your existing stack in minutes. We support 200+ data sources out of the box."
+      },
+      "2": {
+        "number": "II",
+        "title": "Build your workflow",
+        "description": "Design powerful automations with our visual builder or write code directly."
+      },
+      "3": {
+        "number": "III",
+        "title": "Ship to production",
+        "description": "Deploy globally with zero configuration. Your app goes live in under 30 seconds."
+      }
+    }
+  },
+  "infrastructure": {
+    "eyebrow": "Infrastructure",
+    "title": "Global by",
+    "title2": "default.",
+    "description": "Deploy once, run everywhere. Our edge network spans 17 data centers across 6 continents, delivering sub-50ms latency to 99% of the world.",
+    "header": "Edge Network",
+    "status": "All operational",
+    "stats": {
+      "datacenters": { "value": "17", "label": "Data centers" },
+      "uptime": { "value": "99.99%", "label": "Uptime SLA" },
+      "latency": { "value": "<50ms", "label": "Global latency" }
+    },
+    "locations": {
+      "sanFrancisco": { "city": "San Francisco", "region": "US West" },
+      "newYork": { "city": "New York", "region": "US East" },
+      "london": { "city": "London", "region": "Europe" },
+      "tokyo": { "city": "Tokyo", "region": "Asia Pacific" },
+      "sydney": { "city": "Sydney", "region": "Oceania" },
+      "saoPaulo": { "city": "Sao Paulo", "region": "South America" }
+    }
+  },
+  "metrics": {
+    "eyebrow": "Live metrics",
+    "title": "Performance you",
+    "title2": "can measure.",
+    "live": "Live",
+    "metrics": {
+      "requests": { "value": 2847392, "label": "API requests today" },
+      "uptime": { "value": 99, "suffix": ".99%", "label": "Uptime this quarter" },
+      "responseTime": { "value": 23, "suffix": "ms", "label": "Average response time" },
+      "countries": { "value": 184, "label": "Countries served" }
+    }
+  },
+  "integrations": {
+    "eyebrow": "Integrations",
+    "title": "Works with your",
+    "title2": "favorite tools.",
+    "description": "Connect to 200+ services instantly. If you can name it, we integrate with it.",
+    "cta": "View all integrations"
+  },
+  "security": {
+    "eyebrow": "Security",
+    "title": "Trust is",
+    "title2": "non-negotiable.",
+    "description": "Enterprise-grade security isn't optional. It's built into every layer of our platform, from infrastructure to application.",
+    "soc2": "SOC 2 Type II",
+    "soc2Desc": "Independently audited security controls with continuous monitoring.",
+    "encryption": "End-to-end encryption",
+    "encryptionDesc": "AES-256 encryption for data at rest and TLS 1.3 in transit.",
+    "zeroTrust": "Zero-trust architecture",
+    "zeroTrustDesc": "Every request is authenticated and authorized. No exceptions.",
+    "compliance": "GDPR & HIPAA",
+    "complianceDesc": "Full compliance with data protection and healthcare regulations."
+  },
+  "developers": {
+    "eyebrow": "For developers",
+    "title": "Built by devs.",
+    "title2": "For devs.",
+    "description": "A thoughtfully designed SDK that gets out of your way. Ship faster with intuitive APIs and exceptional documentation.",
+    "features": {
+      "typescript": { "title": "TypeScript native", "description": "Full type safety with auto-generated types." },
+      "zeroconfig": { "title": "Zero config", "description": "Sensible defaults that just work." },
+      "edge": { "title": "Edge-ready", "description": "Runs anywhere: Node, Deno, Bun, browsers." },
+      "lightweight": { "title": "12KB gzipped", "description": "Lightweight with zero dependencies." }
+    },
+    "tabs": {
+      "install": "Install",
+      "initialize": "Initialize",
+      "deploy": "Deploy"
+    },
+    "links": {
+      "docs": "Read the docs",
+      "github": "View on GitHub"
+    }
+  },
+  "testimonials": {
+    "eyebrow": "Customers",
+    "title": "Loved by teams",
+    "title2": "worldwide."
+  },
+  "pricing": {
+    "eyebrow": "Pricing",
+    "title": "Simple, transparent",
+    "title2": "pricing",
+    "description": "Start free and scale as you grow. No hidden fees, no surprises.",
+    "monthly": "Monthly",
+    "annual": "Annual",
+    "save": "Save 17%",
+    "mostPopular": "Most Popular",
+    "perMonth": "/month",
+    "custom": "Custom",
+    "plans": {
+      "starter": {
+        "name": "Starter",
+        "description": "For individuals and small projects",
+        "cta": "Start free",
+        "features": {
+          "0": "Up to 3 projects",
+          "1": "1GB storage",
+          "2": "Community support",
+          "3": "Basic analytics",
+          "4": "SSL certificates"
+        }
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "For growing teams and businesses",
+        "cta": "Start trial",
+        "features": {
+          "5": "Custom domains",
+          "6": "Team collaboration",
+          "7": "API access"
+        }
+      },
+      "enterprise": {
+        "name": "Enterprise",
+        "description": "For large-scale operations",
+        "cta": "Contact sales",
+        "features": {
+          "0": "Everything in Pro",
+          "1": "Unlimited storage",
+          "2": "24/7 dedicated support",
+          "3": "Custom integrations",
+          "4": "SLA guarantee",
+          "5": "On-premise option",
+          "6": "Security audit",
+          "7": "Custom contracts"
+        }
+      }
+    },
+    "footer": "All plans include automatic updates, HTTPS, and DDoS protection. {{compare}}",
+    "compare": "Compare all features"
+  },
+  "cta": {
+    "title": "Ready to build",
+    "title2": "something great?",
+    "description": "Join thousands of teams shipping faster with Optimus. Start free, scale infinitely.",
+    "startBuilding": "Start building free",
+    "talkToSales": "Talk to sales",
+    "noCreditCard": "No credit card required"
+  },
+  "footer": {
+    "description": "The platform for teams who ship. Build, deploy, and scale with unprecedented velocity.",
+    "links": {
+      "product": "Product",
+      "developers": "Developers",
+      "company": "Company",
+      "legal": "Legal"
+    },
+    "product": {
+      "features": "Features",
+      "howItWorks": "How it works",
+      "pricing": "Pricing",
+      "integrations": "Integrations"
+    },
+    "developers": {
+      "documentation": "Documentation",
+      "apiReference": "API Reference",
+      "sdk": "SDK",
+      "status": "Status"
+    },
+    "company": {
+      "about": "About",
+      "blog": "Blog",
+      "careers": "Careers",
+      "hiring": "Hiring",
+      "contact": "Contact"
+    },
+    "legal": {
+      "privacy": "Privacy",
+      "terms": "Terms",
+      "security": "Security"
+    },
+    "social": {
+      "twitter": "Twitter",
+      "github": "GitHub",
+      "linkedin": "LinkedIn"
+    },
+    "copyright": "2025 Optimus. All rights reserved.",
+    "status": "All systems operational"
+  }
+}

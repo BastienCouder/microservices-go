@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 )
@@ -337,6 +338,14 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	if err != nil {
 		return PerceptionData{}, err
 	}
+	projectModels, hasProjectModels, err := s.listProjectEnabledModels(ctx, projectID, organizationID)
+	if err != nil {
+		return PerceptionData{}, err
+	}
+	competitors, err := s.listProjectCompetitors(ctx, projectID, organizationID)
+	if err != nil {
+		return PerceptionData{}, err
+	}
 	brandCanon, err := s.GetBrandCanon(ctx, projectID, organizationID)
 	if err != nil {
 		return PerceptionData{}, err
@@ -344,44 +353,55 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 
 	var result PerceptionData
 	result.BrandCanon = brandCanon
+	result.Radar = []PerceptionRadarPoint{}
+	result.TopErrors = []PerceptionError{}
 	result.Metadata = map[string]any{
-		"projectId":   projectID,
-		"generatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		"projectId":     projectID,
+		"generatedAt":   time.Now().UTC().Format(time.RFC3339Nano),
+		"models":        []string{},
+		"projectModels": append([]string(nil), projectModels...),
+		"competitors":   append([]string(nil), competitors...),
 	}
-	if !dashboard.HasData || len(dashboard.Responses) == 0 {
+	responses := dashboard.Responses
+	if hasProjectModels {
+		responses = filterResponsesByModelIDs(responses, projectModels)
+	}
+	if !dashboard.HasData || len(responses) == 0 {
+		result.Metadata["responses"] = 0
+		result.Metadata["analyzedResponses"] = 0
 		return result, nil
 	}
 
-	analyzed := float64(len(dashboard.Responses))
-	mentions := 0
-	citations := 0
-	positive := 0
-	neutral := 0
-	negative := 0
-
-	for _, response := range dashboard.Responses {
-		if response.BrandMentioned {
-			mentions++
-		}
-		if response.CitationFound {
-			citations++
-		}
-		switch response.Sentiment {
-		case "positive":
-			positive++
-		case "negative":
-			negative++
-		default:
-			neutral++
+	metrics := make([]perceptionResponseMetrics, 0, len(responses))
+	modelsSet := make(map[string]struct{}, len(responses))
+	metricsByModel := make(map[string][]perceptionResponseMetrics)
+	for _, response := range responses {
+		responseMetrics := buildPerceptionResponseMetrics(response, brandCanon, competitors)
+		metrics = append(metrics, responseMetrics)
+		modelID := strings.TrimSpace(response.ModelID)
+		if modelID != "" {
+			modelsSet[modelID] = struct{}{}
+			metricsByModel[modelID] = append(metricsByModel[modelID], responseMetrics)
 		}
 	}
 
-	result.Scores.PositioningAccuracy = clampToPercent(float64(mentions) / analyzed * 100)
-	result.Scores.FactualAccuracy = clampToPercent(float64(citations) / analyzed * 100)
-	sentimentWeighted := (float64(positive*100) + float64(neutral*60) + float64(negative*25)) / analyzed
-	result.Scores.SentimentScore = clampToPercent(sentimentWeighted)
+	models := make([]string, 0, len(modelsSet))
+	for modelID := range modelsSet {
+		models = append(models, modelID)
+	}
+	sort.Strings(models)
 
-	result.Metadata["responses"] = len(dashboard.Responses)
+	result.Scores = derivePerceptionScoresFromMetrics(metrics)
+	result.Radar = derivePerceptionRadarFromMetrics(metrics)
+	result.TopErrors = derivePerceptionTopErrors(brandCanon, result.Scores, result.Radar, metricsByModel)
+	result.Metadata["models"] = models
+	result.Metadata["latestRunId"] = ""
+	if dashboard.LatestRun != nil {
+		result.Metadata["latestRunId"] = dashboard.LatestRun.ID
+	}
+	result.Metadata["windowLabel"] = derivePerceptionWindowLabel(responses, time.Now().UTC())
+	result.Metadata["responses"] = len(responses)
+	result.Metadata["analyzedResponses"] = len(responses)
 	result.Metadata["visibilityScore"] = dashboard.VisibilityScore
 	return result, nil
 }

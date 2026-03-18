@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -16,6 +17,7 @@ import (
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
@@ -57,10 +59,12 @@ func main() {
 	dashboardCache := rediscache.NewDashboardCache(cfg.RedisAddr, cfg.RedisPassword)
 
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:             analysisstate.NewStateStore(db),
-		DashboardCache:    dashboardCache,
-		DashboardCacheTTL: cfg.DashboardCacheTTL,
-		ProjectVerifier:   projectGRPCClient,
+		Store:              analysisstate.NewStateStore(db),
+		DashboardCache:     dashboardCache,
+		DashboardCacheTTL:  cfg.DashboardCacheTTL,
+		ProjectVerifier:    projectGRPCClient,
+		ProjectCompetitors: projectGRPCClient,
+		ProjectModels:      projectGRPCClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)
@@ -70,17 +74,25 @@ func main() {
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metrics", metricsHandler)
 	h.Register(mux)
 
-	httpServer := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")(mux),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+	httpServer := httpsrv.NewServer(
+		cfg.HTTPAddr,
+		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")(mux),
+		httpsrv.WithReadTimeout(10*time.Second),
+		httpsrv.WithWriteTimeout(20*time.Second),
+	)
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.HandleFunc("GET /metrics", metricsHandler)
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("analysis-service metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
 	}
 
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
@@ -122,6 +134,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}

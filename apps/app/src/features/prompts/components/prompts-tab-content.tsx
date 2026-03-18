@@ -12,6 +12,7 @@ import {
   MoreHorizontal,
   PanelRightOpen,
   Pencil,
+  Play,
   Trash2,
   TrendingUp,
 } from "lucide-react";
@@ -33,7 +34,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -65,6 +65,14 @@ type PromptsTabContentProps = {
   setTabResponses: () => void;
   deletePrompt: (id: string) => void;
   onEditPrompt: (id: string) => void;
+  canRunPrompt: (item: PromptItem | null) => boolean;
+  runPrompt: (item: PromptItem) => void;
+  isPromptRunning: (item: PromptItem | null) => boolean;
+  canRunSelectedPrompts: boolean;
+  selectedRunnablePromptCount: number;
+  runningSelectedPrompts: boolean;
+  runningAnyPrompts: boolean;
+  runSelectedPrompts: () => void;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
   statusBadgeVariant: (status: PromptItem["status"]) => "secondary" | "outline" | "destructive";
@@ -189,6 +197,10 @@ function PromptActions({
   setTabResponses,
   requestDeletePrompt,
   onEditPrompt,
+  canRunPrompt,
+  runPrompt,
+  isPromptRunning,
+  runningAnyPrompts,
 }: {
   item: PromptItem;
   setSelectedPromptId: (id: string) => void;
@@ -197,8 +209,14 @@ function PromptActions({
   setTabResponses: () => void;
   requestDeletePrompt: (item: PromptItem) => void;
   onEditPrompt: (id: string) => void;
+  canRunPrompt: (item: PromptItem | null) => boolean;
+  runPrompt: (item: PromptItem) => void;
+  isPromptRunning: (item: PromptItem | null) => boolean;
+  runningAnyPrompts: boolean;
 }) {
   const sourcePromptId = item.sourcePromptId || item.id;
+  const promptRunnable = canRunPrompt(item);
+  const promptRunning = isPromptRunning(item);
 
   return (
     <DropdownMenu>
@@ -207,8 +225,18 @@ function PromptActions({
           <MoreHorizontal className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-40">
-        <DropdownMenuLabel>Actions du prompt</DropdownMenuLabel>
+      <DropdownMenuContent align="end" className="w-auto">
+        <DropdownMenuItem
+          disabled={!promptRunnable || promptRunning || runningAnyPrompts}
+          onClick={(event) => {
+            event.stopPropagation();
+            runPrompt(item);
+          }}
+        >
+          <Play className="h-4 w-4" />
+          {promptRunning ? "Lancement..." : "Lancer le prompt"}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={(event) => {
             event.stopPropagation();
@@ -313,6 +341,14 @@ export function PromptsTabContent({
   setTabResponses,
   deletePrompt,
   onEditPrompt,
+  canRunPrompt,
+  runPrompt,
+  isPromptRunning,
+  canRunSelectedPrompts,
+  selectedRunnablePromptCount,
+  runningSelectedPrompts,
+  runningAnyPrompts,
+  runSelectedPrompts,
   getModelVisual,
   rankTone,
   statusBadgeVariant,
@@ -462,6 +498,21 @@ export function PromptsTabContent({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="h-8 rounded-full px-3 text-xs sm:h-7 sm:px-2.5"
+                  disabled={!canRunSelectedPrompts || runningSelectedPrompts || runningAnyPrompts}
+                  onClick={runSelectedPrompts}
+                >
+                  <Play className="mr-1.5 h-3.5 w-3.5" />
+                  {runningSelectedPrompts
+                    ? "Lancement..."
+                    : selectedRunnablePromptCount > 0
+                      ? `Lancer les prompts (${selectedRunnablePromptCount})`
+                      : "Lancer les prompts"}
+                </Button>
                 <BulkStatusButton
                   label="Activer"
                   toneClassName="text-primary"
@@ -619,6 +670,10 @@ export function PromptsTabContent({
                             setTabResponses={setTabResponses}
                             requestDeletePrompt={setPendingDeletePrompt}
                             onEditPrompt={onEditPrompt}
+                            canRunPrompt={canRunPrompt}
+                            runPrompt={runPrompt}
+                            isPromptRunning={isPromptRunning}
+                            runningAnyPrompts={runningAnyPrompts}
                           />
                         </TableCell>
                       </TableRow>
@@ -739,6 +794,10 @@ export function PromptsTabContent({
                                 setTabResponses={setTabResponses}
                                 requestDeletePrompt={setPendingDeletePrompt}
                                 onEditPrompt={onEditPrompt}
+                                canRunPrompt={canRunPrompt}
+                                runPrompt={runPrompt}
+                                isPromptRunning={isPromptRunning}
+                                runningAnyPrompts={runningAnyPrompts}
                               />
                             </div>
                           </div>

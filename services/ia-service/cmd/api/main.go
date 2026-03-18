@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -15,9 +16,10 @@ import (
 
 	iav1 "github.com/bastiencouder/microservices-go/contracts/gen/go/ia/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/http"
-	openai "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openai"
+	openrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openrouter"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
@@ -49,7 +51,13 @@ func main() {
 
 	var provider usecase.PromptProvider
 	if cfg.ExecutionMode == string(usecase.ExecutionModeProvider) {
-		provider = openai.NewClient(cfg.ProviderBaseURL, cfg.ProviderAPIKey, httpClient)
+		provider = openrouter.NewClient(
+			cfg.ProviderBaseURL,
+			cfg.ProviderAPIKey,
+			cfg.ProviderHTTPReferer,
+			cfg.ProviderAppName,
+			httpClient,
+		)
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(usecase.Dependencies{
@@ -64,17 +72,25 @@ func main() {
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metrics", metricsHandler)
 	h.Register(mux)
 
-	httpServer := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")(mux),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+	httpServer := httpsrv.NewServer(
+		cfg.HTTPAddr,
+		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")(mux),
+		httpsrv.WithReadTimeout(10*time.Second),
+		httpsrv.WithWriteTimeout(20*time.Second),
+	)
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.HandleFunc("GET /metrics", metricsHandler)
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("ia-service metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
 	}
 
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
@@ -116,6 +132,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}

@@ -31,6 +31,23 @@ jobs:
       - name: golangci-lint (strict)
         run: golangci-lint run --config .golangci.yml
 
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.work
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: govulncheck
+        run: |
+          for dir in contracts services/*; do
+            if [ -f "$dir/go.mod" ]; then
+              (cd "$dir" && govulncheck ./...)
+            fi
+          done
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +56,12 @@ jobs:
         with:
           go-version-file: go.work
       - name: Unit tests
-        run: go test ./services/...
+        run: |
+          for dir in contracts services/*; do
+            if [ -f "$dir/go.mod" ]; then
+              (cd "$dir" && go test ./...)
+            fi
+          done
 
   organizations-integration:
     runs-on: ubuntu-latest

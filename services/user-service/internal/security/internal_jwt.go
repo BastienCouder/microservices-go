@@ -85,7 +85,7 @@ func auditDenied(r *http.Request, reason string) {
 }
 
 func isPublicPath(path string) bool {
-	return path == "/health" || path == "/ready" || path == "/metrics"
+	return path == "/health" || path == "/ready"
 }
 
 func verifyInternalJWT(token, secret, expectedIssuer, expectedAudience string) (internalTokenClaims, error) {

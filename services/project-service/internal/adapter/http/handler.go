@@ -23,6 +23,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /projects", h.createProject)
 	mux.HandleFunc("GET /projects", h.listProjects)
+	mux.HandleFunc("GET /internal/scheduled-analysis/jobs", h.listScheduledAnalysisJobs)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
 	mux.HandleFunc("GET /projects/ai-models", h.listModels)
 	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
@@ -273,6 +274,15 @@ func (h *Handler) getProjectImpactContext(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeSuccess(w, http.StatusOK, contextValue)
+}
+
+func (h *Handler) listScheduledAnalysisJobs(w http.ResponseWriter, r *http.Request) {
+	jobs, err := h.svc.ListScheduledAnalysisJobs(r.Context())
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, jobs)
 }
 
 func (h *Handler) getProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {

@@ -6,6 +6,9 @@ option go_package = "github.com/bastiencouder/microservices-go/contracts/gen/go/
 
 service ProjectService {
   rpc CheckProjectAccess(CheckProjectAccessRequest) returns (CheckProjectAccessResponse);
+  rpc ListProjectCompetitors(ListProjectCompetitorsRequest) returns (ListProjectCompetitorsResponse);
+  rpc ListProjectEnabledModels(ListProjectEnabledModelsRequest) returns (ListProjectEnabledModelsResponse);
+  rpc ListScheduledAnalysisJobs(ListScheduledAnalysisJobsRequest) returns (ListScheduledAnalysisJobsResponse);
 }
 
 message CheckProjectAccessRequest {
@@ -17,4 +20,46 @@ message CheckProjectAccessResponse {
   bool allowed = 1;
   bool exists = 2;
   string reason = 3;
+}
+
+message ListProjectCompetitorsRequest {
+  string project_id = 1;
+}
+
+message ListProjectCompetitorsResponse {
+  repeated string competitors = 1;
+}
+
+message ListProjectEnabledModelsRequest {
+  string project_id = 1;
+}
+
+message ListProjectEnabledModelsResponse {
+  repeated string model_ids = 1;
+}
+
+message PromptSchedule {
+  string mode = 1;
+  string cron = 2;
+  string timezone = 3;
+  map<string, string> model_crons = 4;
+}
+
+message ScheduledAnalysisJob {
+  string project_id = 1;
+  string project_name = 2;
+  int64 organization_id = 3;
+  int64 created_by = 4;
+  string brand_name = 5;
+  repeated string competitors = 6;
+  string prompt_id = 7;
+  string prompt_text = 8;
+  repeated string model_ids = 9;
+  PromptSchedule schedule = 10;
+}
+
+message ListScheduledAnalysisJobsRequest {}
+
+message ListScheduledAnalysisJobsResponse {
+  repeated ScheduledAnalysisJob jobs = 1;
 }

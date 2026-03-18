@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	HTTPAddr          string
+	MetricsAddr       string
 	DatabaseURL       string
 	EmailRendererURL  string
 	ResendAPIKey      string
@@ -48,6 +49,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		HTTPAddr:          httpAddr,
+		MetricsAddr:       optionalEnv("METRICS_ADDR"),
 		DatabaseURL:       databaseURL,
 		EmailRendererURL:  emailRendererURL,
 		ResendAPIKey:      resendAPIKey,
@@ -119,4 +121,8 @@ func requiredEnv(key string) (string, error) {
 		return "", fmt.Errorf("missing required environment variable %s", key)
 	}
 	return value, nil
+}
+
+func optionalEnv(key string) string {
+	return strings.TrimSpace(os.Getenv(key))
 }

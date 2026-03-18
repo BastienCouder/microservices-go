@@ -56,6 +56,21 @@ func (s *Service) ListProjectModels(ctx context.Context, projectID string, organ
 	return selection, nil
 }
 
+func (s *Service) ListEnabledProjectModelIDs(ctx context.Context, projectID string, organizationID int64) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return nil, err
+	}
+
+	return filterEnabledModels(s.projectModels, projectID), nil
+}
+
 func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, organizationID int64, modelIDs []string) (ReplaceProjectModelsResult, error) {
 	if len(modelIDs) == 0 {
 		return ReplaceProjectModelsResult{}, fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)

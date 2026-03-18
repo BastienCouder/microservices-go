@@ -70,6 +70,10 @@ describe("loadPerceptionData", () => {
       }),
       jsonResponse(200, {
         success: true,
+        data: [{ id: "cmp-1", name: "HubSpot" }],
+      }),
+      jsonResponse(200, {
+        success: true,
         data: {
           promptRuns: [
             {
@@ -160,5 +164,198 @@ describe("loadPerceptionData", () => {
     ]);
     expect(result.data.trend["30d"].data.length > 0).toBe(true);
     expect(JSON.stringify(result.data).includes("Nike")).toBe(false);
+  });
+
+  test("filters perception responses to the currently enabled project models when backend provides them", async () => {
+    mockFetchSequence([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+          {
+            id: "sonar",
+            displayName: "Perplexity",
+            provider: "perplexity",
+            groupName: "Perplexity",
+            isEnabledForProject: false,
+          },
+        ],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [{ id: "cmp-1", name: "HubSpot" }],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+          aiResponses: [
+            {
+              id: "response-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est recommandee avec source.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test"],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              promptRunId: "prompt-run-1",
+              modelId: "sonar",
+              rawResponse: "HubSpot est devant Acme.",
+              brandMentioned: true,
+              brandPosition: "bottom",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "negative",
+              createdAt: "2026-03-10T09:00:00Z",
+            },
+          ],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          scores: {
+            positioningAccuracy: 100,
+            factualAccuracy: 100,
+            sentimentScore: 100,
+          },
+          metadata: {
+            generatedAt: "2026-03-10T09:30:00Z",
+            projectModels: ["gpt-4o-mini"],
+            models: ["gpt-4o-mini"],
+            responses: 1,
+            analyzedResponses: 1,
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
+
+    expect(result.data.metadata.models).toEqual(["gpt-4o-mini"]);
+    expect(result.data.metadata.analyzedResponses).toBe(1);
+    expect(result.data.responses).toHaveLength(1);
+    expect(result.data.responses[0]?.modelId).toBe("gpt-4o-mini");
+    expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT"]);
+  });
+
+  test("falls back to the latest run with active project model responses for score cards and trends", async () => {
+    mockFetchSequence([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+          {
+            id: "sonar",
+            displayName: "Perplexity",
+            provider: "perplexity",
+            groupName: "Perplexity",
+            isEnabledForProject: false,
+          },
+        ],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [{ id: "cmp-1", name: "HubSpot" }],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          latestRun: { id: "run-disabled" },
+          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+          aiResponses: [
+            {
+              id: "response-1",
+              runId: "run-enabled",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est recommandee avec source.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test"],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              runId: "run-disabled",
+              promptRunId: "prompt-run-1",
+              modelId: "sonar",
+              rawResponse: "HubSpot est devant Acme.",
+              brandMentioned: true,
+              brandPosition: "bottom",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "negative",
+              createdAt: "2026-03-11T09:00:00Z",
+            },
+          ],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          scores: {
+            positioningAccuracy: 100,
+            factualAccuracy: 100,
+            sentimentScore: 100,
+          },
+          metadata: {
+            generatedAt: "2026-03-11T09:30:00Z",
+            projectModels: ["gpt-4o-mini"],
+            models: ["gpt-4o-mini"],
+            responses: 1,
+            analyzedResponses: 1,
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
+
+    expect(result.data.metadata.latestRunId).toBe("run-enabled");
+    expect(result.data.trend["last-run"].data).toHaveLength(1);
+    expect(result.data.trend["last-run"].data[0]?.positioning).toBe(100);
   });
 });

@@ -46,6 +46,7 @@ export const apiRoutes = {
     list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,
   },
   analysis: {
+    analyze: (projectId: string) => `/analysis/projects/${projectId}/analyze`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,

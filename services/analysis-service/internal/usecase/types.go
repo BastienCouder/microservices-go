@@ -91,14 +91,38 @@ type DashboardData struct {
 	Responses       []AIResponse `json:"aiResponses"`
 }
 
+type PerceptionScores struct {
+	PositioningAccuracy int `json:"positioningAccuracy"`
+	FactualAccuracy     int `json:"factualAccuracy"`
+	SentimentScore      int `json:"sentimentScore"`
+}
+
+type PerceptionRadarPoint struct {
+	Axis   string `json:"axis"`
+	Label  string `json:"label"`
+	Score  int    `json:"score"`
+	Target int    `json:"target"`
+}
+
+type PerceptionError struct {
+	ID               string   `json:"id"`
+	Severity         string   `json:"severity"`
+	Title            string   `json:"title"`
+	Issue            string   `json:"issue"`
+	Impact           string   `json:"impact"`
+	DetectedInModels []string `json:"detectedInModels"`
+	FixType          string   `json:"fixType"`
+	GeneratedContent string   `json:"generatedContent"`
+	OptimizePriority string   `json:"optimizePriority"`
+	Type             string   `json:"type"`
+}
+
 type PerceptionData struct {
-	Scores struct {
-		PositioningAccuracy int `json:"positioningAccuracy"`
-		FactualAccuracy     int `json:"factualAccuracy"`
-		SentimentScore      int `json:"sentimentScore"`
-	} `json:"scores"`
-	BrandCanon BrandCanon     `json:"brandCanon"`
-	Metadata   map[string]any `json:"metadata"`
+	Scores     PerceptionScores       `json:"scores"`
+	Radar      []PerceptionRadarPoint `json:"radar"`
+	TopErrors  []PerceptionError      `json:"topErrors"`
+	BrandCanon BrandCanon             `json:"brandCanon"`
+	Metadata   map[string]any         `json:"metadata"`
 }
 
 type BrandCanon struct {
@@ -164,11 +188,21 @@ type ProjectAccessVerifier interface {
 	EnsureProjectAccessible(ctx context.Context, projectID string, organizationID int64) error
 }
 
+type ProjectCompetitorsProvider interface {
+	ListProjectCompetitors(ctx context.Context, projectID string, organizationID int64) ([]string, error)
+}
+
+type ProjectModelsProvider interface {
+	ListProjectEnabledModels(ctx context.Context, projectID string, organizationID int64) ([]string, error)
+}
+
 type Dependencies struct {
-	Store             StateStore
-	DashboardCache    DashboardCache
-	DashboardCacheTTL time.Duration
-	ProjectVerifier   ProjectAccessVerifier
+	Store              StateStore
+	DashboardCache     DashboardCache
+	DashboardCacheTTL  time.Duration
+	ProjectVerifier    ProjectAccessVerifier
+	ProjectCompetitors ProjectCompetitorsProvider
+	ProjectModels      ProjectModelsProvider
 }
 
 type persistedState struct {
@@ -202,8 +236,10 @@ type Service struct {
 	alertsByProject     map[string][]string
 	brandCanonByProject map[string]*BrandCanon
 
-	store             StateStore
-	dashboardCache    DashboardCache
-	dashboardCacheTTL time.Duration
-	projectVerifier   ProjectAccessVerifier
+	store              StateStore
+	dashboardCache     DashboardCache
+	dashboardCacheTTL  time.Duration
+	projectVerifier    ProjectAccessVerifier
+	projectCompetitors ProjectCompetitorsProvider
+	projectModels      ProjectModelsProvider
 }

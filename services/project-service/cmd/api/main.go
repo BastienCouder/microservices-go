@@ -18,6 +18,7 @@ import (
 
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
 	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
@@ -100,17 +101,25 @@ func main() {
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /metrics", metricsHandler)
 	h.Register(mux)
 
-	httpServer := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "project-service")(mux),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       10 * time.Second,
-		WriteTimeout:      20 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10,
+	httpServer := httpsrv.NewServer(
+		cfg.HTTPAddr,
+		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "project-service")(mux),
+		httpsrv.WithReadTimeout(10*time.Second),
+		httpsrv.WithWriteTimeout(20*time.Second),
+	)
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.HandleFunc("GET /metrics", metricsHandler)
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("project-service metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
 	}
 
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
@@ -153,6 +162,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}

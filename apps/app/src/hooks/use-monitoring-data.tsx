@@ -12,6 +12,7 @@ import {
   getMonitoringQueryContext,
   loadMonitoringData,
   type MonitoringData,
+  type MonitoringModel,
   type MonitoringPrompt,
 } from "@/lib/monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
@@ -139,4 +140,4 @@ export function useMonitoringData(): MonitoringDataContextValue {
   return context;
 }
 
-export type { MonitoringData, MonitoringPrompt };
+export type { MonitoringData, MonitoringModel, MonitoringPrompt };

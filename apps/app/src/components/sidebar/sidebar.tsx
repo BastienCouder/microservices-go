@@ -21,7 +21,7 @@ import {
   storeSelectedProjectID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
-import { MONITORING_ITEMS, ORGANIZATION_ITEMS, type SidebarProjectOption } from "./sidebar-constants";
+import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS, type SidebarProjectOption } from "./sidebar-constants";
 import { SidebarOrganizationSwitcher } from "./sidebar-organization-switcher";
 import { SidebarNavItem } from "./sidebar-nav-item";
 
@@ -235,6 +235,7 @@ function SidebarComponent({
     org: selectedOrganizationId,
     projectId: activeProject?.id,
   });
+  const isActiveHref = (href: string) => canonicalCurrentPath === href.split("?", 1)[0];
 
   const handleSelectProject = (projectId: string) => {
     setSelectedProjectId(projectId);
@@ -246,16 +247,6 @@ function SidebarComponent({
         createProject: null,
       }),
     );
-  };
-
-  const navLabels = {
-    prompts: "prompts",
-    pages: "pages",
-    brands: "brands",
-    models: "models",
-    organizations: "organizations",
-    team: "team",
-    settings: "project settings",
   };
 
   return (
@@ -300,7 +291,7 @@ function SidebarComponent({
             <SidebarNavItem
               href={projectScopedMonitoringHref}
               label={"monitoring"}
-              active={canonicalCurrentPath === "/monitoring"}
+              active={isActiveHref(projectScopedMonitoringHref)}
               collapsed={collapsed}
               className="font-bold uppercase tracking-wider text-[11px]"
             />
@@ -313,8 +304,8 @@ function SidebarComponent({
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  label={navLabels[item.labelKey]}
-                  active={canonicalCurrentPath === item.href}
+                  label={SIDEBAR_LABELS[item.labelKey]}
+                  active={isActiveHref(item.href)}
                   indent={!collapsed}
                   collapsed={collapsed}
                 />
@@ -326,7 +317,7 @@ function SidebarComponent({
             <SidebarNavItem
               href={perceptionHref}
               label={"perception"}
-              active={canonicalCurrentPath === "/perception"}
+              active={isActiveHref(perceptionHref)}
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
@@ -335,7 +326,7 @@ function SidebarComponent({
             <SidebarNavItem
               href={optimizeActionsHref}
               label={"optimize actions"}
-              active={canonicalCurrentPath === "/optimize/actions"}
+              active={isActiveHref(optimizeActionsHref)}
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
@@ -344,7 +335,7 @@ function SidebarComponent({
             <SidebarNavItem
               href={contentOptimizerHref}
               label="Content Optimizer"
-              active={canonicalCurrentPath === "/optimize/content-optimizer"}
+              active={isActiveHref(contentOptimizerHref)}
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
@@ -353,7 +344,7 @@ function SidebarComponent({
             <SidebarNavItem
               href={impactHref}
               label={"impact"}
-              active={canonicalCurrentPath === "/impact"}
+              active={isActiveHref(impactHref)}
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
@@ -366,8 +357,8 @@ function SidebarComponent({
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  label={navLabels[item.labelKey]}
-                  active={canonicalCurrentPath === item.href}
+                  label={SIDEBAR_LABELS[item.labelKey]}
+                  active={isActiveHref(item.href)}
                   indent={!collapsed}
                   collapsed={collapsed}
                 />

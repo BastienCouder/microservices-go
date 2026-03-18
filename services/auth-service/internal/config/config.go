@@ -8,6 +8,7 @@ import (
 
 type Config struct {
 	HTTPAddr          string
+	MetricsAddr       string
 	KratosPublicURL   string
 	KratosBrowserURL  string
 	UserServiceURL    string
@@ -52,6 +53,7 @@ func Load() (Config, error) {
 
 	return Config{
 		HTTPAddr:          httpAddr,
+		MetricsAddr:       optionalEnv("METRICS_ADDR"),
 		KratosPublicURL:   kratosPublicURL,
 		KratosBrowserURL:  kratosBrowserURL,
 		UserServiceURL:    userServiceURL,

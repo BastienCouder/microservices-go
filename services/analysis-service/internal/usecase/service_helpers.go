@@ -137,6 +137,37 @@ func clampToPercent(value float64) int {
 	return int(math.Round(value))
 }
 
+func filterResponsesByModelIDs(responses []AIResponse, modelIDs []string) []AIResponse {
+	if len(responses) == 0 {
+		return []AIResponse{}
+	}
+	if len(modelIDs) == 0 {
+		return []AIResponse{}
+	}
+
+	allowed := make(map[string]struct{}, len(modelIDs))
+	for _, modelID := range modelIDs {
+		trimmed := strings.TrimSpace(modelID)
+		if trimmed == "" {
+			continue
+		}
+		allowed[trimmed] = struct{}{}
+	}
+	if len(allowed) == 0 {
+		return []AIResponse{}
+	}
+
+	filtered := make([]AIResponse, 0, len(responses))
+	for _, response := range responses {
+		if _, ok := allowed[strings.TrimSpace(response.ModelID)]; !ok {
+			continue
+		}
+		filtered = append(filtered, response)
+	}
+
+	return filtered
+}
+
 func removeID(items []string, target string) []string {
 	if len(items) == 0 {
 		return items

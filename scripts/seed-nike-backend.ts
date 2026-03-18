@@ -74,7 +74,9 @@ type SeedAlert = {
   createdAt: string;
 };
 
-const COMPOSE_ARGS = ["compose", "-p", "microservices-go-prod", "-f", "docker-compose.yml"];
+const COMPOSE_PROJECT_NAME = process.env.SEED_COMPOSE_PROJECT_NAME?.trim() || "microservices-go-prod";
+const COMPOSE_FILES = parseComposeFiles(process.env.SEED_COMPOSE_FILES);
+const COMPOSE_ARGS = ["compose", "-p", COMPOSE_PROJECT_NAME, ...COMPOSE_FILES.flatMap((file) => ["-f", file])];
 const POSTGRES_EXEC = [...COMPOSE_ARGS, "exec", "-T", "postgres"];
 
 const ORGANIZATION_NAME = process.env.SEED_ORG_NAME ?? "Nike Brand Team";
@@ -194,6 +196,17 @@ const RUN_SNAPSHOTS: RunSnapshot[] = [
 
 function logStep(message: string) {
   console.log(`- ${message}`);
+}
+
+function parseComposeFiles(rawValue: string | undefined): string[] {
+  const files = rawValue
+    ?.split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (files && files.length > 0) {
+    return files;
+  }
+  return ["docker-compose.yml"];
 }
 
 function readBillingPlan(rawPlan: string | undefined): BillingPlan {
@@ -491,57 +504,57 @@ async function saveJSONState(database: string, table: string, state: object) {
 
 const MODELS = [
   {
-    id: "gpt-4o-mini",
-    label: "GPT-4o Mini",
-    provider: "openai",
-    group: "chatgpt",
-    iconKey: "openai",
-    modelId: "gpt-4o-mini",
+    id: "groq-llama-3-3-70b",
+    label: "Llama 3.3 70B (Groq)",
+    provider: "groq",
+    group: "groq",
+    iconKey: "groq",
+    modelId: "llama-3.3-70b-versatile",
     supportsLiveSearch: false,
   },
   {
-    id: "gpt-4o",
-    label: "GPT-4o",
-    provider: "openai",
-    group: "chatgpt",
-    iconKey: "openai",
-    modelId: "gpt-4o",
+    id: "groq-mixtral-8x7b",
+    label: "Mixtral 8x7B (Groq)",
+    provider: "groq",
+    group: "groq",
+    iconKey: "groq",
+    modelId: "mixtral-8x7b-32768",
     supportsLiveSearch: false,
   },
   {
-    id: "claude-3-5-sonnet",
-    label: "Claude 3.5 Sonnet",
-    provider: "anthropic",
-    group: "claude",
-    iconKey: "claude",
-    modelId: "claude-3-5-sonnet",
+    id: "groq-gemma2-9b",
+    label: "Gemma 2 9B (Groq)",
+    provider: "groq",
+    group: "groq",
+    iconKey: "groq",
+    modelId: "gemma2-9b-it",
     supportsLiveSearch: false,
   },
   {
-    id: "gemini-2.0-flash",
-    label: "Gemini 2.0 Flash",
-    provider: "google",
-    group: "gemini",
-    iconKey: "gemini",
-    modelId: "gemini-2.0-flash",
-    supportsLiveSearch: false,
-  },
-  {
-    id: "sonar",
-    label: "Perplexity Sonar",
-    provider: "perplexity",
-    group: "perplexity",
-    iconKey: "perplexity",
-    modelId: "sonar",
-    supportsLiveSearch: true,
-  },
-  {
-    id: "mistral-large",
-    label: "Mistral Large",
+    id: "mistral-small",
+    label: "Mistral Small",
     provider: "mistral",
     group: "mistral",
     iconKey: "mistral",
-    modelId: "mistral-large",
+    modelId: "mistral-small-latest",
+    supportsLiveSearch: false,
+  },
+  {
+    id: "open-mixtral-8x7b",
+    label: "Open Mixtral 8x7B",
+    provider: "mistral",
+    group: "mistral",
+    iconKey: "mistral",
+    modelId: "open-mixtral-8x7b",
+    supportsLiveSearch: false,
+  },
+  {
+    id: "open-mistral-7b",
+    label: "Open Mistral 7B",
+    provider: "mistral",
+    group: "mistral",
+    iconKey: "mistral",
+    modelId: "open-mistral-7b",
     supportsLiveSearch: false,
   },
 ] as const;
@@ -998,6 +1011,8 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
 
 async function main() {
   console.log("Backend seed (organization + project + analysis)");
+  console.log(`SEED_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}`);
+  console.log(`SEED_COMPOSE_FILES=${COMPOSE_FILES.join(",")}`);
   console.log(`SEED_ORG_NAME=${ORGANIZATION_NAME}`);
   console.log(`SEED_PROJECT_ID=${PROJECT_ID}`);
 

@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	httpadapter "github.com/bastiencouder/microservices-go/services/api-gateway/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/api-gateway/internal/config"
 )
@@ -58,17 +59,20 @@ func main() {
 	}()
 
 	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
 	h.Register(mux)
 
-	server := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       5 * time.Second,
-		WriteTimeout:      10 * time.Second,
-		IdleTimeout:       60 * time.Second,
-		MaxHeaderBytes:    64 << 10, // 64 KiB
+	server := httpsrv.NewServer(cfg.HTTPAddr, mux)
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.Handle("/metrics", promhttp.Handler())
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("api-gateway metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
 	}
 
 	go func() {
@@ -84,6 +88,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(ctx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}

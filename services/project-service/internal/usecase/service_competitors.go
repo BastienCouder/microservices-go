@@ -76,6 +76,21 @@ func (s *Service) ListCompetitors(ctx context.Context, projectID string, organiz
 	return competitors, nil
 }
 
+func (s *Service) ListActiveCompetitors(ctx context.Context, projectID string, organizationID int64) ([]string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return nil, err
+	}
+
+	return filterActiveCompetitorsByProject(s.competitors, projectID), nil
+}
+
 func (s *Service) UpdateCompetitor(ctx context.Context, competitorID string, organizationID int64, input UpdateCompetitorInput) (Competitor, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

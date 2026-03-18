@@ -9,6 +9,7 @@ import (
 
 type Config struct {
 	HTTPAddr                 string
+	MetricsAddr              string
 	GRPCAddr                 string
 	DatabaseURL              string
 	OrganizationsServiceURL  string
@@ -57,6 +58,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		HTTPAddr:                 httpAddr,
+		MetricsAddr:              optionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
 		OrganizationsServiceURL:  organizationsServiceURL,

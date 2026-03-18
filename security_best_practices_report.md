@@ -1,146 +1,97 @@
 # Security Best Practices Report
 
-Date: 2026-03-03  
-Scope: Go services in `/var/www/microservices-go/services` + API gateway, contracts, and deployment manifests.
-
 ## Executive Summary
 
-The most important risk is an authorization gap in user read endpoints that can expose other users' data to any authenticated account.  
-There are also several transport and secret-management weaknesses (plaintext internal gRPC, shared/default secrets, default broker credentials) that increase blast radius in case of internal network access.  
-gRPC `Deprecated` comments found in generated files are expected generator output and are not contract deprecations.
+Audit scope covered the current web application codepaths and the Go backend entrypoints, using the `security-best-practices` skill plus direct code inspection.
 
-## Critical Findings
+Three findings stood out:
 
-### SEC-001 - Broken Object-Level Authorization on user read endpoints
-- Severity: Critical
-- Impact: Any authenticated user can query other users' records (including email/profile fields), enabling horizontal privilege escalation and data leakage.
-- Evidence:
-  - API gateway exposes `/users` via authenticated middleware but no permission check path rule for `/users`:
-    - `services/api-gateway/internal/adapter/http/routes.go:31`
-    - `services/api-gateway/internal/adapter/http/permissions.go:64`
-  - User service returns user by arbitrary ID without ownership/admin guard:
-    - `services/user-service/internal/adapter/http/handler.go:105`
-  - User domain includes sensitive profile fields returned by this endpoint:
-    - `services/user-service/internal/domain/user.go:18`
-- Recommendation:
-  - Enforce ownership/admin checks for `GET /users/{id}` and `GET /users/by-auth/{id}`.
-  - Prefer `GET /users/me` for regular users, keep lookup-by-id/by-auth restricted to admin paths.
-  - Add dedicated authorization tests in gateway + user-service.
+1. Multiple Go services intentionally expose `/metrics` on their main listeners and explicitly bypass internal auth for that path.
+2. The MCP HTTP transport uses `http.ListenAndServe` directly, without request timeouts or `MaxHeaderBytes`, which leaves it open to resource-exhaustion attacks.
+3. The backend CI pipeline does not run `govulncheck` or an equivalent dependency vulnerability scan.
 
-## High Findings
+No direct XSS sink, unsafe HTML rendering, or browser-side secret storage issue was identified in the TypeScript files inspected during this audit. The `return_to` flow in the web auth app is normalized back to the configured app origin, which materially reduces open-redirect risk in the currently visible browser flow.
 
-### SEC-002 - Inter-service gRPC transport is plaintext (`insecure.NewCredentials`)
+## High Severity
+
+### SEC-001
+
+- Rule ID: GO-DEPLOY-002
 - Severity: High
+- Location:
+  - `services/api-gateway/cmd/api/main.go:61`
+  - `services/auth-service/cmd/api/main.go:34`
+  - `services/project-service/cmd/api/main.go:103`
+  - `services/user-service/cmd/api/main.go:43`
+  - `services/project-service/internal/security/internal_jwt.go:87`
 - Evidence:
-  - `services/project-service/internal/adapter/client/analysis/client.go:113`
-  - `services/project-service/internal/adapter/client/ia/client.go:112`
-  - `services/analysis-service/internal/adapter/client/project/client.go:113`
-  - `services/attribution-service/internal/adapter/client/project/client.go:113`
-  - `services/api-gateway/internal/adapter/http/permission_grpc.go:28`
-- Recommendation:
-  - Enable TLS/mTLS for internal gRPC.
-  - Use per-service cert identities (SPIFFE/SPIRE or cert-manager) and verify SAN/authority.
-  - Keep REST for frontend only, but secure all service-to-service gRPC channels.
 
-### SEC-003 - Shared/default internal JWT secret and default broker creds in runtime config
+```go
+// services/api-gateway/cmd/api/main.go
+mux.Handle("/metrics", promhttp.Handler())
+```
+
+```go
+// services/auth-service/cmd/api/main.go
+mux.Handle("/metrics", promhttp.Handler())
+```
+
+```go
+// services/project-service/internal/security/internal_jwt.go
+func isPublicPath(path string) bool {
+	return path == "/health" || path == "/ready" || path == "/metrics"
+}
+```
+
+- Impact: If these listeners are reachable outside a strictly private network, they expose operational telemetry without authentication, which can leak service topology, traffic shape, dependency names, error rates, and capacity signals useful for reconnaissance and targeted abuse.
+- Fix: Move `/metrics` onto a dedicated private listener, or require strong network-level restriction and authentication in front of it. At minimum, stop exempting `/metrics` in `isPublicPath` for services that should not expose observability endpoints broadly.
+- Mitigation: Restrict reachability at ingress, service mesh, security groups, or Kubernetes NetworkPolicy so only the metrics scraper can access these endpoints.
+- False positive notes: If all service ports are guaranteed to be private and unreachable from user-controlled networks, severity drops. That guarantee is not visible in the application code inspected here.
+
+### SEC-002
+
+- Rule ID: GO-HTTP-001
 - Severity: High
+- Location: `services/mcp-server/cmd/server/main.go:64`
 - Evidence:
-  - Same default internal JWT secret repeated in compose:
-    - `docker-compose.yml:83`
-    - `docker-compose.yml:349`
-  - Default RabbitMQ credentials used by project service:
-    - `docker-compose.yml:345`
-  - Dev run targets also use fixed weak secrets:
-    - `Makefile:169`
-    - `Makefile:172`
-- Recommendation:
-  - Remove hardcoded defaults, load from secret manager/K8s secret only.
-  - Rotate existing internal JWT secret and broker credentials.
-  - Use distinct secrets per environment and short rotation windows.
 
-## Medium Findings
+```go
+mux := http.NewServeMux()
+mux.Handle("/mcp", handler)
+mux.Handle("/metrics", promhttp.Handler())
+return http.ListenAndServe(httpAddr, mux)
+```
 
-### SEC-004 - Client IP trust is based on unvalidated `X-Forwarded-For`
+- Impact: The MCP server HTTP mode runs without `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout`, `IdleTimeout`, or `MaxHeaderBytes`, which makes it materially more susceptible to slow-client and header-based resource exhaustion.
+- Fix: Replace `http.ListenAndServe` with an explicit `http.Server` configured with conservative timeouts and header limits, consistent with the other Go services in this repo.
+- Mitigation: Keep the MCP transport on `stdio` only, or bind the HTTP transport behind a trusted reverse proxy that enforces aggressive upstream timeouts and request limits.
+- False positive notes: A reverse proxy can reduce exposure, but the application code still lacks the service-local protections required by the skill guidance.
+
+## Medium Severity
+
+### SEC-003
+
+- Rule ID: GO-DEPLOY-001 / GO-SUPPLY-001 baseline
 - Severity: Medium
+- Location: `.github/workflows/backend-ci.yml:21`
 - Evidence:
-  - First `X-Forwarded-For` value is trusted directly:
-    - `services/api-gateway/internal/adapter/http/headers.go:12`
-  - Used for rate limiting decisions:
-    - `services/api-gateway/internal/adapter/http/proxy.go:17`
-- Recommendation:
-  - Trust forwarding headers only from known proxy IP ranges.
-  - Otherwise derive client IP from socket peer (`RemoteAddr`) and ignore spoofable headers.
 
-### SEC-005 - Manual JWT implementation duplicated across services
-- Severity: Medium
-- Evidence:
-  - Custom verify logic (manual split/base64/hmac/claims checks):
-    - `services/project-service/internal/security/internal_jwt.go:89`
-    - `services/analysis-service/internal/security/internal_jwt.go:89`
-    - `services/ia-service/internal/security/internal_jwt.go:89`
-    - `services/api-gateway/internal/adapter/http/internal_jwt.go:56`
-- Recommendation:
-  - Migrate to a maintained JWT library with strict parser options, key ID support (`kid`), and better claim validation ergonomics.
-  - Centralize implementation in shared internal package to avoid drift.
+```yaml
+jobs:
+  lint:
+  test:
+  organizations-integration:
+```
 
-### SEC-006 - Header spoofing surface for internal identity headers when claims are absent
-- Severity: Medium
-- Evidence:
-  - Gateway forwards cloned request headers and only sets `Authorization`:
-    - `services/api-gateway/internal/adapter/http/internal_proxy_auth.go:20`
-  - Service middleware also clones headers and only overwrites identity headers when claims exist:
-    - `services/project-service/internal/security/internal_jwt.go:50`
-- Recommendation:
-  - Explicitly strip inbound `X-Authenticated-*` and `X-Organization-ID` at gateway before proxying.
-  - In service auth middleware, always clear these headers before re-populating from verified claims.
+The workflow runs linting and tests, but no `govulncheck` or equivalent dependency vulnerability scan is present.
 
-### SEC-007 - Production-like compose profile contains insecure operational defaults
-- Severity: Medium
-- Evidence:
-  - Postgres SSL disabled in app envs (example):
-    - `docker-compose.yml:341`
-  - Grafana default admin/admin:
-    - `docker-compose.yml:544`
-    - `docker-compose.yml:545`
-- Recommendation:
-  - Treat compose `prod` profile as non-production unless hardened.
-  - Enforce TLS for DB/broker where applicable.
-  - Move Grafana admin credentials to secrets and rotate defaults.
+- Impact: Known vulnerable dependencies or standard-library reachable issues can ship unnoticed even when unit and integration tests pass.
+- Fix: Add a dedicated CI step running `govulncheck ./...` for the Go workspace, and fail the pipeline on actionable findings.
+- Mitigation: If centralized dependency scanning already exists outside GitHub Actions, document it in-repo so this control is auditable.
+- False positive notes: This finding only covers the visible repository workflow. An external CI/CD platform or org-level scanner could already exist, but that control is not visible here.
 
-## Informational
+## Notes And Assumptions
 
-### INF-001 - Why gRPC generated contracts show `Deprecated` comments
-- Evidence:
-  - Example generated method:
-    - `contracts/gen/go/analysis/v1/analysis.pb.go:57`
-- Explanation:
-  - These comments are generated by `protoc-gen-go` for legacy `Descriptor()` compatibility methods.
-  - They do **not** mean your protobuf message/field/service is deprecated in `contracts/proto/*`.
-  - No `deprecated = true` option was found in source proto contracts.
-
-## Version Hygiene (Current vs Newer)
-
-- Current in repo:
-  - `google.golang.org/grpc v1.67.0` (multiple `go.mod`)
-  - `google.golang.org/protobuf v1.34.2` in several services/contracts
-  - Buf plugins:
-    - `buf.build/protocolbuffers/go:v1.36.10`
-    - `buf.build/grpc/go:v1.5.1`
-- Newer upstream versions found (as of 2026-03-03):
-  - Go stable: `go1.25.4`
-  - `google.golang.org/grpc`: `v1.78.0`
-  - `google.golang.org/protobuf`: `v1.36.10`
-  - `google.golang.org/protobuf/cmd/protoc-gen-go`: `v1.36.11`
-  - `google.golang.org/grpc/cmd/protoc-gen-go-grpc`: `v1.6.1`
-
-Inference:
-- Buf plugin tags generally track generator tool versions; validate `buf.build/protocolbuffers/go:v1.36.11` and `buf.build/grpc/go:v1.6.1` availability in your Buf registry before bumping.
-
-## Suggested Remediation Order
-
-1. Fix SEC-001 authorization gap and add regression tests.
-2. Enforce TLS/mTLS on internal gRPC links (SEC-002).
-3. Rotate secrets + remove weak defaults (SEC-003).
-4. Hard-strip/overwrite forwarded identity headers (SEC-006) and harden proxy IP handling (SEC-004).
-5. Replace custom JWT implementation and centralize (SEC-005).
-6. Harden compose operational defaults (SEC-007).
+- The frontend auth flow currently normalizes `return_to` against the configured app origin in `apps/web/src/app/auth/auth-routing.ts`, so I did not classify it as an exploitable open redirect in the visible implementation.
+- I did not find `dangerouslySetInnerHTML` in the inspected frontend scope.
+- I did not run dynamic tests or deployment-level verification, so ingress/WAF/private-network assumptions still need runtime confirmation.

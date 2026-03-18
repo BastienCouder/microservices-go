@@ -19,7 +19,10 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ProjectService_CheckProjectAccess_FullMethodName = "/project.v1.ProjectService/CheckProjectAccess"
+	ProjectService_CheckProjectAccess_FullMethodName        = "/project.v1.ProjectService/CheckProjectAccess"
+	ProjectService_ListProjectCompetitors_FullMethodName    = "/project.v1.ProjectService/ListProjectCompetitors"
+	ProjectService_ListProjectEnabledModels_FullMethodName  = "/project.v1.ProjectService/ListProjectEnabledModels"
+	ProjectService_ListScheduledAnalysisJobs_FullMethodName = "/project.v1.ProjectService/ListScheduledAnalysisJobs"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -27,6 +30,9 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProjectServiceClient interface {
 	CheckProjectAccess(ctx context.Context, in *CheckProjectAccessRequest, opts ...grpc.CallOption) (*CheckProjectAccessResponse, error)
+	ListProjectCompetitors(ctx context.Context, in *ListProjectCompetitorsRequest, opts ...grpc.CallOption) (*ListProjectCompetitorsResponse, error)
+	ListProjectEnabledModels(ctx context.Context, in *ListProjectEnabledModelsRequest, opts ...grpc.CallOption) (*ListProjectEnabledModelsResponse, error)
+	ListScheduledAnalysisJobs(ctx context.Context, in *ListScheduledAnalysisJobsRequest, opts ...grpc.CallOption) (*ListScheduledAnalysisJobsResponse, error)
 }
 
 type projectServiceClient struct {
@@ -47,11 +53,44 @@ func (c *projectServiceClient) CheckProjectAccess(ctx context.Context, in *Check
 	return out, nil
 }
 
+func (c *projectServiceClient) ListProjectCompetitors(ctx context.Context, in *ListProjectCompetitorsRequest, opts ...grpc.CallOption) (*ListProjectCompetitorsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectCompetitorsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListProjectCompetitors_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListProjectEnabledModels(ctx context.Context, in *ListProjectEnabledModelsRequest, opts ...grpc.CallOption) (*ListProjectEnabledModelsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListProjectEnabledModelsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListProjectEnabledModels_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListScheduledAnalysisJobs(ctx context.Context, in *ListScheduledAnalysisJobsRequest, opts ...grpc.CallOption) (*ListScheduledAnalysisJobsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListScheduledAnalysisJobsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListScheduledAnalysisJobs_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
 type ProjectServiceServer interface {
 	CheckProjectAccess(context.Context, *CheckProjectAccessRequest) (*CheckProjectAccessResponse, error)
+	ListProjectCompetitors(context.Context, *ListProjectCompetitorsRequest) (*ListProjectCompetitorsResponse, error)
+	ListProjectEnabledModels(context.Context, *ListProjectEnabledModelsRequest) (*ListProjectEnabledModelsResponse, error)
+	ListScheduledAnalysisJobs(context.Context, *ListScheduledAnalysisJobsRequest) (*ListScheduledAnalysisJobsResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -64,6 +103,15 @@ type UnimplementedProjectServiceServer struct{}
 
 func (UnimplementedProjectServiceServer) CheckProjectAccess(context.Context, *CheckProjectAccessRequest) (*CheckProjectAccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckProjectAccess not implemented")
+}
+func (UnimplementedProjectServiceServer) ListProjectCompetitors(context.Context, *ListProjectCompetitorsRequest) (*ListProjectCompetitorsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProjectCompetitors not implemented")
+}
+func (UnimplementedProjectServiceServer) ListProjectEnabledModels(context.Context, *ListProjectEnabledModelsRequest) (*ListProjectEnabledModelsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListProjectEnabledModels not implemented")
+}
+func (UnimplementedProjectServiceServer) ListScheduledAnalysisJobs(context.Context, *ListScheduledAnalysisJobsRequest) (*ListScheduledAnalysisJobsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListScheduledAnalysisJobs not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -104,6 +152,60 @@ func _ProjectService_CheckProjectAccess_Handler(srv interface{}, ctx context.Con
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_ListProjectCompetitors_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectCompetitorsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListProjectCompetitors(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListProjectCompetitors_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListProjectCompetitors(ctx, req.(*ListProjectCompetitorsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListProjectEnabledModels_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListProjectEnabledModelsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListProjectEnabledModels(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListProjectEnabledModels_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListProjectEnabledModels(ctx, req.(*ListProjectEnabledModelsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListScheduledAnalysisJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListScheduledAnalysisJobsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListScheduledAnalysisJobs(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListScheduledAnalysisJobs_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListScheduledAnalysisJobs(ctx, req.(*ListScheduledAnalysisJobsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +216,18 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckProjectAccess",
 			Handler:    _ProjectService_CheckProjectAccess_Handler,
+		},
+		{
+			MethodName: "ListProjectCompetitors",
+			Handler:    _ProjectService_ListProjectCompetitors_Handler,
+		},
+		{
+			MethodName: "ListProjectEnabledModels",
+			Handler:    _ProjectService_ListProjectEnabledModels_Handler,
+		},
+		{
+			MethodName: "ListScheduledAnalysisJobs",
+			Handler:    _ProjectService_ListScheduledAnalysisJobs_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

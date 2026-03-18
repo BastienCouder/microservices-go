@@ -72,6 +72,42 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	}
 }
 
+func TestExecutePromptSupportsProjectCatalogModels(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService()
+	modelIDs := []string{
+		"gpt-4o-mini",
+		"gpt-4o",
+		"claude-3-5-sonnet",
+		"gemini-2.0-flash",
+		"sonar",
+		"sonar-pro",
+		"mistral-large",
+	}
+
+	for _, modelID := range modelIDs {
+		modelID := modelID
+		t.Run(modelID, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := svc.ExecutePrompt(context.Background(), ExecutePromptInput{
+				PromptID:     "prompt-1",
+				PromptText:   "Test",
+				ModelID:      modelID,
+				BrandName:    "Acme",
+				MockResponse: "Acme est visible",
+			})
+			if err != nil {
+				t.Fatalf("execute prompt: %v", err)
+			}
+			if result.ModelID != modelID {
+				t.Fatalf("expected model id %q, got %q", modelID, result.ModelID)
+			}
+		})
+	}
+}
+
 func TestExtractBrandFromURL(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
