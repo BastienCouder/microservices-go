@@ -25,6 +25,21 @@ export const MONITORING_PERIOD_OPTIONS = [
     description: "Trimestre",
   },
   {
+    value: "180d",
+    label: "6m",
+    description: "Semestre",
+  },
+  {
+    value: "365d",
+    label: "1a",
+    description: "Année glissante",
+  },
+  {
+    value: "ytd",
+    label: "Année",
+    description: "Depuis janvier",
+  },
+  {
     value: "custom",
     label: "Custom",
     description: "Dates",

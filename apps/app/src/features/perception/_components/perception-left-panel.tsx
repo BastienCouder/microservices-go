@@ -108,14 +108,17 @@ export function PerceptionLeftPanel({
         </div>
 
         <TabsContent value="brand" className="m-0 min-h-0 flex-1 overflow-y-auto px-2 pb-4 no-scrollbar">
-          <div className="mb-3 flex justify-end">
-            <Button asChild variant="outline" size="sm">
-              <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
-                Modifier la marque
-              </Link>
-            </Button>
-          </div>
-          <BrandCanonSummary canon={canon} isDemo={isDemo} />
+          <BrandCanonSummary
+            canon={canon}
+            isDemo={isDemo}
+            action={
+              <Button asChild variant="outline" size="sm" className="rounded-full">
+                <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
+                  Changer de marque
+                </Link>
+              </Button>
+            }
+          />
         </TabsContent>
 
         <TabsContent value="filters" className="m-0 min-h-0 flex-1 overflow-y-auto px-2 pb-4 no-scrollbar">

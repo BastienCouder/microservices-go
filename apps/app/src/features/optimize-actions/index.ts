@@ -1,1 +1,0 @@
-export { OptimizeActionsPage } from "./view";

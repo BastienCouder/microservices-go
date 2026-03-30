@@ -6,7 +6,6 @@ import {
   PerceptionDonutVisual,
   PerceptionLeftPanel,
   PerceptionModelAxisHeatmap,
-  PerceptionOptimizeActions,
   PerceptionScoreMiniCard,
   PerceptionThreeColumnLayout,
   PerceptionTrendChart,
@@ -86,22 +85,11 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
               />
             ))}
           </div>
-
-          <PerceptionOptimizeActions
-            drafts={viewModel.optimizeDrafts}
-            persistError={viewModel.persistError}
-          />
         </div>
       }
       right={
         <div className="px-1 pb-4">
-          <TopErrorsPanel
-            errors={viewModel.filteredTopErrors}
-            generatedIds={viewModel.generatedIds}
-            onFix={viewModel.handleFix}
-            savingErrorIds={viewModel.savingErrorIds}
-            modelNames={initialData.metadata.models}
-          />
+          <TopErrorsPanel errors={viewModel.filteredTopErrors} />
         </div>
       }
     />

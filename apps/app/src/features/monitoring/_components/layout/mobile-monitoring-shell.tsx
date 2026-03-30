@@ -66,7 +66,9 @@ export function MobileMonitoringShell() {
 
   const handlePeriodChange = (nextPeriod: string) => {
     filtersViewModel.setPeriod(nextPeriod);
-    if (nextPeriod !== "custom") filtersViewModel.setDateRange(undefined);
+    if (nextPeriod !== "custom") {
+      filtersViewModel.setDateRange(undefined);
+    }
   };
 
   if (loading) {
@@ -156,7 +158,10 @@ export function MobileMonitoringShell() {
           </section>
 
           {filters.period === "custom" ? (
-            <MobileCustomRangePanel value={filtersViewModel.dateRange} onChange={filtersViewModel.setDateRange} />
+            <MobileCustomRangePanel
+              value={filtersViewModel.dateRange}
+              onChange={filtersViewModel.setDateRange}
+            />
           ) : null}
 
           <section className="space-y-3">

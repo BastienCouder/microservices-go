@@ -76,6 +76,8 @@ export function promptIsInPeriod(promptTime: string, period: string): boolean {
   if (period === "14d") return hours <= 24 * 14;
   if (period === "30d") return hours <= 24 * 30;
   if (period === "90d") return hours <= 24 * 90;
+  if (period === "180d") return hours <= 24 * 180;
+  if (period === "365d") return hours <= 24 * 365;
 
   return true;
 }
@@ -112,6 +114,9 @@ export function getPromptPeriodRange(
   else if (period === "14d") from.setDate(from.getDate() - 14);
   else if (period === "30d") from.setDate(from.getDate() - 30);
   else if (period === "90d") from.setDate(from.getDate() - 90);
+  else if (period === "180d") from.setDate(from.getDate() - 180);
+  else if (period === "365d") from.setDate(from.getDate() - 365);
+  else if (period === "ytd") return { from: startOfDay(new Date(now.getFullYear(), 0, 1)), to: endOfDay(now) };
   else from.setDate(from.getDate() - 7);
 
   return { from, to: now };

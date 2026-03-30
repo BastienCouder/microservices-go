@@ -18,16 +18,8 @@ import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared
 
 export function TopErrorsPanel({
   errors,
-  generatedIds,
-  onFix,
-  savingErrorIds,
-  modelNames,
 }: {
   errors: PerceptionError[];
-  generatedIds: Set<string>;
-  onFix: (error: PerceptionError) => void | Promise<void>;
-  savingErrorIds: Set<string>;
-  modelNames: string[];
 }) {
   const [selectedError, setSelectedError] = useState<PerceptionError | null>(null);
 
@@ -58,9 +50,6 @@ export function TopErrorsPanel({
               key={error.id}
               error={error}
               index={index}
-              isGenerated={generatedIds.has(error.id)}
-              isSaving={savingErrorIds.has(error.id)}
-              onFix={onFix}
               onOpenDetails={() => setSelectedError(error)}
             />
           ))
@@ -119,20 +108,6 @@ export function TopErrorsPanel({
                 </section>
               </div>
 
-              <div className="border-t border-border/60 p-4">
-                <Button
-                  className="w-full"
-                  onClick={() => void onFix(selectedError)}
-                  disabled={savingErrorIds.has(selectedError.id) || generatedIds.has(selectedError.id)}
-                  variant={generatedIds.has(selectedError.id) ? "secondary" : "default"}
-                >
-                  {savingErrorIds.has(selectedError.id)
-                    ? "..."
-                    : generatedIds.has(selectedError.id)
-                      ? PERCEPTION_TEXT.topErrors.added
-                      : PERCEPTION_TEXT.topErrors.fix}
-                </Button>
-              </div>
             </div>
           ) : null}
         </SheetContent>
@@ -150,16 +125,10 @@ function getSeverityTone(severity: PerceptionError["severity"]) {
 function TopErrorCard({
   error,
   index,
-  isGenerated,
-  isSaving,
-  onFix,
   onOpenDetails,
 }: {
   error: PerceptionError;
   index: number;
-  isGenerated: boolean;
-  isSaving: boolean;
-  onFix: (error: PerceptionError) => void | Promise<void>;
   onOpenDetails: () => void;
 }) {
   const tone = getSeverityTone(error.severity);
@@ -213,18 +182,9 @@ function TopErrorCard({
             <div className="text-[11px] text-muted-foreground">
               {formatPerceptionErrorTypeLabel(error.type)}
             </div>
-            <Button
-              size="sm"
-              variant={isGenerated ? "secondary" : "default"}
-              onClick={(e) => {
-                e.stopPropagation();
-                void onFix(error);
-              }}
-              disabled={isSaving || isGenerated}
-              className="h-8 shrink-0 rounded-full px-3 text-xs"
-            >
-              {isSaving ? "..." : isGenerated ? PERCEPTION_TEXT.topErrors.added : PERCEPTION_TEXT.topErrors.fix}
-            </Button>
+            <span className="text-[11px] text-muted-foreground">
+              {PERCEPTION_TEXT.topErrors.seeMore}
+            </span>
           </div>
         </div>
       </div>

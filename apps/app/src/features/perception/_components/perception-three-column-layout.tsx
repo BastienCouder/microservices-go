@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 type PerceptionThreeColumnLayoutProps = {
   left: ReactNode;
   center: ReactNode;
-  right: ReactNode;
+  right?: ReactNode;
 };
 
 export function PerceptionThreeColumnLayout({
@@ -18,13 +18,21 @@ export function PerceptionThreeColumnLayout({
           {left}
         </div>
 
-        <div className="col-span-12 border-b md:col-span-8 xl:col-span-6 xl:h-full xl:overflow-hidden xl:border-b-0">
+        <div
+          className={
+            right
+              ? "col-span-12 border-b md:col-span-8 xl:col-span-6 xl:h-full xl:overflow-hidden xl:border-b-0"
+              : "col-span-12 border-b md:col-span-8 xl:col-span-9 xl:h-full xl:overflow-hidden xl:border-b-0"
+          }
+        >
           <div className="h-auto xl:h-full xl:overflow-y-auto">{center}</div>
         </div>
 
-        <div className="col-span-12 h-auto xl:col-span-3 xl:h-full xl:overflow-hidden">
-          <div className="h-auto xl:h-full xl:overflow-y-auto">{right}</div>
-        </div>
+        {right ? (
+          <div className="col-span-12 h-auto xl:col-span-3 xl:h-full xl:overflow-hidden">
+            <div className="h-auto xl:h-full xl:overflow-y-auto">{right}</div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon } from "@/lib/perception-data";
@@ -7,9 +8,11 @@ import type { BrandCanon } from "@/lib/perception-data";
 export function BrandCanonSummary({
   canon,
   isDemo,
+  action,
 }: {
   canon: BrandCanon;
   isDemo: boolean;
+  action?: ReactNode;
 }) {
   return (
     <div className="space-y-4">
@@ -33,6 +36,7 @@ export function BrandCanonSummary({
                   <div className="text-sm font-semibold">{canon.category}</div>
                 </div>
               </div>
+              {action ? <div className="mt-3">{action}</div> : null}
               <div className="mt-3 rounded-md border border-border/60 bg-background/80 px-2.5 py-2">
                 <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{PERCEPTION_TEXT.brandCanon.labels.positioning}</div>
                 <p className="mt-1 text-sm leading-relaxed text-foreground">{canon.positioning}</p>
