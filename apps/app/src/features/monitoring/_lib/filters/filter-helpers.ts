@@ -1,5 +1,9 @@
 import type { DateRange } from "react-day-picker";
 
+import {
+  buildProjectModelFilterItems,
+  buildSelectedProjectModelFilterIds,
+} from "@/lib/project-models";
 import type { MonitoringFiltersSnapshot } from "../shared/use-monitoring-filters";
 import {
   filterPromptsByAudience,
@@ -85,48 +89,7 @@ export function buildVisibleModelFilterItems(
   models: MonitoringModel[],
   showUniqueModelFilters: boolean,
 ): FilterModelItem[] {
-  const filteredModels = models
-    .map((model) => ({
-      ...model,
-      description: model.description ?? "",
-    }))
-    .filter((model) => model.live);
-
-  if (showUniqueModelFilters) {
-    return filteredModels.map((model) => ({
-      id: model.id,
-      displayName: model.displayName,
-      groupName: model.groupName,
-      description: model.description,
-      iconPath: model.iconPath,
-      live: model.live,
-      memberIds: [model.id],
-    }));
-  }
-
-  const groups = new Map<string, FilterModelItem>();
-
-  for (const model of filteredModels) {
-    const groupKey = (model.groupName || model.id).trim();
-    const current = groups.get(groupKey);
-
-    if (!current) {
-      groups.set(groupKey, {
-        id: groupKey,
-        displayName: model.displayName,
-        groupName: model.groupName,
-        description: "",
-        iconPath: model.iconPath,
-        live: true,
-        memberIds: [model.id],
-      });
-      continue;
-    }
-
-    current.memberIds.push(model.id);
-  }
-
-  return Array.from(groups.values());
+  return buildProjectModelFilterItems(models, showUniqueModelFilters);
 }
 
 export function buildModelCards(
@@ -148,13 +111,11 @@ export function buildSelectedModelFilterIds(
   visibleModelFilterItems: FilterModelItem[],
   showUniqueModelFilters: boolean,
 ): string[] {
-  if (showUniqueModelFilters) {
-    return selectedModels;
-  }
-
-  return visibleModelFilterItems
-    .filter((item) => item.memberIds.every((id) => selectedModels.includes(id)))
-    .map((item) => item.id);
+  return buildSelectedProjectModelFilterIds(
+    selectedModels,
+    visibleModelFilterItems,
+    showUniqueModelFilters,
+  );
 }
 
 export function buildProjectWithDynamicCompetitors(

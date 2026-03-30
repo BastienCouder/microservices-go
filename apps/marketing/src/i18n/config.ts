@@ -1,2 +1,45 @@
-export const locales = ['en', 'fr'];
-export const defaultLocale = 'en';
+export const locales = ["fr", "en"] as const;
+
+export type Locale = (typeof locales)[number];
+
+export const defaultLocale: Locale = "fr";
+export const localePrefix = "as-needed";
+
+export function isLocale(value: string): value is Locale {
+  return locales.includes(value as Locale);
+}
+
+export function normalizePathname(pathname: string): string {
+  if (!pathname || pathname === "/") {
+    return "/";
+  }
+
+  return pathname.startsWith("/") ? pathname : `/${pathname}`;
+}
+
+export function stripLocalePrefix(pathname: string): string {
+  const normalizedPathname = normalizePathname(pathname);
+
+  for (const locale of locales) {
+    if (normalizedPathname === `/${locale}`) {
+      return "/";
+    }
+
+    if (normalizedPathname.startsWith(`/${locale}/`)) {
+      const strippedPathname = normalizedPathname.slice(locale.length + 1);
+      return strippedPathname.startsWith("/") ? strippedPathname : `/${strippedPathname}`;
+    }
+  }
+
+  return normalizedPathname;
+}
+
+export function getLocalizedPathname(locale: Locale, pathname: string): string {
+  const normalizedPathname = stripLocalePrefix(pathname);
+
+  if (locale === defaultLocale) {
+    return normalizedPathname;
+  }
+
+  return normalizedPathname === "/" ? `/${locale}` : `/${locale}${normalizedPathname}`;
+}

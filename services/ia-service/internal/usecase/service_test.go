@@ -27,7 +27,7 @@ func TestExecutePromptAnalyzesResponse(t *testing.T) {
 	result, err := svc.ExecutePrompt(ctx, ExecutePromptInput{
 		PromptID:     "prompt-1",
 		PromptText:   "Quel CRM pour PME ?",
-		ModelID:      "gpt-4o-mini",
+		ModelID:      "gpt-oss-20b-free",
 		BrandName:    "Acme",
 		Competitors:  []string{"HubSpot", "Pipedrive"},
 		MockResponse: "Acme est une excellente option face a HubSpot. Voir https://acme.com",
@@ -57,7 +57,7 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	result, err := svc.ExecutePrompt(context.Background(), ExecutePromptInput{
 		PromptID:    "prompt-1",
 		PromptText:  "Meilleur CRM",
-		ModelID:     "gpt-4o-mini",
+		ModelID:     "gpt-oss-20b-free",
 		BrandName:   "Acme",
 		Competitors: []string{"HubSpot"},
 	})
@@ -77,10 +77,13 @@ func TestExecutePromptSupportsProjectCatalogModels(t *testing.T) {
 
 	svc := NewService()
 	modelIDs := []string{
-		"gpt-4o-mini",
+		"gpt-oss-20b-free",
+		"gpt-oss-120b-free",
 		"gpt-4o",
 		"claude-3-5-sonnet",
 		"gemini-2.0-flash",
+		"gemma-3-4b-free",
+		"gemma-3-27b-free",
 		"sonar",
 		"sonar-pro",
 		"mistral-large",

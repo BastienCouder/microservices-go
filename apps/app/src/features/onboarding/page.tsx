@@ -12,7 +12,11 @@ import { StepProgress } from "./step-progress";
 import { StepPrompts } from "./step-prompts";
 import { StepWebsite } from "./step-website";
 
-function OnboardingContent() {
+type OnboardingPageProps = {
+  apiBaseURL: string;
+};
+
+function OnboardingContent({ apiBaseURL }: OnboardingPageProps) {
   const { step } = useOnboarding();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -21,7 +25,7 @@ function OnboardingContent() {
     { component: <StepBrand />, id: 2 },
     { component: <StepCompetitors />, id: 3 },
     { component: <StepPrompts />, id: 4 },
-    { component: <StepModels />, id: 5 },
+    { component: <StepModels apiBaseURL={apiBaseURL} />, id: 5 },
     { component: <StepAnalysis />, id: 6 },
   ];
 
@@ -50,10 +54,10 @@ function OnboardingContent() {
   );
 }
 
-export function OnboardingPage() {
+export function OnboardingPage({ apiBaseURL }: OnboardingPageProps) {
   return (
     <OnboardingProvider totalSteps={6}>
-      <OnboardingContent />
+      <OnboardingContent apiBaseURL={apiBaseURL} />
     </OnboardingProvider>
   );
 }

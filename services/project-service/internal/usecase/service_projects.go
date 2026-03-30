@@ -202,11 +202,11 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 		return FinalizeResult{}, err
 	}
 
-	prompts := filterActivePromptsByProject(s.prompts, s.projectModels, projectID)
+	prompts := filterActivePromptsByProject(s.prompts, s.projectModels, s.models, projectID)
 	if len(prompts) == 0 {
 		return FinalizeResult{}, fmt.Errorf("%w: at least one prompt is required", ErrValidation)
 	}
-	models := filterEnabledModels(s.projectModels, projectID)
+	models := filterEnabledModels(s.projectModels, s.models, projectID)
 	if len(models) == 0 {
 		return FinalizeResult{}, fmt.Errorf("%w: at least one model must be enabled", ErrValidation)
 	}

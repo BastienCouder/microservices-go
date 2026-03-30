@@ -65,7 +65,7 @@ const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   brandPersonas: [],
   competitors: [],
   selectedPrompts: [],
-  selectedModels: ["gpt-4o", "perplexity", "gemini-pro"],
+  selectedModels: [],
 };
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);

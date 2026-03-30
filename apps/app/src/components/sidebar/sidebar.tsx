@@ -322,7 +322,7 @@ function SidebarComponent({
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
           </div>
-          <div className="mb-1">
+          {/* <div className="mb-1">
             <SidebarNavItem
               href={optimizeActionsHref}
               label={"optimize actions"}
@@ -330,8 +330,8 @@ function SidebarComponent({
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
-          </div>
-          <div className="mb-1">
+          </div> */}
+          {/* <div className="mb-1">
             <SidebarNavItem
               href={contentOptimizerHref}
               label="Content Optimizer"
@@ -339,8 +339,8 @@ function SidebarComponent({
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
-          </div>
-          <div className="mb-1">
+          </div> */}
+          {/* <div className="mb-1">
             <SidebarNavItem
               href={impactHref}
               label={"impact"}
@@ -348,7 +348,7 @@ function SidebarComponent({
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
             />
-          </div>
+          </div> */}
 
           <div className="mb-1 mt-4">
             <div className="relative mt-1 space-y-0.5">

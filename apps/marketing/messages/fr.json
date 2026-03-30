@@ -5,106 +5,159 @@
     "developers": "Développeurs",
     "pricing": "Tarifs",
     "signIn": "Se connecter",
-    "startCreating": "Commencer à créer"
+    "startCreating": "Commencer",
+    "accessApp": "Accéder à l'app",
+    "toggleMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu"
+  },
+  "localeSwitcher": {
+    "label": "Changer de langue",
+    "locales": {
+      "fr": "FR",
+      "en": "EN"
+    }
+  },
+  "metadata": {
+    "homeTitle": "Visia, la plateforme pour être mentionnée par les IA",
+    "homeDescription": "Mesurez votre présence dans ChatGPT, Gemini et Perplexity, puis corrigez ce qui empêche votre marque d'être recommandée.",
+    "loginTitle": "Connexion",
+    "loginDescription": "Connectez-vous à Visia pour reprendre votre analyse de visibilité IA et accéder à votre espace.",
+    "registerTitle": "Créer un compte",
+    "registerDescription": "Créez votre compte Visia pour commencer à mesurer et améliorer votre présence dans les réponses IA."
+  },
+  "auth": {
+    "secureAccess": "Accès sécurisé",
+    "logout": "Déconnexion",
+    "account": "Compte",
+    "loginTitle": "Connexion",
+    "registerTitle": "Inscription",
+    "loginSubtitle": "Bienvenue, reprenez votre flux d'authentification.",
+    "registerSubtitle": "Créez votre accès en moins de 30 secondes.",
+    "loginTab": "Connexion",
+    "registerTab": "Inscription",
+    "nameLabel": "Nom",
+    "emailLabel": "Email",
+    "passwordLabel": "Mot de passe",
+    "submitLogin": "Se connecter",
+    "submitRegister": "Créer mon compte",
+    "otpLogin": "Recevoir un code par email",
+    "otpRegister": "Créer mon compte par code email",
+    "google": "Continuer avec Google",
+    "otpCodeLabel": "Code OTP",
+    "otpVerify": "Valider le code",
+    "sideTitle": "Authentification centralisée",
+    "sideDescription": "Connexion et inscription unifiées avec mot de passe, OTP email et Google OIDC.",
+    "endpointLabel": "Endpoint",
+    "errorPage": {
+      "title": "Authentification interrompue",
+      "subtitle": "Le parcours d'authentification n'a pas pu aller au bout. Vous pouvez relancer la connexion ou repartir sur un nouveau flux d'inscription.",
+      "detailsLabel": "Détails",
+      "genericReason": "Kratos a redirigé vers la page d'erreur sans fournir de message supplémentaire.",
+      "loadingReason": "Chargement des détails de l'erreur d'authentification...",
+      "unavailableReason": "Le détail précis de l'erreur Kratos n'est plus disponible. Relancez un nouveau flux de connexion puis réessayez.",
+      "errorIdLabel": "Identifiant d'erreur",
+      "retryLogin": "Réessayer la connexion",
+      "retryRegister": "Créer un nouveau compte",
+      "backHome": "Retour à l'accueil"
+    },
+    "messages": {
+      "unexpectedError": "erreur inattendue",
+      "logoutSuccess": "Déconnexion réussie, le cookie de session a été effacé.",
+      "logoutError": "Erreur de déconnexion : {error}",
+      "invalidCredentials": "Email ou mot de passe invalide.",
+      "passwordFallback": "Impossible de terminer l'authentification par mot de passe.",
+      "passwordSuccess": "Opération réussie.",
+      "loginError": "Erreur de connexion : {error}",
+      "registerError": "Erreur d'inscription : {error}",
+      "invalidEmail": "Email invalide.",
+      "otpStartFallback": "Impossible de démarrer le flux OTP.",
+      "otpTokensMissing": "Informations OTP manquantes.",
+      "otpSent": "Code OTP envoyé.",
+      "otpStartError": "Erreur au démarrage OTP : {error}",
+      "otpInvalidState": "Flux OTP incomplet.",
+      "otpVerifyFallback": "Impossible de vérifier le code OTP.",
+      "otpVerified": "Code OTP validé.",
+      "otpVerifyError": "Erreur de vérification OTP : {error}",
+      "googleFallback": "Impossible de démarrer la connexion Google.",
+      "googleError": "Erreur Google : {error}"
+    }
   },
   "hero": {
-    "title1": "La solution",
+    "title1": "La plateforme",
     "title2": "pour être mentionné dans",
-    "description": "Quand un prospect demande à une IA \"quel outil choisir\", votre marque est-elle citée ou invisible ? Visia vous le dit, et vous aide à corriger ça.",
-    "startTrial": "Être mentionné dans les IA",
-    "watchDemo": "Voir la démo"
+    "description": "Quand un prospect demande à une IA quel outil choisir, votre marque est-elle mentionnée ou invisible ? Visia vous montre ce qui ressort vraiment et quoi corriger pour devenir recommandable.",
+    "startTrial": "Commencer l'analyse",
+    "watchDemo": "Voir la démo",
+    "stats": {
+      "firstResults": "premiers résultats",
+      "tracked": "modèles suivis",
+      "modules": "modules d'analyse",
+      "realData": "données réelles"
+    }
   },
   "features": {
     "eyebrow": "Capacités",
-    "title": "Tout ce dont vous avez besoin",
-    "subtitle": "Rien de superflu.",
-    "deploy": "Vos prospects ont changé de comportement. Votre marketing, pas encore.",
-    "deployDesc": "Avant, ils tapaient sur Google. Aujourd'hui, ils posent leurs questions directement à ChatGPT, Perplexity ou Gemini.",
-    "ai": "Workflows AI-Natifs",
-    "aiDesc": "Construisez des applications intelligentes avec des capacités AI intégrées. De l'inférence à l'entraînement, tout se met à l'échelle automatiquement.",
-    "collab": "Collaboration en Temps Réel",
-    "collabDesc": "Travaillez ensemble de manière fluide. Prévisualisation en direct, retour instantané et contrôle de version qui a du sens.",
-    "security": "Sécurité Entreprise",
-    "securityDesc": "Chiffrement bancaire, conformité SOC 2 et contrôles d'accès granulaires. Vos données vous appartiennent."
-  },
-  "pricing": {
-    "title": "Des tarifs simples et transparents",
-    "monthly": "Mensuel",
-    "annual": "Annuel",
-    "save": "Économisez 20%",
-    "perMonth": "/mois",
-    "mostPopular": "Populaire",
-    "custom": "Sur mesure",
-    "compare": "Comparer les plans",
-    "footer": "Besoin de plus de détails ? {compare} ou contactez notre équipe.",
-    "starter": "Starter",
-    "starterDesc": "Pour les particuliers et petits projets",
-    "starterCta": "Commencer gratuit",
-    "starterF0": "Jusqu'à 3 projets",
-    "starterF1": "1Go de stockage",
-    "starterF2": "Support communautaire",
-    "starterF3": "Analyses de base",
-    "starterF4": "Certificats SSL",
-    "pro": "Pro",
-    "proDesc": "Pour les équipes en croissance",
-    "proCta": "Commencer l'essai",
-    "proF0": "Projets illimités",
-    "proF1": "100Go de stockage",
-    "proF2": "Support prioritaire",
-    "proF3": "Analyses avancées",
-    "proF4": "Domaines personnalisés",
-    "proF5": "Collaboration d'équipe",
-    "proF6": "Accès API",
-    "enterprise": "Entreprise",
-    "enterpriseDesc": "Pour les opérations à grande échelle",
-    "enterpriseCta": "Contacter les ventes",
-    "entF0": "Tout dans Pro",
-    "entF1": "Stockage illimité",
-    "entF2": "Support dédié 24/7",
-    "entF3": "Intégrations personnalisées",
-    "entF4": "Garantie SLA",
-    "entF5": "Option on-premise",
-    "entF6": "Audit sécurité",
-    "entF7": "Contrats sur mesure"
+    "title": "Tout ce qu'il faut.",
+    "subtitle": "Rien d'inutile.",
+    "items": [
+      {
+        "title": "Mesurez votre visibilité IA",
+        "description": "Lancez des prompts ciblés sur plusieurs LLMs et voyez enfin si votre marque apparaît, comment elle est décrite et face à quels concurrents."
+      },
+      {
+        "title": "Identifiez ce qui vous bloque",
+        "description": "Repérez les pages, signaux de marque et contenus qui empêchent les IA de vous comprendre, vous citer ou vous recommander."
+      },
+      {
+        "title": "Priorisez les bonnes actions",
+        "description": "Transformez les observations en plan d'action concret pour le SEO, le contenu, la preuve sociale et la structure de vos pages."
+      },
+      {
+        "title": "Prouvez l'impact dans le temps",
+        "description": "Suivez l'évolution de votre présence, comparez les résultats par modèle et montrez les gains à votre équipe."
+      }
+    ]
   },
   "howItWorks": {
-    "eyebrow": "Processus",
-    "title": "Trois étapes.",
-    "subtitle": "Des possibilités infinies.",
-    "step1Title": "Connectez vos outils",
-    "step1Desc": "Intégrez votre stack existante en quelques minutes. Nous supportons plus de 200 sources de données.",
-    "step2Title": "Construisez votre workflow",
-    "step2Desc": "Concevez des automatisations puissantes avec notre constructeur visuel ou écrivez du code directement.",
-    "step3Title": "Déployez en production",
-    "step3Desc": "Déployez globalement sans configuration. Votre application est en ligne en moins de 30 secondes.",
-    "filename": "optimus.config.ts",
-    "status": "Synchronisé"
+    "headline": {
+      "title": "Une boucle simple.",
+      "subtitle": "Un signal actionnable."
+    },
+    "status": "Analyse synchronisée",
+    "steps": [
+      {
+        "title": "Connectez votre marque",
+        "description": "Ajoutez votre site, vos pages clés et vos concurrents pour définir le terrain de comparaison."
+      },
+      {
+        "title": "Lancez vos scénarios",
+        "description": "Testez les requêtes que vos prospects posent déjà dans ChatGPT, Perplexity, Claude, Gemini et les autres."
+      },
+      {
+        "title": "Recevez le diagnostic",
+        "description": "Visualisez qui est cité, quels messages ressortent et quels angles de contenu manquent pour prendre votre place."
+      },
+      {
+        "title": "Corrigez puis suivez",
+        "description": "Appliquez les recommandations, relancez les tests et mesurez si votre marque gagne enfin en présence."
+      }
+    ]
   },
   "infrastructure": {
-    "eyebrow": "Infrastructure",
-    "title": "Global par",
-    "title2": "défaut.",
-    "description": "Déployez une fois, exécutez partout. Notre réseau edge s'étend sur 17 data centers à travers 6 continents, offrant une latence inférieure à 50ms pour 99% du monde.",
-    "datacenters": "17",
-    "datacentersLabel": "Data centers",
-    "uptime": "99,99%",
-    "uptimeLabel": "SLA de disponibilité",
-    "latency": "<50ms",
-    "latencyLabel": "Latence globale",
-    "header": "Réseau Edge",
-    "status": "Tous opérationnels",
-    "sf": "San Francisco",
-    "usWest": "US Ouest",
-    "ny": "New York",
-    "usEast": "US Est",
-    "london": "Londres",
-    "europe": "Europe",
-    "tokyo": "Tokyo",
-    "asia": "Asie Pacifique",
-    "sydney": "Sydney",
-    "oceania": "Océanie",
-    "saopaulo": "Sao Paulo",
-    "southAmerica": "Amérique du Sud"
+    "headline": {
+      "line1": "Une couverture large.",
+      "line2": "Un signal fiable."
+    },
+    "description": "Surveillez en continu les moteurs qui comptent, avec un historique comparable, une lecture propre des réponses et un suivi stable de votre présence.",
+    "stats": {
+      "covered": "LLMs couverts",
+      "uptime": "disponibilité",
+      "responseTime": "temps de réponse"
+    },
+    "panel": {
+      "allLlms": "Tous les LLMs",
+      "liveMonitoring": "monitoring en direct"
+    }
   },
   "metrics": {
     "eyebrow": "Métriques en direct",
@@ -116,14 +169,160 @@
     "responseTime": "Temps de réponse moyen",
     "countries": "Pays desservis"
   },
+  "integrations": {
+    "title": "Branchez vos sources.",
+    "subtitle": "En quelques minutes.",
+    "description": "Croisez visibilité IA, trafic, pipeline et revenus avec les outils déjà en place dans votre stack.",
+    "items": {
+      "ga4": {
+        "category": "analytics"
+      },
+      "hubspot": {
+        "category": "crm"
+      },
+      "stripe": {
+        "category": "revenus"
+      },
+      "webflow": {
+        "category": "cms"
+      },
+      "markdown": {
+        "category": "contenu"
+      }
+    }
+  },
+  "developers": {
+    "headline": {
+      "title": "API-first.",
+      "subtitle": "Prêt pour l'automatisation."
+    },
+    "description": "Récupérez les données brutes, branchez vos workflows et injectez Visia dans vos outils internes sans dépendance à l'interface.",
+    "status": "Sandbox active",
+    "docsLink": "Voir la documentation",
+    "features": {
+      "api": {
+        "title": "API REST",
+        "description": "Listez les analyses, scores, citations et recommandations depuis vos propres dashboards."
+      },
+      "mcp": {
+        "title": "Serveur MCP",
+        "description": "Exposez vos données de visibilité directement à vos agents et assistants internes."
+      },
+      "webhooks": {
+        "title": "Webhooks",
+        "description": "Déclenchez des workflows à chaque nouvelle analyse, alerte ou variation de score."
+      },
+      "export": {
+        "title": "Exports propres",
+        "description": "Récupérez les données en JSON ou CSV pour vos rapports, notebooks et pipelines."
+      },
+      "docs": {
+        "title": "Documentation concise",
+        "description": "Des endpoints simples, des schémas clairs et des exemples utilisables tout de suite."
+      }
+    },
+    "examples": {
+      "rest": {
+        "label": "REST",
+        "code": "curl -X GET \"https://api.visia.io/v1/analyses?brand=acme\" \\\n  -H \"Authorization: Bearer visia_test_key\" \\\n  -H \"Accept: application/json\""
+      },
+      "mcp": {
+        "label": "MCP",
+        "code": "{\n  \"server\": \"visia\",\n  \"tool\": \"brand.visibility\",\n  \"input\": {\n    \"brand\": \"acme\",\n    \"market\": \"fr\",\n    \"question\": \"quel outil choisir pour gérer la facturation ?\"\n  }\n}"
+      },
+      "webhooks": {
+        "label": "Webhooks",
+        "code": "POST /webhooks/analysis.completed\n{\n  \"brand\": \"acme\",\n  \"score\": 71,\n  \"delta\": 8,\n  \"top_model\": \"ChatGPT\",\n  \"tracked_at\": \"2026-03-19T09:00:00Z\"\n}"
+      }
+    }
+  },
+  "pricing": {
+    "title": "Des tarifs qui suivent votre volume.",
+    "description": "Choisissez un plan selon le nombre de prompts analysés chaque mois et montez en puissance sans changer de stack.",
+    "volumeLabel": "Volume mensuel",
+    "volumeSuffix": "prompts suivis",
+    "volumeHelper": "Faites varier le curseur pour estimer le bon plan selon votre usage.",
+    "promptsShort": "prompts",
+    "mostPopular": "Le plus choisi",
+    "perMonth": "/mois",
+    "custom": "Sur devis",
+    "plans": {
+      "developer": {
+        "name": "Développeur",
+        "description": "Pour tester Visia sur quelques cas d'usage et brancher l'API rapidement.",
+        "cta": "Démarrer",
+        "features": [
+          "Jusqu'à 1 000 prompts analysés",
+          "Accès API et exports",
+          "1 espace de travail",
+          "Support email"
+        ]
+      },
+      "starter": {
+        "name": "Starter",
+        "description": "Pour les petites équipes marketing qui veulent suivre leur visibilité sans friction.",
+        "cta": "Choisir Starter",
+        "features": [
+          "Suivi multi-marques",
+          "Historique des analyses",
+          "Benchmarks concurrents",
+          "Recommandations prioritaires",
+          "2 utilisateurs inclus"
+        ]
+      },
+      "growth": {
+        "name": "Growth",
+        "description": "Pour industrialiser le suivi IA sur plusieurs pays, produits ou entités.",
+        "cta": "Passer à Growth",
+        "features": [
+          "Toutes les intégrations",
+          "Alertes et webhooks",
+          "Segments personnalisés",
+          "Rapports exécutifs",
+          "5 utilisateurs inclus"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Pour les équipes avancées qui veulent gouvernance, accompagnement et workflows sur mesure.",
+        "cta": "Parler à l'équipe",
+        "features": [
+          "Volumes élevés et plans sur mesure",
+          "SSO et contrôle d'accès",
+          "Onboarding dédié",
+          "SLA et support prioritaire",
+          "Aide à la stratégie GEO"
+        ]
+      }
+    }
+  },
   "cta": {
     "title": "Prêt à construire quelque chose de grand ?",
     "startBuilding": "Commencer gratuitement",
     "talkToSales": "Parler aux ventes"
   },
   "footer": {
-    "description": "La plateforme pour les équipes qui livrent. Construisez, déployez et mettez à l'échelle avec une vélocité sans précédent.",
-    "copyright": "© 2025 Visia. Tous droits réservés.",
-    "status": "Tous les systèmes opérationnels"
+    "description": "Mesurez, comprenez et améliorez la manière dont les IA parlent de votre marque.",
+    "copyright": "© 2026 Visia. Tous droits réservés.",
+    "status": "Tous les systèmes opérationnels",
+    "groups": {
+      "product": "Produit",
+      "company": "Entreprise",
+      "legal": "Légal"
+    },
+    "links": {
+      "features": "Fonctionnalités",
+      "howItWorks": "Comment ça marche",
+      "developers": "Développeurs",
+      "pricing": "Tarifs",
+      "about": "À propos",
+      "blog": "Blog",
+      "careers": "Carrières",
+      "hiring": "On recrute",
+      "contact": "Contact",
+      "privacy": "Confidentialité",
+      "terms": "Conditions",
+      "security": "Sécurité"
+    }
   }
 }

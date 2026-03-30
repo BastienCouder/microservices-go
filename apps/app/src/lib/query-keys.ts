@@ -10,8 +10,11 @@ export const appQueryKeys = {
     ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
   optimizeActions: (apiBaseURL: string, projectId: string | null) =>
     ["optimize-actions", apiBaseURL, projectId ?? "__default__"] as const,
-  modelsCatalog: (apiBaseURL: string, organizationId: string) =>
-    ["models", "catalog", apiBaseURL, organizationId] as const,
+  modelsCatalog: (
+    apiBaseURL: string,
+    organizationId: string,
+    scope: "active" | "all" = "active",
+  ) => ["models", "catalog", apiBaseURL, organizationId, scope] as const,
   projectModels: (apiBaseURL: string, organizationId: string, projectId: string) =>
     ["models", "project", apiBaseURL, organizationId, projectId] as const,
   promptsPage: (

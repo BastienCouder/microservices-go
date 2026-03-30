@@ -63,7 +63,6 @@ export function useMonitoringFilterActions(): MonitoringFilterActions {
 export function getActiveMonitoringFilterCount(filters: MonitoringFiltersSnapshot): number {
   let count =
     filters.selectedModels.length +
-    filters.selectedPersonas.length +
     filters.selectedCompetitors.length;
 
   if (filters.period !== "7d" || filters.dateRange !== undefined) {

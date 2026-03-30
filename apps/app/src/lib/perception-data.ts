@@ -5,6 +5,12 @@ import {
   PERCEPTION_PERIOD_LABELS,
   PERCEPTION_VISIBLE_AXES,
 } from "@/lib/app-data";
+import {
+  buildProjectModelLookup,
+  normalizeModelPayloadList,
+  toProjectModelMeta,
+  type ProjectModelMeta,
+} from "@/lib/project-models";
 import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import { gatewayJSON } from "@/shared/api/gateway";
@@ -97,6 +103,7 @@ export type PerceptionResponseRecord = {
   promptRunId: string;
   modelId: string;
   modelName: string;
+  modelGroupName: string;
   createdAt: string | null;
   brandMentioned: boolean;
   citationFound: boolean;
@@ -111,6 +118,8 @@ export type PerceptionResponseRecord = {
     competitors: number;
   };
 };
+
+export type PerceptionModelOption = ProjectModelMeta;
 
 export type PerceptionViewData = {
   source: "project" | "fallback" | "demo";
@@ -132,6 +141,7 @@ export type PerceptionViewData = {
     analyzedResponses: number;
     models: string[];
     projectModels?: string[];
+    modelCatalog: PerceptionModelOption[];
     generatedAt: string;
     latestRunId?: string;
     runtimeMode: RuntimeMode;
@@ -156,6 +166,7 @@ type ParsedResponse = {
   promptRunId: string;
   modelId: string;
   modelName: string;
+  modelGroupName: string;
   createdAt: Date | null;
   brandMentioned: boolean;
   citationFound: boolean;
@@ -345,23 +356,9 @@ function useCaseScore(brandMentioned: boolean): number {
   return brandMentioned ? 100 : 20;
 }
 
-function parseModels(payload: unknown): Map<string, string> {
-  const rows = asArray(payload).map(asObject);
-  const entries = rows.map((row) => {
-    const id = asString(getField(row, ["id", "ID"])).trim();
-    const displayName =
-      asString(getField(row, ["displayName", "DisplayName"])) ||
-      asString(getField(row, ["groupName", "GroupName"])) ||
-      id;
-    return [id, displayName.trim()] as const;
-  });
-
-  return new Map(entries.filter(([id]) => id !== ""));
-}
-
 function parseResponses(
   payload: unknown,
-  modelNamesById: Map<string, string>,
+  modelLookup: Map<string, PerceptionModelOption>,
 ): ParsedResponse[] {
   const monitoring = asObject(payload);
   const responses = asArray(getField(monitoring, ["aiResponses", "responses", "Responses"])).map(asObject);
@@ -374,13 +371,15 @@ function parseResponses(
     const citationFound = asBool(getField(response, ["citationFound", "CitationFound"]));
     const sentiment = normalizeSentiment(asString(getField(response, ["sentiment", "Sentiment"])));
     const brandPosition = asString(getField(response, ["brandPosition", "BrandPosition"]));
+    const modelMeta = modelLookup.get(modelId.trim().toLowerCase()) || null;
 
     return {
       id: asString(getField(response, ["id", "ID"])),
       runId: asString(getField(response, ["runId", "RunID"])),
       promptRunId: asString(getField(response, ["promptRunId", "PromptRunID"])),
       modelId,
-      modelName: modelNamesById.get(modelId) || modelId,
+      modelName: modelMeta?.displayName || modelId,
+      modelGroupName: modelMeta?.groupName || modelMeta?.displayName || modelId,
       createdAt: parseISODate(asString(getField(response, ["createdAt", "CreatedAt"]))),
       brandMentioned,
       citationFound,
@@ -567,7 +566,7 @@ function deriveRadarFromParsedResponses(responses: ParsedResponse[]): Perception
 
 function deriveModelAxisHeatmap(
   responses: ParsedResponse[],
-  modelNamesById: Map<string, string>,
+  modelCatalog: PerceptionModelOption[],
 ): PerceptionViewData["modelAxisHeatmap"] {
   const axes: PerceptionHeatmapAxis[] = PERCEPTION_VISIBLE_AXES.map((axis) => ({
     key: axis,
@@ -577,7 +576,7 @@ function deriveModelAxisHeatmap(
 
   const responseGroups = new Map<string, ParsedResponse[]>();
   for (const response of responses) {
-    const key = response.modelName || response.modelId;
+    const key = response.modelGroupName || response.modelName || response.modelId;
     const existing = responseGroups.get(key);
     if (existing) {
       existing.push(response);
@@ -587,8 +586,8 @@ function deriveModelAxisHeatmap(
   }
 
   const orderedModelNames = uniqueStrings([
-    ...Array.from(modelNamesById.values()),
-    ...responses.map((response) => response.modelName || response.modelId),
+    ...modelCatalog.map((model) => model.groupName || model.displayName || model.id),
+    ...responses.map((response) => response.modelGroupName || response.modelName || response.modelId),
   ]).filter((modelName) => responseGroups.has(modelName));
 
   const rows: PerceptionHeatmapRow[] = orderedModelNames.map((modelName) => {
@@ -611,6 +610,9 @@ function deriveModelAxisHeatmap(
 
 function deriveModelAxisHeatmapFromParsedResponses(
   responses: ParsedResponse[],
+  options?: {
+    groupByModelFamily?: boolean;
+  },
 ): PerceptionViewData["modelAxisHeatmap"] {
   const axes: PerceptionHeatmapAxis[] = PERCEPTION_VISIBLE_AXES.map((axis) => ({
     key: axis,
@@ -620,7 +622,10 @@ function deriveModelAxisHeatmapFromParsedResponses(
 
   const responseGroups = new Map<string, ParsedResponse[]>();
   for (const response of responses) {
-    const key = response.modelName || response.modelId;
+    const key =
+      options?.groupByModelFamily === false
+        ? response.modelName || response.modelId
+        : response.modelGroupName || response.modelName || response.modelId;
     const existing = responseGroups.get(key);
     if (existing) {
       existing.push(response);
@@ -963,8 +968,18 @@ export function filterPerceptionResponses(
   const reference = parseISODate(referenceDate) ?? new Date();
 
   return responses.filter((response) => {
-    if (modelSet.size > 0 && !modelSet.has(response.modelName || response.modelId)) {
-      return false;
+    if (modelSet.size > 0) {
+      const matchesModel = [
+        response.modelId,
+        response.modelName,
+        response.modelGroupName,
+      ]
+        .filter(Boolean)
+        .some((value) => modelSet.has(value));
+
+      if (!matchesModel) {
+        return false;
+      }
     }
 
     if (period === "all") return true;
@@ -996,20 +1011,15 @@ export function derivePerceptionRadarFromResponses(
 export function derivePerceptionHeatmapFromResponses(
   responses: PerceptionResponseRecord[],
   {
-    groupModelName,
+    groupByModelFamily = true,
   }: {
-    groupModelName?: (modelName: string) => string;
+    groupByModelFamily?: boolean;
   } = {},
 ): PerceptionViewData["modelAxisHeatmap"] {
-  const parsedResponses = responses.map(parseResponseRecord);
-  const groupedResponses = groupModelName
-    ? parsedResponses.map((response) => ({
-        ...response,
-        modelName: groupModelName(response.modelName || response.modelId) || response.modelName || response.modelId,
-      }))
-    : parsedResponses;
-
-  return deriveModelAxisHeatmapFromParsedResponses(groupedResponses);
+  return deriveModelAxisHeatmapFromParsedResponses(
+    responses.map(parseResponseRecord),
+    { groupByModelFamily },
+  );
 }
 
 export function derivePerceptionTopErrorsFromResponses(
@@ -1046,12 +1056,13 @@ function buildPerceptionBase(
   competitorsPayload: unknown,
   monitoringPayload: unknown,
   perceptionPayload: PerceptionApiPayload,
-  modelNamesById: Map<string, string>,
+  modelLookup: Map<string, PerceptionModelOption>,
+  modelCatalog: PerceptionModelOption[],
   runtimeMode: RuntimeMode,
   projectId: string,
 ): PerceptionViewData {
   const projectModelFilter = parseProjectModelFilter(perceptionPayload.metadata?.projectModels);
-  const responses = filterResponsesToProjectModels(parseResponses(monitoringPayload, modelNamesById), projectModelFilter);
+  const responses = filterResponsesToProjectModels(parseResponses(monitoringPayload, modelLookup), projectModelFilter);
   const monitoringLatestRunId = asString(
     getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"]),
   );
@@ -1070,7 +1081,11 @@ function buildPerceptionBase(
   const competitors = parseCompetitors(competitorsPayload);
   const scores = deriveScores(perceptionPayload, responses);
   const radar = deriveRadar(perceptionPayload, responses);
-  const modelAxisHeatmap = deriveModelAxisHeatmap(responses, modelNamesById);
+  const activeModelCatalog = projectModelFilter.size > 0
+    ? modelCatalog.filter((model) => projectModelFilter.has(model.id))
+    : modelCatalog.filter((model) => model.live);
+  const visibleModelCatalog = activeModelCatalog.length > 0 ? activeModelCatalog : modelCatalog;
+  const modelAxisHeatmap = deriveModelAxisHeatmap(responses, visibleModelCatalog);
   const trend = deriveTrend(responses, latestRunId, referenceDate);
   const topErrors = deriveTopErrors(perceptionPayload, brandCanon, scores, radar, modelAxisHeatmap);
   const models = uniqueStrings(
@@ -1094,6 +1109,7 @@ function buildPerceptionBase(
       windowLabel: deriveWindowLabel(responses, referenceDate),
       analyzedResponses: responses.length,
       models,
+      modelCatalog: visibleModelCatalog,
       latestRunId,
       generatedAt: (generatedAt || referenceDate).toISOString(),
     },
@@ -1148,7 +1164,8 @@ function mergePerceptionData(
       ...payload.metadata,
       runtimeMode,
       projectId,
-      models: payload.metadata?.models ?? base.metadata.models,
+      models: base.metadata.models,
+      modelCatalog: base.metadata.modelCatalog,
       analyzedResponses: asNumber(payload.metadata?.analyzedResponses ?? base.metadata.analyzedResponses),
       windowLabel: payload.metadata?.windowLabel || base.metadata.windowLabel,
       latestRunId: base.metadata.latestRunId,
@@ -1219,8 +1236,11 @@ export async function loadPerceptionData(
   const monitoringPayload = unwrapRequiredEnvelope(monitoringRes, "monitoring");
   const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayload;
 
-  const modelNamesById = parseModels(modelsPayload);
-  const base = buildPerceptionBase(projectPayload, competitorsPayload, monitoringPayload, perceptionPayload, modelNamesById, mode, projectId);
+  const modelCatalog = normalizeModelPayloadList(modelsPayload).map((model) =>
+    toProjectModelMeta(model),
+  );
+  const modelLookup = buildProjectModelLookup(modelCatalog);
+  const base = buildPerceptionBase(projectPayload, competitorsPayload, monitoringPayload, perceptionPayload, modelLookup, modelCatalog, mode, projectId);
 
   return {
     data: mergePerceptionData(base, perceptionPayload, mode, projectId),

@@ -11,7 +11,6 @@ import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
 import { CompetitorFilterSection } from "./competitor-filter-section";
 import { FiltersPanelLoading } from "./filters-panel-loading";
 import { ModelFilterSection } from "./model-filter-section";
-import { PersonaFilterSection } from "./persona-filter-section";
 
 type FiltersPanelViewProps = {
   loading: boolean;
@@ -93,14 +92,15 @@ export function FiltersPanelView(props: FiltersPanelViewProps) {
               />
             </div>
 
-            <PersonaFilterSection
+            {/* Persona filters are intentionally paused for now. */}
+            {/* <PersonaFilterSection
               personaOptions={props.personaOptions}
               selectedPersonas={props.selectedPersonas}
               togglePersona={props.togglePersona}
               clearPersonas={props.clearPersonas}
               showAllPersonas={props.showAllPersonas}
               setShowAllPersonas={props.setShowAllPersonas}
-            />
+            /> */}
 
             <ModelFilterSection
               models={props.models}

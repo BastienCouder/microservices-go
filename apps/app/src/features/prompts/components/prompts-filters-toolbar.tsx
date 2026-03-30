@@ -3,7 +3,6 @@
 import { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { DatePickerWithRange } from "@/components/monitoring/date-range-picker";
 import { Search } from "lucide-react";
@@ -83,7 +82,10 @@ export function PromptsFiltersToolbar({
           setPeriod={setPeriod}
         />
 
-        {availablePersonas.length > 0 ? (
+        {/* Persona UI is intentionally paused for now. We keep the props/state
+            wired in the background so the feature can come back later without
+            redoing the data plumbing. */}
+        {/* {availablePersonas.length > 0 ? (
           <Select value={persona} onValueChange={setPersona}>
             <SelectTrigger className="h-10 w-full sm:h-8 sm:w-[160px]">
               <SelectValue placeholder="Persona" />
@@ -97,7 +99,7 @@ export function PromptsFiltersToolbar({
               ))}
             </SelectContent>
           </Select>
-        ) : null}
+        ) : null} */}
 
         <ModelsFilterPopover
           open={modelsPopoverOpen}

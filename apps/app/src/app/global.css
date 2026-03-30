@@ -134,15 +134,15 @@
 
 
   /* --- 3. RADIUS (Specifique Dashboard Pro) --- */
-  --radius-xs: 25px;
+  --radius-xs: 15px;
   /* XS Custom */
-  --radius-sm: 25px;
+  --radius-sm: 15px;
   /* Badges/Alerts */
-  --radius-md: 25px;
+  --radius-md: 15px;
   /* Cards/KPIs/Inputs/Buttons (Primary) */
-  --radius-lg: 25px;
+  --radius-lg: 15px;
   /* Sidebar */
-  --radius-xl: 25px;
+  --radius-xl: 15px;
 
 
   /* --- 4. SHADOWS (Subtil B2B) --- */

@@ -1,15 +1,24 @@
 import React from "react";
-import type { Metadata } from 'next';
-import { Analytics } from '@vercel/analytics/next';
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages } from 'next-intl/server';
-import './globals.css';
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
+import { Analytics } from "@vercel/analytics/next";
+import { NextIntlClientProvider } from "next-intl";
+import { getMessages, setRequestLocale } from "next-intl/server";
+import { isLocale, locales } from "@/src/i18n/config";
+import { getSiteURL } from "@/src/site/config";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: 'Visia - Platform to Create',
-  description: 'The creative platform for teams who ship. Build, deploy, and scale with unprecedented velocity.',
-  generator: 'v0.app',
+  metadataBase: new URL(getSiteURL()),
+  title: {
+    default: "Visia",
+    template: "%s | Visia",
+  },
 };
+
+export function generateStaticParams() {
+  return locales.map((locale) => ({ locale }));
+}
 
 export default async function RootLayout({
   children,
@@ -19,6 +28,11 @@ export default async function RootLayout({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+  if (!isLocale(locale)) {
+    notFound();
+  }
+
+  setRequestLocale(locale);
   const messages = await getMessages();
 
   return (

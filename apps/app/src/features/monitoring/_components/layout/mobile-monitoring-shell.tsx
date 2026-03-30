@@ -36,7 +36,6 @@ export function MobileMonitoringShell() {
   const analyticsViewModel = useAnalyticsPanelViewModel();
   const activityViewModel = useActivityPanelViewModel();
   const activeFilterCount = useMemo(() => (
-    filters.selectedPersonas.length +
     filters.selectedCompetitors.length +
     filtersViewModel.selectedModels.length +
     Number(filters.period !== "7d" || filters.dateRange !== undefined) +
@@ -45,7 +44,6 @@ export function MobileMonitoringShell() {
     filters.dateRange,
     filters.period,
     filters.selectedCompetitors.length,
-    filters.selectedPersonas.length,
     filters.showUniqueModelFilters,
     filtersViewModel.selectedModels.length,
   ]);
@@ -53,9 +51,6 @@ export function MobileMonitoringShell() {
   const activeFilterLabels = useMemo(() => {
     const labels: string[] = [];
 
-    if (filters.selectedPersonas.length > 0) {
-      labels.push(`${filters.selectedPersonas.length} persona${filters.selectedPersonas.length > 1 ? "s" : ""}`);
-    }
     if (filtersViewModel.selectedModels.length > 0) {
       labels.push(`${filtersViewModel.selectedModels.length} modèle${filtersViewModel.selectedModels.length > 1 ? "s" : ""}`);
     }
@@ -67,7 +62,7 @@ export function MobileMonitoringShell() {
     }
 
     return labels;
-  }, [filters.selectedCompetitors.length, filters.selectedPersonas.length, filters.showUniqueModelFilters, filtersViewModel.selectedModels.length]);
+  }, [filters.selectedCompetitors.length, filters.showUniqueModelFilters, filtersViewModel.selectedModels.length]);
 
   const handlePeriodChange = (nextPeriod: string) => {
     filtersViewModel.setPeriod(nextPeriod);

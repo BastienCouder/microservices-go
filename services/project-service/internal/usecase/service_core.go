@@ -102,7 +102,7 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 				prompt.Status = PromptStatusDisabled
 			}
 		}
-		if schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, prompt.ProjectID))); err == nil {
+		if schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, prompt.ProjectID))); err == nil {
 			prompt.Schedule = schedule
 		}
 	}
@@ -185,12 +185,10 @@ func (s *Service) persistLocked(ctx context.Context) error {
 
 func (s *Service) seedDefaultModels() {
 	defaults := []AIModel{
-		{ID: "gpt-4o-mini", Label: "GPT-4o Mini", Provider: "openai", Group: "chatgpt", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "gpt-4o-mini", IsActive: true},
-		{ID: "gpt-4o", Label: "GPT-4o", Provider: "openai", Group: "chatgpt", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "gpt-4o", IsActive: true},
-		{ID: "claude-3-5-sonnet", Label: "Claude 3.5 Sonnet", Provider: "anthropic", Group: "claude", IconKey: "claude", IconPath: "/models/claude.svg", ModelID: "claude-3-5-sonnet", IsActive: true},
-		{ID: "gemini-2.0-flash", Label: "Gemini 2.0 Flash", Provider: "google", Group: "gemini", IconKey: "gemini", IconPath: "/models/gemini.svg", ModelID: "gemini-2.0-flash", IsActive: true},
-		{ID: "sonar", Label: "Perplexity Sonar", Provider: "perplexity", Group: "perplexity", IconKey: "perplexity", IconPath: "/models/perplexity.svg", ModelID: "sonar", IsActive: true, SupportsLiveSearch: true},
-		{ID: "mistral-large", Label: "Mistral Large", Provider: "mistral", Group: "mistral", IconKey: "mistral", IconPath: "/models/mistral.svg", ModelID: "mistral-large", IsActive: true},
+		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", IsActive: true},
+		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", IsActive: true},
+		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B (free)", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it:free", IsActive: true},
+		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B (free)", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it:free", IsActive: true},
 	}
 	for _, model := range defaults {
 		s.models[model.ID] = model
@@ -390,8 +388,8 @@ func effectivePromptModelIDs(prompt *Prompt, enabledModelIDs []string) []string 
 	return nonNilStringSlice(enabledModelIDs)
 }
 
-func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[string]map[string]bool, projectID string) []AnalysisPromptText {
-	enabledModelIDs := filterEnabledModels(projectModels, projectID)
+func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[string]map[string]bool, models map[string]AIModel, projectID string) []AnalysisPromptText {
+	enabledModelIDs := filterEnabledModels(projectModels, models, projectID)
 	out := make([]AnalysisPromptText, 0)
 	for _, prompt := range prompts {
 		if prompt.ProjectID == projectID && prompt.IsActive {
@@ -406,10 +404,11 @@ func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[
 	return out
 }
 
-func filterEnabledModels(projectModels map[string]map[string]bool, projectID string) []string {
+func filterEnabledModels(projectModels map[string]map[string]bool, models map[string]AIModel, projectID string) []string {
 	out := make([]string, 0)
 	for modelID, enabled := range projectModels[projectID] {
-		if enabled {
+		model, exists := models[modelID]
+		if enabled && exists && model.IsActive {
 			out = append(out, modelID)
 		}
 	}

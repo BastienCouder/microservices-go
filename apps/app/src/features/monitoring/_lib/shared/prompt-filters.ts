@@ -28,8 +28,8 @@ export function matchesPromptAudienceFilters(
 ): boolean {
   const matchesModel =
     selectedModels.length === 0 || selectedModels.includes(prompt.modelId);
-  const matchesPersona =
-    selectedPersonas.length === 0 || selectedPersonas.includes(prompt.persona);
+  // Persona filtering is intentionally paused for now.
+  const matchesPersona = true;
   const promptCompetitors = (prompt.competitorsMentioned || []).map(
     normalizeFilterValue,
   );

@@ -30,7 +30,7 @@ func TestGenerateMapsInternalModelIDsAndSetsOpenRouterHeaders(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
-		if payload.Model != "anthropic/claude-3.5-sonnet" {
+		if payload.Model != "openai/gpt-oss-20b:free" {
 			t.Fatalf("expected mapped model id, got %q", payload.Model)
 		}
 
@@ -41,7 +41,7 @@ func TestGenerateMapsInternalModelIDsAndSetsOpenRouterHeaders(t *testing.T) {
 
 	client := NewClient(server.URL, "test-key", "https://microservices-go.local", "microservices-go", server.Client())
 
-	result, err := client.Generate(context.Background(), "claude-3-5-sonnet", "Analyse la marque")
+	result, err := client.Generate(context.Background(), "gpt-oss-20b-free", "Analyse la marque")
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -79,8 +79,12 @@ func TestResolveModelIDSupportsProjectCatalog(t *testing.T) {
 	cases := map[string]string{
 		"gpt-4o-mini":       "openai/gpt-4o-mini",
 		"gpt-4o":            "openai/gpt-4o",
+		"gpt-oss-20b-free":  "openai/gpt-oss-20b:free",
+		"gpt-oss-120b-free": "openai/gpt-oss-120b:free",
 		"claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
 		"gemini-2.0-flash":  "google/gemini-2.0-flash-001",
+		"gemma-3-4b-free":   "google/gemma-3-4b-it:free",
+		"gemma-3-27b-free":  "google/gemma-3-27b-it:free",
 		"sonar":             "perplexity/sonar",
 		"sonar-pro":         "perplexity/sonar-pro",
 		"mistral-large":     "mistralai/mistral-large",

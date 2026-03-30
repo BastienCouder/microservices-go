@@ -25,13 +25,41 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /projects", h.listProjects)
 	mux.HandleFunc("GET /internal/scheduled-analysis/jobs", h.listScheduledAnalysisJobs)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
+	mux.HandleFunc("POST /projects/ai-models", h.createModel)
 	mux.HandleFunc("GET /projects/ai-models", h.listModels)
 	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
+	mux.HandleFunc("/projects/ai-models/", h.projectAIModelRoutes)
 	mux.HandleFunc("/projects/", h.projectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
 	mux.HandleFunc("/competitors/", h.competitorRoutes)
+	mux.HandleFunc("POST /ai-models", h.createModel)
 	mux.HandleFunc("GET /ai-models", h.listModels)
 	mux.HandleFunc("POST /ai-models/seed", h.seedModels)
+	mux.HandleFunc("/ai-models/", h.aiModelRoutes)
+}
+
+func (h *Handler) aiModelRoutes(w http.ResponseWriter, r *http.Request) {
+	h.aiModelRoutesWithPrefix(w, r, "/ai-models/")
+}
+
+func (h *Handler) projectAIModelRoutes(w http.ResponseWriter, r *http.Request) {
+	h.aiModelRoutesWithPrefix(w, r, "/projects/ai-models/")
+}
+
+func (h *Handler) aiModelRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
+	parts := splitPathAfter(r.URL.Path, prefix)
+	if len(parts) != 1 || parts[0] == "" {
+		http.NotFound(w, r)
+		return
+	}
+	modelID := parts[0]
+
+	switch r.Method {
+	case http.MethodPatch:
+		h.updateModel(w, r, modelID)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 func (h *Handler) internalProjectRoutes(w http.ResponseWriter, r *http.Request) {
@@ -637,6 +665,79 @@ func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	writeSuccess(w, http.StatusOK, result)
+}
+
+type createAIModelRequest struct {
+	ID                 string `json:"id"`
+	Label              string `json:"displayName"`
+	Provider           string `json:"provider"`
+	Group              string `json:"groupName"`
+	IconKey            string `json:"iconKey"`
+	ModelID            string `json:"providerModelId"`
+	IsActive           *bool  `json:"isActive"`
+	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
+}
+
+func (h *Handler) createModel(w http.ResponseWriter, r *http.Request) {
+	var req createAIModelRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+
+	model, err := h.svc.CreateModel(r.Context(), usecase.CreateAIModelInput{
+		ID:                 req.ID,
+		Label:              req.Label,
+		Provider:           req.Provider,
+		Group:              req.Group,
+		IconKey:            req.IconKey,
+		ModelID:            req.ModelID,
+		IsActive:           isActive,
+		SupportsLiveSearch: req.SupportsLiveSearch,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, model)
+}
+
+type updateAIModelRequest struct {
+	Label              *string `json:"displayName"`
+	Provider           *string `json:"provider"`
+	Group              *string `json:"groupName"`
+	IconKey            *string `json:"iconKey"`
+	ModelID            *string `json:"providerModelId"`
+	IsActive           *bool   `json:"isActive"`
+	SupportsLiveSearch *bool   `json:"supportsLiveSearch"`
+}
+
+func (h *Handler) updateModel(w http.ResponseWriter, r *http.Request, modelID string) {
+	var req updateAIModelRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	model, err := h.svc.UpdateModel(r.Context(), modelID, usecase.UpdateAIModelInput{
+		Label:              req.Label,
+		Provider:           req.Provider,
+		Group:              req.Group,
+		IconKey:            req.IconKey,
+		ModelID:            req.ModelID,
+		IsActive:           req.IsActive,
+		SupportsLiveSearch: req.SupportsLiveSearch,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, model)
 }
 
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {

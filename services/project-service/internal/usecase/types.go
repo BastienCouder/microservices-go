@@ -170,6 +170,27 @@ type AIModel struct {
 	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
 }
 
+type CreateAIModelInput struct {
+	ID                 string
+	Label              string
+	Provider           string
+	Group              string
+	IconKey            string
+	ModelID            string
+	IsActive           bool
+	SupportsLiveSearch bool
+}
+
+type UpdateAIModelInput struct {
+	Label              *string
+	Provider           *string
+	Group              *string
+	IconKey            *string
+	ModelID            *string
+	IsActive           *bool
+	SupportsLiveSearch *bool
+}
+
 type ProjectModelSelection struct {
 	AIModel
 	IsEnabledForProject bool `json:"isEnabledForProject"`

@@ -37,7 +37,7 @@ func (s *analysisClientSpy) RecordResponse(_ context.Context, _ string, input An
 }
 
 type iaClientSpy struct {
-	execCalls int
+	execCalls  int
 	execInputs []IAExecutePromptInput
 }
 
@@ -191,7 +191,7 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
-	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
 
@@ -200,11 +200,11 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	firstPromptModels := []string{"gpt-4o"}
+	firstPromptModels := []string{"gpt-oss-120b-free"}
 	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &firstPromptModels}); err != nil {
 		t.Fatalf("update first prompt models: %v", err)
 	}
-	secondPromptModels := []string{"sonar"}
+	secondPromptModels := []string{"gemma-3-27b-free"}
 	if _, err := svc.UpdatePrompt(ctx, prompts[1].ID, 42, UpdatePromptInput{ModelIDs: &secondPromptModels}); err != nil {
 		t.Fatalf("update second prompt models: %v", err)
 	}
@@ -228,8 +228,8 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 		t.Fatalf("process outbox event: %v", err)
 	}
 
-	if !reflect.DeepEqual(analysisSpy.lastStartReq.ModelIDs, []string{"gpt-4o", "sonar"}) {
-		t.Fatalf("expected analysis start modelIds [gpt-4o sonar], got %#v", analysisSpy.lastStartReq.ModelIDs)
+	if !reflect.DeepEqual(analysisSpy.lastStartReq.ModelIDs, []string{"gemma-3-27b-free", "gpt-oss-120b-free"}) {
+		t.Fatalf("expected analysis start modelIds [gemma-3-27b-free gpt-oss-120b-free], got %#v", analysisSpy.lastStartReq.ModelIDs)
 	}
 	if len(iaSpy.execInputs) != 2 {
 		t.Fatalf("expected 2 ia executions, got %d", len(iaSpy.execInputs))
@@ -240,10 +240,10 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 		gotCoverage[call.PromptID] = append(gotCoverage[call.PromptID], call.ModelID)
 	}
 
-	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"gpt-4o"}) {
-		t.Fatalf("expected first prompt coverage [gpt-4o], got %#v", gotCoverage[prompts[0].ID])
+	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"gpt-oss-120b-free"}) {
+		t.Fatalf("expected first prompt coverage [gpt-oss-120b-free], got %#v", gotCoverage[prompts[0].ID])
 	}
-	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"sonar"}) {
-		t.Fatalf("expected second prompt coverage [sonar], got %#v", gotCoverage[prompts[1].ID])
+	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"gemma-3-27b-free"}) {
+		t.Fatalf("expected second prompt coverage [gemma-3-27b-free], got %#v", gotCoverage[prompts[1].ID])
 	}
 }

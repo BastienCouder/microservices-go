@@ -1,4 +1,4 @@
-import { PromptsResponsesWorkspace } from "../components/prompts-workspace";
+import { PromptsResponsesWorkspace } from "../_components/prompts-workspace";
 import { MonitoringDataProvider } from "@/hooks/use-monitoring-data";
 
 type PromptsClientProps = {

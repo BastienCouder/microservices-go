@@ -1,0 +1,234 @@
+"use client";
+
+import Link from "next/link";
+import { useState, useEffect } from "react";
+import { useLocale, useTranslations } from "next-intl";
+import { Button } from "@/components/ui/button";
+import { Menu, X } from "lucide-react";
+import { LocaleSwitcher } from "@/app/[locale]/_components/locale-switcher";
+import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
+
+export function Navigation() {
+  const t = useTranslations("navigation");
+  const locale = useLocale() as Locale;
+  const [isScrolled, setIsScrolled] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  const gatewayURL = process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000";
+  const appURL = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004";
+
+  const navLinks = [
+    { name: t("features"), href: "#features" },
+    { name: t("howItWorks"), href: "#how-it-works" },
+    { name: t("developers"), href: "#developers" },
+    { name: t("pricing"), href: "#pricing" },
+  ];
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadAuthState = async () => {
+      try {
+        const response = await fetch(`${gatewayURL}/auth/me`, {
+          method: "GET",
+          credentials: "include",
+          cache: "no-store",
+        });
+
+        if (!active) {
+          return;
+        }
+
+        setIsAuthenticated(response.ok);
+      } catch {
+        if (active) {
+          setIsAuthenticated(false);
+        }
+      }
+    };
+
+    void loadAuthState();
+
+    return () => {
+      active = false;
+    };
+  }, [gatewayURL]);
+
+  return (
+    <header
+      className={`fixed z-50 transition-all duration-500 ${
+        isScrolled 
+          ? "top-4 left-4 right-4" 
+          : "top-0 left-0 right-0"
+      }`}
+    >
+      <nav 
+        className={`mx-auto transition-all duration-500 ${
+          isScrolled || isMobileMenuOpen
+            ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl max-w-[1200px]"
+            : "bg-transparent max-w-[1400px]"
+        } relative z-50`}
+      >
+        <div 
+          className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${
+            isScrolled ? "h-14" : "h-20"
+          }`}
+        >
+          {/* Logo */}
+          <Link href={getLocalizedPathname(locale, "/")} className="flex items-center gap-2 group">
+            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>Visia</span>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden md:flex items-center gap-12">
+            {navLinks.map((link) => (
+              <a
+                key={link.name}
+                href={link.href}
+                className="text-sm text-foreground/70 hover:text-foreground transition-colors duration-300 relative group"
+              >
+                {link.name}
+                <span className="absolute -bottom-1 left-0 w-0 h-px bg-foreground transition-all duration-300 group-hover:w-full" />
+              </a>
+            ))}
+          </div>
+
+          {/* Desktop CTA */}
+          <div className="hidden md:flex items-center gap-4">
+            <LocaleSwitcher />
+            {isAuthenticated ? (
+              <Button
+                asChild
+                size="sm"
+                className={`bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
+              >
+                <a href={appURL}>{t("accessApp")}</a>
+              </Button>
+            ) : (
+              <>
+                <Button
+                  asChild
+                  size="sm"
+                  variant="outline"
+                  className={`rounded-full border-primary/20 text-primary hover:bg-primary/5 hover:text-primary transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-5 h-9 text-sm"}`}
+                >
+                  <Link href={getLocalizedPathname(locale, "/login")}>{t("signIn")}</Link>
+                </Button>
+                <Button
+                  asChild
+                  size="sm"
+                  className={`bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all duration-500 ${isScrolled ? "px-4 h-8 text-xs" : "px-6"}`}
+                >
+                  <Link href={getLocalizedPathname(locale, "/register")}>{t("startCreating")}</Link>
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2"
+            aria-label={isMobileMenuOpen ? t("closeMenu") : t("toggleMenu")}
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-6 h-6" />
+            ) : (
+              <Menu className="w-6 h-6" />
+            )}
+          </button>
+        </div>
+
+      </nav>
+      
+      {/* Mobile Menu - Full Screen Overlay */}
+      <div
+        className={`md:hidden fixed inset-0 bg-background z-40 transition-all duration-500 ${
+          isMobileMenuOpen 
+            ? "opacity-100 pointer-events-auto" 
+            : "opacity-0 pointer-events-none"
+        }`}
+        style={{ top: 0 }}
+      >
+        <div className="flex flex-col h-full px-8 pt-28 pb-8">
+          <div className="flex items-center justify-between gap-4">
+            <button
+              type="button"
+              onClick={() => setIsMobileMenuOpen(false)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-foreground/10 text-foreground transition-colors hover:bg-foreground/5"
+              aria-label={t("closeMenu")}
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <LocaleSwitcher />
+          </div>
+
+          {/* Navigation Links */}
+          <div className="flex-1 flex flex-col justify-center gap-8">
+            {navLinks.map((link, i) => (
+              <a
+                key={link.name}
+                href={link.href}
+                onClick={() => setIsMobileMenuOpen(false)}
+                className={`text-4xl sm:text-5xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${
+                  isMobileMenuOpen 
+                    ? "opacity-100 translate-y-0" 
+                    : "opacity-0 translate-y-4"
+                }`}
+                style={{ transitionDelay: isMobileMenuOpen ? `${i * 75}ms` : "0ms" }}
+              >
+                {link.name}
+              </a>
+            ))}
+          </div>
+          
+          {/* Bottom CTAs */}
+          <div className={`flex flex-col sm:flex-row gap-4 pt-8 border-t border-foreground/10 transition-all duration-500 ${
+            isMobileMenuOpen 
+              ? "opacity-100 translate-y-0" 
+              : "opacity-0 translate-y-4"
+          }`}
+          style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
+          >
+            {isAuthenticated ? (
+              <Button
+                asChild
+                className="flex-1 rounded-full h-14 text-base bg-primary text-primary-foreground hover:bg-primary/90"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <a href={appURL}>{t("accessApp")}</a>
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  asChild
+                  variant="outline" 
+                  className="flex-1 rounded-full h-14 text-base border-primary/20 text-primary hover:bg-primary/5 hover:text-primary"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Link href={getLocalizedPathname(locale, "/login")}>{t("signIn")}</Link>
+                </Button>
+                <Button 
+                  asChild
+                  className="flex-1 bg-primary text-primary-foreground rounded-full h-14 text-base hover:bg-primary/90"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  <Link href={getLocalizedPathname(locale, "/register")}>{t("startCreating")}</Link>
+                </Button>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}

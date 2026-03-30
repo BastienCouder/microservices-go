@@ -29,7 +29,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 			continue
 		}
 
-		enabledModelIDs := filterEnabledModels(s.projectModels, projectID)
+		enabledModelIDs := filterEnabledModels(s.projectModels, s.models, projectID)
 		if len(enabledModelIDs) == 0 {
 			continue
 		}

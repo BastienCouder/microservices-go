@@ -57,14 +57,15 @@ export function ActivityPromptDetailContent({
             ) : null}
           </div>
 
-          <div className="space-y-1">
+          {/* Persona block is intentionally paused for now. */}
+          {/* <div className="space-y-1">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {content.persona}
             </p>
             <p className="text-sm font-medium text-foreground">
               {selectedPrompt.persona || notAvailableLabel}
             </p>
-          </div>
+          </div> */}
 
           <div className="space-y-1 sm:col-span-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">

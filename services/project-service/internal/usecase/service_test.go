@@ -112,6 +112,108 @@ func TestReplaceProjectModelsRejectsUnknownModel(t *testing.T) {
 	}
 }
 
+func TestCreateAndUpdateModel(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	created, err := svc.CreateModel(ctx, CreateAIModelInput{
+		ID:                 "openai-o3",
+		Label:              "OpenAI o3",
+		Provider:           "openai",
+		Group:              "chatgpt",
+		IconKey:            "openai",
+		ModelID:            "o3",
+		IsActive:           true,
+		SupportsLiveSearch: false,
+	})
+	if err != nil {
+		t.Fatalf("create model: %v", err)
+	}
+	if created.IconPath != "/models/openai.svg" {
+		t.Fatalf("expected openai icon path, got %q", created.IconPath)
+	}
+
+	newLabel := "OpenAI o3 Updated"
+	inactive := false
+	liveSearch := true
+	updated, err := svc.UpdateModel(ctx, "openai-o3", UpdateAIModelInput{
+		Label:              &newLabel,
+		IsActive:           &inactive,
+		SupportsLiveSearch: &liveSearch,
+	})
+	if err != nil {
+		t.Fatalf("update model: %v", err)
+	}
+	if updated.Label != newLabel {
+		t.Fatalf("expected label %q, got %q", newLabel, updated.Label)
+	}
+	if updated.IsActive {
+		t.Fatalf("expected model to be inactive")
+	}
+	if !updated.SupportsLiveSearch {
+		t.Fatalf("expected live search to be enabled")
+	}
+}
+
+func TestReplaceProjectModelsRejectsInactiveModel(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 12,
+		CreatedBy:      1,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	inactive := false
+	if _, err := svc.UpdateModel(ctx, "gpt-oss-20b-free", UpdateAIModelInput{IsActive: &inactive}); err != nil {
+		t.Fatalf("deactivate model: %v", err)
+	}
+
+	_, err = svc.ReplaceProjectModels(ctx, project.ID, 12, []string{"gpt-oss-20b-free"})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestListEnabledProjectModelIDsSkipsInactiveCatalogModels(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 12,
+		CreatedBy:      1,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 12, []string{"gpt-oss-20b-free"}); err != nil {
+		t.Fatalf("replace models: %v", err)
+	}
+
+	inactive := false
+	if _, err := svc.UpdateModel(ctx, "gpt-oss-20b-free", UpdateAIModelInput{IsActive: &inactive}); err != nil {
+		t.Fatalf("deactivate model: %v", err)
+	}
+
+	enabledModelIDs, err := svc.ListEnabledProjectModelIDs(ctx, project.ID, 12)
+	if err != nil {
+		t.Fatalf("list enabled models: %v", err)
+	}
+	if len(enabledModelIDs) != 0 {
+		t.Fatalf("expected no enabled model ids, got %v", enabledModelIDs)
+	}
+}
+
 func TestListProjectsFiltersByOrganization(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -280,7 +382,7 @@ func TestUpdatePromptPersistsModelCoverage(t *testing.T) {
 		t.Fatalf("create project: %v", err)
 	}
 
-	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
 
@@ -289,14 +391,14 @@ func TestUpdatePromptPersistsModelCoverage(t *testing.T) {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	modelIDs := []string{"sonar"}
+	modelIDs := []string{"gemma-3-27b-free"}
 	updated, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
 	if err != nil {
 		t.Fatalf("update prompt: %v", err)
 	}
 
-	if !reflect.DeepEqual(updated.ModelIDs, []string{"sonar"}) {
-		t.Fatalf("expected modelIds [sonar], got %#v", updated.ModelIDs)
+	if !reflect.DeepEqual(updated.ModelIDs, []string{"gemma-3-27b-free"}) {
+		t.Fatalf("expected modelIds [gemma-3-27b-free], got %#v", updated.ModelIDs)
 	}
 
 	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
@@ -306,8 +408,8 @@ func TestUpdatePromptPersistsModelCoverage(t *testing.T) {
 	if len(page.Items) != 1 {
 		t.Fatalf("expected 1 prompt, got %d", len(page.Items))
 	}
-	if !reflect.DeepEqual(page.Items[0].ModelIDs, []string{"sonar"}) {
-		t.Fatalf("expected persisted modelIds [sonar], got %#v", page.Items[0].ModelIDs)
+	if !reflect.DeepEqual(page.Items[0].ModelIDs, []string{"gemma-3-27b-free"}) {
+		t.Fatalf("expected persisted modelIds [gemma-3-27b-free], got %#v", page.Items[0].ModelIDs)
 	}
 }
 
@@ -326,7 +428,7 @@ func TestUpdatePromptRejectsModelOutsideProjectCoverage(t *testing.T) {
 		t.Fatalf("create project: %v", err)
 	}
 
-	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
 
@@ -335,7 +437,7 @@ func TestUpdatePromptRejectsModelOutsideProjectCoverage(t *testing.T) {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	modelIDs := []string{"sonar"}
+	modelIDs := []string{"gemma-3-27b-free"}
 	_, err = svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
@@ -357,7 +459,7 @@ func TestUpdatePromptPersistsScheduleConfig(t *testing.T) {
 		t.Fatalf("create project: %v", err)
 	}
 
-	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
 
@@ -371,8 +473,8 @@ func TestUpdatePromptPersistsScheduleConfig(t *testing.T) {
 		Cron:     "0 */4 * * *",
 		Timezone: "Europe/Paris",
 		ModelCrons: map[string]string{
-			"gpt-4o": "15 */2 * * *",
-			"sonar":  "45 6 * * 1-5",
+			"gpt-oss-120b-free": "15 */2 * * *",
+			"gemma-3-27b-free":  "45 6 * * 1-5",
 		},
 	}
 
@@ -489,7 +591,7 @@ func TestListEnabledProjectModelIDsReturnsOnlyCurrentProjectModels(t *testing.T)
 		t.Fatalf("create project: %v", err)
 	}
 
-	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
 
@@ -498,7 +600,7 @@ func TestListEnabledProjectModelIDsReturnsOnlyCurrentProjectModels(t *testing.T)
 		t.Fatalf("list enabled project model ids: %v", err)
 	}
 
-	expected := []string{"gpt-4o", "sonar"}
+	expected := []string{"gemma-3-27b-free", "gpt-oss-120b-free"}
 	if !reflect.DeepEqual(modelIDs, expected) {
 		t.Fatalf("expected enabled project model ids %v, got %v", expected, modelIDs)
 	}

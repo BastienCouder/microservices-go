@@ -24,7 +24,7 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 	if _, err := svc.ActivateProject(ctx, activeProject.ID, 42); err != nil {
 		t.Fatalf("activate project: %v", err)
 	}
-	if _, err := svc.ReplaceProjectModels(ctx, activeProject.ID, 42, []string{"gpt-4o", "sonar"}); err != nil {
+	if _, err := svc.ReplaceProjectModels(ctx, activeProject.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace models: %v", err)
 	}
 
@@ -38,13 +38,13 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 		Cron:     "0 */4 * * *",
 		Timezone: "Europe/Paris",
 		ModelCrons: map[string]string{
-			"gpt-4o": "15 */2 * * *",
+			"gpt-oss-120b-free": "15 */2 * * *",
 		},
 	}
 	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule}); err != nil {
 		t.Fatalf("update prompt schedule: %v", err)
 	}
-	firstPromptModels := []string{"gpt-4o"}
+	firstPromptModels := []string{"gpt-oss-120b-free"}
 	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &firstPromptModels}); err != nil {
 		t.Fatalf("update prompt models: %v", err)
 	}
@@ -101,8 +101,8 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 	if job.PromptText != "Prompt A" {
 		t.Fatalf("expected prompt text Prompt A, got %q", job.PromptText)
 	}
-	if !reflect.DeepEqual(job.ModelIDs, []string{"gpt-4o"}) {
-		t.Fatalf("expected model ids [gpt-4o], got %#v", job.ModelIDs)
+	if !reflect.DeepEqual(job.ModelIDs, []string{"gpt-oss-120b-free"}) {
+		t.Fatalf("expected model ids [gpt-oss-120b-free], got %#v", job.ModelIDs)
 	}
 	if !reflect.DeepEqual(job.Competitors, []string{"HubSpot", "Pipedrive"}) {
 		t.Fatalf("expected competitors [HubSpot Pipedrive], got %#v", job.Competitors)

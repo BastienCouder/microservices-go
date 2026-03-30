@@ -157,7 +157,7 @@ func (s *Service) AddPrompts(ctx context.Context, projectID string, organization
 		return nil, err
 	}
 
-	defaultModelIDs := filterEnabledModels(s.projectModels, projectID)
+	defaultModelIDs := filterEnabledModels(s.projectModels, s.models, projectID)
 	if len(defaultModelIDs) == 0 {
 		return nil, fmt.Errorf("%w: at least one model must be enabled", ErrValidation)
 	}
@@ -310,7 +310,7 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 		prompt.Intent = strings.TrimSpace(*input.Intent)
 	}
 	if input.ModelIDs != nil {
-		enabledModelIDs := filterEnabledModels(s.projectModels, project.ID)
+		enabledModelIDs := filterEnabledModels(s.projectModels, s.models, project.ID)
 		modelIDs, err := validatePromptModelIDs(*input.ModelIDs, enabledModelIDs)
 		if err != nil {
 			return Prompt{}, err
@@ -318,13 +318,13 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 		prompt.ModelIDs = modelIDs
 	}
 	if input.Schedule != nil {
-		schedule, err := normalizePromptSchedule(*input.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, project.ID)))
+		schedule, err := normalizePromptSchedule(*input.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, project.ID)))
 		if err != nil {
 			return Prompt{}, err
 		}
 		prompt.Schedule = schedule
 	} else {
-		schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, project.ID)))
+		schedule, err := normalizePromptSchedule(prompt.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, project.ID)))
 		if err != nil {
 			return Prompt{}, err
 		}

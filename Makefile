@@ -1,4 +1,4 @@
-.PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth run-project run-analysis run-ia run-attribution migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification migrate-project migrate-analysis migrate-attribution sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev up-front up-doc up-email up-mcp up-backend up-infra up-backup up-monitoring up-migrations up-full up-dev-front up-dev-backend up-dev-infra up-dev-monitoring up-dev-migrations up-dev-min up-dev-full clean-dev-go-cache reset-dev-backend
+.PHONY: run-gateway run-user run-organizations run-permission run-billing run-notification run-auth run-project run-analysis run-ia run-attribution migrate-user migrate-organizations migrate-permission migrate-billing migrate-notification migrate-project migrate-analysis migrate-attribution sqlc-generate-user sqlc-generate-organizations sqlc-generate-permission sqlc-generate-billing sqlc-generate-notification sqlc-generate-all test test-integration-org test-integration-user test-integration-permission test-integration-billing test-integration-notification test-integration-db lint lint-fix fmt up down up-dev down-dev logs-dev kratos-init kratos-init-dev up-front up-doc up-email up-mcp up-backend up-infra up-backup up-monitoring up-migrations up-full up-dev-front up-dev-backend up-dev-infra up-dev-monitoring up-dev-migrations up-dev-min up-dev-full clean-dev-go-cache reset-dev-backend seed-nike-backend seed-nike-live
 .PHONY: up-backend-sequential
 
 COMPOSE_PROD = docker compose -p microservices-go-prod -f docker-compose.yml
@@ -176,6 +176,12 @@ run-ia:
 
 run-attribution:
 	HTTP_ADDR=:8092 ATTRIBUTION_DB_HOST=localhost ATTRIBUTION_DB_PORT=5432 ATTRIBUTION_DB_USER=attrsvc ATTRIBUTION_DB_NAME=attrsvc ATTRIBUTION_DB_SSLMODE=disable ATTRIBUTION_DB_PASSWORD=attrsvc PROJECT_SERVICE_GRPC_ADDR=localhost:9088 INTERNAL_JWT_SECRET=$${INTERNAL_JWT_SECRET:?INTERNAL_JWT_SECRET is required} INTERNAL_JWT_ISSUER=api-gateway GRPC_ALLOW_INSECURE=true go run ./services/attribution-service/cmd/api
+
+seed-nike-backend:
+	docker run --rm -v $$(pwd):/workspace -w /workspace -v /usr/bin/docker:/usr/local/bin/docker -v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins -v /var/run/docker.sock:/var/run/docker.sock -e SEED_COMPOSE_PROJECT_NAME=$${SEED_COMPOSE_PROJECT_NAME:-microservices-go} -e SEED_COMPOSE_FILES=$${SEED_COMPOSE_FILES:-docker-compose.yml} -e SEED_ANALYSIS_MODE=$${SEED_ANALYSIS_MODE:-synthetic} oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+
+seed-nike-live:
+	SEED_ANALYSIS_MODE=live $(MAKE) seed-nike-backend
 
 test:
 	go test ./services/...

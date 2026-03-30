@@ -746,6 +746,9 @@ services:
     profiles: ["migrations"]
     image: oryd/kratos:v25.4.0
     entrypoint: ["sh", "/etc/config/kratos/migrate.sh"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       KRATOS_DB_HOST: postgres
       KRATOS_DB_PORT: "5432"
@@ -767,6 +770,9 @@ services:
     image: oryd/kratos:v25.4.0
     restart: unless-stopped
     entrypoint: ["sh", "/etc/config/kratos/start.sh"]
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       KRATOS_DB_HOST: postgres
       KRATOS_DB_PORT: "5432"

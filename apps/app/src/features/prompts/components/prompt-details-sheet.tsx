@@ -20,7 +20,7 @@ function PromptDetailsContent({ prompt, mobile }: { prompt: PromptItem; mobile: 
       <div className={cn("border-b px-5 py-4", mobile ? "pt-2" : "px-6 py-5")}>
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant="outline">{prompt.rowMode === "global" ? "Vue globale" : "Par IA"}</Badge>
-          {prompt.persona ? <Badge variant="outline">{prompt.persona}</Badge> : null}
+          {/* Persona badge is intentionally paused for now. */}
           <Badge variant="outline">{prompt.runs.length} executions</Badge>
           <Badge variant="outline">{promptStatusLabel(prompt.status)}</Badge>
         </div>

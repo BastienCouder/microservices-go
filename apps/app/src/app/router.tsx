@@ -86,7 +86,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
         path="/onboarding"
         element={
           <Suspense fallback={null}>
-            <OnboardingPage />
+            <OnboardingPage apiBaseURL={apiBaseURL} />
           </Suspense>
         }
       />

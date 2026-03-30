@@ -1,9 +1,13 @@
 import type { DateRange } from "react-day-picker";
 
 import { apiRoutes } from "@/lib/api-config";
+import {
+  normalizeModelPayloadList,
+  toProjectModelMeta,
+  type ProjectModelMeta,
+} from "@/lib/project-models";
 import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
-import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { gatewayJSON } from "@/shared/api/gateway";
 
 export type MonitoringCompetitor = {
@@ -14,16 +18,7 @@ export type MonitoringCompetitor = {
   trend: "up" | "down" | "stable";
 };
 
-export type MonitoringModel = {
-  id: string;
-  displayName: string;
-  provider: string;
-  groupName: string;
-  providerModelId: string;
-  description: string;
-  iconPath: string;
-  live: boolean;
-};
+export type MonitoringModel = ProjectModelMeta;
 
 export type MonitoringPrompt = {
   responseId: string;
@@ -568,19 +563,9 @@ export async function loadMonitoringData(
   const monitoringPayload = asObject(unwrapRequiredEnvelope(monitoringRes, "monitoring"));
   const alertsPayload = asArray(unwrapRequiredEnvelope(alertsRes, "alerts"));
 
-  const projectModels: MonitoringModel[] = modelsPayload.map((entry) => {
-    const row = asObject(entry);
-    return {
-      id: asString(getField(row, ["id", "ID"])),
-      displayName: asString(getField(row, ["displayName", "DisplayName"])),
-      provider: asString(getField(row, ["provider", "Provider"])),
-      groupName: asString(getField(row, ["groupName", "GroupName"])).trim(),
-      providerModelId: asString(getField(row, ["providerModelId", "ProviderModelId"])),
-      description: asString(getField(row, ["description", "Description"])),
-      iconPath: toSafeImageAssetPath(asString(getField(row, ["iconPath", "IconPath"]))),
-      live: asBool(getField(row, ["isEnabledForProject"])),
-    };
-  });
+  const projectModels: MonitoringModel[] = normalizeModelPayloadList(modelsPayload).map((model) =>
+    toProjectModelMeta(model),
+  );
 
   const liveModels = projectModels.filter((model) => model.live);
   const models = options?.includeHistoricalModels ? projectModels : liveModels;

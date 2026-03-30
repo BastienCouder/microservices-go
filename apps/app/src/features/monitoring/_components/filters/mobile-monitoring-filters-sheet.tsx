@@ -50,9 +50,6 @@ export function MobileMonitoringFiltersSheet({
   onOpenChange,
   showResetFilters,
   onResetFilters,
-  personaOptions,
-  selectedPersonas,
-  togglePersona,
   models,
   selectedModels,
   toggleModel,
@@ -77,7 +74,8 @@ export function MobileMonitoringFiltersSheet({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <div className="space-y-6">
-            <section className="space-y-3 rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
+            {/* Persona filters are intentionally paused for now. */}
+            {/* <section className="space-y-3 rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
               <SectionHeader title="Persona" count={selectedPersonas.length} />
               {personaOptions.length === 0 ? (
                 <FiltersEmptyStateCard label="Aucun persona disponible." className="h-[120px]" />
@@ -94,7 +92,7 @@ export function MobileMonitoringFiltersSheet({
                   ))}
                 </div>
               )}
-            </section>
+            </section> */}
 
             <section className="space-y-4 rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
               <SectionHeader title="Modèles IA" count={selectedModels.length} />

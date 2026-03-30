@@ -44,6 +44,8 @@ export const apiRoutes = {
   },
   aiModels: {
     list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,
+    create: () => "/projects/ai-models",
+    update: (modelId: string) => `/projects/ai-models/${modelId}`,
   },
   analysis: {
     analyze: (projectId: string) => `/analysis/projects/${projectId}/analyze`,

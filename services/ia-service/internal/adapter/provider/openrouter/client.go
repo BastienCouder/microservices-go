@@ -17,8 +17,12 @@ const defaultBaseURL = "https://openrouter.ai/api/v1"
 var modelAliases = map[string]string{
 	"gpt-4o-mini":       "openai/gpt-4o-mini",
 	"gpt-4o":            "openai/gpt-4o",
+	"gpt-oss-20b-free":  "openai/gpt-oss-20b:free",
+	"gpt-oss-120b-free": "openai/gpt-oss-120b:free",
 	"claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
 	"gemini-2.0-flash":  "google/gemini-2.0-flash-001",
+	"gemma-3-4b-free":   "google/gemma-3-4b-it:free",
+	"gemma-3-27b-free":  "google/gemma-3-27b-it:free",
 	"sonar":             "perplexity/sonar",
 	"sonar-pro":         "perplexity/sonar-pro",
 	"mistral-large":     "mistralai/mistral-large",

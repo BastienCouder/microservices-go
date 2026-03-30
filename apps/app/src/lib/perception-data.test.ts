@@ -151,6 +151,10 @@ describe("loadPerceptionData", () => {
     expect(result.data.brandCanon.useCases).toEqual([]);
     expect(result.data.brandCanon.features).toEqual([]);
     expect(result.data.metadata.models).toEqual(["ChatGPT", "Claude"]);
+    expect(result.data.metadata.modelCatalog.map((model) => model.id)).toEqual([
+      "gpt-4o-mini",
+      "claude-3-7-sonnet",
+    ]);
     expect(result.data.metadata.analyzedResponses).toBe(3);
     expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT", "Claude"]);
     expect(
@@ -255,7 +259,8 @@ describe("loadPerceptionData", () => {
 
     const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
 
-    expect(result.data.metadata.models).toEqual(["gpt-4o-mini"]);
+    expect(result.data.metadata.models).toEqual(["ChatGPT"]);
+    expect(result.data.metadata.modelCatalog.map((model) => model.id)).toEqual(["gpt-4o-mini"]);
     expect(result.data.metadata.analyzedResponses).toBe(1);
     expect(result.data.responses).toHaveLength(1);
     expect(result.data.responses[0]?.modelId).toBe("gpt-4o-mini");
@@ -357,5 +362,98 @@ describe("loadPerceptionData", () => {
     expect(result.data.metadata.latestRunId).toBe("run-enabled");
     expect(result.data.trend["last-run"].data).toHaveLength(1);
     expect(result.data.trend["last-run"].data[0]?.positioning).toBe(100);
+  });
+
+  test("groups multiple project model variants under the same IA family in perception heatmaps", async () => {
+    mockFetchSequence([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "GPT-4o mini",
+            provider: "openai",
+            groupName: "ChatGPT",
+            providerModelId: "openai/gpt-4o-mini",
+            isEnabledForProject: true,
+          },
+          {
+            id: "gpt-4.1-mini",
+            displayName: "GPT-4.1 mini",
+            provider: "openai",
+            groupName: "ChatGPT",
+            providerModelId: "openai/gpt-4.1-mini",
+            isEnabledForProject: true,
+          },
+        ],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+          aiResponses: [
+            {
+              id: "response-1",
+              runId: "run-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est un CRM pertinent.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              runId: "run-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4.1-mini",
+              rawResponse: "Acme convient bien aux PME.",
+              brandMentioned: true,
+              brandPosition: "mid",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "neutral",
+              createdAt: "2026-03-10T08:05:00Z",
+            },
+          ],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          metadata: {
+            generatedAt: "2026-03-10T09:00:00Z",
+            projectModels: ["gpt-4o-mini", "gpt-4.1-mini"],
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
+
+    expect(result.data.metadata.models).toEqual(["GPT-4o mini", "GPT-4.1 mini"]);
+    expect(result.data.metadata.modelCatalog.map((model) => model.groupName)).toEqual([
+      "ChatGPT",
+      "ChatGPT",
+    ]);
+    expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT"]);
   });
 });
