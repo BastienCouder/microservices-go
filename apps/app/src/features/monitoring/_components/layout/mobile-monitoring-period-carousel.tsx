@@ -1,8 +1,9 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { useLocale } from "@/shared/hooks/use-i18n";
 
-import { MONITORING_PERIOD_OPTIONS } from "../../_lib/shared/monitoring-periods";
+import { getMonitoringPeriodOptions } from "../../_lib/shared/monitoring-periods";
 
 type MobileMonitoringPeriodCarouselProps = {
   value: string;
@@ -13,10 +14,13 @@ export function MobileMonitoringPeriodCarousel({
   value,
   onValueChange,
 }: MobileMonitoringPeriodCarouselProps) {
+  const { locale } = useLocale();
+  const options = getMonitoringPeriodOptions(locale);
+
   return (
     <div className="-mx-1 overflow-x-auto px-1 no-scrollbar">
       <div className="flex w-max snap-x snap-mandatory gap-2 pb-1 pr-4">
-        {MONITORING_PERIOD_OPTIONS.map((option) => {
+        {options.map((option) => {
           const isActive = option.value === value;
 
           return (

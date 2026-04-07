@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { apiRoutes } from "@/lib/api-config";
-import { PERCEPTION_TEXT } from "@/lib/app-data";
 import {
   derivePerceptionHeatmapFromResponses,
   derivePerceptionRadarFromResponses,
@@ -15,6 +14,7 @@ import {
   type PerceptionTrendPeriodKey,
   type PerceptionViewData,
 } from "@/lib/perception-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
 
 type OptimizeDraft = {
@@ -80,6 +80,7 @@ function mergeDrafts(
 }
 
 export function usePerceptionViewModel(initialData: PerceptionViewData) {
+  const { locale, t } = useScopedI18n("perception");
   const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -153,8 +154,8 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     [filteredResponses],
   );
   const filteredTopErrors = useMemo(
-    () => derivePerceptionTopErrorsFromResponses(initialData.brandCanon, filteredResponses),
-    [filteredResponses, initialData.brandCanon],
+    () => derivePerceptionTopErrorsFromResponses(initialData.brandCanon, filteredResponses, locale),
+    [filteredResponses, initialData.brandCanon, locale],
   );
   const modelAxisHeatmap = useMemo(
     () =>
@@ -180,24 +181,24 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     () => [
       {
         id: "positioning",
-        title: PERCEPTION_TEXT.scoreCards.positioning.title,
+        title: t("scoreCardPositioningTitle"),
         value: lastRunScores.positioningAccuracy,
-        hint: PERCEPTION_TEXT.scoreCards.positioning.hint,
+        hint: t("scoreCardPositioningHint"),
       },
       {
         id: "factual",
-        title: PERCEPTION_TEXT.scoreCards.factual.title,
+        title: t("scoreCardFactualTitle"),
         value: lastRunScores.factualAccuracy,
-        hint: PERCEPTION_TEXT.scoreCards.factual.hint,
+        hint: t("scoreCardFactualHint"),
       },
       {
         id: "sentiment",
-        title: PERCEPTION_TEXT.scoreCards.sentiment.title,
+        title: t("scoreCardSentimentTitle"),
         value: lastRunScores.sentimentScore,
-        hint: PERCEPTION_TEXT.scoreCards.sentiment.hint,
+        hint: t("scoreCardSentimentHint"),
       },
     ],
-    [lastRunScores],
+    [lastRunScores, t],
   );
 
   const handleFix = async (error: PerceptionError) => {
@@ -266,7 +267,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
       );
     } catch (err) {
       setPersistError(
-        err instanceof Error ? err.message : PERCEPTION_TEXT.optimizeActions.createActionError,
+        err instanceof Error ? err.message : t("optimizeActionsCreateError"),
       );
     } finally {
       setSavingErrorIds((current) => {

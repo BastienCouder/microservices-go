@@ -3,12 +3,12 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   formatPerceptionFixTypeLabel,
   formatPerceptionPriorityLabel,
   formatPerceptionStatusLabel,
-  PERCEPTION_TEXT,
-} from "@/lib/app-data";
+} from "../_lib";
 
 type OptimizeDraft = {
   id: string;
@@ -27,13 +27,14 @@ export function PerceptionOptimizeActions({
   drafts: OptimizeDraft[];
   persistError: string | null;
 }) {
+  const { locale, t } = useScopedI18n("perception");
   return (
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          <MonitoringSectionTitle>{PERCEPTION_TEXT.optimizeActions.title}</MonitoringSectionTitle>
+          <MonitoringSectionTitle>{t("optimizeActionsTitle")}</MonitoringSectionTitle>
         </CardTitle>
-        <CardDescription>{PERCEPTION_TEXT.optimizeActions.description}</CardDescription>
+        <CardDescription>{t("optimizeActionsDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {persistError ? (
@@ -43,7 +44,7 @@ export function PerceptionOptimizeActions({
         ) : null}
         {drafts.length === 0 ? (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            {PERCEPTION_TEXT.optimizeActions.empty}
+            {t("optimizeActionsEmpty")}
           </div>
         ) : (
           drafts.map((draft) => (
@@ -51,12 +52,12 @@ export function PerceptionOptimizeActions({
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="font-medium text-sm">{draft.title}</div>
                 <Badge variant={draft.priority === "high" ? "destructive" : "secondary"}>
-                  {formatPerceptionPriorityLabel(draft.priority)}
+                  {formatPerceptionPriorityLabel(draft.priority, locale)}
                 </Badge>
               </div>
               <div className="mb-2 text-xs text-muted-foreground">
-                {formatPerceptionFixTypeLabel(draft.type)} • {PERCEPTION_TEXT.optimizeActions.statusPrefix}:{" "}
-                {formatPerceptionStatusLabel(draft.status)}
+                {formatPerceptionFixTypeLabel(draft.type, locale)} • {t("optimizeActionsStatusPrefix")}:{" "}
+                {formatPerceptionStatusLabel(draft.status, locale)}
               </div>
               <p className="mb-2 text-sm">{draft.issue}</p>
               <div className="rounded-md bg-muted/50 p-2 text-sm">{draft.generatedContent}</div>

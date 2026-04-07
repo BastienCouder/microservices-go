@@ -13,7 +13,7 @@ import {
 import { buildResponseRows } from "./prompt-data-factory";
 import { buildPromptsDerivedActions } from "./prompt-derived-actions";
 import { usePromptsDerivedEffects } from "./use-prompts-derived-effects";
-import { normalizeModelName, PERIOD_TO_MINUTES, STAGES } from "./utils";
+import { DEFAULT_PROMPT_PERIOD, normalizeModelName, PERIOD_TO_MINUTES, STAGES } from "./utils";
 import type { AIModel, PeriodKey, PromptItem, PromptRowMode, PromptSort, PromptSortDirection } from "./types";
 
 type MonitoringDataShape = {
@@ -46,7 +46,7 @@ type UsePromptsDerivedStateParams = {
   criticalOnly: boolean;
   noMentionOnly: boolean;
   showHistorical: boolean;
-  topCompetitor: string;
+  selectedCompetitors: string[];
   focusPromptId: string | null;
   responseVisibleCount: number;
   selectedPromptId: string | null;
@@ -68,7 +68,7 @@ type UsePromptsDerivedStateParams = {
   setCriticalOnly: (value: boolean) => void;
   setNoMentionOnly: (value: boolean) => void;
   setShowHistorical: (value: boolean) => void;
-  setTopCompetitor: (value: "all" | string) => void;
+  setSelectedCompetitors: (value: string[] | ((current: string[]) => string[])) => void;
   setFocusPromptId: (value: string | null) => void;
   setPromptSort: (value: PromptSort) => void;
   setPromptSortDirection: (value: PromptSortDirection | ((current: PromptSortDirection) => PromptSortDirection)) => void;
@@ -97,7 +97,7 @@ export function usePromptsDerivedState({
   criticalOnly,
   noMentionOnly,
   showHistorical,
-  topCompetitor,
+  selectedCompetitors,
   focusPromptId,
   responseVisibleCount,
   selectedPromptId,
@@ -119,7 +119,7 @@ export function usePromptsDerivedState({
   setCriticalOnly,
   setNoMentionOnly,
   setShowHistorical,
-  setTopCompetitor,
+  setSelectedCompetitors,
   setFocusPromptId,
   setPromptSort,
   setPromptSortDirection,
@@ -160,6 +160,12 @@ export function usePromptsDerivedState({
   );
 
   const rangeMinutes = useMemo(() => {
+    if (period === "ytd") {
+      const now = new Date();
+      const startOfYear = new Date(now.getFullYear(), 0, 1);
+      const days = Math.max(1, differenceInCalendarDays(now, startOfYear) + 1);
+      return days * 24 * 60;
+    }
     if (period !== "custom") return PERIOD_TO_MINUTES[period];
     if (!dateRange?.from) return PERIOD_TO_MINUTES["90d"];
     const to = dateRange.to ?? dateRange.from;
@@ -170,14 +176,13 @@ export function usePromptsDerivedState({
   const filteredPromptRows = useMemo(() => {
     const searchLower = deferredSearch.toLowerCase();
     const rows = prompts.filter((item) => {
-      const matchesPeriod = item.lastRunMinutes <= rangeMinutes || item.runs.length === 0;
       const matchesModel =
         selectedPromptModels.length === 0 ||
         item.models.length === 0 ||
         item.models.some((model) => selectedPromptModels.includes(model));
       const matchesSearch = searchLower === "" || item.prompt.toLowerCase().includes(searchLower);
       const matchesArchive = showArchived || item.status !== "archived";
-      return matchesPeriod && matchesModel && matchesSearch && matchesArchive;
+      return matchesModel && matchesSearch && matchesArchive;
     });
 
     return sortPromptItems(rows, promptSort, promptSortDirection);
@@ -186,7 +191,6 @@ export function usePromptsDerivedState({
     promptSort,
     promptSortDirection,
     prompts,
-    rangeMinutes,
     selectedPromptModels,
     showArchived,
   ]);
@@ -220,9 +224,11 @@ export function usePromptsDerivedState({
         const matchesNoMention = !noMentionOnly || !item.mention;
         const matchesHistory = showHistorical || !item.isHistorical;
         const matchesCompetitor =
-          topCompetitor === "all" ||
-          item.competitors.includes(topCompetitor) ||
-          item.competitor === topCompetitor;
+          selectedCompetitors.length === 0 ||
+          selectedCompetitors.some(
+            (competitor) =>
+              item.competitors.includes(competitor) || item.competitor === competitor,
+          );
         const matchesFocusedPrompt = !focusPromptId || item.promptId === focusPromptId;
         return (
           matchesPeriod &&
@@ -247,7 +253,7 @@ export function usePromptsDerivedState({
     search,
     selectedResponseModels,
     showHistorical,
-    topCompetitor,
+    selectedCompetitors,
   ]);
 
   usePromptsDerivedEffects({
@@ -271,7 +277,7 @@ export function usePromptsDerivedState({
     onlyErrors,
     criticalOnly,
     showHistorical,
-    topCompetitor,
+    selectedCompetitorsKey: selectedCompetitors.join("|"),
     search,
     setSelectedPromptId,
     setResponseVisibleCount,
@@ -293,12 +299,12 @@ export function usePromptsDerivedState({
     toolbarAvailableModels.every((model) => toolbarSelectedModels.includes(model));
 
   const hasActiveGlobalFilters =
-    period !== "7d" ||
     showArchived ||
     search.trim().length > 0 ||
     toolbarSelectedModels.length !== toolbarAvailableModels.length ||
     toolbarAvailableModels.some((model) => !toolbarSelectedModels.includes(model)) ||
-    (tab === "responses" && !showHistorical);
+    (tab === "responses" &&
+      (period !== DEFAULT_PROMPT_PERIOD || !showHistorical || selectedCompetitors.length > 0));
 
   const actions = buildPromptsDerivedActions({
     allModelsSelected,
@@ -320,7 +326,7 @@ export function usePromptsDerivedState({
     setCriticalOnly,
     setNoMentionOnly,
     setShowHistorical,
-    setTopCompetitor,
+    setSelectedCompetitors,
     setFocusPromptId,
     setPromptPage,
     setSelectedPromptIds,

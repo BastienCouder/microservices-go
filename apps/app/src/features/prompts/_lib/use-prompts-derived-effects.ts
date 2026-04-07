@@ -25,7 +25,7 @@ type UsePromptsDerivedEffectsParams = {
   onlyErrors: boolean;
   criticalOnly: boolean;
   showHistorical: boolean;
-  topCompetitor: string;
+  selectedCompetitorsKey: string;
   search: string;
   setSelectedPromptId: (value: string | null | ((current: string | null) => string | null)) => void;
   setResponseVisibleCount: (value: number | ((current: number) => number)) => void;
@@ -84,7 +84,7 @@ export function usePromptsDerivedEffects(params: UsePromptsDerivedEffectsParams)
     params.selectedResponseModelsKey,
     params.setResponseVisibleCount,
     params.showHistorical,
-    params.topCompetitor,
+    params.selectedCompetitorsKey,
   ]);
 
   useEffect(() => {

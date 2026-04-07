@@ -4,14 +4,11 @@ import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import { ModelFilterModeTabs } from "@/components/monitoring/model-filter-mode-tabs";
-import { Badge } from "@/components/ui/badge";
+import { PeriodFilterPicker } from "@/components/monitoring/period-filter-picker";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { FiltersEmptyStateCard } from "@/features/monitoring/_components/shared/filters-empty-state-card";
 import { ModelCard } from "@/features/monitoring/_components/shared/model-card";
-import { PERCEPTION_PERIOD_LABELS, PERCEPTION_TEXT } from "@/lib/app-data";
 import type {
   BrandCanon,
   PerceptionModelOption,
@@ -24,13 +21,18 @@ import {
   type ProjectModelFilterItem,
 } from "@/lib/project-models";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { BrandCanonHeroInsightCard } from "../brand-canon/_components";
+import { buildBrandCanonHeroInsight } from "../brand-canon/_lib";
+import { buildPerceptionPeriodOptions } from "../_lib";
 import { BrandCanonSummary } from "./brand-canon-summary";
 
 const MODELS_COUNT = 4;
 
 export function PerceptionLeftPanel({
   canon,
-  source,
+  radar,
+  trendData,
   windowLabel,
   analyzedResponses,
   selectedModels,
@@ -46,7 +48,8 @@ export function PerceptionLeftPanel({
   isDemo,
 }: {
   canon: BrandCanon;
-  source: PerceptionViewData["source"];
+  radar: PerceptionViewData["radar"];
+  trendData: PerceptionViewData["trend"][PerceptionTrendPeriodKey]["data"];
   windowLabel: string;
   analyzedResponses: number;
   selectedModels: string[];
@@ -61,6 +64,7 @@ export function PerceptionLeftPanel({
   onToggleModelFilterMode: (value: boolean) => void;
   isDemo: boolean;
 }) {
+  const { locale, t } = useScopedI18n("perception");
   const location = useLocation();
   const brandEditSearch = useMemo(() => {
     const params = new URLSearchParams(location.search.startsWith("?") ? location.search.slice(1) : location.search);
@@ -68,42 +72,26 @@ export function PerceptionLeftPanel({
     const search = params.toString();
     return search ? `?${search}` : "";
   }, [location.search]);
+  const heroInsight = useMemo(
+    () =>
+      buildBrandCanonHeroInsight(radar, trendData, {
+        windowLabel,
+        analyzedResponses,
+      }, locale),
+    [analyzedResponses, locale, radar, trendData, windowLabel],
+  );
 
   return (
     <div className="flex h-auto flex-col xl:h-full">
-      <div className="m-2 mb-4 shrink-0 rounded-md bg-primary p-4 text-primary-foreground">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <h4 className="mt-1 leading-tight">
-              <MonitoringSectionTitle className="text-primary-foreground [&>span:first-child]:text-primary-foreground">
-                {PERCEPTION_TEXT.leftPanel.title}
-              </MonitoringSectionTitle>
-            </h4>
-            <p className="mt-3 text-xs text-primary-foreground/85">{PERCEPTION_TEXT.leftPanel.helper}</p>
-          </div>
-          <Badge variant="secondary" className="border-0 bg-white/15 text-primary-foreground hover:bg-white/15">
-            {source === "project"
-              ? PERCEPTION_TEXT.leftPanel.source.project
-              : source === "fallback"
-                ? PERCEPTION_TEXT.leftPanel.source.fallback
-                : PERCEPTION_TEXT.leftPanel.source.demo}
-          </Badge>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Badge variant="secondary" className="border-0 bg-white/15 text-primary-foreground hover:bg-white/15">
-            {windowLabel}
-          </Badge>
-          <Badge variant="secondary" className="border-0 bg-white/15 text-primary-foreground hover:bg-white/15">
-            {analyzedResponses} {PERCEPTION_TEXT.leftPanel.responsesLabel}
-          </Badge>
-        </div>
+      <div className="m-2 mb-4 shrink-0">
+        <BrandCanonHeroInsightCard insight={heroInsight} />
       </div>
 
       <Tabs defaultValue="brand" className="min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-2 pb-2">
           <TabsList className="h-9 w-full">
-            <TabsTrigger value="brand">{PERCEPTION_TEXT.leftPanel.tabs.brand}</TabsTrigger>
-            <TabsTrigger value="filters">{PERCEPTION_TEXT.leftPanel.tabs.filters}</TabsTrigger>
+            <TabsTrigger value="brand">{t("leftPanelTabBrand")}</TabsTrigger>
+            <TabsTrigger value="filters">{t("leftPanelTabFilters")}</TabsTrigger>
           </TabsList>
         </div>
 
@@ -112,9 +100,9 @@ export function PerceptionLeftPanel({
             canon={canon}
             isDemo={isDemo}
             action={
-              <Button asChild variant="outline" size="sm" className="rounded-full">
+              <Button asChild variant="outline" size="sm" className="w-full justify-center rounded-full">
                 <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
-                  Changer de marque
+                  {t("leftPanelChangeBrand")}
                 </Link>
               </Button>
             }
@@ -163,6 +151,7 @@ function PerceptionFiltersPanel({
   showUniqueModelFilters: boolean;
   onToggleModelFilterMode: (value: boolean) => void;
 }) {
+  const { locale, t } = useScopedI18n("perception");
   const visibleModelFilterItems = useMemo<ProjectModelFilterItem[]>(
     () => buildProjectModelFilterItems(modelOptions, showUniqueModelFilters),
     [modelOptions, showUniqueModelFilters],
@@ -202,24 +191,17 @@ function PerceptionFiltersPanel({
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{PERCEPTION_TEXT.filters.period}</label>
-        <Select value={selectedPeriod} onValueChange={(value) => onPeriodChange(value as PerceptionTrendPeriodKey)}>
-          <SelectTrigger className="h-10 w-full bg-background lg:h-8">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent position="item-aligned">
-            <SelectItem value="all">{PERCEPTION_PERIOD_LABELS.all}</SelectItem>
-            <SelectItem value="7d">{PERCEPTION_PERIOD_LABELS["7d"]}</SelectItem>
-            <SelectItem value="30d">{PERCEPTION_PERIOD_LABELS["30d"]}</SelectItem>
-            <SelectItem value="90d">{PERCEPTION_PERIOD_LABELS["90d"]}</SelectItem>
-            <SelectItem value="last-run">{PERCEPTION_PERIOD_LABELS["last-run"]}</SelectItem>
-          </SelectContent>
-        </Select>
+        <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersPeriod")}</label>
+        <PeriodFilterPicker
+          value={selectedPeriod}
+          onValueChange={(value) => onPeriodChange(value as PerceptionTrendPeriodKey)}
+          options={buildPerceptionPeriodOptions(locale)}
+        />
       </div>
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between gap-2">
-          <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{PERCEPTION_TEXT.filters.models}</label>
+          <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersModels")}</label>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -230,7 +212,7 @@ function PerceptionFiltersPanel({
               )}
               onClick={onResetModels}
             >
-              {PERCEPTION_TEXT.filters.clear}
+              {t("filtersClear")}
             </Button>
           </div>
         </div>
@@ -238,12 +220,12 @@ function PerceptionFiltersPanel({
         <ModelFilterModeTabs
           value={showUniqueModelFilters ? "unique" : "grouped"}
           onValueChange={(value) => onToggleModelFilterMode(value === "unique")}
-          groupedLabel={PERCEPTION_TEXT.filters.groupedMode}
-          uniqueLabel={PERCEPTION_TEXT.filters.uniqueMode}
+          groupedLabel={t("filtersGroupedMode")}
+          uniqueLabel={t("filtersUniqueMode")}
         />
 
         {modelOptions.length === 0 ? (
-          <FiltersEmptyStateCard label={PERCEPTION_TEXT.filters.noModels} />
+          <FiltersEmptyStateCard label={t("filtersNoModels")} />
         ) : (
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             {visibleModels.map((model) => (
@@ -268,11 +250,11 @@ function PerceptionFiltersPanel({
           >
             {showAllModels ? (
               <>
-                {PERCEPTION_TEXT.filters.showLess} <ChevronUp className="ml-1 h-3 w-3" />
+                {t("filtersShowLess")} <ChevronUp className="ml-1 h-3 w-3" />
               </>
             ) : (
               <>
-                {PERCEPTION_TEXT.filters.showMore} ({visibleModelFilterItems.length - MODELS_COUNT}){" "}
+                {t("filtersShowMore")} ({visibleModelFilterItems.length - MODELS_COUNT}){" "}
                 <ChevronDown className="ml-1 h-3 w-3" />
               </>
             )}

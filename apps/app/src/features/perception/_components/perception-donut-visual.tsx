@@ -1,16 +1,26 @@
 "use client";
 
 import { useMemo } from "react";
+import { Badge } from "@/components/ui/badge";
 import type { PerceptionViewData } from "@/lib/perception-data";
-import { PERCEPTION_DONUT_COLORS, PERCEPTION_TEXT, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
+import { PERCEPTION_DONUT_COLORS, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { getPerceptionAxisLabel, getPerceptionGradeLabel } from "../_lib";
 
 type RankedPoint = PerceptionViewData["radar"][number] & {
   color: string;
 };
 
-export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["radar"] }) {
+export function PerceptionDonutVisual({
+  points,
+  periodLabel,
+}: {
+  points: PerceptionViewData["radar"];
+  periodLabel: string;
+}) {
+  const { locale, t } = useScopedI18n("perception");
   const rankedPoints = useMemo<RankedPoint[]>(() => {
     const byAxis = new Map(points.map((point) => [point.axis, point] as const));
     const orderedPoints: RankedPoint[] = [];
@@ -35,8 +45,8 @@ export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["
   if (rankedPoints.length === 0) {
     return (
       <div className="rounded-[28px] border border-border/60 bg-background px-5 py-6">
-        <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
-        <p className="mt-2 text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
+        <MonitoringSectionTitle>{t("donutTitle")}</MonitoringSectionTitle>
+        <p className="mt-2 text-sm text-muted-foreground">{t("donutSubtitle")}</p>
       </div>
     );
   }
@@ -45,48 +55,18 @@ export function PerceptionDonutVisual({ points }: { points: PerceptionViewData["
     <div className="px-5 py-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
-          <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</p>
+          <MonitoringSectionTitle>{t("donutTitle")}</MonitoringSectionTitle>
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
         </div>
-        <div className="grid min-w-[15rem] grid-cols-1 gap-2 sm:grid-cols-3 md:min-w-[24rem]">
-          <SummaryStat
-            label={PERCEPTION_TEXT.donut.overallLabel}
-            value={`${overallScore}/100`}
-          />
-          <SummaryStat
-            label={PERCEPTION_TEXT.donut.bestAxisLabel}
-            value={bestPoint ? `${bestPoint.label} ${bestPoint.score}` : "--"}
-          />
-          <SummaryStat
-            label={PERCEPTION_TEXT.donut.weakestAxisLabel}
-            value={weakestPoint ? `${weakestPoint.label} ${weakestPoint.score}` : "--"}
-            helper={`${alignedAxesCount}/${rankedPoints.length} ${PERCEPTION_TEXT.donut.alignedAxesLabel}`}
-          />
-        </div>
+        <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
+          {periodLabel}
+        </Badge>
       </div>
       <div className="mt-3 space-y-3">
         {rankedPoints.map((point, index) => (
-          <AxisProgressRow key={point.axis} point={point} rank={index + 1} />
+          <AxisProgressRow key={point.axis} point={point} rank={index + 1} locale={locale} />
         ))}
       </div>
-    </div>
-  );
-}
-
-function SummaryStat({
-  label,
-  value,
-  helper,
-}: {
-  label: string;
-  value: string;
-  helper?: string;
-}) {
-  return (
-    <div className="rounded-[18px] border border-border/60 bg-background/70 px-3 py-2.5">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
-      <div className="mt-1 text-sm font-semibold text-foreground">{value}</div>
-      {helper ? <div className="mt-1 text-[11px] text-muted-foreground">{helper}</div> : null}
     </div>
   );
 }
@@ -94,15 +74,19 @@ function SummaryStat({
 function AxisProgressRow({
   point,
   rank,
+  locale,
 }: {
   point: RankedPoint;
   rank: number;
+  locale: string;
 }) {
+  const { t } = useScopedI18n("perception");
   const progressWidth = `${Math.max(6, Math.min(100, point.score))}%`;
   const targetOffset = `calc(${Math.max(0, Math.min(100, point.target))}% - 1px)`;
   const delta = point.score - point.target;
-  const statusLabel = delta >= 0 ? PERCEPTION_TEXT.donut.aboveTarget : PERCEPTION_TEXT.donut.belowTarget;
-  const gradeLabel = getPerceptionGradeLabel(point.score);
+  const statusLabel = delta >= 0 ? t("donutAboveTarget") : t("donutBelowTarget");
+  const gradeLabel = getPerceptionGradeLabel(point.score, locale);
+  const axisLabel = getPerceptionAxisLabel(point.axis, locale);
 
   return (
     <div className="rounded-[20px] border border-border/60 bg-background/85 p-3">
@@ -115,7 +99,7 @@ function AxisProgressRow({
             {rank}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-foreground">{point.label}</div>
+            <div className="truncate text-sm font-semibold text-foreground">{axisLabel}</div>
             <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
               <span className="font-medium text-foreground/80">{gradeLabel}</span>
               <span className="text-muted-foreground">•</span>
@@ -151,12 +135,4 @@ function AxisProgressRow({
 function averageScore(values: number[]): number {
   if (values.length === 0) return 0;
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
-}
-
-function getPerceptionGradeLabel(score: number): string {
-  if (score >= 90) return PERCEPTION_TEXT.donut.grades.excellent;
-  if (score >= 80) return PERCEPTION_TEXT.donut.grades.veryGood;
-  if (score >= 65) return PERCEPTION_TEXT.donut.grades.good;
-  if (score >= 50) return PERCEPTION_TEXT.donut.grades.fragile;
-  return PERCEPTION_TEXT.donut.grades.insufficient;
 }

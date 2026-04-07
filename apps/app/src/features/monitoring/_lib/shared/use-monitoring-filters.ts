@@ -65,7 +65,7 @@ export function getActiveMonitoringFilterCount(filters: MonitoringFiltersSnapsho
     filters.selectedModels.length +
     filters.selectedCompetitors.length;
 
-  if (filters.period !== "7d" || filters.dateRange !== undefined) {
+  if (filters.period !== "14d" || filters.dateRange !== undefined) {
     count += 1;
   }
 

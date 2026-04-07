@@ -1,28 +1,29 @@
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+
 import { defaultPromptSchedule, promptScheduleLabel } from "./utils";
 import type { AIModel, PromptItem, PromptSchedule } from "./types";
 
 export const GLOBAL_CADENCE_PRESETS = [
-  { id: "6h", label: "Toutes les 6 heures", cron: "0 */6 * * *" },
-  { id: "daily", label: "Chaque jour a 09:00", cron: "0 9 * * *" },
-  { id: "twice-weekly", label: "Deux fois par semaine", cron: "0 9 * * 1,4" },
-  { id: "weekends", label: "Tous les week-ends", cron: "30 8 * * 6,0" },
+  { id: "6h", labelKey: "preset6hLabel", cron: "0 */6 * * *" },
+  { id: "daily", labelKey: "presetDaily0900Label", cron: "0 9 * * *" },
+  { id: "twice-weekly", labelKey: "presetTwiceWeeklyLabel", cron: "0 9 * * 1,4" },
+  { id: "weekends", labelKey: "presetWeekendsLabel", cron: "30 8 * * 6,0" },
 ];
 
 export const PROMPT_STATUS_OPTIONS: Array<{
   value: PromptItem["status"];
-  label: string;
 }> = [
-  { value: "active", label: "Actif" },
-  { value: "disabled", label: "Desactive" },
-  { value: "archived", label: "Archive" },
+  { value: "active" },
+  { value: "disabled" },
+  { value: "archived" },
 ];
 
 export const PROMPT_MAX_LENGTH = 500;
 
-export function getPromptStatusLabel(status: PromptItem["status"]) {
-  if (status === "active") return "Actif";
-  if (status === "disabled") return "Desactive";
-  return "Archive";
+export function getPromptStatusLabel(status: PromptItem["status"], locale = "en") {
+  if (status === "active") return translateI18nText("prompts-workspace", "statusActive", locale);
+  if (status === "disabled") return translateI18nText("prompts-workspace", "statusDisabled", locale);
+  return translateI18nText("prompts-workspace", "statusArchived", locale);
 }
 
 export function normalizeEditorSchedule(
@@ -44,15 +45,20 @@ export function normalizeEditorSchedule(
   };
 }
 
-export function buildEditorCadenceSummary(schedule: PromptSchedule) {
+export function buildEditorCadenceSummary(schedule: PromptSchedule, locale = "en") {
   const overridesCount = Object.keys(schedule.modelCrons).length;
   return {
     overridesCount,
-    cadenceModeLabel: schedule.mode === "global" ? "Cadence globale" : "Cadence par IA",
-    scheduleLabel: promptScheduleLabel(schedule),
+    cadenceModeLabel:
+      schedule.mode === "global"
+        ? translateI18nText("prompts-workspace", "cadenceModeGlobal", locale)
+        : translateI18nText("prompts-workspace", "cadenceModePerAi", locale),
+    scheduleLabel: promptScheduleLabel(schedule, undefined, locale),
     badgeLabel:
       schedule.mode === "global"
-        ? "Cadence globale"
-        : `${overridesCount} IA personnalisee${overridesCount > 1 ? "s" : ""}`,
+        ? translateI18nText("prompts-workspace", "cadenceModeGlobal", locale)
+        : translateI18nText("prompts-workspace", "customAiCount", locale, {
+            count: overridesCount,
+          }),
   };
 }

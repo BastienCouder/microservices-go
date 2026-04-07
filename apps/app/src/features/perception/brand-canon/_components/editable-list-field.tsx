@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { sanitizeList } from "../_lib/brand-canon-utils";
 
 export function EditableListField({
@@ -24,6 +25,7 @@ export function EditableListField({
   addLabel: string;
   emptyLabel: string;
 }) {
+  const { t } = useScopedI18n("perception-brand-canon");
   const [draft, setDraft] = useState("");
   const items = sanitizeList(value);
 
@@ -64,7 +66,7 @@ export function EditableListField({
                 type="button"
                 onClick={() => onChange(items.filter((entry) => entry !== item))}
                 className="rounded-full text-muted-foreground transition hover:text-foreground"
-                aria-label={`Supprimer ${item}`}
+                aria-label={t("removeItem", { item })}
               >
                 <X className="h-3 w-3" />
               </button>

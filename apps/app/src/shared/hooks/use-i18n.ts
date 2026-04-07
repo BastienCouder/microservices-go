@@ -1,99 +1,10 @@
-type Dictionary = Record<string, string>;
+import type { TOptions } from "i18next";
+import { useTranslation } from "react-i18next";
 
-const MONITORING_ANALYTICS_PANEL: Dictionary = {
-  autoInsightsTitle: "Insights automatiques",
-  autoInsightsDescription: "Observations clés détectées à partir des tendances de visibilité et de citations.",
-  kpiMentionRateTitle: "Taux de mention",
-  kpiVisibilityScoreTitle: "Score de visibilité",
-  kpiAvgPositionTitle: "Rang moyen",
-  mentionRateSubSuffix: "réponses mentionnent votre marque",
-  trendVs7dSuffix: "vs 7j",
-  betterPositionLabel: "meilleure position",
-  visibilityScoreSub: "Score combiné mention × position × sentiment",
-  avgPositionSub: "Sur toutes les réponses où vous êtes cité",
-  visibilityAnalyticsTitle: "Analyse de visibilité",
-  visibilityAnalyticsDescription: "Suivez l'évolution de la visibilité de votre marque sur les modèles IA sélectionnés.",
-  aiSentimentTitle: "Ton des réponses IA",
-  aiSentimentDescription: "Répartition des réponses qui mentionnent votre marque : positif, neutre ou négatif. Ce n'est pas un score unique.",
-  factualAccuracyLabel: "Réponses avec citation",
-  factualAccuracyDescription: "Part des réponses qui s'appuient sur au moins une source.",
-  sentimentPositive: "Positif",
-  sentimentNeutral: "Neutre",
-  sentimentNegative: "Négatif",
-  topCitedPagesTitle: "Pages les plus citées",
-  topCitedPagesDescription: "Couverture de citation sur les URLs les plus référencées.",
-  top3Coverage: "Couverture top 3",
-  longTailPages: "Pages longue traîne",
-  insightCitationsLabel: "Citations",
-  brandVisibilityTitle: "Visibilité de la marque",
-  brandVisibilityDescription: "Suivez les performances de votre marque dans le temps face à vos concurrents",
-  topBrands: "Top marques",
-  byVisibility: "par visibilité",
-  mentions: "mentions",
-  noDataAvailable: "Aucune donnée disponible",
-};
+import i18n, { translations, type TranslationKeys } from "@/shared/i18n";
 
-const MONITORING_FILTERS_PANEL: Dictionary = {
-  filters: "Filtres",
-  period: "Période",
-  personas: "Personas",
-  models: "Modèles",
-  clear: "Supprimer",
-  clearPersonas: "Effacer",
-  clearCompetitors: "Effacer",
-  resetFilters: "Réinitialiser les filtres",
-  topCompetitors: "Top concurrents (SOV)",
-  showLess: "Voir moins",
-  showMore: "Voir plus",
-  noDataAvailable: "Aucune donnée disponible",
-};
-
-const MONITORING_ACTIVITY_PANEL: Dictionary = {
-  criticalUpdates: "Mises à jour critiques",
-  promptsStream: "Flux de prompts",
-  noPromptsFound: "Aucun prompt trouvé.",
-  showMore: "Voir plus",
-  showLess: "Voir moins",
-  mentioned: "Mentionné",
-  missed: "Manqué",
-  rankTop: "Rang #1",
-  alertInsight: "Insight alerte",
-  triggerPrompt: "Prompt déclencheur",
-  score: "Score",
-  mentions: "Mentions",
-  rank: "Rang",
-  competitors: "Concurrents",
-  notAvailable: "N/A",
-  noDataAvailable: "Aucune donnée disponible",
-  close: "Fermer",
-  detailedAnalysis: "Analyse détaillée",
-  copyPrompt: "Copier le prompt",
-  promptCopied: "Prompt copié",
-  copyUnavailable: "Copie indisponible",
-  userPrompt: "Prompt utilisateur",
-  responseWithHighlights: "Signaux détectés",
-  visibility: "Visibilité",
-  mention: "Mention",
-  responseTone: "Ton",
-  citations: "Citations",
-  pagesCited: "Pages citées",
-  sourceCoverage: "Couverture des sources",
-  analysisSummary: "Résumé d'analyse",
-  model: "Modèle",
-  persona: "Persona",
-  factualAccuracyLabel: "Réponses avec citation",
-  sentimentPositive: "Positif",
-  sentimentNeutral: "Neutre",
-  sentimentNegative: "Négatif",
-  yes: "OUI",
-  no: "NON",
-};
-
-const CONTENT_BY_NAMESPACE: Record<string, Dictionary> = {
-  "monitoring-analytics-panel": MONITORING_ANALYTICS_PANEL,
-  "monitoring-filters-panel": MONITORING_FILTERS_PANEL,
-  "monitoring-activity-panel": MONITORING_ACTIVITY_PANEL,
-};
+type SupportedLocale = "fr" | "en";
+type TranslationNamespace = keyof TranslationKeys;
 
 function humanizeKey(value: string): string {
   return value
@@ -103,25 +14,97 @@ function humanizeKey(value: string): string {
     .trim();
 }
 
-export function useI18nScope(namespace?: string): Dictionary {
-  const scoped = namespace ? CONTENT_BY_NAMESPACE[namespace] : undefined;
+function normalizeLocale(locale: string | undefined): SupportedLocale {
+  return locale?.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+function getNamespaceContent(
+  namespace: string | undefined,
+  locale: string,
+): Record<string, string> | undefined {
+  if (!namespace) return undefined;
+
+  const normalizedLocale = normalizeLocale(locale);
+  const dictionary = translations[normalizedLocale]?.translations;
+  if (!dictionary) return undefined;
+
+  const scoped = dictionary[namespace as TranslationNamespace];
+  if (!scoped || typeof scoped !== "object" || Array.isArray(scoped)) {
+    return undefined;
+  }
+
+  return scoped as Record<string, string>;
+}
+
+export function getI18nText(namespace: string | undefined, key: string, locale: string): string {
+  const scoped = getNamespaceContent(namespace, locale);
+  const resolvedValue = scoped?.[key];
+
+  if (typeof resolvedValue === "string" && resolvedValue.length > 0) {
+    return resolvedValue;
+  }
+
+  return humanizeKey(key);
+}
+
+export function translateI18nText(
+  namespace: string | undefined,
+  key: string,
+  locale: string,
+  options?: TOptions,
+): string {
+  const normalizedLocale = normalizeLocale(locale);
+  const translate = i18n.getFixedT(normalizedLocale, "translations", namespace);
+
+  return translate(key, {
+    ...options,
+    defaultValue: getI18nText(namespace, key, normalizedLocale),
+  });
+}
+
+export function useI18nScope(namespace?: string): Record<string, string> {
+  const { i18n: translationInstance } = useTranslation(
+    "translations",
+    namespace ? { keyPrefix: namespace } : undefined,
+  );
+  const locale = translationInstance.resolvedLanguage || translationInstance.language || i18n.language;
 
   return new Proxy(
     {},
     {
       get: (_target, prop) => {
         if (typeof prop !== "string") return "";
-        if (scoped && prop in scoped) return scoped[prop] ?? "";
-        return humanizeKey(prop);
+
+        return translateI18nText(namespace, prop, locale);
       },
     },
-  ) as Dictionary;
+  ) as Record<string, string>;
+}
+
+export function useScopedI18n(namespace?: string): {
+  locale: SupportedLocale;
+  t: (key: string, options?: TOptions) => string;
+} {
+  const { i18n: translationInstance } = useTranslation(
+    "translations",
+    namespace ? { keyPrefix: namespace } : undefined,
+  );
+  const locale = normalizeLocale(
+    translationInstance.resolvedLanguage || translationInstance.language || i18n.language,
+  );
+
+  return {
+    locale,
+    t: (key, options) => translateI18nText(namespace, key, locale, options),
+  };
 }
 
 export function useLocale(): { locale: string } {
-  if (typeof navigator === "undefined") {
-    return { locale: "fr" };
-  }
-  const locale = navigator.language?.toLowerCase().startsWith("fr") ? "fr" : "en";
-  return { locale };
+  const { i18n: translationInstance } = useTranslation();
+
+  return {
+    locale: normalizeLocale(
+      translationInstance.resolvedLanguage || translationInstance.language || i18n.language,
+    ),
+  };
 }

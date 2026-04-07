@@ -62,10 +62,6 @@ export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, to
               <div className="text-xs text-muted-foreground">{content.top3Coverage}</div>
               <div className="text-sm font-semibold md:text-base">{topCitedTotal}%</div>
             </div>
-            <div className="rounded-md border p-2">
-              <div className="text-xs text-muted-foreground">{content.longTailPages}</div>
-              <div className="text-sm font-semibold md:text-base">{longTailShare}%</div>
-            </div>
           </div>
           </div>
         )}

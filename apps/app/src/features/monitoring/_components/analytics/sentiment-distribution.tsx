@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 import { Cell, Pie, PieChart } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { AI_SENTIMENT_COLORS } from "@/lib/app-data";
@@ -14,17 +14,11 @@ type SentimentItem = { name: string; value: number; fill: string };
 
 type SentimentDistributionProps = {
   sentimentData: SentimentItem[];
-  factualAccuracy: number;
-  factualAccuracyCount: number;
-  totalCount: number;
   hasData: boolean;
 };
 
 export const SentimentDistribution = memo(function SentimentDistribution({
   sentimentData,
-  factualAccuracy,
-  factualAccuracyCount,
-  totalCount,
   hasData,
 }: SentimentDistributionProps) {
   const content = useI18nScope("monitoring-analytics-panel");
@@ -60,7 +54,6 @@ export const SentimentDistribution = memo(function SentimentDistribution({
             <div className="h-[220px]">
             <ChartContainer config={localizedChartConfig} className="h-full w-full">
               <PieChart>
-                <ChartTooltip content={<ChartTooltipContent />} />
                 <Pie data={coloredSentimentData} dataKey="value" nameKey="name" innerRadius={82} outerRadius={96} strokeWidth={2}>
                   {coloredSentimentData.map((entry) => (
                     <Cell key={entry.name} fill={entry.fill} />
@@ -119,19 +112,6 @@ export const SentimentDistribution = memo(function SentimentDistribution({
           ) : (
             <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
           )}
-
-          <div className="-mt-1 text-center">
-            <div className="text-xl font-bold leading-none">{factualAccuracy}%</div>
-            <div className="text-xs text-muted-foreground md:text-sm">{content.factualAccuracyLabel}</div>
-            <div className="mt-1 text-[11px] text-muted-foreground">
-              {content.factualAccuracyDescription}
-            </div>
-            {hasData ? (
-              <div className="mt-1 text-[11px] text-muted-foreground">
-                {`${factualAccuracyCount}/${totalCount} reponses avec citation`}
-              </div>
-            ) : null}
-          </div>
 
           <div className="grid grid-cols-3 gap-2">
             {coloredSentimentData.map((item) => (

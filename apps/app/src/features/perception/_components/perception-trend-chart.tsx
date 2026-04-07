@@ -1,10 +1,13 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
-import { APP_CHART_UI_COLORS, PERCEPTION_TEXT, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
+import { APP_CHART_UI_COLORS, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { getPerceptionGradeLabel } from "../_lib";
 
 type TrendPoint = {
   label: string;
@@ -16,25 +19,35 @@ type TrendPoint = {
 export function PerceptionTrendChart({
   data,
   periodLabel,
+  badgeLabel,
 }: {
   data: TrendPoint[];
   periodLabel: string;
+  badgeLabel: string;
 }) {
+  const { t } = useScopedI18n("perception");
   const chartConfig = {
-    positioning: { label: PERCEPTION_TEXT.trend.series.positioning, color: PERCEPTION_TREND_COLORS.positioning },
-    factual: { label: PERCEPTION_TEXT.trend.series.factual, color: PERCEPTION_TREND_COLORS.factual },
-    sentiment: { label: PERCEPTION_TEXT.trend.series.sentiment, color: PERCEPTION_TREND_COLORS.sentiment },
+    positioning: { label: t("trendSeriesPositioning"), color: PERCEPTION_TREND_COLORS.positioning },
+    factual: { label: t("trendSeriesFactual"), color: PERCEPTION_TREND_COLORS.factual },
+    sentiment: { label: t("trendSeriesSentiment"), color: PERCEPTION_TREND_COLORS.sentiment },
   };
 
   return (
     <Card className="border-border/60">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">
-          <MonitoringSectionTitle>{PERCEPTION_TEXT.trend.title}</MonitoringSectionTitle>
-        </CardTitle>
-        <CardDescription>
-          {PERCEPTION_TEXT.trend.descriptionPrefix} {periodLabel} {PERCEPTION_TEXT.trend.descriptionSuffix}
-        </CardDescription>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="text-base">
+              <MonitoringSectionTitle>{t("trendTitle")}</MonitoringSectionTitle>
+            </CardTitle>
+            <CardDescription>
+              {t("trendDescription", { periodLabel })}
+            </CardDescription>
+          </div>
+          <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
+            {badgeLabel}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="min-w-0">
         <div className="h-[230px] w-full">
@@ -93,18 +106,18 @@ export function PerceptionTrendChart({
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
           <TrendDefinitionCard
             color={PERCEPTION_TREND_COLORS.positioning}
-            title={PERCEPTION_TEXT.trend.series.positioning}
-            description={PERCEPTION_TEXT.trend.definitions.positioning}
+            title={t("trendSeriesPositioning")}
+            description={t("trendDefinitionPositioning")}
           />
           <TrendDefinitionCard
             color={PERCEPTION_TREND_COLORS.factual}
-            title={PERCEPTION_TEXT.trend.series.factual}
-            description={PERCEPTION_TEXT.trend.definitions.factual}
+            title={t("trendSeriesFactual")}
+            description={t("trendDefinitionFactual")}
           />
           <TrendDefinitionCard
             color={PERCEPTION_TREND_COLORS.sentiment}
-            title={PERCEPTION_TEXT.trend.series.sentiment}
-            description={PERCEPTION_TEXT.trend.definitions.sentiment}
+            title={t("trendSeriesSentiment")}
+            description={t("trendDefinitionSentiment")}
           />
         </div>
       </CardContent>
@@ -121,13 +134,14 @@ function PerceptionTrendTooltip({
   label?: string;
   payload?: Array<{ value?: number; name?: string; color?: string }>;
 }) {
+  const { locale, t } = useScopedI18n("perception");
   if (!active || !payload?.length) return null;
 
   return (
     <div className="min-w-[340px] max-w-[370px] rounded-xl border border-border/60 bg-background/96 p-2.5 shadow-[0_14px_36px_-20px_rgba(15,23,42,0.35)] backdrop-blur-md">
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          Point de mesure
+          {t("trendTooltipMeasurement")}
         </div>
         <div className="rounded-full border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground">
           {label}
@@ -138,7 +152,7 @@ function PerceptionTrendTooltip({
           const value = typeof item.value === "number" ? item.value : 0;
           const color = item.color ?? APP_CHART_UI_COLORS.primary ?? "hsl(var(--primary))";
           const barValue = Math.max(0, Math.min(100, value));
-          const metric = getTrendTooltipMetric(item.name);
+          const metric = getTrendTooltipMetric(item.name, t);
           return (
             <div key={item.name} className="rounded-lg border border-border/50 bg-muted/15 p-2">
               <div className="flex items-start justify-between gap-2">
@@ -155,7 +169,7 @@ function PerceptionTrendTooltip({
               </div>
               <div className="flex items-center justify-between gap-2 text-[10px]">
                 <span className="font-medium" style={{ color }}>
-                  {scoreToTrendLabel(value)}
+                  {getPerceptionGradeLabel(value, locale)}
                 </span>
               </div>
               <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted/50">
@@ -189,29 +203,21 @@ function TrendDefinitionCard({
   );
 }
 
-function getTrendTooltipMetric(key?: string) {
+function getTrendTooltipMetric(key: string | undefined, t: (key: string) => string) {
   if (key === "positioning") {
     return {
-      label: PERCEPTION_TEXT.trend.series.positioning,
-      description: PERCEPTION_TEXT.trend.definitions.positioning,
+      label: t("trendSeriesPositioning"),
+      description: t("trendDefinitionPositioning"),
     };
   }
   if (key === "factual") {
     return {
-      label: PERCEPTION_TEXT.trend.series.factual,
-      description: PERCEPTION_TEXT.trend.definitions.factual,
+      label: t("trendSeriesFactual"),
+      description: t("trendDefinitionFactual"),
     };
   }
   return {
-    label: PERCEPTION_TEXT.trend.series.sentiment,
-    description: PERCEPTION_TEXT.trend.definitions.sentiment,
+    label: t("trendSeriesSentiment"),
+    description: t("trendDefinitionSentiment"),
   };
-}
-
-function scoreToTrendLabel(score: number) {
-  if (score >= 90) return "Excellent";
-  if (score >= 80) return "Très bien";
-  if (score >= 65) return "Bien";
-  if (score >= 50) return "Fragile";
-  return "Insuffisant";
 }

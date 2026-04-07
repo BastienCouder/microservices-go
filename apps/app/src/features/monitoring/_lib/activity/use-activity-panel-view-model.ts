@@ -8,6 +8,28 @@ import { useMonitoringFilters } from "../shared/use-monitoring-filters";
 
 type MonitoringAlert = MonitoringData["alerts"][number];
 
+function getPromptSortValue(prompt: MonitoringPrompt): number {
+  if (prompt.createdAt) {
+    const createdAt = new Date(prompt.createdAt);
+    if (!Number.isNaN(createdAt.getTime())) {
+      return createdAt.getTime();
+    }
+  }
+
+  const normalizedTime = prompt.time.trim().toLowerCase();
+  const match = normalizedTime.match(/^(\d+)\s*(m|h|d)$/);
+  if (!match) {
+    return 0;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2];
+  const multiplier =
+    unit === "m" ? 60 * 1000 : unit === "h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+  return Date.now() - amount * multiplier;
+}
+
 type ActivityPanelViewModel = {
   loading: boolean;
   filteredAlerts: MonitoringAlert[];
@@ -28,7 +50,10 @@ export function useActivityPanelViewModel(): ActivityPanelViewModel {
   const [selectedAlert, setSelectedAlert] = useState<MonitoringAlert | null>(null);
 
   const filteredPrompts = useMemo(
-    () => filterPromptsByScope(recent_prompts, filters),
+    () =>
+      [...filterPromptsByScope(recent_prompts, filters)].sort(
+        (left, right) => getPromptSortValue(right) - getPromptSortValue(left),
+      ),
     [filters, recent_prompts],
   );
   const filteredAlerts = useMemo(

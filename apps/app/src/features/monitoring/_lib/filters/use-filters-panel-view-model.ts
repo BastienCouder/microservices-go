@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
+import { buildFilterHeroInsight, type FilterHeroInsight } from "./filter-hero-insight";
 import {
   buildModelCards,
   buildPersonaOptions,
@@ -39,9 +41,11 @@ type FiltersPanelViewModel = {
   showResetFilters: boolean;
   showUniqueModelFilters: boolean;
   onModelFilterModeChange: (value: boolean) => void;
+  heroInsight: FilterHeroInsight;
 };
 
 export function useFiltersPanelViewModel(): FiltersPanelViewModel {
+  const { locale } = useScopedI18n("monitoring-filters-panel");
   const { data: monitoringData, loading } = useMonitoringData();
   const filters = useMonitoringFilters();
   const actions = useMonitoringFilterActions();
@@ -88,6 +92,16 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
       project,
       recent_prompts,
     ],
+  );
+  const heroInsight = useMemo(
+    () =>
+      buildFilterHeroInsight({
+        project: projectWithDynamicCompetitors,
+        prompts: recent_prompts,
+        filters,
+        locale,
+      }),
+    [filters, locale, projectWithDynamicCompetitors, recent_prompts],
   );
 
   const toggleModelFilter = useCallback(
@@ -145,5 +159,6 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
     showResetFilters: hasActiveMonitoringFilters(filters),
     showUniqueModelFilters: filters.showUniqueModelFilters,
     onModelFilterModeChange: actions.setShowUniqueModelFilters,
+    heroInsight,
   };
 }

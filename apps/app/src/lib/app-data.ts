@@ -78,10 +78,18 @@ export const PERCEPTION_PERIOD_LABELS = {
   "last-run": "Dernière exécution",
 } as const;
 
+export const PERCEPTION_PERIOD_BADGE_LABELS = {
+  all: "All",
+  "7d": "7d",
+  "30d": "30d",
+  "90d": "90d",
+  "last-run": "Run",
+} as const;
+
 export const PERCEPTION_TEXT = {
   donut: {
     title: "Perception de votre marque",
-    subtitle: "Lecture rapide du niveau d'alignement de votre marque dans les réponses IA.",
+    subtitle: "Niveau d'alignement de votre marque dans les réponses IA.",
     scoreCaption: "score perception",
     overallLabel: "Score global",
     bestAxisLabel: "Point fort",

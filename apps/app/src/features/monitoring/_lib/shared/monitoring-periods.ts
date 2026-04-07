@@ -1,51 +1,61 @@
-export const MONITORING_PERIOD_OPTIONS = [
-  {
-    value: "today",
-    label: "24h",
-    description: "Aujourd'hui",
-  },
-  {
-    value: "7d",
-    label: "7j",
-    description: "Semaine",
-  },
-  {
-    value: "14d",
-    label: "14j",
-    description: "2 semaines",
-  },
-  {
-    value: "30d",
-    label: "30j",
-    description: "Mois",
-  },
-  {
-    value: "90d",
-    label: "90j",
-    description: "Trimestre",
-  },
-  {
-    value: "180d",
-    label: "6m",
-    description: "Semestre",
-  },
-  {
-    value: "365d",
-    label: "1a",
-    description: "Année glissante",
-  },
-  {
-    value: "ytd",
-    label: "Année",
-    description: "Depuis janvier",
-  },
-  {
-    value: "custom",
-    label: "Custom",
-    description: "Dates",
-  },
-] as const;
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 
-export function getMonitoringPeriodLabel(value: string): string {
-  return MONITORING_PERIOD_OPTIONS.find((option) => option.value === value)?.label ?? value;
+type MonitoringPeriodOption = {
+  value: string;
+  label: string;
+  description: string;
+};
+
+export function getMonitoringPeriodOptions(locale: string): readonly MonitoringPeriodOption[] {
+  return [
+    {
+      value: "today",
+      label: translateI18nText("monitoring-filters-panel", "periodShortToday", locale),
+      description: translateI18nText("monitoring-filters-panel", "today", locale),
+    },
+    {
+      value: "7d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort7d", locale),
+      description: translateI18nText("monitoring-filters-panel", "days7", locale),
+    },
+    {
+      value: "14d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort14d", locale),
+      description: translateI18nText("monitoring-filters-panel", "days14", locale),
+    },
+    {
+      value: "30d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort30d", locale),
+      description: translateI18nText("monitoring-filters-panel", "days30", locale),
+    },
+    {
+      value: "90d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort90d", locale),
+      description: translateI18nText("monitoring-filters-panel", "months3", locale),
+    },
+    {
+      value: "180d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort180d", locale),
+      description: translateI18nText("monitoring-filters-panel", "months6", locale),
+    },
+    {
+      value: "365d",
+      label: translateI18nText("monitoring-filters-panel", "periodShort365d", locale),
+      description: translateI18nText("monitoring-filters-panel", "year1", locale),
+    },
+    {
+      value: "ytd",
+      label: translateI18nText("monitoring-filters-panel", "periodShortYtd", locale),
+      description: translateI18nText("monitoring-filters-panel", "yearToDate", locale),
+    },
+    {
+      value: "custom",
+      label: translateI18nText("monitoring-filters-panel", "periodShortCustom", locale),
+      description: translateI18nText("monitoring-filters-panel", "custom", locale),
+    },
+  ] as const;
+}
+
+export function getMonitoringPeriodLabel(value: string, locale: string): string {
+  return getMonitoringPeriodOptions(locale).find((option) => option.value === value)?.label ?? value;
 }

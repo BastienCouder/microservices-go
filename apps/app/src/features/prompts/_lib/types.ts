@@ -1,4 +1,13 @@
-export type PeriodKey = "today" | "7d" | "14d" | "30d" | "90d" | "custom";
+export type PeriodKey =
+  | "today"
+  | "7d"
+  | "14d"
+  | "30d"
+  | "90d"
+  | "180d"
+  | "365d"
+  | "ytd"
+  | "custom";
 export type Stage = "Awareness" | "Consideration" | "Decision";
 export type Persona = string;
 export type AIModel = string;

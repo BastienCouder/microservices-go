@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { ModelVisual } from "./types";
 
 type PromptModelsDialogProps = {
@@ -34,6 +35,7 @@ export function PromptModelsDialog({
   saving = false,
   onSave,
 }: PromptModelsDialogProps) {
+  const { t } = useScopedI18n("prompts-workspace");
   const [draftModels, setDraftModels] = useState<string[]>(selectedModels);
 
   useEffect(() => {
@@ -54,14 +56,14 @@ export function PromptModelsDialog({
     return `${visual.provider} ${visual.name}`.trim();
   });
   const description = selectedModelLabels.length > 0
-    ? `AI actives: ${selectedModelLabels.join(", ")}`
-    : "Aucune IA active pour ce prompt.";
+    ? t("activeAiDescription", { models: selectedModelLabels.join(", ") })
+    : t("noActiveAi");
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit AI coverage</DialogTitle>
+          <DialogTitle>{t("editAiCoverageTitle")}</DialogTitle>
           {promptLabel.trim() ? (
             <p className="line-clamp-2 text-sm font-medium leading-6 text-foreground">
               {promptLabel.trim()}
@@ -102,7 +104,7 @@ export function PromptModelsDialog({
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             onClick={() => {
@@ -110,7 +112,7 @@ export function PromptModelsDialog({
             }}
             disabled={draftModels.length === 0 || saving}
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("saving") : t("save")}
           </Button>
         </DialogFooter>
       </DialogContent>

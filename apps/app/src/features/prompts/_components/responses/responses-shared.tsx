@@ -2,6 +2,40 @@ import { forwardRef, type ComponentProps } from "react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
+
+const RESPONSE_FILTER_TONES = {
+  neutral: {
+    active: "border-foreground bg-muted/40 text-foreground",
+    inactive: "border-border/80 bg-background text-foreground hover:bg-muted/30",
+    dot: "border-border/60 bg-background text-muted-foreground",
+    dotInner: "bg-muted-foreground/60",
+  },
+  amber: {
+    active:
+      "border-amber-300 bg-amber-50 text-amber-900 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.25)]",
+    inactive:
+      "border-border/80 bg-background text-foreground hover:border-amber-200 hover:bg-amber-50/60 hover:text-amber-900",
+    dot: "border-amber-300 bg-amber-50 text-amber-700",
+    dotInner: "bg-amber-500",
+  },
+  emerald: {
+    active:
+      "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.16)]",
+    inactive:
+      "border-border/80 bg-background text-foreground hover:border-emerald-200 hover:bg-emerald-50/60 hover:text-emerald-700",
+    dot: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    dotInner: "bg-emerald-500",
+  },
+  rose: {
+    active:
+      "border-rose-200 bg-rose-50 text-rose-700 shadow-[inset_0_0_0_1px_rgba(244,63,94,0.14)]",
+    inactive:
+      "border-border/80 bg-background text-foreground hover:border-rose-200 hover:bg-rose-50/60 hover:text-rose-700",
+    dot: "border-rose-200 bg-rose-50 text-rose-700",
+    dotInner: "bg-rose-500",
+  },
+} as const;
 
 export const virtuosoTableComponents = {
   Scroller: forwardRef<HTMLDivElement, ComponentProps<"div">>(({ className, ...props }, ref) => (
@@ -25,30 +59,36 @@ export function ResponseFilterToggle({
   label,
   active,
   onToggle,
+  tone = "neutral",
 }: {
   label: string;
   active: boolean;
   onToggle: () => void;
+  tone?: keyof typeof RESPONSE_FILTER_TONES;
 }) {
+  const toneClasses = RESPONSE_FILTER_TONES[tone];
+
   return (
     <Button
       type="button"
       size="sm"
       variant="outline"
+      aria-pressed={active}
       className={cn(
-        "h-8 rounded-full px-3 text-xs sm:h-7 sm:px-2.5",
-        active ? "border-primary/40 bg-primary/5" : "border-border/70 bg-background hover:bg-muted/20",
+        "h-8 rounded-full px-3 text-xs font-medium transition-all sm:h-7 sm:px-2.5",
+        active ? toneClasses.active : toneClasses.inactive,
       )}
       onClick={onToggle}
     >
       <span
         aria-hidden="true"
         className={cn(
-          "mr-2 flex h-3.5 w-3.5 items-center justify-center rounded-full border border-primary/50",
-          active ? "bg-primary/12" : "bg-transparent",
+          "mr-2 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors",
+          toneClasses.dot,
+          active ? "scale-100" : "scale-95 opacity-85",
         )}
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-primary" />
+        <span className={cn("h-1.5 w-1.5 rounded-full", toneClasses.dotInner)} />
       </span>
       {label}
     </Button>
@@ -56,7 +96,8 @@ export function ResponseFilterToggle({
 }
 
 export function ResponseCompetitorsCell({ competitors }: { competitors: string[] }) {
-  const visibleCompetitor = competitors[0] || "Aucun";
+  const content = useI18nScope("prompts-workspace");
+  const visibleCompetitor = competitors[0] || content.noCompetitor;
   const hiddenCompetitors = competitors.slice(1);
 
   if (hiddenCompetitors.length === 0) {
@@ -77,7 +118,7 @@ export function ResponseCompetitorsCell({ competitors }: { competitors: string[]
           <button
             type="button"
             className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-border/70 bg-background px-2 text-[11px] font-medium text-muted-foreground"
-            aria-label={`${hiddenCompetitors.length} concurrents supplementaires`}
+            aria-label={`${hiddenCompetitors.length} ${content.additionalCompetitors}`}
           >
             +{hiddenCompetitors.length}
           </button>
@@ -94,16 +135,18 @@ export function ResponseCompetitorsCell({ competitors }: { competitors: string[]
   );
 }
 
-export function formatCompetitorSummary(competitors: string[]) {
-  if (competitors.length === 0) return "Aucun";
+export function formatCompetitorSummary(competitors: string[], noCompetitorLabel: string) {
+  if (competitors.length === 0) return noCompetitorLabel;
   if (competitors.length === 1) return competitors[0]!;
   return `${competitors[0]} +${competitors.length - 1}`;
 }
 
 export function EmptyResponsesState() {
+  const content = useI18nScope("prompts-workspace");
+
   return (
     <div className="flex h-full items-center justify-center rounded-xl border border-dashed border-border/70 bg-muted/15 px-4 py-10 text-sm text-muted-foreground">
-      Aucune reponse pour les filtres selectionnes.
+      {content.noResponsesForFilters}
     </div>
   );
 }

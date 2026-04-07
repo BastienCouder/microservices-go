@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
-import { useLocale, useI18nScope } from "@/shared/hooks/use-i18n";
+import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {
   buildTopCitedPagesFromPrompts,
@@ -15,7 +15,6 @@ import {
   buildAutomaticInsights,
   buildSentimentData,
   buildVisibilityBarData,
-  getSafeText,
   getTrendDirection,
 } from "./analytics-panel-helpers";
 import {
@@ -26,42 +25,44 @@ import { useMonitoringFilters } from "../shared/use-monitoring-filters";
 
 export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
   const content = useI18nScope("monitoring-analytics-panel");
-  const { locale } = useLocale();
-  const isFr = locale === "fr";
+  const { t } = useScopedI18n("monitoring-analytics-panel");
   const filters = useMonitoringFilters();
   const { data: monitoringData, loading } = useMonitoringData();
   const { models, recent_prompts } = monitoringData;
-
-  const mentionRateSubSuffix = getSafeText(
-    content.mentionRateSubSuffix,
-    "reponses mentionnent votre marque",
-    "responses mention your brand",
-    isFr,
-  );
-  const trendVs7dSuffix = getSafeText(content.trendVs7dSuffix, "vs 7j", "vs 7d", isFr);
-  const betterPositionLabel = getSafeText(
-    content.betterPositionLabel,
-    "meilleure position",
-    "better position",
-    isFr,
-  );
-  const visibilityScoreSub = getSafeText(
-    content.visibilityScoreSub,
-    "Score combine mention x position x sentiment",
-    "Combined score: mention x position x sentiment",
-    isFr,
-  );
-  const avgPositionSub = getSafeText(
-    content.avgPositionSub,
-    "Sur toutes les reponses ou vous etes cite",
-    "Across all responses where your brand is cited",
-    isFr,
-  );
-  const insightCitationsLabel = getSafeText(
-    content.insightCitationsLabel,
-    "Citations",
-    "Citations",
-    isFr,
+  const trendVs7dSuffix = content.trendVs7dSuffix;
+  const betterPositionLabel = content.betterPositionLabel;
+  const visibilityScoreSub = content.visibilityScoreSub;
+  const avgPositionSub = content.avgPositionSub;
+  const insightCitationsLabel = content.insightCitationsLabel;
+  const automaticInsightsCopy = useMemo(
+    () => ({
+      brandMentionTemplate: ({
+        label,
+        mentions,
+        total,
+      }: {
+        label: string;
+        mentions: number;
+        total: number;
+      }) => t("brandMentionTemplate", { label, mentions, total }),
+      coMentionsModel: content.coMentionsAnalyticsTitle,
+      coMentionsTemplate: ({
+        competitor,
+        mentions,
+        total,
+      }: {
+        competitor: string;
+        mentions: number;
+        total: number;
+      }) => t("coMentionsTemplate", { competitor, mentions, total }),
+      competitionModel: content.competitionModel,
+      competitionTemplate: ({ competitor }: { competitor: string }) =>
+        t("competitionTemplate", { competitor }),
+      topCitedTemplate: ({ url }: { url: string }) => t("topCitedTemplate", { url }),
+      qualityModel: content.qualityModel,
+      qualityTemplate: ({ score }: { score: number }) => t("qualityTemplate", { score }),
+    }),
+    [content.coMentionsAnalyticsTitle, content.competitionModel, content.qualityModel, t],
   );
 
   const filteredPrompts = useMemo(
@@ -145,8 +146,9 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
         selectedCompetitors: filters.selectedCompetitors,
         topCitedPages,
         insightCitationsLabel,
+        copy: automaticInsightsCopy,
       }),
-    [filters.selectedCompetitors, insightCitationsLabel, models, promptsForKpiCards, topCitedPages],
+    [automaticInsightsCopy, filters.selectedCompetitors, insightCitationsLabel, models, promptsForKpiCards, topCitedPages],
   );
 
   const visibilityBarData = useMemo(
@@ -176,12 +178,18 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
   const avgPositionTrendDelta =
     baselineMetrics.avgPosition - filteredMetrics.avgPosition;
   const emptyMentionRateValue = "0%";
-  const emptyMentionRateSub = `0/0 ${mentionRateSubSuffix}`;
-  const emptyMentionTrend = `0% ${trendVs7dSuffix}`;
+  const emptyMentionRateSub = t("mentionRateSub", { count: 0, total: 0 });
+  const emptyMentionTrend = t("mentionTrend", { delta: "0%", trendSuffix: trendVs7dSuffix });
   const emptyVisibilityScoreValue = "0 / 100";
-  const emptyVisibilityTrend = `0 ${trendVs7dSuffix}`;
+  const emptyVisibilityTrend = t("visibilityTrend", {
+    delta: "0",
+    trendSuffix: trendVs7dSuffix,
+  });
   const emptyAvgPositionValue = "0";
-  const emptyAvgPositionTrend = `0 (${betterPositionLabel})`;
+  const emptyAvgPositionTrend = t("avgPositionTrend", {
+    delta: "0",
+    betterPositionLabel,
+  });
 
   return {
     loading,
@@ -190,10 +198,16 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
         ? `${filteredMetrics.mentionRate}%`
         : emptyMentionRateValue,
       mentionRateSub: hasFilteredMetricData
-        ? `${mentionCount}/${promptsForKpiCards.length} ${mentionRateSubSuffix}`
+        ? t("mentionRateSub", {
+            count: mentionCount,
+            total: promptsForKpiCards.length,
+          })
         : emptyMentionRateSub,
       mentionTrend: hasFilteredMetricData
-        ? `${mentionTrendDelta >= 0 ? "+" : ""}${mentionTrendDelta}% ${trendVs7dSuffix}`
+        ? t("mentionTrend", {
+            delta: `${mentionTrendDelta >= 0 ? "+" : ""}${mentionTrendDelta}%`,
+            trendSuffix: trendVs7dSuffix,
+          })
         : emptyMentionTrend,
       mentionTrendDir: hasFilteredMetricData
         ? getTrendDirection(mentionTrendDelta)
@@ -203,7 +217,10 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
         : emptyVisibilityScoreValue,
       visibilitySub: visibilityScoreSub,
       visibilityTrend: hasFilteredMetricData
-        ? `${visibilityTrendDelta >= 0 ? "+" : ""}${visibilityTrendDelta} ${trendVs7dSuffix}`
+        ? t("visibilityTrend", {
+            delta: `${visibilityTrendDelta >= 0 ? "+" : ""}${visibilityTrendDelta}`,
+            trendSuffix: trendVs7dSuffix,
+          })
         : emptyVisibilityTrend,
       visibilityTrendDir: hasFilteredMetricData
         ? getTrendDirection(visibilityTrendDelta)
@@ -214,7 +231,10 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
           : emptyAvgPositionValue,
       avgPositionSub,
       avgPositionTrend: hasFilteredMetricData
-        ? `${avgPositionTrendDelta >= 0 ? "+" : ""}${avgPositionTrendDelta.toFixed(1)} (${betterPositionLabel})`
+        ? t("avgPositionTrend", {
+            delta: `${avgPositionTrendDelta >= 0 ? "+" : ""}${avgPositionTrendDelta.toFixed(1)}`,
+            betterPositionLabel,
+          })
         : emptyAvgPositionTrend,
       avgPositionTrendDir: hasFilteredMetricData
         ? getTrendDirection(avgPositionTrendDelta)
@@ -226,7 +246,7 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
       hasCompetitorFilter: filters.selectedCompetitors.length > 0,
       title:
         filters.selectedCompetitors.length > 0
-          ? "Co-mentions Analytics"
+          ? content.coMentionsAnalyticsTitle
           : undefined,
     },
     sentiment: {

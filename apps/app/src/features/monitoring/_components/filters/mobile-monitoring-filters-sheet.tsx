@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 
 import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
 import { ModelCard } from "../shared/model-card";
@@ -59,16 +60,19 @@ export function MobileMonitoringFiltersSheet({
   showUniqueModelFilters,
   onModelFilterModeChange,
 }: MobileMonitoringFiltersSheetProps) {
+  const content = useI18nScope("monitoring-filters-panel");
+  const activityContent = useI18nScope("monitoring-activity-panel");
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
       <DrawerContent className="h-[88vh] max-h-[88vh] gap-0 overflow-hidden rounded-t-[32px] border-none bg-[#f8f7f3] p-0">
         <DrawerHeader className="border-b border-slate-200/80 px-5 pb-4 pt-2 text-left">
           <DrawerTitle className="flex items-center gap-2 text-lg font-semibold text-slate-950">
             <Sparkles className="h-4 w-4 text-primary" />
-            Filtres monitoring
+            {content.filters}
           </DrawerTitle>
           <DrawerDescription className="text-sm leading-relaxed text-slate-500">
-            Ajustez la lecture du monitoring avec des sélections rapides, pensées pour le mobile.
+            {content.touchSelectionDescription}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -95,14 +99,16 @@ export function MobileMonitoringFiltersSheet({
             </section> */}
 
             <section className="space-y-4 rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
-              <SectionHeader title="Modèles IA" count={selectedModels.length} />
+              <SectionHeader title={content.models} count={selectedModels.length} />
               <ModelFilterModeTabs
                 value={showUniqueModelFilters ? "unique" : "grouped"}
                 onValueChange={(value) => onModelFilterModeChange(value === "unique")}
+                groupedLabel={content.groupedAI}
+                uniqueLabel={content.byAI}
                 listClassName="h-10 w-full rounded-2xl bg-slate-100"
               />
               {models.length === 0 ? (
-                <FiltersEmptyStateCard label="Aucun modèle disponible." className="h-[120px]" />
+                <FiltersEmptyStateCard label={content.noModelAvailable} className="h-[120px]" />
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   {models.map((model) => (
@@ -121,9 +127,9 @@ export function MobileMonitoringFiltersSheet({
             </section>
 
             <section className="space-y-3 rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
-              <SectionHeader title="Concurrents" count={selectedCompetitors.length} />
+              <SectionHeader title={content.topCompetitors} count={selectedCompetitors.length} />
               {project.competitors.length === 0 ? (
-                <FiltersEmptyStateCard label="Aucun concurrent disponible." className="h-[120px]" />
+                <FiltersEmptyStateCard label={content.noCompetitorAvailable} className="h-[120px]" />
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {project.competitors.map((competitor) => (
@@ -151,14 +157,14 @@ export function MobileMonitoringFiltersSheet({
               onClick={onResetFilters}
               disabled={!showResetFilters}
             >
-              Réinitialiser
+              {content.resetFilters}
             </Button>
             <Button
               type="button"
               className="h-12 rounded-2xl"
               onClick={() => onOpenChange(false)}
             >
-              Fermer
+              {activityContent.close}
             </Button>
           </div>
         </DrawerFooter>
@@ -174,11 +180,13 @@ function SectionHeader({
   title: string;
   count: number;
 }) {
+  const content = useI18nScope("monitoring-filters-panel");
+
   return (
     <div className="flex items-center justify-between gap-3">
       <div>
         <p className="text-base font-semibold text-slate-950">{title}</p>
-        <p className="text-xs text-slate-500">Sélection tactile, application immédiate.</p>
+        <p className="text-xs text-slate-500">{content.touchSelectionDescription}</p>
       </div>
       <div className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
         {count}

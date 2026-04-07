@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { BrandCompetitor } from "@/lib/perception-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 export function CompetitorEditor({
   value,
@@ -13,6 +14,7 @@ export function CompetitorEditor({
   value: BrandCompetitor[];
   onChange: (next: BrandCompetitor[]) => void;
 }) {
+  const { t } = useScopedI18n("perception-brand-canon");
   const [newName, setNewName] = useState("");
   const [newWebsite, setNewWebsite] = useState("");
 
@@ -40,15 +42,15 @@ export function CompetitorEditor({
   return (
     <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
       <div className="space-y-1">
-        <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">Concurrents suivis</div>
+        <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("competitorsTitle")}</div>
         <p className="text-xs leading-5 text-muted-foreground">
-          Ajoutez ou mettez à jour les concurrents utilisés dans les comparaisons et les analyses IA.
+          {t("competitorsDescription")}
         </p>
       </div>
 
       {value.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border/70 bg-background/70 px-4 py-5 text-sm text-muted-foreground">
-          Aucun concurrent saisi.
+          {t("competitorsEmpty")}
         </div>
       ) : (
         <div className="space-y-3">
@@ -66,7 +68,7 @@ export function CompetitorEditor({
                     ),
                   )
                 }
-                placeholder="Nom du concurrent"
+                placeholder={t("competitorNamePlaceholder")}
               />
               <Input
                 value={competitor.website}
@@ -77,14 +79,16 @@ export function CompetitorEditor({
                     ),
                   )
                 }
-                placeholder="https://exemple.com"
+                placeholder={t("competitorWebsitePlaceholder")}
               />
               <Button
                 type="button"
                 variant="outline"
                 size="icon"
                 onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
-                aria-label={`Supprimer ${competitor.name || "ce concurrent"}`}
+                aria-label={t("deleteCompetitor", {
+                  name: competitor.name || t("deleteCompetitorFallback"),
+                })}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -98,17 +102,17 @@ export function CompetitorEditor({
           value={newName}
           onChange={(event) => setNewName(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Ajouter un concurrent"
+          placeholder={t("competitorAddPlaceholder")}
         />
         <Input
           value={newWebsite}
           onChange={(event) => setNewWebsite(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="https://exemple.com"
+          placeholder={t("competitorWebsitePlaceholder")}
         />
         <Button type="button" variant="outline" onClick={addCompetitor}>
           <Plus className="mr-1 h-4 w-4" />
-          Ajouter le concurrent
+          {t("competitorAdd")}
         </Button>
       </div>
     </div>

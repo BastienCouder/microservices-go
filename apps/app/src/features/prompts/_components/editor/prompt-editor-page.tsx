@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PageHeader } from "@/features/shared/view/page-header";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PROMPT_MAX_LENGTH,
   buildEditorCadenceSummary,
@@ -44,6 +45,7 @@ export function PromptEditorPage({
   onBack,
   onSave,
 }: PromptEditorPageProps) {
+  const { locale, t } = useScopedI18n("prompts-workspace");
   const [promptText, setPromptText] = useState("");
   const [selectedModels, setSelectedModels] = useState<AIModel[]>([]);
   const [schedule, setSchedule] = useState<PromptSchedule>(defaultPromptSchedule());
@@ -78,7 +80,7 @@ export function PromptEditorPage({
     },
     selectedModels,
   );
-  const cadenceSummary = buildEditorCadenceSummary(normalizedSchedule);
+  const cadenceSummary = buildEditorCadenceSummary(normalizedSchedule, locale);
   const canSave =
     promptText.trim() !== "" &&
     promptText.length <= PROMPT_MAX_LENGTH &&
@@ -88,24 +90,24 @@ export function PromptEditorPage({
   return (
     <div className="flex pt-44 h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
-        title={mode === "create" ? "Nouveau prompt" : "Modifier le prompt"}
+        title={mode === "create" ? t("editorCreateTitle") : t("editorEditTitle")}
         baseline={
           mode === "create"
-            ? "Creez le prompt, definissez la couverture IA et choisissez la cadence d'analyse au meme endroit."
-            : "Modifiez le texte du prompt, la couverture IA et la cadence depuis une page dediee."
+            ? t("editorCreateBaseline")
+            : t("editorEditBaseline")
         }
         actionsVariant="classic"
         meta={
           <>
-            <Badge variant="outline">{getPromptStatusLabel(status)}</Badge>
-            <Badge variant="outline">{selectedModels.length} IA</Badge>
+            <Badge variant="outline">{getPromptStatusLabel(status, locale)}</Badge>
+            <Badge variant="outline">{t("selectedAiCount", { count: selectedModels.length })}</Badge>
             <Badge variant="outline">{cadenceSummary.badgeLabel}</Badge>
           </>
         }
         actions={
           <Button type="button" onClick={onBack}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Retour
+            {t("back")}
           </Button>
         }
         className="hidden md:flex pr-4"
@@ -181,7 +183,7 @@ export function PromptEditorPage({
       <div className="border-t px-2 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <Button type="button" variant="outline" onClick={onBack} disabled={saving}>
-            Annuler
+            {t("cancel")}
           </Button>
           <Button
             type="button"
@@ -195,7 +197,7 @@ export function PromptEditorPage({
               })
             }
           >
-            {saving ? "Enregistrement..." : mode === "create" ? "Creer le prompt" : "Enregistrer"}
+            {saving ? t("saving") : mode === "create" ? t("createPrompt") : t("savePrompt")}
           </Button>
         </div>
       </div>

@@ -8,6 +8,7 @@ import type {
   PromptSortDirection,
 } from "./types";
 import { getPromptSelectionKey, PROMPT_SORT_DEFAULT_DIRECTION, RESPONSES_BATCH_SIZE } from "./prompt-normalizers";
+import { DEFAULT_PROMPT_PERIOD } from "./utils";
 
 export function buildPromptsDerivedActions(params: {
   allModelsSelected: boolean;
@@ -29,7 +30,7 @@ export function buildPromptsDerivedActions(params: {
   setCriticalOnly: (value: boolean) => void;
   setNoMentionOnly: (value: boolean) => void;
   setShowHistorical: (value: boolean) => void;
-  setTopCompetitor: (value: "all" | string) => void;
+  setSelectedCompetitors: (value: string[] | ((current: string[]) => string[])) => void;
   setFocusPromptId: (value: string | null) => void;
   setPromptPage: (value: number) => void;
   setSelectedPromptIds: (value: string[] | ((current: string[]) => string[])) => void;
@@ -38,7 +39,7 @@ export function buildPromptsDerivedActions(params: {
   setResponseVisibleCount: (value: number | ((current: number) => number)) => void;
 }) {
   const clearFilters = () => {
-    params.setPeriod("7d");
+    params.setPeriod(DEFAULT_PROMPT_PERIOD);
     params.setDateRange(undefined);
     params.setSelectedPromptModels(params.promptAvailableModels);
     params.setSelectedResponseModels(params.responseAvailableModels);
@@ -49,7 +50,7 @@ export function buildPromptsDerivedActions(params: {
     params.setCriticalOnly(false);
     params.setNoMentionOnly(false);
     params.setShowHistorical(true);
-    params.setTopCompetitor("all");
+    params.setSelectedCompetitors([]);
     params.setFocusPromptId(null);
     params.setPromptPage(1);
   };

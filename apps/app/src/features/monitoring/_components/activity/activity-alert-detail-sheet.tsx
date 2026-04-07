@@ -30,7 +30,7 @@ export function ActivityAlertDetailSheet({
                   {content.alertInsight}
                 </Badge>
                 <span className="text-xs text-muted-foreground">
-                  {getAlertTypeLabel(selectedAlert.prompts) || selectedAlert.time}
+                  {getAlertTypeLabel(selectedAlert.prompts, content) || selectedAlert.time}
                 </span>
               </div>
               <SheetTitle className="text-base font-semibold leading-snug">

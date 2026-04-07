@@ -3,19 +3,6 @@ import { VISIBILITY_ANALYTICS_COLORS } from "@/lib/app-data";
 import { chartConfig, getSentimentCounts } from "./analytics-utils";
 import type { InsightItem, SentimentDatum, VisibilityBarDatum } from "./types";
 
-export function getSafeText(
-  value: unknown,
-  fallbackFr: string,
-  fallbackEn: string,
-  isFr: boolean,
-): string {
-  return typeof value === "string" && value.length > 0
-    ? value
-    : isFr
-      ? fallbackFr
-      : fallbackEn;
-}
-
 export function getTrendDirection(delta: number): "up" | "down" | "stable" {
   if (delta > 0) return "up";
   if (delta < 0) return "down";
@@ -126,6 +113,16 @@ export function buildAutomaticInsights(input: {
   selectedCompetitors: string[];
   topCitedPages: Array<{ url: string; value: number }>;
   insightCitationsLabel: string;
+  copy: {
+    brandMentionTemplate: (args: { label: string; mentions: number; total: number }) => string;
+    coMentionsModel: string;
+    coMentionsTemplate: (args: { competitor: string; mentions: number; total: number }) => string;
+    competitionModel: string;
+    competitionTemplate: (args: { competitor: string }) => string;
+    topCitedTemplate: (args: { url: string }) => string;
+    qualityModel: string;
+    qualityTemplate: (args: { score: number }) => string;
+  };
 }): InsightItem[] {
   const insights: InsightItem[] = [];
   const rowsByModel = new Map<string, typeof input.prompts>();
@@ -157,7 +154,11 @@ export function buildAutomaticInsights(input: {
     const best = modelMentionRates[0]!;
     insights.push({
       model: best.label,
-      text: `${best.label} mentionne votre marque dans ${best.mentions}/${best.total} reponses sur le scope actuel.`,
+      text: input.copy.brandMentionTemplate({
+        label: best.label,
+        mentions: best.mentions,
+        total: best.total,
+      }),
       delta: `${best.rate}%`,
       level: best.rate >= 70 ? "high" : "medium",
     });
@@ -176,8 +177,12 @@ export function buildAutomaticInsights(input: {
     const total = input.prompts.length || 1;
 
     insights.push({
-      model: "Co-mentions",
-      text: `${selectedCompetitor} est co-cite avec votre marque dans ${coMentions} reponses sur ${input.prompts.length} apres filtres.`,
+      model: input.copy.coMentionsModel,
+      text: input.copy.coMentionsTemplate({
+        competitor: selectedCompetitor,
+        mentions: coMentions,
+        total: input.prompts.length,
+      }),
       delta: `${Math.round((coMentions / total) * 100)}%`,
       level: coMentions > 0 ? "high" : "medium",
     });
@@ -198,8 +203,8 @@ export function buildAutomaticInsights(input: {
 
     if (topCompetitor) {
       insights.push({
-        model: "Concurrence",
-        text: `${topCompetitor[0]} est le concurrent le plus cite dans le scope actuel.`,
+        model: input.copy.competitionModel,
+        text: input.copy.competitionTemplate({ competitor: topCompetitor[0] }),
         delta: `${topCompetitor[1]}`,
         level: "medium",
       });
@@ -210,7 +215,7 @@ export function buildAutomaticInsights(input: {
     const topPage = input.topCitedPages[0]!;
     insights.push({
       model: input.insightCitationsLabel,
-      text: `${topPage.url} est la page la plus citee par les IA sur le scope actuel.`,
+      text: input.copy.topCitedTemplate({ url: topPage.url }),
       delta: `${topPage.value}%`,
       level: topPage.value >= 40 ? "high" : "medium",
     });
@@ -223,8 +228,8 @@ export function buildAutomaticInsights(input: {
     );
 
     insights.push({
-      model: "Qualite",
-      text: `Le score moyen de visibilite sur les reponses filtrees est de ${avgScore}/100.`,
+      model: input.copy.qualityModel,
+      text: input.copy.qualityTemplate({ score: avgScore }),
       delta: `${avgScore}/100`,
       level: avgScore >= 70 ? "high" : "medium",
     });

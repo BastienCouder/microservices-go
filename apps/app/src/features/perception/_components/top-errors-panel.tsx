@@ -6,21 +6,23 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import {
-  formatPerceptionErrorTypeLabel,
-  formatPerceptionPriorityLabel,
-  getModelIconForName,
-  PERCEPTION_TEXT,
-} from "@/lib/app-data";
+import { getModelIconForName } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { PerceptionError } from "@/lib/perception-data";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  formatPerceptionErrorTypeLabel as formatPerceptionErrorTypeLabelI18n,
+  formatPerceptionPriorityLabel as formatPerceptionPriorityLabelI18n,
+  getPerceptionSeverityLabel,
+} from "../_lib";
 
 export function TopErrorsPanel({
   errors,
 }: {
   errors: PerceptionError[];
 }) {
+  const { locale, t } = useScopedI18n("perception");
   const [selectedError, setSelectedError] = useState<PerceptionError | null>(null);
 
   return (
@@ -28,20 +30,20 @@ export function TopErrorsPanel({
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h4>
-            <MonitoringSectionTitle>{PERCEPTION_TEXT.topErrors.title}</MonitoringSectionTitle>
+            <MonitoringSectionTitle>{t("topErrorsTitle")}</MonitoringSectionTitle>
           </h4>
         </div>
         <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">
-    {errors.length}
+          {errors.length}
         </Badge>
       </div>
 
       <div className="space-y-3">
         {errors.length === 0 ? (
           <div className="rounded-md bg-background p-4 text-center">
-            <p className="text-sm font-medium text-foreground">{PERCEPTION_TEXT.topErrors.emptyTitle}</p>
+            <p className="text-sm font-medium text-foreground">{t("topErrorsEmptyTitle")}</p>
             <p className="mt-1 text-xs text-muted-foreground">
-              {PERCEPTION_TEXT.topErrors.emptyDescription}
+              {t("topErrorsEmptyDescription")}
             </p>
           </div>
         ) : (
@@ -51,12 +53,13 @@ export function TopErrorsPanel({
               error={error}
               index={index}
               onOpenDetails={() => setSelectedError(error)}
+              locale={locale}
             />
           ))
         )}
 
         <Button asChild variant="ghost" size="sm" className="w-full text-xs">
-          <Link to="/optimize/actions">{PERCEPTION_TEXT.topErrors.seeMore}</Link>
+          <Link to="/optimize/actions">{t("topErrorsSeeMore")}</Link>
         </Button>
       </div>
 
@@ -66,9 +69,9 @@ export function TopErrorsPanel({
             <div className="flex h-full flex-col">
               <SheetHeader className="border-b border-border/60 p-4 text-left">
                 <div className="mb-2 flex flex-wrap gap-1.5">
-                  <Badge variant="outline">{formatPerceptionErrorTypeLabel(selectedError.type)}</Badge>
+                  <Badge variant="outline">{formatPerceptionErrorTypeLabelI18n(selectedError.type, locale)}</Badge>
                   <Badge variant={selectedError.optimizePriority === "high" ? "destructive" : "secondary"}>
-                    {formatPerceptionPriorityLabel(selectedError.optimizePriority)}
+                    {formatPerceptionPriorityLabelI18n(selectedError.optimizePriority, locale)}
                   </Badge>
                   {selectedError.detectedInModels.map((model) => (
                     <Badge
@@ -83,26 +86,26 @@ export function TopErrorsPanel({
                 </div>
                 <SheetTitle className="text-base leading-tight">{selectedError.title}</SheetTitle>
                 <SheetDescription>
-                  {PERCEPTION_TEXT.topErrors.sheetDescription}
+                  {t("topErrorsSheetDescription")}
                 </SheetDescription>
               </SheetHeader>
 
               <div className="flex-1 space-y-4 overflow-y-auto p-4">
                 <section className="space-y-1">
                   <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {PERCEPTION_TEXT.topErrors.aiClaim}
+                    {t("topErrorsAiClaim")}
                   </h5>
                   <p className="text-sm leading-relaxed text-foreground">{selectedError.issue}</p>
                 </section>
 
                 <section className="space-y-1">
-                  <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{PERCEPTION_TEXT.topErrors.impact}</h5>
+                  <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">{t("topErrorsImpact")}</h5>
                   <p className="text-sm leading-relaxed text-foreground">{selectedError.impact}</p>
                 </section>
 
                 <section className="space-y-1">
                   <h5 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {PERCEPTION_TEXT.topErrors.generatedFix}
+                    {t("topErrorsGeneratedFix")}
                   </h5>
                   <div className="rounded-md bg-muted/40 p-3 text-sm leading-relaxed">{selectedError.generatedContent}</div>
                 </section>
@@ -116,22 +119,29 @@ export function TopErrorsPanel({
   );
 }
 
-function getSeverityTone(severity: PerceptionError["severity"]) {
-  if (severity === "high") return { dot: "bg-rose-500", label: "text-rose-500", tag: PERCEPTION_TEXT.topErrors.severity.high };
-  if (severity === "medium") return { dot: "bg-amber-500", label: "text-amber-600", tag: PERCEPTION_TEXT.topErrors.severity.medium };
-  return { dot: "bg-sky-500", label: "text-sky-600", tag: PERCEPTION_TEXT.topErrors.severity.low };
+function getSeverityTone(severity: PerceptionError["severity"], locale: string) {
+  if (severity === "high") {
+    return { dot: "bg-rose-500", label: "text-rose-500", tag: getPerceptionSeverityLabel("high", locale) };
+  }
+  if (severity === "medium") {
+    return { dot: "bg-amber-500", label: "text-amber-600", tag: getPerceptionSeverityLabel("medium", locale) };
+  }
+  return { dot: "bg-sky-500", label: "text-sky-600", tag: getPerceptionSeverityLabel("low", locale) };
 }
 
 function TopErrorCard({
   error,
   index,
   onOpenDetails,
+  locale,
 }: {
   error: PerceptionError;
   index: number;
   onOpenDetails: () => void;
+  locale: string;
 }) {
-  const tone = getSeverityTone(error.severity);
+  const { t } = useScopedI18n("perception");
+  const tone = getSeverityTone(error.severity, locale);
 
   return (
     <div
@@ -151,7 +161,7 @@ function TopErrorCard({
           <div className="flex flex-wrap items-center gap-2">
             <div className={cn("h-2 w-2 rounded-full", tone.dot)} />
             <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {PERCEPTION_TEXT.topErrors.errorPrefix}
+              {t("topErrorsErrorPrefix")}
               {index + 1}
             </span>
             <Badge variant="outline" className={cn("rounded-full px-2 py-0 text-[10px] font-medium", tone.label)}>
@@ -180,10 +190,10 @@ function TopErrorCard({
 
           <div className="flex items-center justify-between gap-3 pt-1">
             <div className="text-[11px] text-muted-foreground">
-              {formatPerceptionErrorTypeLabel(error.type)}
+              {formatPerceptionErrorTypeLabelI18n(error.type, locale)}
             </div>
             <span className="text-[11px] text-muted-foreground">
-              {PERCEPTION_TEXT.topErrors.seeMore}
+              {t("topErrorsSeeMore")}
             </span>
           </div>
         </div>

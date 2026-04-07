@@ -8,6 +8,7 @@ import {
   PanelRightOpen,
   Pencil,
   Play,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +20,77 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptItem, PromptSort, PromptSortDirection } from "../../_lib/types";
+
+function getRunPromptActionLabel(
+  item: PromptItem,
+  promptRunning: boolean,
+  content: Record<string, string>,
+) {
+  if (promptRunning) return content.launching;
+  return item.runs.length > 0 ? content.rerunPrompt : content.runPrompt;
+}
+
+function stopPromptActionPropagation(event: { stopPropagation: () => void }) {
+  event.stopPropagation();
+}
+
+function PromptActionItem({
+  icon: Icon,
+  title,
+  description,
+  tone = "default",
+  disabled = false,
+  onSelect,
+}: {
+  icon: typeof Play;
+  title: string;
+  description: string;
+  tone?: "default" | "destructive";
+  disabled?: boolean;
+  onSelect: (event: Event) => void;
+}) {
+  return (
+    <DropdownMenuItem
+      variant={tone}
+      disabled={disabled}
+      onSelect={onSelect}
+      className={cn(
+        "cursor-pointer group min-h-[58px] items-center gap-3 rounded-2xl border bg-background px-3 py-3 focus:bg-muted/30",
+        tone === "destructive"
+          ? "border-rose-200/80 focus:border-rose-300 focus:bg-rose-50/80"
+          : "border-border/70 focus:border-border",
+      )}
+    >
+      <div
+        className={cn(
+          "mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-colors",
+          tone === "destructive"
+            ? "border-rose-200 bg-rose-50 text-rose-600"
+            : "border-border/70 bg-muted/25 text-muted-foreground group-focus:text-foreground",
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className={cn("text-sm font-semibold", tone === "destructive" ? "text-rose-700" : "text-foreground")}>
+          {title}
+        </div>
+      </div>
+      <span
+        className={cn(
+          "h-2.5 w-2.5 shrink-0 rounded-full transition-colors",
+          tone === "destructive" ? "bg-rose-400/80" : "bg-muted-foreground/25 group-focus:bg-primary/80",
+        )}
+        aria-hidden="true"
+      />
+    </DropdownMenuItem>
+  );
+}
 
 export function SortableColumnHeader({
   label,
@@ -63,8 +132,9 @@ export function PromptModelBadges({
   getModelVisual: (model: string) => ModelVisual;
   singleLine?: boolean;
 }) {
-  const visibleModels = item.models.slice(0, 2);
-  const hiddenModels = item.models.slice(2);
+  const maxVisibleModels = singleLine ? 1 : 2;
+  const visibleModels = item.models.slice(0, maxVisibleModels);
+  const hiddenModels = item.models.slice(maxVisibleModels);
   const remaining = item.models.length - visibleModels.length;
 
   return (
@@ -148,80 +218,96 @@ export function PromptActions({
   isPromptRunning: (item: PromptItem | null) => boolean;
   runningAnyPrompts: boolean;
 }) {
+  const content = useI18nScope("prompts-workspace");
   const sourcePromptId = item.sourcePromptId || item.id;
   const promptRunnable = canRunPrompt(item);
   const promptRunning = isPromptRunning(item);
+  const runLabel = getRunPromptActionLabel(item, promptRunning, content);
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
-        <Button size="icon" variant="ghost">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-auto">
-        <DropdownMenuItem
-          disabled={!promptRunnable || promptRunning || runningAnyPrompts}
-          onClick={(event) => {
-            event.stopPropagation();
-            runPrompt(item);
-          }}
-        >
-          <Play className="h-4 w-4" />
-          {promptRunning ? "Lancement..." : "Lancer le prompt"}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={(event) => {
-            event.stopPropagation();
-            onEditPrompt(sourcePromptId);
-          }}
-        >
-          <Pencil className="h-4 w-4" />
-          Modifier le prompt
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={(event) => {
-            event.stopPropagation();
-            if (typeof navigator !== "undefined") void navigator.clipboard.writeText(item.prompt);
-          }}
-        >
-          <Copy className="h-4 w-4" />
-          Copier le prompt
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={(event) => {
-            event.stopPropagation();
-            setSelectedPromptId(item.id);
-            setIsPromptDetailsOpen(true);
-          }}
-        >
-          <PanelRightOpen className="h-4 w-4" />
-          Ouvrir les details
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={(event) => {
-            event.stopPropagation();
-            setFocusPromptId(sourcePromptId);
-            setTabResponses();
-          }}
-        >
-          <Eye className="h-4 w-4" />
-          Voir les reponses
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          variant="destructive"
-          onClick={(event) => {
-            event.stopPropagation();
-            requestDeletePrompt({ ...item, sourcePromptId });
-          }}
-        >
-          <Trash2 className="h-4 w-4" />
-          Supprimer le prompt
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <div
+      onClick={stopPromptActionPropagation}
+      onPointerDown={stopPromptActionPropagation}
+      onKeyDown={stopPromptActionPropagation}
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(event) => event.stopPropagation()}>
+          <Button size="icon" variant="ghost" className="rounded-full border border-transparent hover:border-border/70 hover:bg-muted/50">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-[340px] max-w-[92vw] p-0">
+          <FloatingPanelHeader
+            title={content.promptActionsTitle}
+            description={content.promptActionsDescription}
+          />
+          <div className="space-y-2 px-4 py-4">
+            <PromptActionItem
+              icon={promptRunnable ? Play : Sparkles}
+              title={runLabel}
+              description={
+                promptRunnable
+                  ? content.runNowDescription
+                  : content.saveBeforeRunDescription
+              }
+              disabled={!promptRunnable || promptRunning || runningAnyPrompts}
+              onSelect={(event) => {
+                event.stopPropagation();
+                runPrompt(item);
+              }}
+            />
+            <PromptActionItem
+              icon={Pencil}
+              title={content.editPrompt}
+              description={content.editPromptDescription}
+              onSelect={(event) => {
+                event.stopPropagation();
+                onEditPrompt(sourcePromptId);
+              }}
+            />
+            <PromptActionItem
+              icon={Copy}
+              title={content.copyPrompt}
+              description={content.copyPromptDescription}
+              onSelect={(event) => {
+                event.stopPropagation();
+                if (typeof navigator !== "undefined") void navigator.clipboard.writeText(item.prompt);
+              }}
+            />
+            <PromptActionItem
+              icon={PanelRightOpen}
+              title={content.openDetails}
+              description={content.openDetailsDescription}
+              onSelect={(event) => {
+                event.stopPropagation();
+                setSelectedPromptId(item.id);
+                setIsPromptDetailsOpen(true);
+              }}
+            />
+            <PromptActionItem
+              icon={Eye}
+              title={content.viewResponses}
+              description={content.viewResponsesDescription}
+              onSelect={(event) => {
+                event.stopPropagation();
+                setFocusPromptId(sourcePromptId);
+                setTabResponses();
+              }}
+            />
+            <PromptActionItem
+              icon={Trash2}
+              title={content.deletePrompt}
+              description={content.deletePromptDescription}
+              tone="destructive"
+              onSelect={(event) => {
+                event.stopPropagation();
+                requestDeletePrompt({ ...item, sourcePromptId });
+              }}
+            />
+          </div>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   );
 }
 

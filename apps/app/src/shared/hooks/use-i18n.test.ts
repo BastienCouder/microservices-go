@@ -1,0 +1,43 @@
+import { describe, expect, test } from "bun:test";
+
+import { getI18nText, translateI18nText } from "./use-i18n";
+
+describe("getI18nText", () => {
+  test("returns the localized monitoring copy for French and English", () => {
+    expect(getI18nText("monitoring-analytics-panel", "visibilityAnalyticsTitle", "fr-FR")).toBe(
+      "Analyse de visibilité",
+    );
+    expect(getI18nText("monitoring-analytics-panel", "visibilityAnalyticsTitle", "en-US")).toBe(
+      "Visibility analysis",
+    );
+  });
+
+  test("returns the localized prompts copy for French and English", () => {
+    expect(getI18nText("prompts-workspace", "responsesTab", "fr")).toBe("Réponses");
+    expect(getI18nText("prompts-workspace", "responsesTab", "en")).toBe("Responses");
+  });
+
+  test("returns the localized sidebar copy for French and English", () => {
+    expect(getI18nText("sidebar", "logout", "fr")).toBe("Déconnexion");
+    expect(getI18nText("sidebar", "logout", "en")).toBe("Logout");
+  });
+
+  test("humanizes unknown keys when no translation exists", () => {
+    expect(getI18nText("prompts-workspace", "someMissingKey", "en")).toBe("some Missing Key");
+  });
+});
+
+describe("translateI18nText", () => {
+  test("supports pluralization and interpolation from translation files", () => {
+    expect(
+      translateI18nText("prompts-workspace", "selectedModels", "fr", {
+        count: 2,
+      }),
+    ).toBe("2 modèles sélectionnés");
+    expect(
+      translateI18nText("monitoring-mobile", "selectedCompetitors", "en", {
+        count: 1,
+      }),
+    ).toBe("1 competitor");
+  });
+});

@@ -5,7 +5,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
 import { getPromptSelectionKey, readSelectedOrganizationId, RESPONSES_BATCH_SIZE } from "./prompt-normalizers";
-import { rankTone, statusBadgeVariant, truncate } from "./utils";
+import { DEFAULT_PROMPT_PERIOD, rankTone, statusBadgeVariant, truncate } from "./utils";
 import { usePromptsDerivedState } from "./use-prompts-derived-state";
 import { usePromptsMutations } from "./use-prompts-mutations";
 import { usePromptsSourceData } from "./use-prompts-source-data";
@@ -24,7 +24,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const queryClient = useQueryClient();
   const { data: monitoringData, mode, projectId } = useMonitoringData();
   const [organizationId, setOrganizationId] = useState("");
-  const [period, setPeriod] = useState<PeriodKey>("7d");
+  const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PROMPT_PERIOD);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [tab, setTab] = useState<"prompts" | "responses">("prompts");
   const [persona, setPersona] = useState<"all" | Persona>("all");
@@ -39,7 +39,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const [criticalOnly, setCriticalOnly] = useState(false);
   const [noMentionOnly, setNoMentionOnly] = useState(false);
   const [showHistorical, setShowHistorical] = useState(true);
-  const [topCompetitor, setTopCompetitor] = useState<"all" | string>("all");
+  const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>([]);
   const [selectedPromptIds, setSelectedPromptIds] = useState<string[]>([]);
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
   const [isPromptDetailsOpen, setIsPromptDetailsOpen] = useState(false);
@@ -110,7 +110,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     criticalOnly,
     noMentionOnly,
     showHistorical,
-    topCompetitor,
+    selectedCompetitors,
     focusPromptId,
     responseVisibleCount,
     selectedPromptId,
@@ -132,7 +132,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setCriticalOnly,
     setNoMentionOnly,
     setShowHistorical,
-    setTopCompetitor,
+    setSelectedCompetitors,
     setFocusPromptId,
     setPromptSort,
     setPromptSortDirection,
@@ -177,6 +177,14 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const runSelectedPrompts = () => {
     if (runnableSelectedPrompts.length === 0 || mutations.runPromptsMutation.isPending) return;
     mutations.runPromptsMutation.mutate(runnableSelectedPrompts);
+  };
+
+  const toggleCompetitor = (competitor: string) => {
+    setSelectedCompetitors((current) =>
+      current.includes(competitor)
+        ? current.filter((item) => item !== competitor)
+        : [...current, competitor],
+    );
   };
 
   return {
@@ -248,8 +256,9 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setNoMentionOnly,
     showHistorical,
     setShowHistorical,
-    topCompetitor,
-    setTopCompetitor,
+    selectedCompetitors,
+    toggleCompetitor,
+    clearCompetitors: () => setSelectedCompetitors([]),
     availableCompetitors: source.availableCompetitors,
     promptEditorState,
     openCreatePromptEditor: () => setPromptEditorState({ mode: "create" }),

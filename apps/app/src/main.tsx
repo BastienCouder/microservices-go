@@ -6,6 +6,7 @@ import { BrowserRouter } from "react-router-dom";
 import App from "@/app/App";
 import { preloadModelSvgIcons } from "@/lib/asset-preload";
 import { createAppQueryClient } from "@/lib/query-client";
+import "@/shared/i18n";
 
 preloadModelSvgIcons();
 

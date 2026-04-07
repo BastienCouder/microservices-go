@@ -1,8 +1,11 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { PERCEPTION_HEATMAP_AXIS_COLORS, PERCEPTION_TEXT } from "@/lib/app-data";
+import { PERCEPTION_HEATMAP_AXIS_COLORS } from "@/lib/app-data";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { getPerceptionAxisLabel, getPerceptionHeatmapGradeLabel } from "../_lib";
 
 type HeatmapAxis = {
   key: string;
@@ -23,27 +26,34 @@ function scoreToCellStyle(score: number, axisKey: string) {
   };
 }
 
-function textForScore(score: number) {
-  if (score >= 80) return PERCEPTION_TEXT.heatmap.grades.excellent;
-  if (score >= 65) return PERCEPTION_TEXT.heatmap.grades.good;
-  if (score >= 50) return PERCEPTION_TEXT.heatmap.grades.medium;
-  return PERCEPTION_TEXT.heatmap.grades.low;
+function textForScore(score: number, locale: string) {
+  return getPerceptionHeatmapGradeLabel(score, locale);
 }
 
 export function PerceptionModelAxisHeatmap({
   axes,
   rows,
+  periodLabel,
 }: {
   axes: HeatmapAxis[];
   rows: HeatmapRow[];
+  periodLabel: string;
 }) {
+  const { locale, t } = useScopedI18n("perception");
   return (
     <Card className="min-w-0 border-border/60">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base">
-          <MonitoringSectionTitle>{PERCEPTION_TEXT.heatmap.title}</MonitoringSectionTitle>
-        </CardTitle>
-        <CardDescription>{PERCEPTION_TEXT.heatmap.description}</CardDescription>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <CardTitle className="text-base">
+              <MonitoringSectionTitle>{t("heatmapTitle")}</MonitoringSectionTitle>
+            </CardTitle>
+            <CardDescription>{t("heatmapDescription")}</CardDescription>
+          </div>
+          <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
+            {periodLabel}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="min-w-0">
         <div className="space-y-3">
@@ -54,15 +64,16 @@ export function PerceptionModelAxisHeatmap({
                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                   {axes.map((axis) => {
                     const score = row.values[axis.key] ?? 0;
+                    const axisLabel = getPerceptionAxisLabel(axis.key as never, locale);
                     return (
                       <div
                         key={`mobile-${row.model}-${axis.key}`}
                         className="rounded-md border border-border/40 px-2 py-2"
                         style={scoreToCellStyle(score, axis.key)}
                       >
-                        <div className="text-[10px] font-medium text-foreground/80">{axis.label}</div>
+                        <div className="text-[10px] font-medium text-foreground/80">{axisLabel}</div>
                         <div className="mt-1 text-sm font-semibold tabular-nums">{score}</div>
-                        <div className="text-[10px] text-foreground/80">{textForScore(score)}</div>
+                        <div className="text-[10px] text-foreground/80">{textForScore(score, locale)}</div>
                       </div>
                     );
                   })}
@@ -74,12 +85,12 @@ export function PerceptionModelAxisHeatmap({
           <div className="hidden lg:block">
             <div className="mb-2 grid grid-cols-[120px_1fr] gap-2">
               <div className="px-2 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                {PERCEPTION_TEXT.heatmap.modelColumn}
+                {t("heatmapModelColumn")}
               </div>
               <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${axes.length}, minmax(0, 1fr))` }}>
                 {axes.map((axis) => (
                   <div key={`header-${axis.key}`} className="px-1 text-center text-[11px] font-medium text-muted-foreground">
-                    {axis.label}
+                    {getPerceptionAxisLabel(axis.key as never, locale)}
                   </div>
                 ))}
               </div>
@@ -97,15 +108,16 @@ export function PerceptionModelAxisHeatmap({
                   >
                     {axes.map((axis) => {
                       const score = row.values[axis.key] ?? 0;
+                      const axisLabel = getPerceptionAxisLabel(axis.key as never, locale);
                       return (
                         <div
                           key={`desktop-${row.model}-${axis.key}`}
                           className="min-w-0 rounded-md border border-border/40 px-1 py-2 text-center"
                           style={scoreToCellStyle(score, axis.key)}
-                          title={`${row.model} • ${axis.label}: ${score}/100`}
+                          title={`${row.model} • ${axisLabel}: ${score}/100`}
                         >
                           <div className="text-xs font-semibold tabular-nums text-foreground">{score}</div>
-                          <div className="truncate text-[10px] text-foreground/80">{textForScore(score)}</div>
+                          <div className="truncate text-[10px] text-foreground/80">{textForScore(score, locale)}</div>
                         </div>
                       );
                     })}

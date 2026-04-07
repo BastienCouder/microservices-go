@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   buildScheduleHeaderSummary,
   buildScheduleValidation,
@@ -40,6 +41,7 @@ export function PromptScheduleDialog({
   saving = false,
   onSave,
 }: PromptScheduleDialogProps) {
+  const { locale, t } = useScopedI18n("prompts-workspace");
   const [draft, setDraft] = useState<PromptSchedule>(schedule);
   const [showAdvancedCron, setShowAdvancedCron] = useState(false);
 
@@ -54,7 +56,7 @@ export function PromptScheduleDialog({
     setShowAdvancedCron(hasCustomGlobalCron || hasCustomOverride);
   }, [open, schedule, selectedModels]);
 
-  const headerSummary = buildScheduleHeaderSummary(draft);
+  const headerSummary = buildScheduleHeaderSummary(draft, locale);
   const validation = buildScheduleValidation(draft);
   const visibleModels = useMemo(
     () =>
@@ -120,7 +122,7 @@ export function PromptScheduleDialog({
 
         <DialogFooter className="border-t px-6 py-4">
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             disabled={!validation.isValid || saving}
@@ -136,7 +138,7 @@ export function PromptScheduleDialog({
               )
             }
           >
-            {saving ? "Saving..." : "Save cadence"}
+            {saving ? t("saving") : t("saveCadence")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { GLOBAL_CADENCE_PRESETS } from "../../_lib/prompt-editor";
 import { promptScheduleLabel } from "../../_lib/utils";
 import type { AIModel, ModelVisual, PromptSchedule } from "../../_lib/types";
@@ -35,15 +36,16 @@ export function PromptCadenceSection({
   onToggleOverride: (model: AIModel, enabled: boolean) => void;
   onUpdateOverride: (model: AIModel, cron: string) => void;
 }) {
+  const { locale, t } = useScopedI18n("prompts-workspace");
   const overridesCount = Object.keys(schedule.modelCrons).length;
 
   return (
     <section className="rounded-3xl bg-background p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-2">
-          <div className="text-sm font-medium">Cadence d'analyse</div>
+          <div className="text-sm font-medium">{t("editorCadenceTitle")}</div>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Choisissez un rythme global, ou activez une cadence personnalisee pour certaines IA si besoin.
+            {t("editorCadenceDescription")}
           </p>
         </div>
         <div className="flex gap-2 text-xs">
@@ -57,14 +59,14 @@ export function PromptCadenceSection({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <ModeCard title="Globale" description="Meme cadence pour toutes les IA selectionnees" active={schedule.mode === "global"} icon={<Globe2 className="h-4 w-4" />} onClick={() => onSetMode("global")} />
-        <ModeCard title="Par IA" description="Personnalise la cadence de base sur certaines IA" active={schedule.mode === "per_model"} icon={<Bot className="h-4 w-4" />} onClick={() => onSetMode("per_model")} />
+        <ModeCard title={t("editorCadenceModeGlobalTitle")} description={t("editorCadenceModeGlobalDescription")} active={schedule.mode === "global"} icon={<Globe2 className="h-4 w-4" />} onClick={() => onSetMode("global")} />
+        <ModeCard title={t("editorCadenceModePerAiTitle")} description={t("editorCadenceModePerAiDescription")} active={schedule.mode === "per_model"} icon={<Bot className="h-4 w-4" />} onClick={() => onSetMode("per_model")} />
       </div>
 
       <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_220px]">
         <div className="space-y-3">
           <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-            Prereglages rapides
+            {t("quickPresets")}
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {GLOBAL_CADENCE_PRESETS.map((preset) => {
@@ -81,7 +83,7 @@ export function PromptCadenceSection({
                       : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/20",
                   )}
                 >
-                  <div className="text-sm font-medium">{preset.label}</div>
+                  <div className="text-sm font-medium">{t(preset.labelKey)}</div>
                 </button>
               );
             })}
@@ -90,7 +92,7 @@ export function PromptCadenceSection({
 
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label htmlFor="prompt-timezone">Fuseau horaire</Label>
+            <Label htmlFor="prompt-timezone">{t("timezone")}</Label>
             <Input
               id="prompt-timezone"
               value={schedule.timezone}
@@ -105,9 +107,9 @@ export function PromptCadenceSection({
 
       {schedule.mode === "per_model" ? (
         <div className="mt-5 space-y-3">
-          <div className="text-sm font-medium">Cadences personnalisees par IA</div>
+          <div className="text-sm font-medium">{t("perAiCustomCadencesTitle")}</div>
           <p className="text-sm leading-6 text-muted-foreground">
-            Chaque IA apparait ci-dessous. Cliquez sur `Definir une cadence propre` pour modifier une IA individuellement.
+            {t("perAiCustomCadencesDescription")}
           </p>
           <div className="space-y-3">
             {selectedModels.map((model) => {
@@ -115,8 +117,8 @@ export function PromptCadenceSection({
               const overrideCron = schedule.modelCrons[model] || "";
               const hasOverride = overrideCron !== "";
               const currentCadenceLabel = hasOverride
-                ? promptScheduleLabel(schedule, overrideCron)
-                : `${promptScheduleLabel(schedule)} (globale)`;
+                ? promptScheduleLabel(schedule, overrideCron, locale)
+                : `${promptScheduleLabel(schedule, undefined, locale)} (${t("globalCadenceSuffix")})`;
 
               return (
                 <div key={model} className="rounded-2xl border border-border/70 bg-muted/10 px-4 py-4">
@@ -132,17 +134,17 @@ export function PromptCadenceSection({
                     </div>
                     {hasOverride ? (
                       <Button type="button" size="sm" variant="outline" className="rounded-full" disabled={saving} onClick={() => onToggleOverride(model, false)}>
-                        Revenir a la cadence globale
+                        {t("revertToGlobalCadence")}
                       </Button>
                     ) : (
                       <Button type="button" size="sm" variant="outline" className="rounded-full" disabled={saving} onClick={() => onToggleOverride(model, true)}>
-                        Definir une cadence personnalisée
+                        {t("setCustomCadence")}
                       </Button>
                     )}
                   </div>
 
                   <div className="mt-3 break-words text-xs text-muted-foreground [overflow-wrap:anywhere]">
-                    Cadence actuelle : {currentCadenceLabel}
+                    {t("currentCadence", { label: currentCadenceLabel })}
                   </div>
 
                   {hasOverride ? (
@@ -157,7 +159,7 @@ export function PromptCadenceSection({
                           disabled={saving}
                           onClick={() => onUpdateOverride(model, preset.cron)}
                         >
-                          {preset.label}
+                          {t(preset.labelKey)}
                         </Button>
                       ))}
                     </div>
@@ -167,7 +169,9 @@ export function PromptCadenceSection({
             })}
           </div>
           <div className="text-xs text-muted-foreground">
-            {overridesCount === 0 ? "Aucune cadence personnalisee" : `${overridesCount} IA avec une cadence personnalisee`}
+            {overridesCount === 0
+              ? t("noCustomCadence")
+              : t("customCadenceCount", { count: overridesCount })}
           </div>
         </div>
       ) : null}

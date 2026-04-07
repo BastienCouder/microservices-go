@@ -5,6 +5,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 import {
   buildScopedHref,
   readOrganizationIdFromSearch,
@@ -39,6 +40,7 @@ type MobileFloatingNavProps = {
 };
 
 export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavProps) {
+  const content = useI18nScope("sidebar");
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const activeProjectId = readProjectIdFromSearch(location.search) || readSelectedProjectID();
@@ -46,12 +48,12 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
 
   const navigationItems = useMemo(
     () => [
-      { href: buildScopedHref("/monitoring", { projectId: activeProjectId }), label: "Monitoring" },
+      { href: buildScopedHref("/monitoring", { projectId: activeProjectId }), label: content.monitoring },
       ...MONITORING_ITEMS.map((item) => ({
         href: buildScopedHref(item.href, { projectId: activeProjectId }),
-        label: formatMobileLabel(SIDEBAR_LABELS[item.labelKey]),
+        label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      { href: buildScopedHref("/perception", { projectId: activeProjectId }), label: "Perception" },
+      { href: buildScopedHref("/perception", { projectId: activeProjectId }), label: content.perception },
       { href: buildScopedHref("/optimize/actions", { projectId: activeProjectId }), label: "Optimize actions" },
       { href: buildScopedHref("/optimize/content-optimizer", { projectId: activeProjectId }), label: "Content optimizer" },
       { href: buildScopedHref("/impact", { projectId: activeProjectId }), label: "Impact" },
@@ -60,10 +62,10 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
           org: activeOrganizationId,
           projectId: activeProjectId,
         }),
-        label: formatMobileLabel(SIDEBAR_LABELS[item.labelKey]),
+        label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
     ],
-    [activeOrganizationId, activeProjectId],
+    [activeOrganizationId, activeProjectId, content],
   );
 
   return (
@@ -79,7 +81,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                   variant="ghost"
                   size="icon"
                   className="h-11 w-11 rounded-full border border-white/60 bg-white/20 text-foreground shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"
-                  aria-label="Open navigation"
+                  aria-label={content.openNavigation}
                 >
                   <Menu className="h-5 w-5" />
                 </Button>
@@ -90,8 +92,8 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                 showCloseButton={false}
                 className="inset-auto left-3 right-3 top-3 bottom-3 h-auto rounded-[30px] border border-white/70 bg-[rgba(255,255,255,0.76)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.16)] backdrop-blur-2xl"
               >
-                <SheetTitle className="sr-only">Navigation mobile</SheetTitle>
-                <SheetDescription className="sr-only">Acces rapide aux sections principales de l application.</SheetDescription>
+                <SheetTitle className="sr-only">{content.mobileNavigationTitle}</SheetTitle>
+                <SheetDescription className="sr-only">{content.mobileNavigationDescription}</SheetDescription>
 
                 <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col px-5 pb-5 pt-5">
                   <div className="flex items-start justify-between gap-4">
@@ -102,7 +104,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                         variant="ghost"
                         size="icon"
                         className="h-10 w-10 rounded-full bg-transparent text-foreground/75 hover:bg-white/45 hover:text-foreground"
-                        aria-label="Close navigation"
+                        aria-label={content.closeNavigation}
                       >
                         <X className="h-5 w-5" />
                       </Button>
@@ -141,7 +143,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                       className="h-14 w-full rounded-[20px] border-white/80 bg-white/70 text-base font-semibold text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] backdrop-blur-xl hover:bg-white"
                       onClick={() => void onLogout?.()}
                     >
-                      Logout
+                      {content.logout}
                     </Button>
                   </div>
                 </div>

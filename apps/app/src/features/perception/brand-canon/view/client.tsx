@@ -14,6 +14,7 @@ import { PageHeader } from "@/features/shared/view/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import type { BrandCanon, BrandCompetitor, PerceptionViewData } from "@/lib/perception-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { CompetitorEditor, EditableListField } from "../_components";
 import {
   buildBackSearch,
@@ -35,6 +36,7 @@ export function BrandCanonEditorPageClient({
   apiBaseURL: string;
   routeSearch: string;
 }) {
+  const { locale, t } = useScopedI18n("perception-brand-canon");
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -60,11 +62,11 @@ export function BrandCanonEditorPageClient({
   const handleSave = async () => {
     setMessage(null);
     if (!initialData.metadata.projectId) {
-      setMessage("Mode démo : aucune sauvegarde serveur.");
+      setMessage(t("demoSaveMessage"));
       return;
     }
 
-    const competitorError = validateCompetitors(competitorsDraft);
+    const competitorError = validateCompetitors(competitorsDraft, locale);
     if (competitorError) {
       setActiveTab("competitors");
       setMessage(competitorError);
@@ -95,9 +97,9 @@ export function BrandCanonEditorPageClient({
           resolveRuntimeMode(routeSearch),
         ),
       });
-      setMessage("Référentiel de marque enregistré.");
+      setMessage(t("savedMessage"));
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : "Erreur de sauvegarde");
+      setMessage(err instanceof Error ? err.message : t("saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -106,86 +108,88 @@ export function BrandCanonEditorPageClient({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
-        title="Référentiel de marque"
-        baseline="Modifiez la source de vérité de la marque : positionnement, cas d’usage, fonctionnalités et concurrents."
+        title={t("editorPageTitle")}
+        baseline={t("editorPageBaseline")}
         actionsVariant="classic"
         actions={
           <Button asChild variant="default">
             <Link to={{ pathname: "/brands", search: buildBackSearch(location.search) }}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Retour
+              {t("back")}
             </Link>
           </Button>
         }
       />
 
       <ScrollArea className="mt-4 min-h-0 flex-1 pr-2 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
-        <Card className="rounded-tr-none">
-          <CardHeader>
-            <CardTitle>Champs éditables</CardTitle>
-            <CardDescription>
-              Les modifications enregistrées sont réutilisées dans les vues marque et perception.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4 pb-6">
-            <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-4 flex-col">
-              <TabsList className="h-auto w-full justify-start rounded-xl bg-muted/50 p-1 sm:w-auto">
-                <TabsTrigger value="brand" className="px-3 py-1.5 text-xs sm:text-sm">Marque</TabsTrigger>
-                <TabsTrigger value="competitors" className="px-3 py-1.5 text-xs sm:text-sm">Concurrents</TabsTrigger>
-              </TabsList>
+        <div className="space-y-4">
+          <Card className="rounded-tr-none">
+            <CardHeader>
+              <CardTitle>{t("editableFieldsTitle")}</CardTitle>
+              <CardDescription>
+                {t("editableFieldsDescription")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pb-6">
+              <Tabs value={activeTab} onValueChange={handleTabChange} className="gap-4 flex-col">
+                <TabsList className="h-auto w-full justify-start rounded-xl bg-muted/50 p-1 sm:w-auto">
+                  <TabsTrigger value="brand" className="px-3 py-1.5 text-xs sm:text-sm">{t("tabBrand")}</TabsTrigger>
+                  <TabsTrigger value="competitors" className="px-3 py-1.5 text-xs sm:text-sm">{t("tabCompetitors")}</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="brand" className="mt-0 space-y-4">
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label="Marque" hint="Nom affiché dans les réponses IA et sur les vues de synthèse.">
-                    <Input value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
+                <TabsContent value="brand" className="mt-0 space-y-4">
+                  <div className="grid gap-4 lg:grid-cols-2">
+                    <Field label={t("fieldBrand")} hint={t("fieldBrandHint")}>
+                      <Input value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
+                    </Field>
+                    <Field label={t("fieldCategory")} hint={t("fieldCategoryHint")}>
+                      <Input value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
+                    </Field>
+                  </div>
+
+                  <Field label={t("fieldPositioning")} hint={t("fieldPositioningHint")}>
+                    <Textarea
+                      value={canonDraft.positioning}
+                      onChange={(e) => update("positioning", e.target.value)}
+                      className="min-h-[140px]"
+                    />
                   </Field>
-                  <Field label="Catégorie" hint="Secteur ou catégorie principale utilisée pour situer la marque.">
-                    <Input value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
-                  </Field>
-                </div>
 
-                <Field label="Positionnement" hint="Description de référence qui explique clairement ce que fait la marque.">
-                  <Textarea
-                    value={canonDraft.positioning}
-                    onChange={(e) => update("positioning", e.target.value)}
-                    className="min-h-[140px]"
-                  />
-                </Field>
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <EditableListField
+                      label={t("fieldUseCases")}
+                      description={t("fieldUseCasesDescription")}
+                      value={canonDraft.useCases}
+                      onChange={(next) => update("useCases", next)}
+                      placeholder={t("fieldUseCasesPlaceholder")}
+                      addLabel={t("fieldUseCasesAdd")}
+                      emptyLabel={t("fieldUseCasesEmpty")}
+                    />
+                    <EditableListField
+                      label={t("fieldFeatures")}
+                      description={t("fieldFeaturesDescription")}
+                      value={canonDraft.features}
+                      onChange={(next) => update("features", next)}
+                      placeholder={t("fieldFeaturesPlaceholder")}
+                      addLabel={t("fieldFeaturesAdd")}
+                      emptyLabel={t("fieldFeaturesEmpty")}
+                    />
+                  </div>
+                </TabsContent>
 
-                <div className="grid gap-4 xl:grid-cols-2">
-                  <EditableListField
-                    label="Cas d’usage prioritaires"
-                    description="Les usages à faire ressortir dans les réponses IA."
-                    value={canonDraft.useCases}
-                    onChange={(next) => update("useCases", next)}
-                    placeholder="Ajouter un cas d’usage"
-                    addLabel="Ajouter le cas"
-                    emptyLabel="Aucun cas d’usage saisi."
-                  />
-                  <EditableListField
-                    label="Fonctionnalités clés"
-                    description="Les fonctionnalités que la marque doit faire reconnaître immédiatement."
-                    value={canonDraft.features}
-                    onChange={(next) => update("features", next)}
-                    placeholder="Ajouter une fonctionnalité"
-                    addLabel="Ajouter la fonctionnalité"
-                    emptyLabel="Aucune fonctionnalité saisie."
-                  />
-                </div>
-              </TabsContent>
-
-              <TabsContent value="competitors" className="mt-0">
-                <CompetitorEditor value={competitorsDraft} onChange={setCompetitorsDraft} />
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                <TabsContent value="competitors" className="mt-0">
+                  <CompetitorEditor value={competitorsDraft} onChange={setCompetitorsDraft} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        </div>
       </ScrollArea>
 
       <div className="border-t px-2 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="text-xs text-muted-foreground">
-            {message ?? "Sauvegarde du référentiel de marque et des concurrents."}
+            {message ?? t("footerDefaultMessage")}
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <Button
@@ -194,10 +198,10 @@ export function BrandCanonEditorPageClient({
               onClick={() => navigate({ pathname: "/brands", search: buildBackSearch(location.search) })}
               disabled={isSaving}
             >
-              Annuler
+              {t("cancel")}
             </Button>
             <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
-              {isSaving ? "Enregistrement..." : "Enregistrer"}
+              {isSaving ? t("saving") : t("save")}
             </Button>
           </div>
         </div>

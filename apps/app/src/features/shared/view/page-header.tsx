@@ -51,6 +51,9 @@ export function PageHeader({
             actionsClassName,
           )}
         >
+          {actionsVariant === "classic" ? (
+          null
+          ) : null}
           {actionsVariant === "accent" ? (
             <div className="hidden h-10 w-10 shrink-0 rounded-full bg-primary/8 ring-1 ring-primary/12 sm:block" />
           ) : null}

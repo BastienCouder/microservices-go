@@ -3,6 +3,7 @@
 import type { DateRange } from "react-day-picker";
 
 import { Input } from "@/components/ui/input";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 
 type MobileCustomRangePanelProps = {
   value: DateRange | undefined;
@@ -31,19 +32,21 @@ export function MobileCustomRangePanel({
   value,
   onChange,
 }: MobileCustomRangePanelProps) {
+  const content = useI18nScope("monitoring-mobile");
+
   return (
     <div className="rounded-[28px] border border-slate-200/80 bg-white p-4 shadow-sm">
       <div className="mb-3">
-        <p className="text-sm font-semibold text-slate-950">Plage personnalisée</p>
+        <p className="text-sm font-semibold text-slate-950">{content.customRangeTitle}</p>
         <p className="text-xs text-slate-500">
-          Choisissez une période précise pour resserrer la lecture du monitoring.
+          {content.customRangeDescription}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="space-y-1.5">
           <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
-            Début
+            {content.start}
           </span>
           <Input
             type="date"
@@ -58,7 +61,7 @@ export function MobileCustomRangePanel({
 
         <label className="space-y-1.5">
           <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">
-            Fin
+            {content.end}
           </span>
           <Input
             type="date"

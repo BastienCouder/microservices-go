@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Sparkles, Target } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useLocale } from "@/shared/hooks/use-i18n";
 import {
   PerceptionDonutVisual,
   PerceptionLeftPanel,
@@ -11,7 +12,11 @@ import {
   PerceptionTrendChart,
   TopErrorsPanel,
 } from "../_components";
-import { usePerceptionViewModel } from "../_lib";
+import {
+  getPerceptionPeriodBadgeLabel,
+  getPerceptionPeriodLabel,
+  usePerceptionViewModel,
+} from "../_lib";
 import type { PerceptionViewData } from "@/lib/perception-data";
 
 type PerceptionClientProps = {
@@ -25,15 +30,19 @@ const SCORE_CARD_ICONS = {
 } as const;
 
 export function PerceptionClient({ initialData }: PerceptionClientProps) {
+  const { locale } = useLocale();
   const viewModel = usePerceptionViewModel(initialData);
+  const periodLabel = getPerceptionPeriodLabel(viewModel.selectedPeriod, locale);
+  const periodBadgeLabel = getPerceptionPeriodBadgeLabel(viewModel.selectedPeriod, locale);
 
   return (
     <PerceptionThreeColumnLayout
       left={
         <PerceptionLeftPanel
           canon={initialData.brandCanon}
-          source={initialData.source}
-          windowLabel={viewModel.perceptionTrend.periodLabel}
+          radar={viewModel.filteredRadar}
+          trendData={viewModel.perceptionTrend.data}
+          windowLabel={periodLabel}
           analyzedResponses={viewModel.filteredResponses.length}
           selectedModels={viewModel.selectedModels}
           modelOptions={viewModel.modelCatalog}
@@ -63,17 +72,22 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
         <div className="space-y-4 px-1 pb-4">
           <Card className="border-border/60 overflow-hidden py-4">
             <CardContent className="p-0">
-              <PerceptionDonutVisual points={viewModel.filteredRadar} />
+              <PerceptionDonutVisual
+                points={viewModel.filteredRadar}
+                periodLabel={periodBadgeLabel}
+              />
             </CardContent>
           </Card>
 
           <PerceptionModelAxisHeatmap
             axes={viewModel.modelAxisHeatmap.axes}
             rows={viewModel.modelAxisHeatmap.rows}
+            periodLabel={periodBadgeLabel}
           />
           <PerceptionTrendChart
             data={viewModel.perceptionTrend.data}
-            periodLabel={viewModel.perceptionTrend.periodLabel}
+            periodLabel={periodLabel}
+            badgeLabel={periodBadgeLabel}
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

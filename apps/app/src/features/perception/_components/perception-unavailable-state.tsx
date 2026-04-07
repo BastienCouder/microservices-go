@@ -2,8 +2,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { FiltersEmptyStateCard } from "@/features/monitoring/_components/shared/filters-empty-state-card";
 import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
-import { PERCEPTION_TEXT } from "@/lib/app-data";
 import type { BrandCanon } from "@/lib/perception-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PerceptionLeftPanel } from "./perception-left-panel";
 import { PerceptionThreeColumnLayout } from "./perception-three-column-layout";
 
@@ -27,14 +27,16 @@ export function PerceptionUnavailableState({
 }: {
   error: string | null;
 }) {
-  const errorLabel = (error || "").trim().toLowerCase() !== "" ? "Aucune donnée" : "Aucune donnée";
+  const { t } = useScopedI18n("perception");
+  const errorLabel = (error || "").trim().toLowerCase() !== "" ? t("unavailableNoData") : t("unavailableNoData");
 
   return (
     <PerceptionThreeColumnLayout
       left={
         <PerceptionLeftPanel
           canon={EMPTY_BRAND_CANON}
-          source="project"
+          radar={[]}
+          trendData={[]}
           windowLabel="--"
           analyzedResponses={0}
           selectedModels={[]}
@@ -55,21 +57,21 @@ export function PerceptionUnavailableState({
           <Card className="border-border/60 overflow-hidden py-4">
             <CardContent className="space-y-3 px-4">
               <div>
-                <MonitoringSectionTitle>{PERCEPTION_TEXT.donut.title}</MonitoringSectionTitle>
+                <MonitoringSectionTitle>{t("donutTitle")}</MonitoringSectionTitle>
               </div>
-              <div className="text-sm text-muted-foreground">{PERCEPTION_TEXT.donut.subtitle}</div>
+              <div className="text-sm text-muted-foreground">{t("donutSubtitle")}</div>
               <FiltersEmptyStateCard label={errorLabel} className="h-[320px] text-sm" />
             </CardContent>
           </Card>
           <Card className="min-w-0 border-border/60">
             <CardHeader className="pb-2">
               <CardTitle className="text-base">
-                <MonitoringSectionTitle>{PERCEPTION_TEXT.heatmap.title}</MonitoringSectionTitle>
+                <MonitoringSectionTitle>{t("heatmapTitle")}</MonitoringSectionTitle>
               </CardTitle>
-              <CardDescription>{PERCEPTION_TEXT.heatmap.description}</CardDescription>
+              <CardDescription>{t("heatmapDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <FiltersEmptyStateCard label="Aucune donnée" className="h-[280px] text-sm" />
+              <FiltersEmptyStateCard label={t("unavailableNoData")} className="h-[280px] text-sm" />
             </CardContent>
           </Card>
         </div>
@@ -79,7 +81,7 @@ export function PerceptionUnavailableState({
           <Card className="border-border/60">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-semibold">
-                <MonitoringSectionTitle>{PERCEPTION_TEXT.topErrors.title}</MonitoringSectionTitle>
+                <MonitoringSectionTitle>{t("topErrorsTitle")}</MonitoringSectionTitle>
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -99,21 +101,22 @@ export function BrandCanonUnavailableState({
   error: string | null;
   onReload: () => Promise<void>;
 }) {
-  const errorLabel = (error || "").trim().toLowerCase() !== "" ? "Aucune donnée" : "Aucune donnée";
+  const { t } = useScopedI18n("perception");
+  const errorLabel = (error || "").trim().toLowerCase() !== "" ? t("unavailableNoData") : t("unavailableNoData");
 
   return (
     <div className="mx-0 my-0 grid grid-cols-12 gap-0 md:m-4 xl:h-full xl:min-h-0">
       <div className="col-span-12 xl:col-span-8 xl:col-start-3">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle>Éditeur du référentiel de marque</CardTitle>
+            <CardTitle>{t("brandCanonUnavailableTitle")}</CardTitle>
             <CardDescription>
-              Modifiez la source de vérité de la marque : catégorie, cas d’usage, fonctionnalités et concurrents.
+              {t("brandCanonUnavailableDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 p-6 pt-0">
             <FiltersEmptyStateCard label={errorLabel} className="h-24 text-sm" />
-            <Button onClick={() => void onReload()}>Recharger</Button>
+            <Button onClick={() => void onReload()}>{t("reload")}</Button>
           </CardContent>
         </Card>
       </div>

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -84,7 +85,12 @@ export function CreatePromptDialog({
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="p-0">
+                  <FloatingPanelHeader
+                    title="Persona"
+                    description="Choisissez l'angle ou le profil associe a ce prompt."
+                    className="px-3.5 pt-3.5"
+                  />
                   {availablePersonas.map((item) => (
                     <SelectItem key={item} value={item}>
                       {item}

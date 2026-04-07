@@ -9,8 +9,10 @@ import { useI18nScope } from "@/shared/hooks/use-i18n";
 
 import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
 import { CompetitorFilterSection } from "./competitor-filter-section";
+import { FilterHeroInsightCard } from "./filter-hero-insight-card";
 import { FiltersPanelLoading } from "./filters-panel-loading";
 import { ModelFilterSection } from "./model-filter-section";
+import type { FilterHeroInsight } from "../../_lib/filters/filter-hero-insight";
 
 type FiltersPanelViewProps = {
   loading: boolean;
@@ -49,6 +51,7 @@ type FiltersPanelViewProps = {
   showResetFilters: boolean;
   showUniqueModelFilters: boolean;
   onModelFilterModeChange: (value: boolean) => void;
+  heroInsight: FilterHeroInsight;
 };
 
 export function FiltersPanelView(props: FiltersPanelViewProps) {
@@ -62,6 +65,8 @@ export function FiltersPanelView(props: FiltersPanelViewProps) {
     <div className="flex h-auto flex-col lg:h-full">
       <div className="min-h-0 flex-1 overflow-y-auto p-2 no-scrollbar lg:min-h-0 lg:p-2">
         <div className="flex flex-col gap-5 pb-4">
+          <FilterHeroInsightCard insight={props.heroInsight} />
+
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-2">
               <h4 className="min-w-0 text-sm font-semibold text-foreground md:text-base lg:text-sm">

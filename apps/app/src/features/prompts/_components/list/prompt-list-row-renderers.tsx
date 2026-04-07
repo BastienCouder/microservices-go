@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { promptStatusLabel, relativeRunLabel } from "../../_lib/utils";
+import { promptScheduleLabel, promptStatusLabel, relativeRunLabel } from "../../_lib/utils";
+import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptItem, PromptRowMode } from "../../_lib/types";
 import { PromptActions, PromptModelBadges } from "./prompt-list-parts";
 
@@ -27,6 +28,8 @@ type SharedProps = {
   rankTone: (rank: number) => string;
   statusBadgeVariant: (status: PromptItem["status"]) => "secondary" | "outline" | "destructive";
   onRunSelect: (runId: string) => void;
+  locale: string;
+  content: Record<string, string>;
 };
 
 export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
@@ -48,18 +51,22 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
           onCheckedChange={() => props.togglePromptSelection(selectionKey)}
         />
       </TableCell>
-      <TableCell className="min-w-[280px] max-w-[340px]">
+      <TableCell className="min-w-[220px] max-w-[260px] xl:min-w-[280px] xl:max-w-[340px]">
         <div className="truncate font-medium leading-6">{item.prompt}</div>
       </TableCell>
       <TableCell>
-        <PromptModelBadges
-          item={item}
-          getModelVisual={props.getModelVisual}
-          singleLine={props.promptRowMode === "global"}
-        />
+        <div className="max-w-[128px] overflow-hidden xl:max-w-[180px]">
+          <PromptModelBadges
+            item={item}
+            getModelVisual={props.getModelVisual}
+            singleLine={props.promptRowMode === "global"}
+          />
+        </div>
       </TableCell>
       <TableCell>
-        <div className="min-w-[170px] text-xs font-medium">{item.effectiveScheduleLabel}</div>
+        <div className="max-w-[140px] truncate text-xs font-medium xl:max-w-[180px]">
+          {promptScheduleLabel(item.schedule, item.effectiveCron, props.locale)}
+        </div>
       </TableCell>
       <TableCell>
         {hasResults ? (
@@ -94,14 +101,20 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
                 item.lastRunMinutes < 60 ? "bg-emerald-500" : "bg-amber-500",
               )}
             />
-            {relativeRunLabel(item.lastRunMinutes)}
+            {relativeRunLabel(item.lastRunMinutes, props.locale)}
           </div>
         ) : null}
       </TableCell>
-      <TableCell>
-        <Badge variant={props.statusBadgeVariant(item.status)}>{promptStatusLabel(item.status)}</Badge>
+      <TableCell className="hidden xl:table-cell">
+        <Badge variant={props.statusBadgeVariant(item.status)}>
+          {promptStatusLabel(item.status, props.locale)}
+        </Badge>
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell
+        className="w-[56px] text-right"
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => event.stopPropagation()}
+      >
         <PromptActions
           item={item}
           setSelectedPromptId={props.setSelectedPromptId}
@@ -121,6 +134,7 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
 }
 
 export function PromptMobileCard({ item, ...props }: { item: PromptItem } & SharedProps) {
+  const content = useI18nScope("prompts-workspace");
   const sourcePromptId = item.sourcePromptId || item.id;
   const selectionKey = props.getPromptSelectionKey(item);
   const hasResults = item.runs.length > 0;
@@ -153,50 +167,64 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
           <div className="space-y-2">
             <div className="line-clamp-3 text-sm font-medium leading-6">{item.prompt}</div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">{props.promptRowMode === "global" ? "Vue globale" : "Par IA"}</Badge>
-              <Badge variant={props.statusBadgeVariant(item.status)}>{promptStatusLabel(item.status)}</Badge>
+              <Badge variant="outline">
+                {props.promptRowMode === "global" ? content.rowModeGlobal : content.rowModeModel}
+              </Badge>
+              <Badge variant={props.statusBadgeVariant(item.status)}>
+                {promptStatusLabel(item.status, props.locale)}
+              </Badge>
             </div>
           </div>
 
           <PromptModelBadges item={item} getModelVisual={props.getModelVisual} />
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <Metric label="Mention" value={hasResults ? `${item.mentionRate}%` : null} />
-            <Metric label="Classement" value={hasResults ? item.rank.toFixed(1) : null} />
-            <Metric label="Cadence" value={item.effectiveScheduleLabel} />
-            <Metric label="SOV" value={hasResults ? `${item.sov}%` : null} />
-            <Metric label="Derniere execution" value={hasResults ? relativeRunLabel(item.lastRunMinutes) : null} />
+          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            <Metric label={content.mention} value={hasResults ? `${item.mentionRate}%` : null} />
+            <Metric label={content.rank} value={hasResults ? item.rank.toFixed(1) : null} />
+            <Metric
+              label={content.columnCadence}
+              value={promptScheduleLabel(item.schedule, item.effectiveCron, props.locale)}
+            />
+            <Metric label={content.overviewSov} value={hasResults ? `${item.sov}%` : null} />
+            <Metric
+              label={content.columnLastRun}
+              value={hasResults ? relativeRunLabel(item.lastRunMinutes, props.locale) : null}
+            />
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="rounded-full"
+              className="w-full rounded-full sm:w-auto"
               onClick={(event) => {
                 event.stopPropagation();
                 props.setFocusPromptId(sourcePromptId);
                 props.setTabResponses();
               }}
             >
-              Voir les reponses
+              {content.viewResponses}
             </Button>
             {item.runs[0]?.id ? (
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                className="rounded-full"
+                className="w-full rounded-full sm:w-auto"
                 onClick={(event) => {
                   event.stopPropagation();
                   props.onRunSelect(item.runs[0]!.id);
                 }}
               >
-                Ouvrir l'execution
+                {content.openRun}
               </Button>
             ) : null}
-            <div className="ml-auto" onClick={(event) => event.stopPropagation()}>
+            <div
+              className="pt-1 sm:ml-auto sm:pt-0"
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => event.stopPropagation()}
+            >
               <PromptActions
                 item={item}
                 setSelectedPromptId={props.setSelectedPromptId}
@@ -234,6 +262,8 @@ export function PromptRowModeSwitch({
   promptRowMode: PromptRowMode;
   setPromptRowMode: (value: PromptRowMode) => void;
 }) {
+  const content = useI18nScope("prompts-workspace");
+
   return (
     <div className="flex shrink-0 gap-1 rounded-full border p-1">
       <Button
@@ -244,7 +274,7 @@ export function PromptRowModeSwitch({
         onClick={() => setPromptRowMode("global")}
       >
         <Layers3 className="mr-1 h-3.5 w-3.5" />
-        Vue globale
+        {content.rowModeGlobal}
       </Button>
       <Button
         type="button"
@@ -254,7 +284,7 @@ export function PromptRowModeSwitch({
         onClick={() => setPromptRowMode("model")}
       >
         <Bot className="mr-1 h-3.5 w-3.5" />
-        Par IA
+        {content.rowModeModel}
       </Button>
     </div>
   );
@@ -271,6 +301,8 @@ export function RunSelectedButton({
   selectedRunnablePromptCount: number;
   runSelectedPrompts: () => void;
 }) {
+  const { t } = useScopedI18n("prompts-workspace");
+
   return (
     <Button
       type="button"
@@ -282,10 +314,10 @@ export function RunSelectedButton({
     >
       <Play className="mr-1.5 h-3.5 w-3.5" />
       {runningSelectedPrompts
-        ? "Lancement..."
-        : selectedRunnablePromptCount > 0
-          ? `Lancer les prompts (${selectedRunnablePromptCount})`
-          : "Lancer les prompts"}
+        ? t("launching")
+        : selectedRunnablePromptCount === 0
+          ? t("selectPromptToRun")
+          : t("runSelectedPrompt", { count: selectedRunnablePromptCount })}
     </Button>
   );
 }

@@ -1,4 +1,5 @@
 import type { BrandCompetitor } from "@/lib/perception-data";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 export type EditorTab = "brand" | "competitors";
 
@@ -37,18 +38,29 @@ export function sanitizeList(items: string[]): string[] {
   return nextItems;
 }
 
-export function validateCompetitors(competitors: BrandCompetitor[]): string | null {
+export function validateCompetitors(
+  competitors: BrandCompetitor[],
+  locale = "en",
+): string | null {
   const seen = new Set<string>();
 
   for (const competitor of competitors) {
     const name = competitor.name.trim();
     if (!name) {
-      return "Chaque concurrent doit avoir un nom ou être supprimé.";
+      return translateI18nText(
+        "perception-brand-canon",
+        "validationMissingCompetitorName",
+        locale,
+      );
     }
 
     const key = name.toLowerCase();
     if (seen.has(key)) {
-      return "Chaque concurrent doit être unique.";
+      return translateI18nText(
+        "perception-brand-canon",
+        "validationUniqueCompetitor",
+        locale,
+      );
     }
     seen.add(key);
   }

@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { ChartContainer } from "@/components/ui/chart";
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { VISIBILITY_ANALYTICS_COLORS } from "@/lib/app-data";
@@ -36,7 +36,6 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
   const hasData = barData.length > 0;
   const maxValue = Math.max(10, ...barData.map((item) => item.value));
   const { chartAreaHeight, yAxisWidth } = getVisibilityChartLayout(barData);
-  const totalMentions = Math.max(1, barData.reduce((sum, item) => sum + item.value, 0));
 
   return (
     <Card className="w-full min-w-0 rounded-md">
@@ -47,9 +46,9 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
               <MonitoringSectionTitle>{title || content.visibilityAnalyticsTitle}</MonitoringSectionTitle>
             </CardTitle>
             <CardDescription className="text-xs leading-relaxed md:text-sm">
-              Nombre de reponses IA ou votre marque est mentionnee.
+              {content.modelVisibilityMetricDescription}
               {hasCompetitorFilter
-                ? " Avec un filtre concurrent, on compte seulement les co-mentions (votre marque + concurrent selectionne)."
+                ? ` ${content.modelVisibilityMetricDescriptionWithCompetitor}`
                 : ""}
             </CardDescription>
           </div>
@@ -65,7 +64,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
           <div className="flex min-w-0 flex-col">
           <ChartContainer
             config={chartConfig}
-            className="!aspect-auto min-h-0 w-full overflow-x-hidden capitalize"
+            className="!aspect-auto min-h-0 w-full overflow-x-hidden"
             style={{ height: `${chartAreaHeight}px`, minHeight: `${chartAreaHeight}px` }}
           >
             <BarChart
@@ -92,14 +91,6 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
                 axisLine={false}
                 tickMargin={10}
                 tick={<VisibilityYAxisTick />}
-              />
-              <ChartTooltip
-                cursor={{ fill: VISIBILITY_ANALYTICS_COLORS.tooltipCursor }}
-                content={
-                  <VisibilityAnalyticsTooltip
-                    totalMentions={totalMentions}
-                  />
-                }
               />
               <Bar
                 dataKey="value"
@@ -220,41 +211,5 @@ function VisibilityYAxisTick({
         </tspan>
       ))}
     </text>
-  );
-}
-
-function VisibilityAnalyticsTooltip({
-  active,
-  payload,
-  totalMentions,
-}: {
-  active?: boolean;
-  payload?: Array<{ value?: number; payload?: { label?: string; fill?: string } }>;
-  totalMentions: number;
-}) {
-  const item = payload?.[0];
-  const value = typeof item?.value === "number" ? item.value : 0;
-  const label = item?.payload?.label ?? "Modele";
-  const color = item?.payload?.fill ?? VISIBILITY_ANALYTICS_COLORS.fallbackBar;
-  if (!active || !item) return null;
-
-  const share = Math.round((value / Math.max(totalMentions, 1)) * 100);
-
-  return (
-    <div className="min-w-[180px] rounded-md border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur-sm">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-xs font-medium md:text-sm">{label}</span>
-      </div>
-      <div className="mb-1 flex items-center justify-between gap-4 text-xs">
-        <span className="text-muted-foreground">% dans les resultats affiches</span>
-        <span className="font-mono text-sm font-semibold tabular-nums md:text-base">{share}%</span>
-      </div>
-      <div className="space-y-1">
-        <div className="h-1.5 overflow-hidden rounded-full bg-muted/50">
-          <div className="h-full rounded-full" style={{ width: `${share}%`, backgroundColor: color }} />
-        </div>
-      </div>
-    </div>
   );
 }

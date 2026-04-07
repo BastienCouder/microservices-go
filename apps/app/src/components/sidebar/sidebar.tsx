@@ -10,6 +10,7 @@ import { normalizeOrganizationHierarchy } from "@/features/organizations/lib/hie
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { OrganizationHierarchy } from "@/shared/models";
 import {
   buildScopedHref,
@@ -22,6 +23,7 @@ import {
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS, type SidebarProjectOption } from "./sidebar-constants";
+import { SidebarLanguageSwitcher } from "./sidebar-language-switcher";
 import { SidebarOrganizationSwitcher } from "./sidebar-organization-switcher";
 import { SidebarNavItem } from "./sidebar-nav-item";
 
@@ -120,6 +122,7 @@ function SidebarComponent({
   busy?: boolean;
   onLogout?: () => Promise<void>;
 }) {
+  const content = useI18nScope("sidebar");
   const pathname = useLocation().pathname;
   const location = useLocation();
   const navigate = useNavigate();
@@ -264,7 +267,7 @@ function SidebarComponent({
           </div>
           {!collapsed ? (
             <span className="line-clamp-1 text-[15px] font-semibold tracking-tight text-foreground">
-              {activeProject?.name || activeOrganizationName || "projects"}
+              {activeProject?.name || activeOrganizationName || content.projects}
             </span>
           ) : null}
         </div>
@@ -290,7 +293,7 @@ function SidebarComponent({
           <div className="mb-1">
             <SidebarNavItem
               href={projectScopedMonitoringHref}
-              label={"monitoring"}
+              label={content.monitoring}
               active={isActiveHref(projectScopedMonitoringHref)}
               collapsed={collapsed}
               className="font-bold uppercase tracking-wider text-[11px]"
@@ -304,7 +307,7 @@ function SidebarComponent({
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  label={SIDEBAR_LABELS[item.labelKey]}
+                  label={content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]}
                   active={isActiveHref(item.href)}
                   indent={!collapsed}
                   collapsed={collapsed}
@@ -316,7 +319,7 @@ function SidebarComponent({
           <div className="mb-1">
             <SidebarNavItem
               href={perceptionHref}
-              label={"perception"}
+              label={content.perception}
               active={isActiveHref(perceptionHref)}
               collapsed={collapsed}
                   className="font-bold uppercase tracking-wider text-[11px]"
@@ -350,14 +353,14 @@ function SidebarComponent({
             />
           </div> */}
 
-          <div className="mb-1 mt-4">
+          <div className="mb-1">
             <div className="relative mt-1 space-y-0.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {organizationScopedItems.map((item) => (
                 <SidebarNavItem
                   key={item.href}
                   href={item.href}
-                  label={SIDEBAR_LABELS[item.labelKey]}
+                  label={content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]}
                   active={isActiveHref(item.href)}
                   indent={!collapsed}
                   collapsed={collapsed}
@@ -368,6 +371,9 @@ function SidebarComponent({
         </nav>
 
         <div className="border-t border-border p-2">
+          <div className="mb-1">
+            <SidebarLanguageSwitcher collapsed={collapsed} />
+          </div>
           <button
             disabled={busy}
             className={cn(
@@ -378,7 +384,7 @@ function SidebarComponent({
             onClick={() => void onLogout?.()}
             type="button"
           >
-            {collapsed ? <span className="text-xs font-semibold uppercase tracking-[0.18em]">L</span> : <span>logout</span>}
+            {collapsed ? <span className="text-xs font-semibold uppercase tracking-[0.18em]">L</span> : <span>{content.logout}</span>}
           </button>
           <button
             onClick={() => setCollapsed((prev) => !prev)}
@@ -392,7 +398,7 @@ function SidebarComponent({
             ) : (
               <>
                 <ChevronsLeft className="h-4 w-4" />
-                <span>{"collapse"}</span>
+                <span>{content.collapse}</span>
               </>
             )}
           </button>

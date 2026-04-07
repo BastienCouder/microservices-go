@@ -13,6 +13,7 @@ import {
 } from "@/lib/project-models";
 import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 import { gatewayJSON } from "@/shared/api/gateway";
 
 export type PerceptionAxisKey =
@@ -96,6 +97,8 @@ export type PerceptionTrendSeries = {
   periodLabel: string;
   data: PerceptionTrendPoint[];
 };
+
+type SupportedLocale = "en" | "fr";
 
 export type PerceptionResponseRecord = {
   id: string;
@@ -484,6 +487,18 @@ function deriveLatestRunIdFromResponses(
   return latestRunId || fallbackLatestRunId;
 }
 
+function normalizeLocale(locale: string): SupportedLocale {
+  return locale.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+function translatePerceptionText(
+  locale: string,
+  key: string,
+  options?: Record<string, unknown>,
+): string {
+  return translateI18nText("perception", key, normalizeLocale(locale), options);
+}
+
 function deriveBrandCanon(projectPayload: unknown): BrandCanon {
   const project = asObject(projectPayload);
   const brandName =
@@ -814,6 +829,7 @@ function deriveTopErrors(
   scores: PerceptionScores,
   radar: PerceptionRadarPoint[],
   heatmap: PerceptionViewData["modelAxisHeatmap"],
+  locale: string,
 ): PerceptionError[] {
   if (payload.topErrors && payload.topErrors.length > 0) {
     return payload.topErrors.slice(0, 3).map((error, index) => {
@@ -823,21 +839,23 @@ function deriveTopErrors(
         id: error.id || `perception-error-${index + 1}`,
         type: error.type || `perception-gap-${index + 1}`,
         severity,
-        title: error.title || "Ecart de perception detecte",
-        issue: error.issue || "Le backend a signale un ecart de perception sur cet axe.",
-        impact: error.impact || "Cet ecart degrade la comprehension de la marque par les IA.",
+        title: error.title || translatePerceptionText(locale, "topErrorsFallbackTitle"),
+        issue: error.issue || translatePerceptionText(locale, "topErrorsFallbackIssue"),
+        impact: error.impact || translatePerceptionText(locale, "topErrorsFallbackImpact"),
         detectedInModels: error.detectedInModels ?? heatmap.rows.slice(0, 2).map((row) => row.model),
         fixType: (error.fixType as PerceptionError["fixType"]) || "website_copy",
         optimizePriority: (error.optimizePriority as OptimizePriority) || priorityFromSeverity(severity),
         generatedContent:
           error.generatedContent ||
-          `Clarifier ${brandCanon.brandName || "la marque"} sur cet axe dans le site et les contenus sources.`,
+          translatePerceptionText(locale, "topErrorsFallbackGeneratedContent", {
+            brand: brandCanon.brandName || translatePerceptionText(locale, "brandFallbackName"),
+          }),
       };
     });
   }
 
   const radarByAxis = new Map(radar.map((point) => [point.axis, point.score] as const));
-  const brandLabel = brandCanon.brandName || "la marque";
+  const brandLabel = brandCanon.brandName || translatePerceptionText(locale, "brandFallbackName");
 
   const candidates: Array<{
     type: string;
@@ -853,56 +871,63 @@ function deriveTopErrors(
       type: "positioning_gap",
       score: scores.positioningAccuracy,
       axis: "positioning",
-      title: "Positionnement encore mal cite",
-      issue: `${scores.positioningAccuracy}% des reponses citent correctement ${brandLabel}. Une partie des modeles ne rattache pas encore la marque au bon contexte.`,
-      impact: "La marque peut etre sous-selectionnee ou apparaitre hors sujet dans les recommandations IA.",
+      title: translatePerceptionText(locale, "topErrorsGeneratedPositioningTitle"),
+      issue: translatePerceptionText(locale, "topErrorsGeneratedPositioningIssue", {
+        score: scores.positioningAccuracy,
+        brand: brandLabel,
+      }),
+      impact: translatePerceptionText(locale, "topErrorsGeneratedPositioningImpact"),
       fixType: "website_copy",
-      generatedContent:
-        "Renforcer la proposition de valeur et les cas d'usage directement dans les pages d'entree, les titres et les FAQs.",
+      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedPositioningContent"),
     },
     {
       type: "citation_gap",
       score: scores.factualAccuracy,
       axis: "features",
-      title: "Trop peu de reponses citees",
-      issue: `${scores.factualAccuracy}% des reponses contiennent une citation exploitable. Les IA repondent souvent sans appui explicite sur vos pages.`,
-      impact: "Le discours est moins verifiable et la factualite de la marque baisse dans les resultats.",
+      title: translatePerceptionText(locale, "topErrorsGeneratedCitationTitle"),
+      issue: translatePerceptionText(locale, "topErrorsGeneratedCitationIssue", {
+        score: scores.factualAccuracy,
+      }),
+      impact: translatePerceptionText(locale, "topErrorsGeneratedCitationImpact"),
       fixType: "faq_snippet",
-      generatedContent:
-        "Ajouter des blocs FAQ, preuves, statistiques et pages de reference facilement citables sur les points cles du produit.",
+      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedCitationContent"),
     },
     {
       type: "use_case_gap",
       score: radarByAxis.get("use_cases") ?? 0,
       axis: "use_cases",
-      title: "Couverture use cases incomplete",
-      issue: `${radarByAxis.get("use_cases") ?? 0}% des prompts couverts aboutissent a une mention claire de ${brandLabel}. Les IA ne rattachent pas encore assez la marque aux scenarios cibles.`,
-      impact: "Les opportunites de presence sur les requetes d'intention restent partielles.",
+      title: translatePerceptionText(locale, "topErrorsGeneratedUseCaseTitle"),
+      issue: translatePerceptionText(locale, "topErrorsGeneratedUseCaseIssue", {
+        score: radarByAxis.get("use_cases") ?? 0,
+        brand: brandLabel,
+      }),
+      impact: translatePerceptionText(locale, "topErrorsGeneratedUseCaseImpact"),
       fixType: "website_copy",
-      generatedContent:
-        "Rendre les use cases prioritaires plus visibles dans la navigation, les hero sections et les pages de comparaison.",
+      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedUseCaseContent"),
     },
     {
       type: "sentiment_gap",
       score: scores.sentimentScore,
       axis: "sentiment",
-      title: "Sentiment encore trop neutre ou negatif",
-      issue: `Le score de sentiment est de ${scores.sentimentScore}/100. Les reponses manquent encore de signaux differenciants ou penchent trop vers des alternatives.`,
-      impact: "La marque est moins convaincante dans les syntheses IA et perd en desirabilite.",
+      title: translatePerceptionText(locale, "topErrorsGeneratedSentimentTitle"),
+      issue: translatePerceptionText(locale, "topErrorsGeneratedSentimentIssue", {
+        score: scores.sentimentScore,
+      }),
+      impact: translatePerceptionText(locale, "topErrorsGeneratedSentimentImpact"),
       fixType: "prompt_patch",
-      generatedContent:
-        "Mieux documenter les preuves de valeur, les resultats clients et les differentiants pour orienter les reponses vers des signaux plus positifs.",
+      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedSentimentContent"),
     },
     {
       type: "competitive_gap",
       score: radarByAxis.get("competitors") ?? 0,
       axis: "competitors",
-      title: "Position concurrentielle encore faible",
-      issue: `Le score concurrentiel est de ${radarByAxis.get("competitors") ?? 0}/100. Les IA placent encore trop souvent la marque derriere des concurrents sur les comparatifs.`,
-      impact: "Le trafic de consideration peut etre capte par d'autres acteurs sur les requetes de comparaison.",
+      title: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveTitle"),
+      issue: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveIssue", {
+        score: radarByAxis.get("competitors") ?? 0,
+      }),
+      impact: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveImpact"),
       fixType: "schema_update",
-      generatedContent:
-        "Ajouter des comparatifs, tableaux de differenciation et contenus de preuve sur les concurrents reels du projet.",
+      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveContent"),
     },
   ];
 
@@ -932,8 +957,9 @@ function deriveTopErrorsFromMetrics(
   scores: PerceptionScores,
   radar: PerceptionRadarPoint[],
   heatmap: PerceptionViewData["modelAxisHeatmap"],
+  locale: string,
 ): PerceptionError[] {
-  return deriveTopErrors({}, brandCanon, scores, radar, heatmap);
+  return deriveTopErrors({}, brandCanon, scores, radar, heatmap, locale);
 }
 
 function serializeResponses(responses: ParsedResponse[]): PerceptionResponseRecord[] {
@@ -1025,13 +1051,14 @@ export function derivePerceptionHeatmapFromResponses(
 export function derivePerceptionTopErrorsFromResponses(
   brandCanon: BrandCanon,
   responses: PerceptionResponseRecord[],
+  locale = "en",
 ): PerceptionError[] {
   if (responses.length === 0) return [];
   const parsedResponses = responses.map(parseResponseRecord);
   const scores = deriveScoresFromParsedResponses(parsedResponses);
   const radar = deriveRadarFromParsedResponses(parsedResponses);
   const heatmap = deriveModelAxisHeatmapFromParsedResponses(parsedResponses);
-  return deriveTopErrorsFromMetrics(brandCanon, scores, radar, heatmap);
+  return deriveTopErrorsFromMetrics(brandCanon, scores, radar, heatmap, locale);
 }
 
 export function derivePerceptionTrendSeries(
@@ -1087,7 +1114,14 @@ function buildPerceptionBase(
   const visibleModelCatalog = activeModelCatalog.length > 0 ? activeModelCatalog : modelCatalog;
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, visibleModelCatalog);
   const trend = deriveTrend(responses, latestRunId, referenceDate);
-  const topErrors = deriveTopErrors(perceptionPayload, brandCanon, scores, radar, modelAxisHeatmap);
+  const topErrors = deriveTopErrors(
+    perceptionPayload,
+    brandCanon,
+    scores,
+    radar,
+    modelAxisHeatmap,
+    "en",
+  );
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
   );

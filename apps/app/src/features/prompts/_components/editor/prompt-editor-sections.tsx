@@ -2,6 +2,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PROMPT_STATUS_OPTIONS,
   getPromptStatusLabel,
@@ -23,13 +24,15 @@ export function PromptTextSection({
   onChangePromptText: (value: string) => void;
   onChangeStatus: (value: PromptItem["status"]) => void;
 }) {
+  const { locale, t } = useScopedI18n("prompts-workspace");
+
   return (
     <section className="rounded-3xl rounded-tr-none bg-background p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
-          <div className="text-sm font-medium">Prompt</div>
+          <div className="text-sm font-medium">{t("editorPromptTitle")}</div>
           <p className="text-sm leading-6 text-muted-foreground">
-            Redigez la requete exacte que vous voulez monitorer sur les IA selectionnees.
+            {t("editorPromptDescription")}
           </p>
         </div>
         <div className="text-xs text-muted-foreground">
@@ -41,14 +44,14 @@ export function PromptTextSection({
         value={promptText}
         onChange={(event) => onChangePromptText(event.target.value.slice(0, maxLength))}
         maxLength={maxLength}
-        placeholder="Ex : Quels sont les meilleurs CRM pour une PME B2B SaaS ?"
+        placeholder={t("editorPromptPlaceholder")}
         className="mt-4 min-h-[220px] w-full max-w-full resize-y overflow-x-hidden text-sm leading-7 break-all [overflow-wrap:anywhere]"
       />
 
       <div className="mt-5 border-t pt-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="text-sm font-medium">Statut du prompt</div>
-          <Badge variant="outline">{getPromptStatusLabel(status)}</Badge>
+          <div className="text-sm font-medium">{t("editorStatusTitle")}</div>
+          <Badge variant="outline">{getPromptStatusLabel(status, locale)}</Badge>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-3">
@@ -79,7 +82,9 @@ export function PromptTextSection({
                     )}
                   />
                 </div>
-                <div className="pr-5 text-sm font-semibold">{option.label}</div>
+                <div className="pr-5 text-sm font-semibold">
+                  {getPromptStatusLabel(option.value, locale)}
+                </div>
               </button>
             );
           })}
@@ -102,16 +107,18 @@ export function PromptCoverageSection({
   saving: boolean;
   onToggleModel: (model: AIModel) => void;
 }) {
+  const { t } = useScopedI18n("prompts-workspace");
+
   return (
     <section className="rounded-3xl bg-background p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
-          <div className="text-sm font-medium">Couverture IA</div>
+          <div className="text-sm font-medium">{t("editorCoverageTitle")}</div>
           <p className="text-sm leading-6 text-muted-foreground">
-            Choisissez les fournisseurs et les noms de modeles qui doivent rester actifs sur ce prompt.
+            {t("editorCoverageDescription")}
           </p>
         </div>
-        <Badge variant="outline">{selectedModels.length} selectionnes</Badge>
+        <Badge variant="outline">{t("editorCoverageCount", { count: selectedModels.length })}</Badge>
       </div>
 
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">

@@ -2,6 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PromptRunRow } from "./types";
 
 type ResponseDetailsSheetProps = {
@@ -10,13 +11,15 @@ type ResponseDetailsSheetProps = {
 };
 
 export function ResponseDetailsSheet({ response, onOpenChange }: ResponseDetailsSheetProps) {
+  const { t } = useScopedI18n("prompts-workspace");
+
   return (
     <Sheet open={response !== null} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-xl">
         {response && (
           <>
             <SheetHeader>
-              <SheetTitle>Details de la reponse</SheetTitle>
+              <SheetTitle>{t("responseDetailsTitle")}</SheetTitle>
               <SheetDescription>
                 {response.model} · {response.time}
               </SheetDescription>
@@ -26,31 +29,31 @@ export function ResponseDetailsSheet({ response, onOpenChange }: ResponseDetails
               {response.isHistorical ? (
                 <div className="flex">
                   <Badge variant="outline" className="font-normal">
-                    Historique
+                    {t("historical")}
                   </Badge>
                 </div>
               ) : null}
               <div className="rounded-md border p-3">
-                <div className="text-xs uppercase text-muted-foreground">Prompt</div>
+                <div className="text-xs uppercase text-muted-foreground">{t("prompt")}</div>
                 <p className="mt-1 font-medium">{response.prompt}</p>
               </div>
 
               <div className="rounded-md border p-3">
-                <div className="text-xs uppercase text-muted-foreground">Reponse</div>
+                <div className="text-xs uppercase text-muted-foreground">{t("response")}</div>
                 <p className="mt-1 leading-relaxed">{response.response}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Mention</div>
-                  <div className="mt-1 font-semibold">{response.mention ? "Oui" : "Non"}</div>
+                  <div className="text-xs text-muted-foreground">{t("mention")}</div>
+                  <div className="mt-1 font-semibold">{response.mention ? t("yes") : t("no")}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Classement</div>
+                  <div className="text-xs text-muted-foreground">{t("rank")}</div>
                   <div className="mt-1 font-semibold">{response.rank ?? "-"}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Concurrent</div>
+                  <div className="text-xs text-muted-foreground">{t("competitor")}</div>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {response.competitors.length > 0 ? (
                       response.competitors.map((competitor) => (
@@ -59,18 +62,18 @@ export function ResponseDetailsSheet({ response, onOpenChange }: ResponseDetails
                         </span>
                       ))
                     ) : (
-                      <span className="font-semibold">Aucun</span>
+                      <span className="font-semibold">{t("none")}</span>
                     )}
                   </div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Erreur</div>
+                  <div className="text-xs text-muted-foreground">{t("error")}</div>
                   <div className="mt-1 font-semibold">{response.error ?? "-"}</div>
                 </div>
               </div>
 
               <div className="rounded-md border p-3">
-                <div className="text-xs uppercase text-muted-foreground">Points cles</div>
+                <div className="text-xs uppercase text-muted-foreground">{t("keyPoints")}</div>
                 <ul className="mt-2 space-y-1">
                   {response.highlights.map((item) => (
                     <li key={item} className="flex items-center gap-2">

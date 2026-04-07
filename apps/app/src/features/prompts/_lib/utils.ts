@@ -1,4 +1,8 @@
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+
 import type { PeriodKey, PromptItem, PromptSchedule, Stage } from "./types";
+
+export const DEFAULT_PROMPT_PERIOD: PeriodKey = "14d";
 
 export const PERIOD_TO_MINUTES: Record<PeriodKey, number> = {
   today: 24 * 60,
@@ -6,6 +10,9 @@ export const PERIOD_TO_MINUTES: Record<PeriodKey, number> = {
   "14d": 14 * 24 * 60,
   "30d": 30 * 24 * 60,
   "90d": 90 * 24 * 60,
+  "180d": 180 * 24 * 60,
+  "365d": 365 * 24 * 60,
+  ytd: 365 * 24 * 60,
   custom: 90 * 24 * 60,
 };
 
@@ -51,56 +58,81 @@ function formatHourMinute(hour: number, minute: number) {
   return `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
 }
 
-export function describeCron(cron: string) {
+export function describeCron(cron: string, locale = "en") {
   const value = cron.trim();
-  if (value === "0 * * * *") return "Toutes les heures";
-  if (value === "0 9 * * 1,4") return "Deux fois par semaine";
-  if (value === "30 8 * * 6,0") return "Tous les week-ends a 08:30";
+  if (value === "0 * * * *") return translateI18nText("prompts-workspace", "cronHourly", locale);
+  if (value === "0 9 * * 1,4") return translateI18nText("prompts-workspace", "cronTwiceWeekly", locale);
+  if (value === "30 8 * * 6,0") {
+    return translateI18nText("prompts-workspace", "cronWeekendsAt", locale, {
+      time: "08:30",
+    });
+  }
 
   const everyHours = /^0 \*\/(\d+) \* \* \*$/.exec(value);
   if (everyHours) {
-    return `Toutes les ${everyHours[1]} heures`;
+    return translateI18nText("prompts-workspace", "cronEveryHours", locale, {
+      count: Number(everyHours[1]),
+    });
   }
 
   const daily = /^(\d{1,2}) (\d{1,2}) \* \* \*$/.exec(value);
   if (daily) {
-    return `Chaque jour a ${formatHourMinute(Number(daily[2]), Number(daily[1]))}`;
+    return translateI18nText("prompts-workspace", "cronEveryDayAt", locale, {
+      time: formatHourMinute(Number(daily[2]), Number(daily[1])),
+    });
   }
 
   const weekends = /^(\d{1,2}) (\d{1,2}) \* \* 6,0$/.exec(value);
   if (weekends) {
-    return `Tous les week-ends a ${formatHourMinute(Number(weekends[2]), Number(weekends[1]))}`;
+    return translateI18nText("prompts-workspace", "cronWeekendsAt", locale, {
+      time: formatHourMinute(Number(weekends[2]), Number(weekends[1])),
+    });
   }
 
   const weekdays = /^(\d{1,2}) (\d{1,2}) \* \* 1-5$/.exec(value);
   if (weekdays) {
-    return `En semaine a ${formatHourMinute(Number(weekdays[2]), Number(weekdays[1]))}`;
+    return translateI18nText("prompts-workspace", "cronWeekdaysAt", locale, {
+      time: formatHourMinute(Number(weekdays[2]), Number(weekdays[1])),
+    });
   }
 
-  return "Cron personnalise";
+  return translateI18nText("prompts-workspace", "cronCustom", locale);
 }
 
-export function promptScheduleLabel(schedule: PromptSchedule, cronOverride?: string) {
+export function promptScheduleLabel(
+  schedule: PromptSchedule,
+  cronOverride?: string,
+  locale = "en",
+) {
   const cron = (cronOverride || schedule.cron || DEFAULT_PROMPT_CRON).trim();
   const timezone = schedule.timezone?.trim() || DEFAULT_PROMPT_TIMEZONE;
-  return `${describeCron(cron)} · ${timezone}`;
+  return translateI18nText("prompts-workspace", "scheduleFormat", locale, {
+    description: describeCron(cron, locale),
+    timezone,
+  });
 }
 
-export function promptStatusLabel(status: PromptItem["status"]) {
-  if (status === "active") return "Actif";
-  if (status === "disabled") return "Desactive";
-  return "Archive";
+export function promptStatusLabel(status: PromptItem["status"], locale = "en") {
+  if (status === "active") return translateI18nText("prompts-workspace", "statusActive", locale);
+  if (status === "disabled") return translateI18nText("prompts-workspace", "statusDisabled", locale);
+  return translateI18nText("prompts-workspace", "statusArchived", locale);
 }
 
-export function promptStageLabel(stage: Stage) {
-  if (stage === "Awareness") return "Decouverte";
-  if (stage === "Consideration") return "Consideration";
-  return "Decision";
+export function promptStageLabel(stage: Stage, locale = "en") {
+  if (stage === "Awareness") return translateI18nText("prompts-workspace", "stageAwareness", locale);
+  if (stage === "Consideration") {
+    return translateI18nText("prompts-workspace", "stageConsideration", locale);
+  }
+  return translateI18nText("prompts-workspace", "stageDecision", locale);
 }
 
-export function relativeRunLabel(minutes: number) {
-  if (minutes < 60) return `Il y a ${minutes} min`;
-  return `Il y a ${Math.floor(minutes / 60)} h`;
+export function relativeRunLabel(minutes: number, locale = "en") {
+  if (minutes < 60) {
+    return translateI18nText("prompts-workspace", "runMinutesAgo", locale, { count: minutes });
+  }
+  return translateI18nText("prompts-workspace", "runHoursAgo", locale, {
+    count: Math.floor(minutes / 60),
+  });
 }
 
 export function statusBadgeVariant(status: PromptItem["status"]): "secondary" | "outline" | "destructive" {

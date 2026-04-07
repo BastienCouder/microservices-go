@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 import type { SidebarProjectOption } from "./sidebar-constants";
 
@@ -21,14 +22,18 @@ type SidebarOrganizationSwitcherProps = {
   setOrgOpen: (open: boolean) => void;
 };
 
-function getSubtitle(project: SidebarProjectOption | undefined, organizationName: string): string {
+function getSubtitle(
+  project: SidebarProjectOption | undefined,
+  organizationName: string,
+  content: Record<string, string>,
+): string {
   if (!project) {
-    return organizationName || "No project available";
+    return organizationName || content.noProjectAvailable;
   }
   if (project.brandName.trim() !== "") {
     return `${project.brandName} · ${project.organizationName || organizationName}`;
   }
-  return project.organizationName || organizationName || "No organization selected";
+  return project.organizationName || organizationName || content.noOrganizationSelected;
 }
 
 export function SidebarOrganizationSwitcher({
@@ -43,9 +48,10 @@ export function SidebarOrganizationSwitcher({
   orgOpen,
   setOrgOpen,
 }: SidebarOrganizationSwitcherProps) {
+  const content = useI18nScope("sidebar");
   const currentProject = projects.find((project) => project.id === activeProjectId) || projects[0];
-  const title = currentProject?.name || "Projects";
-  const subtitle = getSubtitle(currentProject, activeOrganizationName);
+  const title = currentProject?.name || content.projects;
+  const subtitle = getSubtitle(currentProject, activeOrganizationName, content);
 
   return (
     <div className={cn("py-3", collapsed ? "px-2" : "px-3")}>
@@ -96,7 +102,7 @@ export function SidebarOrganizationSwitcher({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{project.name}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">{getSubtitle(project, activeOrganizationName)}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">{getSubtitle(project, activeOrganizationName, content)}</div>
                   </div>
                   {project.id === activeProjectId ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
                 </button>
@@ -104,7 +110,7 @@ export function SidebarOrganizationSwitcher({
             </div>
           ) : (
             <p className="px-2.5 py-2 text-sm text-muted-foreground">
-              No projects in this organization yet.
+              {content.noProjectsInOrganization}
             </p>
           )}
           <Separator className="my-1.5" />
@@ -113,20 +119,20 @@ export function SidebarOrganizationSwitcher({
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <FolderPlus className="h-4 w-4" />
-            Add project
+            {content.addProject}
           </Link>
           <Link
             to={settingsHref}
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
             <Settings className="h-4 w-4" />
-            Project settings
+            {content.projectSettings}
           </Link>
           <Link
             to={organizationsHref}
             className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            Manage organization
+            {content.manageOrganization}
           </Link>
         </PopoverContent>
       </Popover>

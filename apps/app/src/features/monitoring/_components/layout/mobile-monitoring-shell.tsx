@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
 import { cn } from "@/lib/utils";
+import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 import { useActivityPanelViewModel } from "../../_lib/activity/use-activity-panel-view-model";
 import { useAnalyticsPanelViewModel } from "../../_lib/analytics/use-analytics-panel-view-model";
 import { useFiltersPanelViewModel } from "../../_lib/filters/use-filters-panel-view-model";
@@ -29,6 +30,8 @@ import { MobileMonitoringPeriodCarousel } from "./mobile-monitoring-period-carou
 import { MobileMonitoringTopNav } from "./mobile-monitoring-top-nav";
 
 export function MobileMonitoringShell() {
+  const content = useI18nScope("monitoring-mobile");
+  const { locale, t } = useScopedI18n("monitoring-mobile");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { data: monitoringData, loading } = useMonitoringData();
   const filters = useMonitoringFilters();
@@ -38,7 +41,7 @@ export function MobileMonitoringShell() {
   const activeFilterCount = useMemo(() => (
     filters.selectedCompetitors.length +
     filtersViewModel.selectedModels.length +
-    Number(filters.period !== "7d" || filters.dateRange !== undefined) +
+    Number(filters.period !== "14d" || filters.dateRange !== undefined) +
     Number(filters.showUniqueModelFilters)
   ), [
     filters.dateRange,
@@ -52,17 +55,31 @@ export function MobileMonitoringShell() {
     const labels: string[] = [];
 
     if (filtersViewModel.selectedModels.length > 0) {
-      labels.push(`${filtersViewModel.selectedModels.length} modèle${filtersViewModel.selectedModels.length > 1 ? "s" : ""}`);
+      labels.push(
+        t("selectedModels", {
+          count: filtersViewModel.selectedModels.length,
+        }),
+      );
     }
     if (filters.selectedCompetitors.length > 0) {
-      labels.push(`${filters.selectedCompetitors.length} concurrent${filters.selectedCompetitors.length > 1 ? "s" : ""}`);
+      labels.push(
+        t("selectedCompetitors", {
+          count: filters.selectedCompetitors.length,
+        }),
+      );
     }
     if (filters.showUniqueModelFilters) {
-      labels.push("vue par IA");
+      labels.push(content.viewByAI);
     }
 
     return labels;
-  }, [filters.selectedCompetitors.length, filters.showUniqueModelFilters, filtersViewModel.selectedModels.length]);
+  }, [
+    content.viewByAI,
+    filters.selectedCompetitors.length,
+    filters.showUniqueModelFilters,
+    filtersViewModel.selectedModels.length,
+    t,
+  ]);
 
   const handlePeriodChange = (nextPeriod: string) => {
     filtersViewModel.setPeriod(nextPeriod);
@@ -79,7 +96,7 @@ export function MobileMonitoringShell() {
     <>
       <MobileMonitoringTopNav
         projectName={monitoringData.project.name}
-        periodLabel={getMonitoringPeriodLabel(filters.period)}
+        periodLabel={getMonitoringPeriodLabel(filters.period, locale)}
         activeFilterCount={activeFilterCount}
         onOpenFilters={() => setFiltersOpen(true)}
       />
@@ -90,30 +107,30 @@ export function MobileMonitoringShell() {
             <div className="min-w-0">
               <div className="inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.14em] text-slate-500">
                 <Waves className="h-3.5 w-3.5 text-primary" />
-                Monitoring mobile
+                {content.monitoringMobile}
               </div>
               <h1 className="mt-4 text-[2rem] font-semibold tracking-tight text-slate-950">
-                {monitoringData.project.name || "Votre monitoring"}
+                {monitoringData.project.name || content.yourMonitoring}
               </h1>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                {monitoringData.project.tagline || "Gardez une lecture claire de votre visibilité IA, même en déplacement."}
+                {monitoringData.project.tagline || content.defaultTagline}
               </p>
             </div>
 
             <div className="mt-5 grid grid-cols-3 gap-2">
-              <SummaryCard label="Réponses" value={activityViewModel.filteredPrompts.length} />
-              <SummaryCard label="Alertes" value={activityViewModel.filteredAlerts.length} tone="warm" />
-              <SummaryCard label="Filtres" value={activeFilterCount} tone="dark" />
+              <SummaryCard label={content.responses} value={activityViewModel.filteredPrompts.length} />
+              <SummaryCard label={content.alerts} value={activityViewModel.filteredAlerts.length} tone="warm" />
+              <SummaryCard label={content.filters} value={activeFilterCount} tone="dark" />
             </div>
 
             <div className="mt-4 flex items-center justify-between gap-3">
               <div className="flex min-w-0 flex-wrap gap-2">
                 <Badge variant="secondary" className="rounded-full bg-white/80 px-3 py-1 text-xs text-slate-700">
-                  Période {getMonitoringPeriodLabel(filters.period)}
+                  {content.periodPrefix} {getMonitoringPeriodLabel(filters.period, locale)}
                 </Badge>
                 {activeFilterLabels.length === 0 ? (
                   <Badge variant="secondary" className="rounded-full bg-slate-950 px-3 py-1 text-xs text-white">
-                    Aucun filtre avancé
+                    {content.noAdvancedFilters}
                   </Badge>
                 ) : (
                   activeFilterLabels.slice(0, 2).map((label) => (
@@ -137,7 +154,7 @@ export function MobileMonitoringShell() {
                   onClick={filtersViewModel.onResetFilters}
                 >
                   <RotateCcw className="mr-1 h-3.5 w-3.5" />
-                  Reset
+                  {content.reset}
                 </Button>
               ) : null}
             </div>
@@ -146,11 +163,11 @@ export function MobileMonitoringShell() {
           <section className="space-y-3 rounded-[30px] border border-white/70 bg-white/92 p-4 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-sm font-semibold text-slate-950">Période d’analyse</p>
-                <p className="text-xs text-slate-500">Glissez horizontalement pour changer de fenêtre.</p>
+                <p className="text-sm font-semibold text-slate-950">{content.analysisPeriodTitle}</p>
+                <p className="text-xs text-slate-500">{content.analysisPeriodDescription}</p>
               </div>
               <div className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                {getMonitoringPeriodLabel(filters.period)}
+                {getMonitoringPeriodLabel(filters.period, locale)}
               </div>
             </div>
 
@@ -178,9 +195,9 @@ export function MobileMonitoringShell() {
 
           <section className="space-y-4">
             <SectionTitle
-              eyebrow="Activité"
-              title="Signaux récents"
-              description="Alertes critiques et derniers prompts restent accessibles sans quitter le monitoring."
+              eyebrow={content.activityEyebrow}
+              title={content.recentSignalsTitle}
+              description={content.recentSignalsDescription}
               trailing={activityViewModel.filteredAlerts.length + activityViewModel.filteredPrompts.length}
             />
             <ActivityAlerts filteredAlerts={activityViewModel.filteredAlerts} previewCount={2} onSelectAlert={activityViewModel.selectAlert} />

@@ -11,8 +11,9 @@ type ResponsesTabContentProps = {
   setNoMentionOnly: (value: boolean) => void;
   showHistorical: boolean;
   setShowHistorical: (value: boolean) => void;
-  topCompetitor: string;
-  setTopCompetitor: (value: string) => void;
+  selectedCompetitors: string[];
+  toggleCompetitor: (value: string) => void;
+  clearCompetitors: () => void;
   availableCompetitors: string[];
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;

@@ -1,18 +1,21 @@
 import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
 
-export function getAlertTypeLabel(value?: string): string {
+export function getAlertTypeLabel(
+  value: string | undefined,
+  content?: Record<string, string>,
+): string {
   const key = (value || "").trim().toLowerCase();
   if (!key) return "";
 
   const labels: Record<string, string> = {
-    visibility_drop: "Baisse de visibilite",
-    competitor_surge: "Concurrence en hausse",
-    ranking_loss: "Perte de position",
-    sentiment_drop: "Baisse de sentiment",
-    factual_error_spike: "Hausse des erreurs factuelles",
-    mention_drop: "Baisse des mentions",
-    citation_drop: "Baisse des citations",
-    pricing_mismatch: "Decalage pricing",
+    visibility_drop: content?.alertTypeVisibilityDrop || "Visibility drop",
+    competitor_surge: content?.alertTypeCompetitorSurge || "Competitor surge",
+    ranking_loss: content?.alertTypeRankingLoss || "Ranking loss",
+    sentiment_drop: content?.alertTypeSentimentDrop || "Sentiment drop",
+    factual_error_spike: content?.alertTypeFactualErrorSpike || "Factual error spike",
+    mention_drop: content?.alertTypeMentionDrop || "Mention drop",
+    citation_drop: content?.alertTypeCitationDrop || "Citation drop",
+    pricing_mismatch: content?.alertTypePricingMismatch || "Pricing mismatch",
   };
 
   return labels[key] || key.replace(/_/g, " ");
@@ -32,7 +35,7 @@ export function getSentimentMeta(
 
   if (value === "negative") {
     return {
-      label: content.sentimentNegative || "Negatif",
+      label: content.sentimentNegative || "Négatif",
       toneClass: "text-rose-700",
       badgeClass: "bg-rose-50 text-rose-700",
     };

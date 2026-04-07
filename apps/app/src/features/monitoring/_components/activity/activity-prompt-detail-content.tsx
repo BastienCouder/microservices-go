@@ -36,7 +36,7 @@ export function ActivityPromptDetailContent({
     selectedPrompt.modelGroupName ||
     selectedPrompt.modelDisplayName ||
     selectedPrompt.modelId ||
-    "Modele";
+    content.defaultModel;
   const selectedPromptModelName = selectedPrompt.modelDisplayName || "";
   const selectedPromptSentiment = getSentimentMeta(selectedPrompt.sentiment, content);
   const citationCount = selectedPrompt.citedUrls.length;
@@ -80,17 +80,17 @@ export function ActivityPromptDetailContent({
         </div>
       </DetailSection>
 
-      <DetailSection title="Lecture synthetique">
+      <DetailSection title={content.summaryReadingTitle}>
         <div className="grid gap-3 sm:grid-cols-2">
           <MetricLine
             label={content.visibility}
             value={`${selectedPrompt.score}%`}
             hint={
               selectedPrompt.score >= 80
-                ? "Presence forte dans la reponse"
+                ? content.visibilityStrongHint
                 : selectedPrompt.score >= 55
-                  ? "Presence correcte mais perfectible"
-                  : "Presence faible dans la reponse"
+                  ? content.visibilityMediumHint
+                  : content.visibilityWeakHint
             }
             valueClassName={getScoreToneClass(selectedPrompt.score)}
           />
@@ -99,8 +99,8 @@ export function ActivityPromptDetailContent({
             value={selectedPrompt.mention ? content.yes : content.no}
             hint={
               selectedPrompt.mention
-                ? "La marque apparait explicitement"
-                : "La marque n'apparait pas explicitement"
+                ? content.mentionPresentHint
+                : content.mentionMissingHint
             }
             valueClassName={
               selectedPrompt.mention ? "text-emerald-700" : "text-muted-foreground"
@@ -109,7 +109,7 @@ export function ActivityPromptDetailContent({
           <MetricLine
             label={content.responseTone}
             value={selectedPromptSentiment.label || notAvailableLabel}
-            hint="Qualification globale du ton de la reponse"
+            hint={content.toneQualificationHint}
             valueClassName={selectedPromptSentiment.toneClass}
           />
           <MetricLine
@@ -117,8 +117,8 @@ export function ActivityPromptDetailContent({
             value={citationCount > 0 ? `${citationCount}` : "0"}
             hint={
               citationCount > 0
-                ? "Sources detectees dans la reponse"
-                : "Aucune source detectee"
+                ? content.sourcesDetectedHint
+                : content.noSourceDetectedHint
             }
             valueClassName={citationCount > 0 ? "text-primary" : "text-muted-foreground"}
           />

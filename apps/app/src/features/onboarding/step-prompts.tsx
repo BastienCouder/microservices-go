@@ -1,5 +1,6 @@
 import { useOnboarding, type PromptWithLanguage } from "@/hooks/use-onboarding";
 import { Button } from "@/components/ui/button";
+import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -125,7 +126,12 @@ export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPrompt
                                         <SelectTrigger className="h-10 rounded-lg border-border/80 bg-background text-sm">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent>
+                                        <SelectContent className="p-0">
+                                            <FloatingPanelHeader
+                                                title="Language"
+                                                description="Choose the language used for this monitored prompt."
+                                                className="px-3.5 pt-3.5"
+                                            />
                                             {LANGUAGE_OPTIONS.map((option) => (
                                                 <SelectItem key={option.value} value={option.value}>
                                                     {option.label}
