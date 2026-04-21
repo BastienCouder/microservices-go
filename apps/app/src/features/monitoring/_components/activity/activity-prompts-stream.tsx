@@ -1,15 +1,17 @@
 "use client";
 
-import { memo } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { memo, useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { preloadPromptsPage } from "@/app/route-preloads";
 import { cn } from "@/lib/utils";
 import type { MonitoringData } from "@/lib/monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
 import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import {
+  getInitialVisiblePromptsCount,
+  getNextVisiblePromptsCount,
+} from "./activity-prompts-stream-state";
 
 type PromptItem = MonitoringData["recent_prompts"][number];
 
@@ -19,14 +21,58 @@ type ActivityPromptsStreamProps = {
   onSelectPrompt: (prompt: PromptItem) => void;
 };
 
-
-
 export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filteredPrompts, previewCount, onSelectPrompt }: ActivityPromptsStreamProps) {
   const content = useI18nScope("monitoring-activity-panel");
-  const location = useLocation();
-  const visiblePrompts = filteredPrompts.slice(0, previewCount);
-  const handleShowMoreIntent = () => {
-    preloadPromptsPage();
+  const totalPrompts = filteredPrompts.length;
+  const [visibleCount, setVisibleCount] = useState(() =>
+    getInitialVisiblePromptsCount(previewCount, totalPrompts),
+  );
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setVisibleCount(getInitialVisiblePromptsCount(previewCount, totalPrompts));
+  }, [filteredPrompts, previewCount, totalPrompts]);
+
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current;
+    const hasMorePrompts = visibleCount < totalPrompts;
+
+    if (!loadMoreElement || !hasMorePrompts || typeof IntersectionObserver === "undefined") {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) {
+          return;
+        }
+
+        setVisibleCount((currentCount) =>
+          getNextVisiblePromptsCount({
+            currentCount,
+            totalCount: totalPrompts,
+          }),
+        );
+      },
+      {
+        rootMargin: "160px 0px",
+      },
+    );
+
+    observer.observe(loadMoreElement);
+
+    return () => observer.disconnect();
+  }, [totalPrompts, visibleCount]);
+
+  const visiblePrompts = filteredPrompts.slice(0, visibleCount);
+  const hasMorePrompts = visibleCount < totalPrompts;
+  const handleLoadMore = () => {
+    setVisibleCount((currentCount) =>
+      getNextVisiblePromptsCount({
+        currentCount,
+        totalCount: totalPrompts,
+      }),
+    );
   };
 
   return (
@@ -52,7 +98,7 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filte
                 type="button"
                 key={`${prompt.modelId}-${prompt.time}-${index}`}
                 onClick={() => onSelectPrompt(prompt)}
-                className="group w-full rounded-md bg-background p-4 text-left transition-all hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                className="group w-full rounded-md bg-background p-4 text-left transition-all cursor-pointer hover:ring-2 hover:ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
                 aria-label={`${content.promptsStream}: ${modelGroup}`}
               >
                 <div className="mb-2.5 flex items-center justify-between">
@@ -112,16 +158,18 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({ filte
           })
         )}
 
-        {filteredPrompts.length > previewCount ? (
-          <Button variant="ghost" size="sm" className="w-full text-xs md:text-sm" asChild>
-            <Link
-              to={{ pathname: "/prompts", search: location.search }}
-              onMouseEnter={handleShowMoreIntent}
-              onFocus={handleShowMoreIntent}
+        {hasMorePrompts ? (
+          <div ref={loadMoreRef}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs md:text-sm"
+              onClick={handleLoadMore}
             >
               {content.showMore}
-            </Link>
-          </Button>
+            </Button>
+          </div>
         ) : null}
       </div>
     </div>

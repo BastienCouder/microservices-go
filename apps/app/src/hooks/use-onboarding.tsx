@@ -24,6 +24,7 @@ export type CompetitorItem = {
 export type OnboardingState = {
   step: number;
   websiteUrl: string;
+  attributionSource: string;
   brandName: string;
   brandShortDescription: string;
   brandDescription: string;
@@ -40,6 +41,7 @@ type OnboardingContextValue = OnboardingState & {
   brandPreparationCompleted: boolean;
   setStep: (step: number) => void;
   setWebsiteUrl: (url: string) => void;
+  setAttributionSource: (source: string) => void;
   setBrandName: (name: string) => void;
   setBrandShortDescription: (description: string) => void;
   setBrandDescription: (description: string) => void;
@@ -57,6 +59,7 @@ type OnboardingContextValue = OnboardingState & {
 const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   step: 1,
   websiteUrl: "",
+  attributionSource: "",
   brandName: "",
   brandShortDescription: "",
   brandDescription: "",
@@ -88,6 +91,9 @@ export function OnboardingProvider({
 
   const [step, setStep] = useState(mergedState.step);
   const [websiteUrl, setWebsiteUrl] = useState(mergedState.websiteUrl);
+  const [attributionSource, setAttributionSource] = useState(
+    mergedState.attributionSource,
+  );
   const [brandName, setBrandName] = useState(mergedState.brandName);
   const [brandShortDescription, setBrandShortDescription] = useState(
     mergedState.brandShortDescription,
@@ -118,6 +124,7 @@ export function OnboardingProvider({
     () => ({
       step,
       websiteUrl,
+      attributionSource,
       brandName,
       brandShortDescription,
       brandDescription,
@@ -131,6 +138,7 @@ export function OnboardingProvider({
       brandPreparationCompleted,
       setStep,
       setWebsiteUrl,
+      setAttributionSource,
       setBrandName,
       setBrandShortDescription,
       setBrandDescription,
@@ -151,6 +159,7 @@ export function OnboardingProvider({
       brandPreparationCompleted,
       brandShortDescription,
       competitors,
+      attributionSource,
       industry,
       keyFeatures,
       selectedModels,

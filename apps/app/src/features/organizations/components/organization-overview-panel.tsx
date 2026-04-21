@@ -1,10 +1,10 @@
 "use client";
 
-import { Building2, FolderKanban, Layers3, ShieldCheck } from "lucide-react";
-
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
 import type { OrganizationHierarchy } from "@/shared/models";
 import { formatDateTime } from "@/shared/utils";
 import type { OrganizationBrandGroup } from "../lib/hierarchy";
@@ -16,46 +16,58 @@ function formatLabel(value: string): string {
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
-function getStatusClassName(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === "active") return "border-emerald-500/30 bg-emerald-500/10 text-emerald-700";
-  if (normalized === "paused") return "border-amber-500/30 bg-amber-500/10 text-amber-700";
-  if (normalized === "draft") return "border-slate-500/30 bg-slate-500/10 text-slate-700";
-  return "border-border bg-muted text-foreground";
+function getRoleBadgeVariant(role: OrganizationRole | undefined): "default" | "secondary" | "outline" {
+  if (role === "owner") return "default";
+  if (role === "admin") return "secondary";
+  return "outline";
 }
 
-function getRoleClassName(role: OrganizationRole | undefined): string {
-  if (role === "owner") return "border-primary/30 bg-primary/10 text-primary";
-  if (role === "admin") return "border-sky-500/30 bg-sky-500/10 text-sky-700";
-  return "border-border bg-muted text-foreground";
-}
-
-function StatCard({
-  label,
-  value,
-  hint,
-  icon: Icon,
+function EmptyState({
+  title,
+  description,
+  action,
 }: {
-  label: string;
-  value: string;
-  hint: string;
-  icon: typeof Building2;
+  title: string;
+  description: string;
+  action?: React.ReactNode;
 }) {
   return (
-    <Card size="sm" className="border">
-      <CardHeader className="pb-0">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardDescription>{label}</CardDescription>
-            <CardTitle className="mt-1 text-2xl">{value}</CardTitle>
-          </div>
-          <div className="rounded-full border bg-muted/60 p-2 text-muted-foreground">
-            <Icon className="size-4" aria-hidden="true" />
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-2 text-xs text-muted-foreground">{hint}</CardContent>
-    </Card>
+    <div className="flex min-h-[300px] items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/15 px-4 py-10 text-center">
+      <div className="flex max-w-md flex-col gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        <p className="text-sm leading-6 text-muted-foreground">{description}</p>
+        {action ? <div className="mt-2">{action}</div> : null}
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="flex flex-col gap-4 pb-4">
+      <Card className="border border-border/60">
+        <CardHeader className="gap-3">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-full max-w-2xl" />
+        </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+          <Skeleton className="h-20 w-full rounded-xl" />
+        </CardContent>
+      </Card>
+      <Card className="border border-border/60">
+        <CardHeader className="gap-3">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="h-4 w-full max-w-xl" />
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, index) => (
+            <Skeleton key={index} className="h-20 w-full rounded-xl" />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
@@ -77,143 +89,124 @@ export function OrganizationOverviewPanel({
   loading: boolean;
 }) {
   if (!selectedOrganizationId) {
-    return <p className="text-sm text-muted-foreground">No organization selected.</p>;
+    return (
+      <EmptyState
+        title="Aucune organisation sélectionnée"
+        description="Choisissez une organisation pour afficher ses projets et sa structure."
+      />
+    );
   }
 
   if (loading && !hierarchy) {
-    return <p className="text-sm text-muted-foreground">Loading organization hierarchy...</p>;
+    return <LoadingState />;
   }
 
   if (!selectedOrganization) {
-    return <p className="text-sm text-muted-foreground">The selected organization is no longer available.</p>;
+    return (
+      <EmptyState
+        title="Organisation indisponible"
+        description="L’organisation sélectionnée n’est plus disponible."
+      />
+    );
   }
 
   const projects = hierarchy?.projects ?? [];
-  const organizationName = hierarchy?.organization.name || selectedOrganization.name;
 
   return (
-    <div className="space-y-4 pb-1">
-      <Card className="border">
+    <div className="flex flex-col gap-4 pb-4">
+      <Card className="border border-border/60">
         <CardHeader className="gap-3">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CardTitle>{organizationName}</CardTitle>
-                <Badge variant="outline" className={getRoleClassName(selectedOrganization.role)}>
-                  {formatLabel(selectedOrganization.role)}
-                </Badge>
-                <Badge variant="outline">Tenant scope: org</Badge>
-              </div>
-              <CardDescription className="max-w-3xl">
-                Billing and data isolation happen at the organization level. Projects remain the work units and are grouped by
-                brand inside this tenant.
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <CardTitle className="text-base">
+                <MonitoringSectionTitle>Résumé rapide</MonitoringSectionTitle>
+              </CardTitle>
+              <CardDescription className="mt-2 leading-6">
+                Les informations essentielles de l’organisation sur un seul écran, sans surcharger la lecture.
               </CardDescription>
             </div>
-            <div className="rounded-lg border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-              Organization ID: <span className="font-medium text-foreground">{selectedOrganization.id}</span>
-            </div>
-          </div>
-          <div className="flex justify-start">
             <Button size="sm" onClick={onOpenCreateProject}>
-              Add project
+              Créer un projet
             </Button>
           </div>
         </CardHeader>
+        <CardContent className="grid gap-3 md:grid-cols-3">
+          <div className="rounded-xl border border-border/60 bg-muted/15 p-4">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Organisation</div>
+            <div className="mt-2 text-sm font-medium">{hierarchy?.organization.name || selectedOrganization.name}</div>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-muted/15 p-4">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Rôle</div>
+            <div className="mt-2">
+              <Badge variant={getRoleBadgeVariant(selectedOrganization.role)}>{formatLabel(selectedOrganization.role)}</Badge>
+            </div>
+          </div>
+          <div className="rounded-xl border border-border/60 bg-muted/15 p-4">
+            <div className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">Structure</div>
+            <div className="mt-2 text-sm font-medium">
+              {projects.length} projet{projects.length > 1 ? "s" : ""} · {brandsCount} marque{brandsCount > 1 ? "s" : ""}
+            </div>
+          </div>
+        </CardContent>
       </Card>
 
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          label="Tenant"
-          value={selectedOrganization.name}
-          hint="Org is the billing and security boundary."
-          icon={Building2}
-        />
-        <StatCard
-          label="Your role"
-          value={formatLabel(selectedOrganization.role)}
-          hint="Roles can differ from one organization to another."
-          icon={ShieldCheck}
-        />
-        <StatCard
-          label="Projects"
-          value={String(projects.length)}
-          hint="Projects are the operational units used across the app."
-          icon={FolderKanban}
-        />
-        <StatCard
-          label="Brands"
-          value={String(brandsCount)}
-          hint="Each brand groups one or more projects in the same tenant."
-          icon={Layers3}
-        />
-      </div>
-
-      <Card className="border">
-        <CardHeader>
-          <CardTitle>Brands and projects</CardTitle>
-          <CardDescription>
-            Members belong to the organization, while project work stays partitioned inside the selected org only.
-          </CardDescription>
+      <Card className="border border-border/60">
+        <CardHeader className="gap-2">
+          <CardTitle className="text-base">
+            <MonitoringSectionTitle>Projets</MonitoringSectionTitle>
+          </CardTitle>
+          <CardDescription>Liste courte des projets regroupés par marque.</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="flex flex-col gap-3">
           {projects.length === 0 ? (
-            <div className="rounded-xl border border-dashed px-4 py-8 text-center">
-              <p className="text-sm font-medium">No projects found for this organization.</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Create projects under this org to expose brand, attribution and workspace data here.
-              </p>
-              <Button size="sm" className="mt-4" onClick={onOpenCreateProject}>
-                Create first project
-              </Button>
-            </div>
+            <EmptyState
+              title="Aucun projet"
+              description="Créez un premier projet pour voir apparaître la structure de l’organisation."
+              action={
+                <Button size="sm" onClick={onOpenCreateProject}>
+                  Créer le premier projet
+                </Button>
+              }
+            />
           ) : (
             brandGroups.map((group) => (
-              <section key={group.key} className="rounded-xl border bg-muted/10 p-4">
-                <div className="flex flex-col gap-2 border-b pb-4 md:flex-row md:items-start md:justify-between">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-medium">{group.name}</h3>
-                      <Badge variant={group.isUnassigned ? "secondary" : "outline"}>
-                        {group.projects.length} project{group.projects.length > 1 ? "s" : ""}
-                      </Badge>
+              <div key={group.key} className="rounded-xl border border-border/60 bg-muted/10 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium">{group.name}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {group.description || (group.isUnassigned ? "Projets sans marque associée." : "Aucune description pour cette marque.")}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {group.description || (group.isUnassigned ? "Projects without an attached brand yet." : "No brand description provided.")}
-                    </p>
                   </div>
+                  <Badge variant={group.isUnassigned ? "secondary" : "outline"}>
+                    {group.projects.length} projet{group.projects.length > 1 ? "s" : ""}
+                  </Badge>
                 </div>
 
-                <div className="mt-4 grid gap-3 xl:grid-cols-2">
+                <div className="mt-3 flex flex-col gap-2">
                   {group.projects.map((project) => (
-                    <article key={project.id} className="rounded-xl border bg-background p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="font-medium">{project.name}</p>
-                          <p className="text-xs text-muted-foreground">Project ID: {project.id}</p>
+                    <div
+                      key={project.id}
+                      className="rounded-lg border border-border/60 bg-background px-3 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium">{project.name}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Créé le {formatDateTime(project.createdAt)}
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Badge variant="outline" className={getStatusClassName(project.status)}>
-                            {formatLabel(project.status)}
-                          </Badge>
+                          <Badge variant="outline">{formatLabel(project.status)}</Badge>
                           {project.attributionSource ? (
                             <Badge variant="secondary">{formatLabel(project.attributionSource)}</Badge>
                           ) : null}
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-3 text-sm text-muted-foreground md:grid-cols-2">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em]">Brand</p>
-                          <p className="mt-1 text-foreground">{project.brandName || "No brand"}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.16em]">Created</p>
-                          <p className="mt-1 text-foreground">{formatDateTime(project.createdAt)}</p>
-                        </div>
-                      </div>
-                    </article>
+                    </div>
                   ))}
                 </div>
-              </section>
+              </div>
             ))
           )}
         </CardContent>

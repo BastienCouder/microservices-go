@@ -33,6 +33,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.projectVerifier = deps.ProjectVerifier
 	svc.projectCompetitors = deps.ProjectCompetitors
 	svc.projectModels = deps.ProjectModels
+	svc.billingQuota = deps.BillingQuota
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err
@@ -247,4 +248,24 @@ func (s *Service) listProjectEnabledModels(ctx context.Context, projectID string
 	}
 
 	return normalized, true, nil
+}
+
+func isSameUTCMonth(left, right time.Time) bool {
+	leftUTC := left.UTC()
+	rightUTC := right.UTC()
+	return leftUTC.Year() == rightUTC.Year() && leftUTC.Month() == rightUTC.Month()
+}
+
+func (s *Service) currentMonthlyPromptUsageLocked(organizationID int64, now time.Time) int {
+	total := 0
+	for _, run := range s.runs {
+		if run == nil || run.OrganizationID != organizationID {
+			continue
+		}
+		if !isSameUTCMonth(run.CreatedAt, now) {
+			continue
+		}
+		total += run.PromptsCount
+	}
+	return total
 }

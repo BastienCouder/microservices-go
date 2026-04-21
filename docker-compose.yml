@@ -392,6 +392,7 @@ services:
       PROJECT_DB_NAME: projectsvc
       PROJECT_DB_SSLMODE: disable
       PROJECT_DB_PASSWORD_FILE: /run/secrets/projectsvc_db_password
+      BILLING_SERVICE_URL: http://billing-service:8086
       ANALYSIS_SERVICE_GRPC_ADDR: analysis-service:9089
       IA_SERVICE_GRPC_ADDR: ia-service:9091
       RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url

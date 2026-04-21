@@ -21,6 +21,7 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
 	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
+	billingclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/billing"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/http"
@@ -77,6 +78,15 @@ func main() {
 		attributionHTTPClient = client
 	}
 
+	var billingHTTPClient usecase.BillingClient
+	if cfg.BillingServiceURL != "" {
+		client, err := billingclient.NewClient(cfg.BillingServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init billing http client: %v", err)
+		}
+		billingHTTPClient = client
+	}
+
 	store, err := projectstate.NewStateStore(db, cfg.SecretEncryptionKey)
 	if err != nil {
 		log.Fatalf("init project state store: %v", err)
@@ -87,6 +97,7 @@ func main() {
 		AnalysisClient:    analysisGRPCClient,
 		IAClient:          iaGRPCClient,
 		AttributionClient: attributionHTTPClient,
+		BillingClient:     billingHTTPClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)

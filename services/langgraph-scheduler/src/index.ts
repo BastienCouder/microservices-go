@@ -1,6 +1,6 @@
 import { getMostRecentDueSlot, resolveModelCron } from "./cron.js";
 import { loadConfig } from "./config.js";
-import { createClients } from "./grpc.js";
+import { createClients, isQuotaExceededSchedulerError } from "./grpc.js";
 import type {
   DueAnalysisJob,
   SchedulerClients,
@@ -103,13 +103,28 @@ function pruneRecentRuns(recentRuns: Map<string, number>, ttlMs: number): void {
   }
 }
 
+function currentQuotaMonthKey(now: Date): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+function pruneQuotaBlocks(blockedOrganizations: Map<number, string>, monthKey: string): void {
+  for (const [organizationId, blockedMonthKey] of blockedOrganizations.entries()) {
+    if (blockedMonthKey !== monthKey) {
+      blockedOrganizations.delete(organizationId);
+    }
+  }
+}
+
 async function runCycle(
   config: SchedulerConfig,
   clients: SchedulerClients,
   workflow: ReturnType<typeof createScheduledRunWorkflow>,
   recentRuns: Map<string, number>,
+  blockedOrganizations: Map<number, string>,
 ): Promise<void> {
   pruneRecentRuns(recentRuns, config.recentRunTTLms);
+  const monthKey = currentQuotaMonthKey(new Date());
+  pruneQuotaBlocks(blockedOrganizations, monthKey);
 
   const jobDefinitions = await clients.project.listScheduledAnalysisJobs();
   const dueJobs = expandDueJobs(jobDefinitions, new Date(), config.lookbackMinutes);
@@ -122,6 +137,9 @@ async function runCycle(
   log("scheduler.due_jobs_found", { count: dueJobs.length });
 
   for (const job of dueJobs) {
+    if (blockedOrganizations.get(job.organizationId) === monthKey) {
+      continue;
+    }
     if (recentRuns.has(job.requestId)) {
       continue;
     }
@@ -144,6 +162,20 @@ async function runCycle(
         modelId: job.modelId,
       });
     } catch (error) {
+      if (isQuotaExceededSchedulerError(error)) {
+        blockedOrganizations.set(job.organizationId, monthKey);
+        log("scheduler.job_skipped_quota", {
+          requestId: job.requestId,
+          organizationId: job.organizationId,
+          projectId: job.projectId,
+          promptId: job.promptId,
+          modelId: job.modelId,
+          monthKey,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+
       recentRuns.delete(job.requestId);
       log("scheduler.job_failed", {
         requestId: job.requestId,
@@ -161,6 +193,7 @@ async function main(): Promise<void> {
   const clients = createClients(config);
   const workflow = createScheduledRunWorkflow(clients);
   const recentRuns = new Map<string, number>();
+  const blockedOrganizations = new Map<number, string>();
 
   log("scheduler.started", {
     pollIntervalMs: config.pollIntervalMs,
@@ -181,7 +214,7 @@ async function main(): Promise<void> {
   try {
     while (!shuttingDown) {
       try {
-        await runCycle(config, clients, workflow, recentRuns);
+        await runCycle(config, clients, workflow, recentRuns, blockedOrganizations);
       } catch (error) {
         log("scheduler.cycle_failed", {
           error: error instanceof Error ? error.message : String(error),

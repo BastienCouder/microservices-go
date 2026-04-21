@@ -19,6 +19,7 @@ import (
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
+	billingclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/billing"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
@@ -55,6 +56,10 @@ func main() {
 		log.Fatalf("init project grpc client: %v", err)
 	}
 	defer projectGRPCClient.Close()
+	billingHTTPClient, err := billingclient.NewClient(cfg.BillingServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+	if err != nil {
+		log.Fatalf("init billing http client: %v", err)
+	}
 
 	dashboardCache := rediscache.NewDashboardCache(cfg.RedisAddr, cfg.RedisPassword)
 
@@ -65,6 +70,7 @@ func main() {
 		ProjectVerifier:    projectGRPCClient,
 		ProjectCompetitors: projectGRPCClient,
 		ProjectModels:      projectGRPCClient,
+		BillingQuota:       billingHTTPClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)

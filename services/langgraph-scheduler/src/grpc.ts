@@ -167,6 +167,16 @@ interface GRPCTransport {
   channelOptions: Partial<grpc.ChannelOptions>;
 }
 
+export class SchedulerServiceError extends Error {
+  code: number | undefined;
+
+  constructor(message: string, code?: number) {
+    super(message);
+    this.name = "SchedulerServiceError";
+    this.code = code;
+  }
+}
+
 const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const PROTO_ROOT = path.resolve(CURRENT_DIR, "../proto");
 const PROTO_LOADER_OPTIONS: protoLoader.Options = {
@@ -260,12 +270,16 @@ function unaryCall<TResponse>(
   return new Promise<TResponse>((resolve, reject) => {
     invoke((error, response) => {
       if (error !== null) {
-        reject(new Error(grpcErrorMessage(error)));
+        reject(new SchedulerServiceError(grpcErrorMessage(error), error.code));
         return;
       }
       resolve(response);
     });
   });
+}
+
+export function isQuotaExceededSchedulerError(error: unknown): boolean {
+  return error instanceof SchedulerServiceError && error.code === grpc.status.RESOURCE_EXHAUSTED;
 }
 
 function toScheduledAnalysisJobDefinitions(

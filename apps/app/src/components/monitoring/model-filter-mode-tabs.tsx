@@ -27,10 +27,10 @@ export function ModelFilterModeTabs({
   return (
     <Tabs value={value} onValueChange={(next) => onValueChange(next as "grouped" | "unique")} className={className}>
       <TabsList className={listClassName}>
-        <TabsTrigger value="grouped" className="px-2 text-[10px] lg:text-[10px]">
+        <TabsTrigger value="grouped" className="px-2 text-xs lg:text-xs">
           {resolvedGroupedLabel}
         </TabsTrigger>
-        <TabsTrigger value="unique" className="px-2 text-[10px] lg:text-[10px]">
+        <TabsTrigger value="unique" className="px-2 text-xs lg:text-xs">
           {resolvedUniqueLabel}
         </TabsTrigger>
       </TabsList>

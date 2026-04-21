@@ -13,11 +13,12 @@ import {
   storeSelectedOrganizationID,
   storeSelectedProjectID,
 } from "@/shared/selection";
-import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/features/shared/view/page-header";
 import { countHierarchyBrands, groupProjectsByBrand, normalizeOrganizationHierarchy } from "../lib/hierarchy";
 import { OrganizationsMainPanel } from "../components/organizations-main-panel";
 import { OrganizationsSidebar } from "../components/organizations-sidebar";
-import type { OrganizationRole, OrganizationSummary, SimulatedPlan, OrganizationTab } from "../components/types";
+import type { OrganizationRole, OrganizationSummary, OrganizationTab } from "../components/types";
 
 type OrganizationsClientProps = {
   apiBaseURL: string;
@@ -31,18 +32,6 @@ type MembershipSummary = {
   organizationId?: string;
   role?: OrganizationRole;
 };
-
-const SIM_PLAN_KEY_PREFIX = "simulated-billing-plan:";
-
-function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan | null {
-  if (rawPlan === "starter" || rawPlan === "growth" || rawPlan === "pro" || rawPlan === "agency-enterprise") {
-    return rawPlan;
-  }
-  if (rawPlan === "free") return "starter";
-  if (rawPlan === "pro-monthly") return "growth";
-  if (rawPlan === "pro-yearly") return "pro";
-  return null;
-}
 
 function buildApiUrl(baseURL: string, path: string): string {
   const base = baseURL.trim();
@@ -163,14 +152,8 @@ function deriveDomainFromWebsiteURL(value: string): string {
   }
 }
 
-function getPlanLabel(organizationId: string): string | null {
-  if (typeof window === "undefined") return null;
-  const plan = normalizeStoredPlan(window.localStorage.getItem(`${SIM_PLAN_KEY_PREFIX}${organizationId}`));
-  if (!plan) return null;
-  if (plan === "starter") return "Starter";
-  if (plan === "growth") return "Growth";
-  if (plan === "pro") return "Pro";
-  return "Agency / Enterprise";
+function getServerPlanLabel(_organizationId: string): string | null {
+  return null;
 }
 
 async function loadOrganizationsList(apiBaseURL: string, signal?: AbortSignal): Promise<OrganizationSummary[]> {
@@ -498,24 +481,46 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
     }
   };
 
+  const isOrganizationsLoading =
+    organizationsQuery.isLoading || (organizationsQuery.isFetching && !organizationsQuery.data);
+  const isResourcesLoading =
+    selectedOrganizationId !== "" &&
+    (organizationResourcesQuery.isLoading || (organizationResourcesQuery.isFetching && !organizationResourcesQuery.data));
+  const isPageLoading = isOrganizationsLoading || isResourcesLoading;
+
   return (
-    <div className="h-full min-h-0 overflow-hidden p-2 md:p-4">
-      <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-md bg-background p-3 md:p-4">
-        <div className="mb-6 shrink-0">
-          <h1 className="text-3xl font-semibold tracking-tight">Organizations</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Manage tenant isolation at the org level, then explore brands and projects inside each organization.
-          </p>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
+      <PageHeader
+        title="Organisations"
+        baseline="Retrouvez vos organisations, leurs projets et leurs accès dans une vue simple, pensée comme les pages monitoring."
+        actionsVariant="classic"
+        actions={
+          selectedOrganization ? (
+            <Button
+              size="sm"
+              onClick={() => {
+                setShowCreateProjectForm(true);
+                setActiveTab("overview");
+                navigate(buildScopedHref("/organizations", { org: selectedOrganizationId, createProject: "1" }), { replace: true });
+              }}
+            >
+              Créer un projet
+            </Button>
+          ) : null
+        }
+      />
+
+      {error ? (
+        <div className="mb-4 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {error}
         </div>
+      ) : null}
 
-        {error ? (
-          <div className="mb-6 shrink-0 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        ) : null}
-
-        <div className="min-h-0 flex flex-1 flex-col gap-6 lg:flex-row">
+      <div className="grid min-h-0 flex-1 gap-4 xl:grid-cols-[minmax(320px,0.95fr)_minmax(0,1.55fr)]">
           <OrganizationsSidebar
             search={search}
             onSearchChange={setSearch}
+            organizationsCount={organizations.length}
             selectedOrganization={selectedOrganization}
             showCreateProjectForm={showCreateProjectForm}
             onToggleCreateProjectForm={() => {
@@ -551,10 +556,8 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
             organizations={filteredOrganizations}
             selectedOrganizationId={selectedOrganizationId}
             onSelectOrganization={handleSelectOrganization}
-            getSimulatedPlanLabel={getPlanLabel}
+            getSimulatedPlanLabel={getServerPlanLabel}
           />
-
-          <Separator orientation="vertical" className="hidden lg:block" />
 
           <OrganizationsMainPanel
             activeTab={activeTab}
@@ -588,15 +591,8 @@ export default function OrganizationsClient({ apiBaseURL, busy, routeSearch, use
               setActiveTab("overview");
               navigate(buildScopedHref("/organizations", { org: selectedOrganizationId, createProject: "1" }), { replace: true });
             }}
-            loading={
-              organizationsQuery.isLoading ||
-              (organizationsQuery.isFetching && !organizationsQuery.data) ||
-              (selectedOrganizationId !== "" &&
-                (organizationResourcesQuery.isLoading ||
-                  (organizationResourcesQuery.isFetching && !organizationResourcesQuery.data)))
-            }
+            loading={isPageLoading}
           />
-        </div>
       </div>
     </div>
   );

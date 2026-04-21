@@ -122,3 +122,69 @@ func TestCreateStripeCustomerPortalSessionUsesHeaderOrganizationScope(t *testing
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestGetQuotaRequiresMatchingOrganizationScope(t *testing.T) {
+	repo := &memoryRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID: 7,
+				Plan:           domain.PlanGrowth,
+				Seats:          3,
+				MonthlyQuota:   200,
+				BillingCycle:   domain.BillingCycleMonthly,
+				Status:         domain.SubscriptionStatusActive,
+				UpdatedAt:      time.Now().UTC(),
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/billing/quotas/7", nil)
+	req.Header.Set("X-Organization-ID", "8")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
+	repo := &memoryRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID: 7,
+				Plan:           domain.PlanGrowth,
+				Seats:          3,
+				MonthlyQuota:   200,
+				BillingCycle:   domain.BillingCycleMonthly,
+				Status:         domain.SubscriptionStatusActive,
+				UpdatedAt:      time.Now().UTC(),
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/billing/quotas/7", nil)
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `"model_selection_limit":6`) {
+		t.Fatalf("expected model selection limit in payload, got %s", body)
+	}
+	if !strings.Contains(body, `"monthly_model_change_limit":3`) {
+		t.Fatalf("expected monthly model change limit in payload, got %s", body)
+	}
+}

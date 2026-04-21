@@ -110,6 +110,30 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 		}
 	}
 
+	entitlements, err := s.resolveBillingEntitlementsLocked(ctx, organizationID)
+	if err != nil {
+		return ReplaceProjectModelsResult{}, err
+	}
+	if entitlements.ModelSelectionLimit > 0 && len(normalized) > entitlements.ModelSelectionLimit {
+		return ReplaceProjectModelsResult{}, fmt.Errorf(
+			"%w: plan %s allows up to %d models",
+			ErrValidation,
+			strings.TrimSpace(entitlements.Plan),
+			entitlements.ModelSelectionLimit,
+		)
+	}
+
+	currentSelection := filterEnabledModels(s.projectModels, s.models, projectID)
+	selectionChanged := !sameNormalizedModelIDs(currentSelection, normalized)
+	modelChangeUsage := s.currentModelSelectionChangeUsageLocked(projectID)
+	shouldIncrementUsage := selectionChanged && len(currentSelection) > 0
+	if shouldIncrementUsage && entitlements.MonthlyModelChangeLimit > 0 && modelChangeUsage.Count >= entitlements.MonthlyModelChangeLimit {
+		return ReplaceProjectModelsResult{}, fmt.Errorf(
+			"%w: monthly model change limit reached",
+			ErrValidation,
+		)
+	}
+
 	backup := s.snapshotLocked()
 	replacement := make(map[string]bool, len(normalized))
 	for _, modelID := range normalized {
@@ -128,6 +152,9 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 		}
 		prompt.Schedule = schedule
 	}
+	if shouldIncrementUsage {
+		s.incrementModelSelectionChangeUsageLocked(projectID)
+	}
 	if err := s.persistLocked(ctx); err != nil {
 		s.restoreLocked(backup)
 		return ReplaceProjectModelsResult{}, err
@@ -135,6 +162,57 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 
 	sort.Strings(normalized)
 	return ReplaceProjectModelsResult{ProjectID: projectID, ModelIDs: normalized, Count: len(normalized)}, nil
+}
+
+func (s *Service) resolveBillingEntitlementsLocked(ctx context.Context, organizationID int64) (BillingEntitlements, error) {
+	if s.billingClient == nil {
+		return BillingEntitlements{
+			Plan:                    "starter",
+			ModelSelectionLimit:     3,
+			MonthlyModelChangeLimit: 3,
+		}, nil
+	}
+
+	entitlements, err := s.billingClient.GetOrganizationEntitlements(ctx, organizationID)
+	if err != nil {
+		return BillingEntitlements{}, fmt.Errorf("%w: billing entitlements unavailable", ErrDependencyUnavailable)
+	}
+	if strings.TrimSpace(entitlements.Plan) == "" {
+		entitlements.Plan = "starter"
+	}
+	if entitlements.MonthlyModelChangeLimit <= 0 {
+		entitlements.MonthlyModelChangeLimit = 3
+	}
+	return entitlements, nil
+}
+
+func (s *Service) currentModelSelectionChangeUsageLocked(projectID string) ProjectModelSelectionChangeUsage {
+	usage := s.modelSelectionChanges[projectID]
+	currentMonth := s.now().UTC().Format("2006-01")
+	if usage.Month != currentMonth {
+		return ProjectModelSelectionChangeUsage{Month: currentMonth}
+	}
+	return usage
+}
+
+func (s *Service) incrementModelSelectionChangeUsageLocked(projectID string) {
+	usage := s.currentModelSelectionChangeUsageLocked(projectID)
+	usage.Count++
+	s.modelSelectionChanges[projectID] = usage
+}
+
+func sameNormalizedModelIDs(left, right []string) bool {
+	normalizedLeft := normalizeModelIDs(left)
+	normalizedRight := normalizeModelIDs(right)
+	if len(normalizedLeft) != len(normalizedRight) {
+		return false
+	}
+	for index, value := range normalizedLeft {
+		if normalizedRight[index] != value {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Service) SeedDefaultModels(ctx context.Context) ([]AIModel, error) {

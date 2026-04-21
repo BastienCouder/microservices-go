@@ -7,9 +7,10 @@ import (
 )
 
 var (
-	ErrValidation   = errors.New("validation error")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrNotFound     = errors.New("not found")
+	ErrValidation            = errors.New("validation error")
+	ErrUnauthorized          = errors.New("unauthorized")
+	ErrNotFound              = errors.New("not found")
+	ErrDependencyUnavailable = errors.New("dependency unavailable")
 )
 
 const (
@@ -297,6 +298,17 @@ type ReplaceProjectModelsResult struct {
 	Count     int      `json:"count"`
 }
 
+type BillingEntitlements struct {
+	Plan                    string `json:"plan"`
+	ModelSelectionLimit     int    `json:"modelSelectionLimit"`
+	MonthlyModelChangeLimit int    `json:"monthlyModelChangeLimit"`
+}
+
+type ProjectModelSelectionChangeUsage struct {
+	Month string `json:"month"`
+	Count int    `json:"count"`
+}
+
 type AnalysisPromptText struct {
 	ID       string   `json:"id"`
 	Text     string   `json:"text"`
@@ -394,6 +406,10 @@ type AttributionClient interface {
 	RecordEvent(ctx context.Context, input AttributionEventInput) error
 }
 
+type BillingClient interface {
+	GetOrganizationEntitlements(ctx context.Context, organizationID int64) (BillingEntitlements, error)
+}
+
 type StateStore interface {
 	Load(ctx context.Context) ([]byte, bool, error)
 	Save(ctx context.Context, payload []byte) error
@@ -404,16 +420,18 @@ type Dependencies struct {
 	AnalysisClient    AnalysisClient
 	IAClient          IAClient
 	AttributionClient AttributionClient
+	BillingClient     BillingClient
 }
 
 type persistedState struct {
-	Seq                int64                                 `json:"seq"`
-	Projects           map[string]*Project                   `json:"projects"`
-	Prompts            map[string]*Prompt                    `json:"prompts"`
-	Competitors        map[string]*Competitor                `json:"competitors"`
-	Models             map[string]AIModel                    `json:"models"`
-	ProjectModels      map[string]map[string]bool            `json:"projectModels"`
-	ImpactIntegrations map[string]*ProjectImpactIntegrations `json:"impactIntegrations"`
-	Outbox             map[string]*OutboxEvent               `json:"outbox"`
-	OutboxOrder        []string                              `json:"outboxOrder"`
+	Seq                   int64                                       `json:"seq"`
+	Projects              map[string]*Project                         `json:"projects"`
+	Prompts               map[string]*Prompt                          `json:"prompts"`
+	Competitors           map[string]*Competitor                      `json:"competitors"`
+	Models                map[string]AIModel                          `json:"models"`
+	ProjectModels         map[string]map[string]bool                  `json:"projectModels"`
+	ModelSelectionChanges map[string]ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
+	ImpactIntegrations    map[string]*ProjectImpactIntegrations       `json:"impactIntegrations"`
+	Outbox                map[string]*OutboxEvent                     `json:"outbox"`
+	OutboxOrder           []string                                    `json:"outboxOrder"`
 }

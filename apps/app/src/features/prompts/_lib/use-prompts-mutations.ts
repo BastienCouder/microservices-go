@@ -31,6 +31,7 @@ type UsePromptsMutationsParams = {
   mode: string;
   organizationId: string;
   activeProjectId: string;
+  quotaReached: boolean;
   deferredSearch: string;
   promptSort: PromptSort;
   promptSortDirection: PromptSortDirection;
@@ -246,7 +247,14 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         queryKey: ["monitoring", params.apiBaseURL, params.activeProjectId],
       });
     },
-    onSettled: () => {
+    onSettled: async () => {
+      await params.queryClient.invalidateQueries({
+        queryKey: appQueryKeys.promptQuota(
+          params.apiBaseURL,
+          params.organizationId,
+          params.activeProjectId,
+        ),
+      });
       params.setRunningPromptRowIds([]);
     },
   });
@@ -259,6 +267,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
   });
 
   const canRunPrompt = (prompt?: Pick<PromptItem, "id" | "sourcePromptId"> | null) =>
+    !params.quotaReached &&
     canRunPersistedPrompt(prompt, {
       organizationId: params.organizationId,
       activeProjectId: params.activeProjectId,

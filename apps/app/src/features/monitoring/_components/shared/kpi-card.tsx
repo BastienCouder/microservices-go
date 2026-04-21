@@ -55,7 +55,7 @@ export function KpiCard({ title, value, sub, trend, trendDir, variant = "default
       </div>
 
       {sub ? (
-        <span className={cn("mt-2 text-xs leading-relaxed md:text-[10px]", isActive ? "text-primary-foreground/80" : "text-muted-foreground")}>
+        <span className={cn("mt-2 text-xs leading-relaxed md:text-xs", isActive ? "text-primary-foreground/80" : "text-muted-foreground")}>
           {sub}
         </span>
       ) : null}

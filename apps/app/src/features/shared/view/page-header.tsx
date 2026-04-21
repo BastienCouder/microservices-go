@@ -26,7 +26,6 @@ export function PageHeader({
   actionsClassName,
 }: PageHeaderProps) {
   return (
-    <>
     <div className={cn("flex flex-col md:gap-4 lg:flex-row lg:items-start lg:justify-between md:mb-4", className)}>
       <div className="min-w-0 space-y-0 px-2">
         <div className="flex items-end gap-2.5 ">
@@ -41,7 +40,6 @@ export function PageHeader({
       </div>
 
       {actions ? (
-        <>
         <div
           className={cn(
             "relative",
@@ -51,18 +49,12 @@ export function PageHeader({
             actionsClassName,
           )}
         >
-          {actionsVariant === "classic" ? (
-          null
-          ) : null}
           {actionsVariant === "accent" ? (
             <div className="hidden h-10 w-10 shrink-0 rounded-full bg-primary/8 ring-1 ring-primary/12 sm:block" />
           ) : null}
           {actions}
-     
         </div>
-        </>
       ) : null}
     </div>
-    </>
   );
 }

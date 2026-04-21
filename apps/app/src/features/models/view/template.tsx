@@ -20,14 +20,8 @@ import {
 import { PageHeader } from "@/features/shared/view/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
 import { cn } from "@/lib/utils";
-import {
-  getPlanLabel,
-  getPlanLimit,
-  normalizeStoredPlan,
-  readSelectedOrganizationId,
-  SIM_PLAN_KEY_PREFIX,
-  type SimulatedPlan,
-} from "../core/model-access";
+import { loadBillingEntitlements } from "@/shared/billing";
+import { getPlanLabel, readSelectedOrganizationId } from "../core/model-access";
 
 type ModelsTemplateProps = {
   apiBaseURL: string;
@@ -45,17 +39,6 @@ function readProjectIdFromSearch(routeSearch: string): string {
     params.get("project") ||
     ""
   ).trim();
-}
-
-function readSimulatedPlan(organizationId: string): SimulatedPlan {
-  if (typeof window === "undefined" || !organizationId) return "starter";
-  try {
-    return normalizeStoredPlan(
-      window.localStorage.getItem(`${SIM_PLAN_KEY_PREFIX}${organizationId}`),
-    );
-  } catch {
-    return "starter";
-  }
 }
 
 function sameStringArray(left: string[], right: string[]): boolean {
@@ -81,17 +64,18 @@ export function ModelsTemplate({
     [routeSearch],
   );
 
-  const plan = useMemo(
-    () => readSimulatedPlan(organizationId),
-    [organizationId],
-  );
-  const planLabel = getPlanLabel(plan);
-
   const projectsCatalogQuery = useQuery({
     queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId),
     enabled: apiBaseURL.trim() !== "" && organizationId !== "",
     queryFn: ({ signal }) =>
       loadProjectsAndCatalog(apiBaseURL, organizationId, { signal }),
+  });
+
+  const billingQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
+    enabled: apiBaseURL.trim() !== "" && organizationId !== "",
+    queryFn: ({ signal }) =>
+      loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
   });
 
   const projects = projectsCatalogQuery.data?.projects ?? [];
@@ -100,7 +84,13 @@ export function ModelsTemplate({
     () => new Set(catalog.map((model) => model.id)),
     [catalog],
   );
-  const selectionLimit = getPlanLimit(plan, catalog.length);
+  const selectionLimit = useMemo(() => {
+    const limit = billingQuery.data?.modelSelectionLimit ?? 0;
+    return limit > 0 ? limit : catalog.length;
+  }, [billingQuery.data?.modelSelectionLimit, catalog.length]);
+  const planLabel = billingQuery.data?.plan
+    ? getPlanLabel(billingQuery.data.plan)
+    : null;
 
   const projectModelsQuery = useQuery({
     queryKey: appQueryKeys.projectModels(
@@ -127,7 +117,7 @@ export function ModelsTemplate({
             "X-Organization-ID": organizationId,
           },
           body: JSON.stringify({
-            modelIds: modelIds.slice(0, selectionLimit),
+            modelIds,
           }),
           credentials: "include",
         },
@@ -142,7 +132,7 @@ export function ModelsTemplate({
         );
       }
 
-      return modelIds.slice(0, selectionLimit);
+      return modelIds;
     },
     onSuccess: async (nextModelIds) => {
       queryClient.setQueryData(
@@ -265,9 +255,11 @@ export function ModelsTemplate({
 
     if (selectedModelIds.length >= selectionLimit) {
       setMessage(
-        `${planLabel} permet jusqu'a ${selectionLimit} modele${
-          selectionLimit > 1 ? "s" : ""
-        }.`,
+        planLabel
+          ? `${planLabel} permet jusqu'a ${selectionLimit} modele${
+              selectionLimit > 1 ? "s" : ""
+            }.`
+          : "La limite de votre plan a ete atteinte.",
       );
       return;
     }
@@ -285,9 +277,11 @@ export function ModelsTemplate({
         meta={
           <>
             <Badge variant="default">{selectedModelIds.length} selectionnes</Badge>
-            <Badge variant="outline" className="capitalize">
-              plan {planLabel}
-            </Badge>
+            {planLabel ? (
+              <Badge variant="outline" className="capitalize">
+                plan {planLabel}
+              </Badge>
+            ) : null}
           </>
         }
         actions={

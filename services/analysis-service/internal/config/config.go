@@ -13,6 +13,7 @@ type Config struct {
 	MetricsAddr              string
 	GRPCAddr                 string
 	DatabaseURL              string
+	BillingServiceURL        string
 	ProjectServiceGRPCAddr   string
 	InternalJWTSecret        string
 	InternalJWTIssuer        string
@@ -42,6 +43,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	projectServiceGRPCAddr, err := requiredEnv("PROJECT_SERVICE_GRPC_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	billingServiceURL, err := requiredEnv("BILLING_SERVICE_URL")
 	if err != nil {
 		return Config{}, err
 	}
@@ -79,6 +84,7 @@ func Load() (Config, error) {
 		MetricsAddr:              optionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
+		BillingServiceURL:        billingServiceURL,
 		ProjectServiceGRPCAddr:   projectServiceGRPCAddr,
 		InternalJWTSecret:        internalJWTSecret,
 		InternalJWTIssuer:        internalJWTIssuer,

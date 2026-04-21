@@ -77,6 +77,8 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.startAnalysis(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "runs" && r.Method == http.MethodGet:
 		h.listRuns(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "quota" && r.Method == http.MethodGet:
+		h.getPromptQuotaUsage(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "dashboard" && r.Method == http.MethodGet:
 		h.getDashboard(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "perception" && r.Method == http.MethodGet:
@@ -264,6 +266,21 @@ func (h *Handler) getDashboard(w http.ResponseWriter, r *http.Request, projectID
 	writeSuccess(w, http.StatusOK, dashboard)
 }
 
+func (h *Handler) getPromptQuotaUsage(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	usage, err := h.svc.GetPromptQuotaUsage(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, usage)
+}
+
 func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -428,6 +445,8 @@ func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+	case errors.Is(err, usecase.ErrQuotaExceeded):
+		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrUnauthorized):
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrNotFound):

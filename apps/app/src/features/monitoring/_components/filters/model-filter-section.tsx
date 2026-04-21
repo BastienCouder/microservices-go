@@ -55,7 +55,7 @@ export function ModelFilterSection({
           variant="ghost"
           size="sm"
           className={cn(
-            "h-8 min-w-[4.75rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[4rem] lg:px-2 lg:text-[10px]",
+            "h-8 min-w-[4.75rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[4rem] lg:px-2 lg:text-xs",
             selectedModels.length === 0 && "invisible pointer-events-none",
           )}
           onClick={clearModels}

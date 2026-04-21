@@ -1,294 +1,220 @@
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { Sparkles, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  OnboardingField,
+  OnboardingStep,
+  OnboardingStepFooter,
+} from "./step-shell";
 
 type StepBrandProps = {
-    hideBack?: boolean;
-    nextLabel?: string;
+  hideBack?: boolean;
+  nextLabel?: string;
 };
 
-const BRAND_PREP_MESSAGES = [
-    "Cross-checking website copy and structure...",
-    "Extracting brand entities and service categories...",
-    "Building your editable brand profile...",
-];
-
 export function StepBrand({ hideBack = false, nextLabel = "Next" }: StepBrandProps) {
-    const {
-        brandName,
-        setBrandName,
-        brandShortDescription,
-        setBrandShortDescription,
-        brandDescription,
-        setBrandDescription,
-        industry,
-        setIndustry,
-        keyFeatures,
-        setKeyFeatures,
-        brandPersonas,
-        setBrandPersonas,
-        brandPreparationCompleted,
-        setBrandPreparationCompleted,
-        nextStep,
-        prevStep,
-    } = useOnboarding();
+  const {
+    brandName,
+    setBrandName,
+    brandShortDescription,
+    setBrandShortDescription,
+    brandDescription,
+    setBrandDescription,
+    industry,
+    setIndustry,
+    keyFeatures,
+    setKeyFeatures,
+    brandPreparationCompleted,
+    setBrandPreparationCompleted,
+    nextStep,
+    prevStep,
+  } = useOnboarding();
+  const { t } = useScopedI18n("onboarding");
+  const [newFeature, setNewFeature] = useState("");
+  const [prepProgress, setPrepProgress] = useState(0);
 
-    const [newFeature, setNewFeature] = useState("");
-    const [newPersona, setNewPersona] = useState("");
-    const [isPreparingLocal, setIsPreparingLocal] = useState(true);
-    const [prepProgress, setPrepProgress] = useState(0);
-    const isPreparing = !brandPreparationCompleted && isPreparingLocal;
+  useEffect(() => {
+    if (brandPreparationCompleted) return;
 
-    useEffect(() => {
-        if (brandPreparationCompleted) return;
+    const durationMs = 15_600;
+    const startedAt = Date.now();
+    let timeoutId: number | undefined;
+    const timer = window.setInterval(() => {
+      const progress = Math.min(
+        ((Date.now() - startedAt) / durationMs) * 100 + Math.random() * 2,
+        100,
+      );
 
-        const durationMs = 15600;
-        const start = Date.now();
+      setPrepProgress(Math.round(progress));
+      if (progress < 100) return;
 
-        const progressTimer = setInterval(() => {
-            const elapsed = Date.now() - start;
-            const base = Math.min((elapsed / durationMs) * 100, 100);
-            const withJitter = Math.min(base + Math.random() * 2, 100);
-            setPrepProgress(Math.round(withJitter));
+      window.clearInterval(timer);
+      timeoutId = window.setTimeout(() => {
+        setBrandPreparationCompleted(true);
+      }, 420);
+    }, 170);
 
-            if (base >= 100) {
-                clearInterval(progressTimer);
-                setPrepProgress(100);
-                setTimeout(() => {
-                    setBrandPreparationCompleted(true);
-                    setIsPreparingLocal(false);
-                }, 420);
-            }
-        }, 170);
-
-        return () => {
-            clearInterval(progressTimer);
-        };
-    }, [brandPreparationCompleted, setBrandPreparationCompleted]);
-
-    const messageMotion = (index: number) => {
-        const p = prepProgress;
-        const windowSize = 3;
-
-        if (index === 0) {
-            if (p <= 33) return { opacity: 1, y: 0 };
-            if (p >= 33 + windowSize) return { opacity: 0, y: -10 };
-            const t = (p - 33) / windowSize;
-            return { opacity: 1 - t, y: -10 * t };
-        }
-
-        if (index === 1) {
-            if (p < 33) return { opacity: 0, y: 10 };
-            if (p < 33 + windowSize) {
-                const t = (p - 33) / windowSize;
-                return { opacity: t, y: 10 * (1 - t) };
-            }
-            if (p <= 66) return { opacity: 1, y: 0 };
-            if (p >= 66 + windowSize) return { opacity: 0, y: -10 };
-            const t = (p - 66) / windowSize;
-            return { opacity: 1 - t, y: -10 * t };
-        }
-
-        if (p < 66) return { opacity: 0, y: 10 };
-        if (p < 66 + windowSize) {
-            const t = (p - 66) / windowSize;
-            return { opacity: t, y: 10 * (1 - t) };
-        }
-        return { opacity: 1, y: 0 };
+    return () => {
+      window.clearInterval(timer);
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
     };
+  }, [brandPreparationCompleted, setBrandPreparationCompleted]);
 
-    const addFeature = () => {
-        const value = newFeature.trim();
-        if (!value || keyFeatures.includes(value)) return;
-        setKeyFeatures([...keyFeatures, value]);
-        setNewFeature("");
-    };
+  const addFeature = () => {
+    const feature = newFeature.trim();
+    if (!feature || keyFeatures.includes(feature)) return;
+    setKeyFeatures([...keyFeatures, feature]);
+    setNewFeature("");
+  };
 
-    const addPersona = () => {
-        const value = newPersona.trim();
-        if (!value || brandPersonas.includes(value)) return;
-        setBrandPersonas([...brandPersonas, value]);
-        setNewPersona("");
-    };
-
-    if (isPreparing) {
-        return (
-            <div className="w-full min-h-[calc(100dvh-180px)] space-y-6 rounded-[32px] border border-white/70 bg-white/95 p-4 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:min-h-0 sm:p-8">
-                <div className="flex flex-col items-center gap-4">
-                    <p className="text-center text-sm font-bold text-primary">{prepProgress}%</p>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                        <div
-                            className="h-full rounded-full bg-primary transition-[width] duration-200 ease-linear"
-                            style={{ width: `${prepProgress}%` }}
-                        />
-                    </div>
-                </div>
-                <div className="flex justify-center">
-                    <div className="relative flex min-h-8 w-full items-center justify-center overflow-hidden rounded-lg bg-primary/5 px-3 sm:px-4">
-                        <Sparkles className="mr-2 size-4 shrink-0 text-primary" />
-                        <div className="relative h-5 flex-1 overflow-hidden text-center">
-                            {BRAND_PREP_MESSAGES.map((message, index) => {
-                                const motion = messageMotion(index);
-                                return (
-                                    <p
-                                        key={message}
-                                        className="absolute left-0 right-0 top-0 flex items-center justify-center text-xs text-muted-foreground transition-all duration-300 sm:text-sm"
-                                        style={{ opacity: motion.opacity, transform: `translateY(${motion.y}px)` }}
-                                    >
-                                        {message}
-                                    </p>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="w-full h-full space-y-6 rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:min-h-0 sm:p-8">
-            <div className="space-y-2">
-                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950 sm:text-3xl">Brand Intelligence</h2>
-                <p className="text-sm text-muted-foreground sm:text-base">We are analyzing your website to understand your products and target customers.</p>
-            </div>
-
-            <div className="space-y-2">
-                <Label htmlFor="brand-short-description" className="text-sm font-semibold">Short Description</Label>
-                <p className="text-xs text-muted-foreground">A brief summary of what your brand does.</p>
-                <Textarea
-                    id="brand-short-description"
-                    className="min-h-[86px] text-sm"
-                    value={brandShortDescription}
-                    onChange={(e) => setBrandShortDescription(e.target.value)}
-                    placeholder="A brief summary of what your brand does"
-                />
-            </div>
-
-            <div className="space-y-2">
-                <Label htmlFor="brand-industry" className="text-sm font-semibold">Industry</Label>
-                <p className="text-xs text-muted-foreground">The industry your brand operates in.</p>
-                <Input
-                    id="brand-industry"
-                    value={industry}
-                    onChange={(e) => setIndustry(e.target.value)}
-                    placeholder="Independent Software Development Services"
-                />
-            </div>
-
-            <div className="space-y-2">
-                <Label htmlFor="brand-description" className="text-sm font-semibold">Description</Label>
-                <p className="text-xs text-muted-foreground">A detailed description of your brand.</p>
-                <Textarea
-                    id="brand-description"
-                    className="min-h-[180px] text-sm"
-                    value={brandDescription}
-                    onChange={(e) => setBrandDescription(e.target.value)}
-                    placeholder="Detailed description"
-                />
-            </div>
-
-            <div className="space-y-3">
-                <Label className="text-sm font-semibold">Key features</Label>
-                <p className="text-xs text-muted-foreground">List at least 3 specific features of your product or service.</p>
-                <div className="space-y-2">
-                    {keyFeatures.map((feature, index) => (
-                        <div key={`${feature}-${index}`} className="flex items-center gap-2 rounded-sm border border-border/80 px-3 py-2">
-                            <Input
-                                value={feature}
-                                onChange={(e) => {
-                                    const clone = [...keyFeatures];
-                                    clone[index] = e.target.value;
-                                    setKeyFeatures(clone);
-                                }}
-                                className="h-9 border-0 shadow-none focus-visible:ring-0"
-                            />
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => setKeyFeatures(keyFeatures.filter((_, i) => i !== index))}
-                                aria-label="Delete feature"
-                            >
-                                <Trash2 className="size-4 text-primary" />
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    <Input
-                        value={newFeature}
-                        onChange={(e) => setNewFeature(e.target.value)}
-                        placeholder="Add a key feature"
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") addFeature();
-                        }}
-                    />
-                    <Button variant="outline" size="sm" onClick={addFeature}>
-                        Add feature
-                    </Button>
-                </div>
-            </div>
-
-            <div className="space-y-2">
-                <Label htmlFor="brand-name" className="text-sm font-semibold">Brand name</Label>
-                <p className="text-xs text-muted-foreground">The name that should appear in monitoring and reporting.</p>
-                <Input
-                    id="brand-name"
-                    value={brandName}
-                    onChange={(e) => setBrandName(e.target.value)}
-                    placeholder="Brand name"
-                />
-            </div>
-
-            <div className="space-y-2">
-                <Label className="text-sm font-semibold">Target personas</Label>
-                <p className="text-xs text-muted-foreground">Describe the ideal customer profiles you want the audit to represent.</p>
-                <div className="space-y-2">
-                    {brandPersonas.map((persona, index) => (
-                        <div key={`${persona}-${index}`} className="flex items-center gap-2 rounded-sm border border-border/80 px-3 py-2">
-                            <Input
-                                value={persona}
-                                onChange={(e) => {
-                                    const clone = [...brandPersonas];
-                                    clone[index] = e.target.value;
-                                    setBrandPersonas(clone);
-                                }}
-                                className="h-9 border-0 shadow-none focus-visible:ring-0"
-                            />
-                            <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                onClick={() => setBrandPersonas(brandPersonas.filter((_, i) => i !== index))}
-                                aria-label="Delete persona"
-                            >
-                                <Trash2 className="size-4 text-primary" />
-                            </Button>
-                        </div>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    <Input
-                        value={newPersona}
-                        onChange={(e) => setNewPersona(e.target.value)}
-                        placeholder="Add a persona"
-                        onKeyDown={(e) => {
-                            if (e.key === "Enter") addPersona();
-                        }}
-                    />
-                    <Button variant="outline" size="sm" onClick={addPersona}>
-                        Add persona
-                    </Button>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/70 pt-4">
-                {hideBack ? <div /> : <Button variant="outline" onClick={prevStep}>Back</Button>}
-                <Button className="min-w-36" onClick={nextStep} disabled={!brandName || !industry}>{nextLabel}</Button>
-            </div>
-        </div>
+  const updateFeature = (index: number, value: string) => {
+    setKeyFeatures(
+      keyFeatures.map((feature, featureIndex) =>
+        featureIndex === index ? value : feature,
+      ),
     );
+  };
+
+  const prepMessage =
+    [
+      t("brandPrepMessage1"),
+      t("brandPrepMessage2"),
+      t("brandPrepMessage3"),
+    ][
+      Math.min(
+        2,
+        Math.floor((prepProgress / 100) * 3),
+      )
+    ];
+
+  if (!brandPreparationCompleted) {
+    return (
+      <OnboardingStep
+        title={t("brandPrepTitle")}
+        description={prepMessage}
+      >
+        <div className="space-y-3">
+          <div className="flex items-center justify-between text-sm font-medium text-primary">
+            <span>{t("brandPrepProgressLabel")}</span>
+            <span>{prepProgress}%</span>
+          </div>
+          <Progress value={prepProgress} className="h-2" />
+        </div>
+      </OnboardingStep>
+    );
+  }
+
+  return (
+    <OnboardingStep
+      title={t("brandTitle")}
+      description={t("brandDescription")}
+      footer={
+        <OnboardingStepFooter
+          hideBack={hideBack}
+          onBack={prevStep}
+          onNext={nextStep}
+          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+        />
+      }
+    >
+      <OnboardingField label={t("brandNameLabel")} htmlFor="brand-name">
+        <Input
+          id="brand-name"
+          value={brandName}
+          onChange={(event) => setBrandName(event.target.value)}
+          placeholder={t("brandNamePlaceholder")}
+        />
+      </OnboardingField>
+
+      <OnboardingField
+        label={t("brandShortDescriptionLabel")}
+        htmlFor="brand-short-description"
+        description={t("brandShortDescriptionHint")}
+      >
+        <Textarea
+          id="brand-short-description"
+          className="min-h-[86px] text-sm"
+          value={brandShortDescription}
+          onChange={(event) => setBrandShortDescription(event.target.value)}
+          placeholder={t("brandShortDescriptionPlaceholder")}
+        />
+      </OnboardingField>
+
+      <OnboardingField
+        label={t("brandIndustryLabel")}
+        htmlFor="brand-industry"
+        description={t("brandIndustryHint")}
+      >
+        <Input
+          id="brand-industry"
+          value={industry}
+          onChange={(event) => setIndustry(event.target.value)}
+          placeholder={t("brandIndustryPlaceholder")}
+        />
+      </OnboardingField>
+
+      <OnboardingField
+        label={t("brandLongDescriptionLabel")}
+        htmlFor="brand-description"
+        description={t("brandLongDescriptionHint")}
+      >
+        <Textarea
+          id="brand-description"
+          className="min-h-[180px] text-sm"
+          value={brandDescription}
+          onChange={(event) => setBrandDescription(event.target.value)}
+          placeholder={t("brandLongDescriptionPlaceholder")}
+        />
+      </OnboardingField>
+
+      <OnboardingField
+        label={t("brandFeaturesLabel")}
+        description={t("brandFeaturesHint")}
+      >
+        <div className="space-y-2">
+          {keyFeatures.map((feature, index) => (
+            <div
+              key={index}
+              className="flex items-center gap-2 rounded-md border border-border/80 px-3 py-2"
+            >
+              <Input
+                value={feature}
+                onChange={(event) => updateFeature(index, event.target.value)}
+                className="h-9 border-0 px-0 shadow-none focus-visible:ring-0"
+              />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() =>
+                  setKeyFeatures(keyFeatures.filter((_, itemIndex) => itemIndex !== index))
+                }
+              >
+                {t("remove")}
+              </Button>
+            </div>
+          ))}
+
+          <div className="flex gap-2">
+            <Input
+              value={newFeature}
+              onChange={(event) => setNewFeature(event.target.value)}
+              placeholder={t("brandFeaturePlaceholder")}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") addFeature();
+              }}
+            />
+            <Button variant="outline" size="sm" onClick={addFeature}>
+              {t("addFeature")}
+            </Button>
+          </div>
+        </div>
+      </OnboardingField>
+    </OnboardingStep>
+  );
 }

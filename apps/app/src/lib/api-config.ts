@@ -47,8 +47,12 @@ export const apiRoutes = {
     create: () => "/projects/ai-models",
     update: (modelId: string) => `/projects/ai-models/${modelId}`,
   },
+  billing: {
+    quota: (organizationId: string) => `/billing/quotas/${organizationId}`,
+  },
   analysis: {
     analyze: (projectId: string) => `/analysis/projects/${projectId}/analyze`,
+    quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,

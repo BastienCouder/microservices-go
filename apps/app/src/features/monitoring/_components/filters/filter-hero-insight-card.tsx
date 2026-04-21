@@ -38,8 +38,18 @@ export function FilterHeroInsightCard({
     : insight.title;
 
   return (
-    <section className="relative flex flex-col rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
-      <div className="mb-6 flex items-start justify-between gap-2">
+    <section className="relative flex flex-col overflow-hidden rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.16),transparent_34%),radial-gradient(circle_at_74%_72%,rgba(255,255,255,0.08),transparent_28%)] opacity-80" />
+        <div className="h-full absolute right-[22%] w-px bg-white/14" />
+        <div className="h-full absolute left-[28%] top-[28%] w-px bg-white/8" />
+        <div className="absolute w-full bottom-[30%] left-[38%] right-[8%] h-px bg-white/12" />
+        <div className="absolute bottom-[22%] left-[6%] right-[24%] h-px w-full bg-white/8" /> 
+{/*         <div className="absolute bottom-[18%] right-[24%] h-[12%] w-px bg-white/10" />
+        <div className="absolute bottom-[30%] right-[8%] h-[22%] w-px bg-white/10" /> */}
+      </div>
+
+      <div className="relative z-10 mb-6 flex items-start justify-between gap-2">
         <div className="max-w-[15rem]">
           {insight.brandName ? (
             <span className="block text-[2rem] font-semibold leading-[0.95] tracking-tight text-white md:text-[2.35rem]">
@@ -55,7 +65,7 @@ export function FilterHeroInsightCard({
         </div>
       </div>
 
-      <div className="mb-2">
+      <div className="relative z-10 mb-2">
         <div className="text-[30px] font-bold tracking-tight text-white md:text-xl">
           {insight.metricValue}
         </div>
@@ -64,7 +74,7 @@ export function FilterHeroInsightCard({
         </p>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
+      <div className="relative z-10 mt-3 flex items-center gap-2">
         <div
           className={cn(
             "flex min-h-7 items-center rounded-[10px] px-2 py-1 text-[11px] font-bold md:text-[10px]",
@@ -81,7 +91,7 @@ export function FilterHeroInsightCard({
         </span>
       </div>
 
-      <div className="mt-3 flex h-10 items-end gap-1.5">
+      <div className="relative z-10 mt-3 flex h-10 items-end gap-1.5">
         {insight.trend.map((value, index) => {
           const ratio = maxTrend > 0 ? value / maxTrend : 0;
           const height = Math.max(8, Math.round(ratio * 38));
@@ -103,7 +113,7 @@ export function FilterHeroInsightCard({
         })}
       </div>
 
-      <p className="mt-2 text-[11px] leading-relaxed text-primary-foreground/72">
+      <p className="relative z-10 mt-2 text-xs leading-relaxed text-primary-foreground/72">
         {insight.microCopy}
       </p>
     </section>

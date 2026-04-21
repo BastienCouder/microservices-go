@@ -1,157 +1,162 @@
 import { useOnboarding, type PromptWithLanguage } from "@/hooks/use-onboarding";
 import { Button } from "@/components/ui/button";
-import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Trash2 } from "lucide-react";
-
-const LANGUAGE_OPTIONS = [
-    { value: "fr", label: "French (France)" },
-    { value: "en", label: "English (United States)" },
-    { value: "es", label: "Spanish" },
-] as const;
-
-const QUICK_TEMPLATES = [
-    "best alternative to [brand]",
-    "[brand] pricing vs competitors",
-    "is [brand] reliable for enterprise",
-    "top tools like [brand] in 2026",
-] as const;
+import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  OnboardingField,
+  OnboardingStep,
+  OnboardingStepFooter,
+} from "./step-shell";
 
 type StepPromptsProps = {
-    hideBack?: boolean;
-    nextLabel?: string;
+  hideBack?: boolean;
+  nextLabel?: string;
 };
 
 export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPromptsProps) {
-    const { selectedPrompts, setSelectedPrompts, nextStep, prevStep } = useOnboarding();
+  const {
+    brandName,
+    competitors,
+    industry,
+    selectedPrompts,
+    setSelectedPrompts,
+    nextStep,
+    prevStep,
+  } = useOnboarding();
+  const { locale, t } = useScopedI18n("onboarding");
 
-    const updatePrompt = (index: number, nextValue: Partial<PromptWithLanguage>) => {
-        const clone = [...selectedPrompts];
-        clone[index] = {
-            ...clone[index],
-            text: clone[index]?.text ?? "",
-            language: clone[index]?.language ?? "en",
-            ...nextValue,
-        };
-        setSelectedPrompts(clone);
-    };
-
-    const addPrompt = (template?: string) => {
-        setSelectedPrompts([
-            ...selectedPrompts,
-            {
-                text: template ?? "",
-                language: "en",
-            },
-        ]);
-    };
-
-    const removePrompt = (index: number) => {
-        setSelectedPrompts(selectedPrompts.filter((_, i) => i !== index));
-    };
-
-    return (
-        <div className="h-full w-full space-y-6 rounded-[32px] border border-white/70 bg-white/95 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:min-h-0 sm:p-8">
-            <div className="space-y-2">
-                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950 sm:text-3xl">Key Prompts to Monitor</h2>
-                <p className="text-sm text-muted-foreground sm:text-base">
-                    Add the questions your customers ask AI models. Keep prompts specific and realistic.
-                </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[250px_1fr]">
-                <aside className="space-y-4">
-                    <div className="rounded-xl border border-border/70 bg-zinc-50/70 p-4">
-                        <Label className="text-sm font-semibold">Template Library</Label>
-                        <p className="mt-1 text-xs text-muted-foreground">Click a template to add it instantly.</p>
-                        <div className="mt-3 space-y-2">
-                            {QUICK_TEMPLATES.map((template) => (
-                                <button
-                                    key={template}
-                                    type="button"
-                                    onClick={() => addPrompt(template)}
-                                    className="w-full rounded-lg border border-border/80 bg-background px-3 py-2 text-left text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-                                >
-                                    {template}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border border-border/70 bg-zinc-50/70 p-4">
-                        <p className="text-sm font-semibold text-foreground">Prompt checklist</p>
-                        <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                            <li>Be specific about use case</li>
-                            <li>Include brand or competitor context</li>
-                            <li>Use real user phrasing</li>
-                        </ul>
-                    </div>
-                </aside>
-
-                <section className="space-y-4 lg:flex lg:h-[560px] lg:flex-col">
-                    <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-zinc-50/70 px-4 py-3">
-                        <div>
-                            <p className="text-sm font-semibold text-foreground">Prompt Workspace</p>
-                            <p className="text-xs text-muted-foreground">{selectedPrompts.length} prompts configured</p>
-                        </div>
-                        <Button variant="outline" onClick={() => addPrompt()}>
-                            <Plus className="size-4 text-primary" />
-                            Add Prompt
-                        </Button>
-                    </div>
-
-                    <div className="space-y-4 lg:flex-1 lg:overflow-y-auto lg:pr-1">
-                        {selectedPrompts.map((prompt, index) => (
-                            <div key={`${index}-${prompt.text}`} className="space-y-3 rounded-xl border border-border/70 bg-background p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-                                <div className="flex items-start gap-2">
-                                    <Textarea
-                                        value={prompt.text}
-                                        onChange={(e) => updatePrompt(index, { text: e.target.value })}
-                                        className="min-h-[96px] bg-background text-sm"
-                                        placeholder="Type a prompt to monitor"
-                                    />
-                                    <Button variant="outline" size="icon" onClick={() => removePrompt(index)} aria-label="Delete prompt">
-                                        <Trash2 className="size-4 text-primary" />
-                                    </Button>
-                                </div>
-
-                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-[130px_1fr] sm:items-center">
-                                    <Label className="text-xs font-medium text-muted-foreground">Language</Label>
-                                    <Select
-                                        value={prompt.language || "en"}
-                                        onValueChange={(value: "fr" | "en" | "es") => updatePrompt(index, { language: value })}
-                                    >
-                                        <SelectTrigger className="h-10 rounded-lg border-border/80 bg-background text-sm">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className="p-0">
-                                            <FloatingPanelHeader
-                                                title="Language"
-                                                description="Choose the language used for this monitored prompt."
-                                                className="px-3.5 pt-3.5"
-                                            />
-                                            {LANGUAGE_OPTIONS.map((option) => (
-                                                <SelectItem key={option.value} value={option.value}>
-                                                    {option.label}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/70 pt-4">
-                {hideBack ? <div /> : <Button variant="outline" onClick={prevStep}>Back</Button>}
-                <Button className="min-w-36" onClick={nextStep} disabled={selectedPrompts.length < 1}>
-                    {nextLabel}
-                </Button>
-            </div>
-        </div>
+  const updatePrompt = (
+    index: number,
+    nextValue: Partial<PromptWithLanguage>,
+  ) => {
+    setSelectedPrompts(
+      selectedPrompts.map((prompt, promptIndex) =>
+        promptIndex === index
+          ? {
+              ...prompt,
+              text: prompt.text ?? "",
+              language: prompt.language ?? "en",
+              ...nextValue,
+            }
+          : prompt,
+      ),
     );
+  };
+
+  const addPrompt = (template = "") => {
+    setSelectedPrompts([
+      ...selectedPrompts,
+      { text: template, language: locale },
+    ]);
+  };
+
+  const generatePromptsWithAI = () => {
+    const resolvedBrand = brandName.trim() || t("yourBrand");
+    const competitorName = competitors[0]?.name?.trim();
+    const resolvedIndustry = industry.trim();
+
+    const generatedTexts =
+      locale === "fr"
+        ? [
+            `quelles sont les meilleures alternatives à ${resolvedBrand} ?`,
+            `${resolvedBrand} est-il fiable pour les entreprises ?`,
+            competitorName
+              ? `${resolvedBrand} vs ${competitorName} : quelle solution choisir ?`
+              : `comment ${resolvedBrand} se compare-t-il à ses concurrents ?`,
+            resolvedIndustry
+              ? `quels sont les meilleurs outils IA pour ${resolvedIndustry} ?`
+              : `quels sont les meilleurs outils comme ${resolvedBrand} en 2026 ?`,
+          ]
+        : [
+            `what are the best alternatives to ${resolvedBrand}?`,
+            `is ${resolvedBrand} reliable for enterprise teams?`,
+            competitorName
+              ? `${resolvedBrand} vs ${competitorName}: which solution is better?`
+              : `how does ${resolvedBrand} compare to competitors?`,
+            resolvedIndustry
+              ? `what are the best AI tools for ${resolvedIndustry}?`
+              : `top tools like ${resolvedBrand} in 2026`,
+          ];
+
+    const existingTexts = new Set(
+      selectedPrompts.map((prompt) => prompt.text.trim().toLowerCase()),
+    );
+    const generatedPrompts = generatedTexts
+      .filter((text) => !existingTexts.has(text.trim().toLowerCase()))
+      .map((text) => ({ text, language: locale }));
+
+    if (generatedPrompts.length === 0) {
+      return;
+    }
+
+    setSelectedPrompts([...selectedPrompts, ...generatedPrompts]);
+  };
+
+  return (
+    <OnboardingStep
+      title={t("promptsTitle")}
+      description={t("promptsDescription")}
+      headerAction={
+        <Button type="button" variant="outline" onClick={generatePromptsWithAI}>
+          <Sparkles className="size-4 text-primary" />
+          {t("generateWithAI")}
+        </Button>
+      }
+      footer={
+        <OnboardingStepFooter
+          hideBack={hideBack}
+          onBack={prevStep}
+          onNext={nextStep}
+          // nextDisabled={selectedPrompts.length < 1}
+          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+        />
+      }
+    >
+      <div className="flex items-center justify-between rounded-md border border-border/70 bg-muted/20 px-4 py-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">{t("promptsWorkspaceLabel")}</p>
+          <p className="text-xs text-muted-foreground">
+            {t("promptsConfigured", { count: selectedPrompts.length })}
+          </p>
+        </div>
+        <Button variant="outline" onClick={() => addPrompt()}>
+          <Plus className="size-4 text-primary" />
+          {t("addPrompt")}
+        </Button>
+      </div>
+
+      <div className="space-y-4">
+        {selectedPrompts.map((prompt, index) => (
+          <div
+            key={index}
+            className="space-y-3 rounded-md border border-border/70 p-4"
+          >
+            <div className="flex items-start gap-2">
+              <Textarea
+                value={prompt.text}
+                onChange={(event) =>
+                  updatePrompt(index, { text: event.target.value })
+                }
+                className="min-h-[96px] text-sm"
+                placeholder={t("promptPlaceholder")}
+              />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() =>
+                  setSelectedPrompts(
+                    selectedPrompts.filter((_, promptIndex) => promptIndex !== index),
+                  )
+                }
+                aria-label={t("remove")}
+              >
+                <Trash2 className="size-4 text-primary" />
+              </Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </OnboardingStep>
+  );
 }

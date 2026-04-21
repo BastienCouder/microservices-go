@@ -104,23 +104,30 @@ func (h *Handler) getQuota(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid organization id"})
 		return
 	}
-
-	sub, err := h.svc.GetSubscription(r.Context(), orgID)
-	if err != nil {
-		if errors.Is(err, domain.ErrSubscriptionMissing) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "subscription not found"})
-			return
+	if _, err := scopedOrganizationID(r, orgID); err != nil {
+		switch {
+		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		case errors.Is(err, errMismatchedOrganizationScope):
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		default:
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
-		"organization_id": sub.OrganizationID,
-		"plan":            sub.Plan,
-		"monthly_quota":   sub.MonthlyQuota,
-		"seats":           sub.Seats,
-	})
+	sub, err := h.svc.GetSubscription(r.Context(), orgID)
+	entitlements := usecase.DefaultOrganizationEntitlements(orgID)
+	if err != nil {
+		if !errors.Is(err, domain.ErrSubscriptionMissing) {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			return
+		}
+	} else {
+		entitlements = usecase.EntitlementsFromSubscription(sub)
+	}
+
+	writeJSON(w, http.StatusOK, entitlements)
 }
 
 func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Request) {

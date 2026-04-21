@@ -82,25 +82,8 @@ export function BrandsTemplate({ apiBaseURL, routeSearch }: BrandsTemplateProps)
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-          <BrandListSection
-            label="Personas cibles"
-            items={data.brandCanon.audience}
-            emptyLabel={PERCEPTION_TEXT.brandCanon.empty}
-            variant="badge"
-            action={
-              <Button asChild variant="outline" size="sm">
-                <Link
-                  to={{
-                    pathname: "/perception/brand-canon",
-                    search: buildBrandCanonSearch(routeSearch, "personas"),
-                  }}
-                >
-                  Modifier persona
-                </Link>
-              </Button>
-            }
-          />
+        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+       
           <BrandListSection
             label="Cas d’usage prioritaires"
             items={data.brandCanon.useCases}

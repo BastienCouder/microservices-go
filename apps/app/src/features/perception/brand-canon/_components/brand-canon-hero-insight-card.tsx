@@ -112,7 +112,7 @@ export function BrandCanonHeroInsightCard({
       ) : null}
 
       {hasMicroCopy ? (
-        <p className={cn("text-[11px] leading-relaxed text-primary-foreground/72", showTrend ? "mt-2" : "mt-3")}>
+        <p className={cn("text-sm leading-relaxed text-primary-foreground/72", showTrend ? "mt-2" : "mt-3")}>
           {insight.microCopy}
         </p>
       ) : null}

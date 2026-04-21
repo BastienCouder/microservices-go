@@ -12,6 +12,7 @@ type Config struct {
 	MetricsAddr              string
 	GRPCAddr                 string
 	DatabaseURL              string
+	BillingServiceURL        string
 	AnalysisServiceGRPCAddr  string
 	IAServiceGRPCAddr        string
 	AttributionServiceURL    string
@@ -94,6 +95,7 @@ func Load() (Config, error) {
 		MetricsAddr:              optionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
+		BillingServiceURL:        optionalEnv("BILLING_SERVICE_URL"),
 		AnalysisServiceGRPCAddr:  analysisServiceGRPCAddr,
 		IAServiceGRPCAddr:        iaServiceGRPCAddr,
 		AttributionServiceURL:    optionalEnv("ATTRIBUTION_SERVICE_URL"),

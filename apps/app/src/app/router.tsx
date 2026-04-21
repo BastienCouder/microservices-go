@@ -4,11 +4,6 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { AppRouterProps } from "./App";
 import { loadPromptsPageModule } from "./route-preloads";
 
-const ProfilePage = lazy(() =>
-  import("@/features/profile/view").then((module) => ({
-    default: module.ProfilePage,
-  })),
-);
 const OrganizationsPage = lazy(() =>
   import("@/features/organizations").then((module) => ({
     default: module.OrganizationsPage,
@@ -46,38 +41,17 @@ const PerceptionBrandCanonPage = lazy(() =>
     default: module.BrandCanonPage,
   })),
 );
-const OptimizeActionsPage = lazy(() =>
-  import("@/features/optimize-actions").then((module) => ({
-    default: module.OptimizeActionsPage,
-  })),
-);
-const ContentOptimizerPage = lazy(() =>
-  import("@/features/content-optimizer").then((module) => ({
-    default: module.ContentOptimizerPage,
-  })),
-);
-const ImpactPage = lazy(() =>
-  import("@/features/impact").then((module) => ({
-    default: module.ImpactPage,
-  })),
-);
+
+
+
 const SettingsPage = lazy(() =>
   import("@/features/settings").then((module) => ({
     default: module.SettingsPage,
   })),
 );
-const BillingPage = lazy(() =>
-  import("@/features/billing").then((module) => ({
-    default: module.BillingPage,
-  })),
-);
 
-const SIDEBAR_FEATURE_ROUTES = [
-  {
-    path: "/optimize/content-optimizer",
-    View: ContentOptimizerPage,
-  },
-] as const;
+
+const SIDEBAR_FEATURE_ROUTES = [] as const;
 
 export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
   return (
@@ -146,33 +120,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
           </Suspense>
         }
       />
-      <Route
-        path="/impact"
-        element={
-          <Suspense fallback={null}>
-            <ImpactPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/optimize/actions"
-        element={
-          <Suspense fallback={null}>
-            <OptimizeActionsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
-      />
-      {SIDEBAR_FEATURE_ROUTES.map((item) => (
-        <Route
-          key={item.path}
-          path={item.path}
-          element={
-            <Suspense fallback={null}>
-              <item.View />
-            </Suspense>
-          }
-        />
-      ))}
+     
       <Route
         path="/settings"
         element={
@@ -181,22 +129,7 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
           </Suspense>
         }
       />
-      <Route
-        path="/billing"
-        element={
-          <Suspense fallback={null}>
-            <BillingPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/profile"
-        element={
-          <Suspense fallback={null}>
-            <ProfilePage user={user} />
-          </Suspense>
-        }
-      />
+   
       <Route
         path="/organizations"
         element={

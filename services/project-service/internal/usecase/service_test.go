@@ -13,6 +13,11 @@ type mutableProjectStore struct {
 	payload []byte
 }
 
+type fakeBillingClient struct {
+	entitlements BillingEntitlements
+	err          error
+}
+
 func (s *mutableProjectStore) Load(_ context.Context) ([]byte, bool, error) {
 	if s.payload == nil {
 		return nil, false, nil
@@ -23,6 +28,13 @@ func (s *mutableProjectStore) Load(_ context.Context) ([]byte, bool, error) {
 func (s *mutableProjectStore) Save(_ context.Context, payload []byte) error {
 	s.payload = append([]byte(nil), payload...)
 	return nil
+}
+
+func (f *fakeBillingClient) GetOrganizationEntitlements(_ context.Context, _ int64) (BillingEntitlements, error) {
+	if f.err != nil {
+		return BillingEntitlements{}, f.err
+	}
+	return f.entitlements, nil
 }
 
 func TestProjectFlowCreateFinalize(t *testing.T) {
@@ -109,6 +121,109 @@ func TestReplaceProjectModelsRejectsUnknownModel(t *testing.T) {
 	_, err = svc.ReplaceProjectModels(ctx, project.ID, 12, []string{"unknown-model"})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestReplaceProjectModelsRejectsSelectionBeyondPlanLimit(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingClient: &fakeBillingClient{
+			entitlements: BillingEntitlements{
+				Plan:                    "starter",
+				ModelSelectionLimit:     3,
+				MonthlyModelChangeLimit: 3,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 12,
+		CreatedBy:      1,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	_, err = svc.ReplaceProjectModels(ctx, project.ID, 12, []string{
+		"gpt-oss-20b-free",
+		"gpt-oss-120b-free",
+		"gemma-3-4b-free",
+		"gemma-3-27b-free",
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestReplaceProjectModelsRejectsMoreThanThreeMonthlyChanges(t *testing.T) {
+	ctx := context.Background()
+	store := &mutableProjectStore{}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		Store: store,
+		BillingClient: &fakeBillingClient{
+			entitlements: BillingEntitlements{
+				Plan:                    "growth",
+				ModelSelectionLimit:     6,
+				MonthlyModelChangeLimit: 3,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	svc.now = func() time.Time {
+		return time.Date(2026, 4, 15, 9, 0, 0, 0, time.UTC)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 12,
+		CreatedBy:      1,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	selectionSets := [][]string{
+		{"gpt-oss-20b-free"},
+		{"gpt-oss-120b-free"},
+		{"gemma-3-4b-free"},
+		{"gemma-3-27b-free"},
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 12, selectionSets[0]); err != nil {
+		t.Fatalf("first change: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 12, selectionSets[1]); err != nil {
+		t.Fatalf("second change: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 12, selectionSets[2]); err != nil {
+		t.Fatalf("third change: %v", err)
+	}
+
+	_, err = svc.ReplaceProjectModels(ctx, project.ID, 12, selectionSets[3])
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error on fourth monthly change, got %v", err)
+	}
+
+	var saved persistedState
+	if err := json.Unmarshal(store.payload, &saved); err != nil {
+		t.Fatalf("unmarshal saved state: %v", err)
+	}
+	usage, ok := saved.ModelSelectionChanges[project.ID]
+	if !ok {
+		t.Fatalf("expected model selection usage to be persisted")
+	}
+	if usage.Month != "2026-04" || usage.Count != 3 {
+		t.Fatalf("expected persisted usage 2026-04/3, got %#v", usage)
 	}
 }
 

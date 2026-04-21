@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 	"time"
 )
@@ -25,6 +26,17 @@ type staticProjectModelsProvider struct {
 
 func (p staticProjectModelsProvider) ListProjectEnabledModels(_ context.Context, _ string, _ int64) ([]string, error) {
 	return append([]string(nil), p.modelIDs...), nil
+}
+
+type staticBillingQuotaProvider struct {
+	monthlyQuota int
+}
+
+func (p staticBillingQuotaProvider) GetMonthlyQuota(_ context.Context, _ int64) (int, bool, error) {
+	if p.monthlyQuota <= 0 {
+		return 0, false, nil
+	}
+	return p.monthlyQuota, true, nil
 }
 
 func (s *mutableAnalysisStore) Load(_ context.Context) ([]byte, bool, error) {
@@ -65,6 +77,208 @@ func TestStartAnalysisCreatesRun(t *testing.T) {
 	}
 	if result.AnalysisRun.ExpectedResponses != 4 {
 		t.Fatalf("expected 4 expected responses, got %d", result.AnalysisRun.ExpectedResponses)
+	}
+}
+
+func TestStartAnalysisRejectsWhenMonthlyQuotaIsReached(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota: staticBillingQuotaProvider{monthlyQuota: 2},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+	svc.now = func() time.Time {
+		return time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+	}
+
+	for index := 0; index < 2; index++ {
+		if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+			OrganizationID: 42,
+			CreatedBy:      7,
+			ProjectID:      "project-1",
+			PromptTexts: []PromptText{
+				{ID: "prompt-1", Text: "Quel CRM choisir ?"},
+			},
+			ModelIDs: []string{"gpt-4o-mini"},
+			RunType:  "manual",
+		}); err != nil {
+			t.Fatalf("seed run %d: %v", index+1, err)
+		}
+	}
+
+	_, err = svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-2", Text: "Comparer Acme et HubSpot"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err == nil {
+		t.Fatal("expected quota error, got nil")
+	}
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
+	}
+}
+
+func TestStartAnalysisAllowsIdempotentReplayEvenWhenQuotaIsReached(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota: staticBillingQuotaProvider{monthlyQuota: 1},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+	svc.now = func() time.Time {
+		return time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+	}
+
+	first, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		RequestID:      "manual:project-1:prompt-1:gpt-4o-mini:2026-04-15T10:00:00Z",
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM choisir ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	replayed, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		RequestID:      "manual:project-1:prompt-1:gpt-4o-mini:2026-04-15T10:00:00Z",
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM choisir ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("replay analysis: %v", err)
+	}
+	if replayed.AnalysisRun.ID != first.AnalysisRun.ID {
+		t.Fatalf("expected replayed run id %s, got %s", first.AnalysisRun.ID, replayed.AnalysisRun.ID)
+	}
+}
+
+func TestStartAnalysisQuotaResetsOnNextMonth(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota: staticBillingQuotaProvider{monthlyQuota: 1},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+
+	currentTime := time.Date(2026, time.April, 30, 23, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time {
+		return currentTime
+	}
+
+	if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM choisir ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	}); err != nil {
+		t.Fatalf("start first month run: %v", err)
+	}
+
+	currentTime = time.Date(2026, time.May, 1, 0, 5, 0, 0, time.UTC)
+	if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-2", Text: "Comparer Acme et HubSpot"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "scheduled",
+	}); err != nil {
+		t.Fatalf("start next month run: %v", err)
+	}
+}
+
+func TestGetPromptQuotaUsageReturnsCurrentMonthUsageAndQuota(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota: staticBillingQuotaProvider{monthlyQuota: 3},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+
+	currentTime := time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time {
+		return currentTime
+	}
+
+	for index := 0; index < 2; index++ {
+		if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+			OrganizationID: 42,
+			CreatedBy:      7,
+			ProjectID:      "project-1",
+			PromptTexts: []PromptText{
+				{ID: "prompt-1", Text: "Quel CRM choisir ?"},
+			},
+			ModelIDs: []string{"gpt-4o-mini"},
+			RunType:  "manual",
+		}); err != nil {
+			t.Fatalf("seed current month run %d: %v", index+1, err)
+		}
+	}
+
+	currentTime = time.Date(2026, time.March, 31, 23, 0, 0, 0, time.UTC)
+	if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-2", Text: "Comparer Acme et HubSpot"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "scheduled",
+	}); err != nil {
+		t.Fatalf("seed previous month run: %v", err)
+	}
+
+	currentTime = time.Date(2026, time.April, 15, 10, 5, 0, 0, time.UTC)
+	usage, err := svc.GetPromptQuotaUsage(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get prompt quota usage: %v", err)
+	}
+
+	if !usage.HasQuota {
+		t.Fatal("expected quota to be available")
+	}
+	if usage.MonthlyQuota != 3 {
+		t.Fatalf("expected monthly quota 3, got %d", usage.MonthlyQuota)
+	}
+	if usage.UsedPrompts != 2 {
+		t.Fatalf("expected used prompts 2, got %d", usage.UsedPrompts)
+	}
+	if usage.RemainingPrompts != 1 {
+		t.Fatalf("expected remaining prompts 1, got %d", usage.RemainingPrompts)
+	}
+	if usage.IsLimitReached {
+		t.Fatal("expected limit not reached")
+	}
+	if usage.CurrentMonth != "2026-04" {
+		t.Fatalf("expected current month 2026-04, got %q", usage.CurrentMonth)
 	}
 }
 

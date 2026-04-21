@@ -86,8 +86,29 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 		}
 	}
 
-	backup := s.snapshotLocked()
 	now := s.now().UTC()
+	if s.billingQuota != nil {
+		monthlyQuota, found, err := s.billingQuota.GetMonthlyQuota(ctx, input.OrganizationID)
+		if err != nil {
+			s.mu.Unlock()
+			return StartAnalysisResult{}, err
+		}
+		if found && monthlyQuota > 0 {
+			usedPrompts := s.currentMonthlyPromptUsageLocked(input.OrganizationID, now)
+			requestedPrompts := len(normalizedPrompts)
+			if usedPrompts+requestedPrompts > monthlyQuota {
+				s.mu.Unlock()
+				return StartAnalysisResult{}, fmt.Errorf(
+					"%w: monthly prompt quota reached (%d/%d)",
+					ErrQuotaExceeded,
+					usedPrompts,
+					monthlyQuota,
+				)
+			}
+		}
+	}
+
+	backup := s.snapshotLocked()
 	expectedResponses := len(normalizedPrompts) * len(normalizedModels)
 	run := &AnalysisRun{
 		ID:                 s.nextID("run"),
@@ -331,6 +352,53 @@ func (s *Service) GetDashboard(ctx context.Context, projectID string, organizati
 
 	s.storeDashboardInCache(ctx, projectID, organizationID, dashboard)
 	return dashboard, nil
+}
+
+func (s *Service) GetPromptQuotaUsage(ctx context.Context, projectID string, organizationID int64) (PromptQuotaUsage, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return PromptQuotaUsage{}, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return PromptQuotaUsage{}, err
+	}
+
+	now := s.now().UTC()
+	monthlyQuota := 0
+	hasQuota := false
+	if s.billingQuota != nil {
+		var err error
+		monthlyQuota, hasQuota, err = s.billingQuota.GetMonthlyQuota(ctx, organizationID)
+		if err != nil {
+			return PromptQuotaUsage{}, err
+		}
+		if monthlyQuota <= 0 {
+			monthlyQuota = 0
+			hasQuota = false
+		}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return PromptQuotaUsage{}, err
+	}
+
+	usedPrompts := s.currentMonthlyPromptUsageLocked(organizationID, now)
+	remainingPrompts := 0
+	if hasQuota {
+		remainingPrompts = max(0, monthlyQuota-usedPrompts)
+	}
+
+	return PromptQuotaUsage{
+		HasQuota:         hasQuota,
+		UsedPrompts:      usedPrompts,
+		MonthlyQuota:     monthlyQuota,
+		RemainingPrompts: remainingPrompts,
+		CurrentMonth:     now.Format("2006-01"),
+		IsLimitReached:   hasQuota && usedPrompts >= monthlyQuota,
+	}, nil
 }
 
 func (s *Service) GetPerception(ctx context.Context, projectID string, organizationID int64) (PerceptionData, error) {

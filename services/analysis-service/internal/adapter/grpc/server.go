@@ -88,6 +88,8 @@ func toStatus(err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
 		return status.Error(codes.InvalidArgument, err.Error())
+	case errors.Is(err, usecase.ErrQuotaExceeded):
+		return status.Error(codes.ResourceExhausted, err.Error())
 	case errors.Is(err, usecase.ErrUnauthorized):
 		return status.Error(codes.PermissionDenied, err.Error())
 	case errors.Is(err, usecase.ErrNotFound):

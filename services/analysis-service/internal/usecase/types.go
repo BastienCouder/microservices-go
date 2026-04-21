@@ -8,9 +8,10 @@ import (
 )
 
 var (
-	ErrValidation   = errors.New("validation error")
-	ErrUnauthorized = errors.New("unauthorized")
-	ErrNotFound     = errors.New("not found")
+	ErrValidation    = errors.New("validation error")
+	ErrUnauthorized  = errors.New("unauthorized")
+	ErrNotFound      = errors.New("not found")
+	ErrQuotaExceeded = errors.New("quota exceeded")
 )
 
 type PromptText struct {
@@ -89,6 +90,15 @@ type DashboardData struct {
 	VisibilityScore int          `json:"visibilityScore"`
 	PromptRuns      []PromptRun  `json:"promptRuns"`
 	Responses       []AIResponse `json:"aiResponses"`
+}
+
+type PromptQuotaUsage struct {
+	HasQuota         bool   `json:"hasQuota"`
+	UsedPrompts      int    `json:"usedPrompts"`
+	MonthlyQuota     int    `json:"monthlyQuota"`
+	RemainingPrompts int    `json:"remainingPrompts"`
+	CurrentMonth     string `json:"currentMonth"`
+	IsLimitReached   bool   `json:"isLimitReached"`
 }
 
 type PerceptionScores struct {
@@ -196,6 +206,10 @@ type ProjectModelsProvider interface {
 	ListProjectEnabledModels(ctx context.Context, projectID string, organizationID int64) ([]string, error)
 }
 
+type BillingQuotaProvider interface {
+	GetMonthlyQuota(ctx context.Context, organizationID int64) (monthlyQuota int, found bool, err error)
+}
+
 type Dependencies struct {
 	Store              StateStore
 	DashboardCache     DashboardCache
@@ -203,6 +217,7 @@ type Dependencies struct {
 	ProjectVerifier    ProjectAccessVerifier
 	ProjectCompetitors ProjectCompetitorsProvider
 	ProjectModels      ProjectModelsProvider
+	BillingQuota       BillingQuotaProvider
 }
 
 type persistedState struct {
@@ -242,4 +257,5 @@ type Service struct {
 	projectVerifier    ProjectAccessVerifier
 	projectCompetitors ProjectCompetitorsProvider
 	projectModels      ProjectModelsProvider
+	billingQuota       BillingQuotaProvider
 }

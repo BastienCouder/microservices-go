@@ -6,6 +6,8 @@ export const appQueryKeys = {
     mode: string,
     historyScope = "active_only",
   ) => ["monitoring", apiBaseURL, projectId ?? "__default__", mode, historyScope] as const,
+  promptQuota: (apiBaseURL: string, organizationId: string, projectId: string | null) =>
+    ["prompt-quota", apiBaseURL, organizationId, projectId ?? "__default__"] as const,
   perception: (apiBaseURL: string, projectId: string | null, mode: string) =>
     ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
   optimizeActions: (apiBaseURL: string, projectId: string | null) =>
@@ -15,6 +17,8 @@ export const appQueryKeys = {
     organizationId: string,
     scope: "active" | "all" = "active",
   ) => ["models", "catalog", apiBaseURL, organizationId, scope] as const,
+  billingQuota: (apiBaseURL: string, organizationId: string) =>
+    ["billing", "quota", apiBaseURL, organizationId] as const,
   projectModels: (apiBaseURL: string, organizationId: string, projectId: string) =>
     ["models", "project", apiBaseURL, organizationId, projectId] as const,
   promptsPage: (

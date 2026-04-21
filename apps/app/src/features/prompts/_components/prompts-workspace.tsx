@@ -5,6 +5,7 @@ import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { PromptDetailsSheet } from "../components/prompt-details-sheet";
 import { PromptsFiltersToolbar } from "../components/prompts-filters-toolbar";
 import { PromptsPageHeader } from "../components/prompts-page-header";
+import { PromptsPlanProgress } from "../components/prompts-plan-progress";
 import { ResponseDetailsSheet } from "../components/response-details-sheet";
 import { PromptEditorPage } from "./editor/prompt-editor-page";
 import { PromptsTabContent } from "./list/prompts-tab-content";
@@ -60,30 +61,38 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
         onImportCsv={state.addImportedPrompts}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-md rounded-tr-none bg-background">
-        <div className="border-b px-3 md:px-4 pb-3 md:pb-4">
-          <PromptsFiltersToolbar
-            currentTab={state.tab}
-            period={state.period}
-            setPeriod={(value) => state.setPeriod(value as PeriodKey)}
-            dateRange={state.dateRange}
-            setDateRange={state.setDateRange}
-            persona={state.persona}
-            setPersona={(value) => state.setPersona(value as "all" | Persona)}
-            availablePersonas={state.availablePersonas}
-            search={state.search}
-            setSearch={state.setSearch}
-            showArchived={state.showArchived}
-            setShowArchived={state.setShowArchived}
-            hasActiveGlobalFilters={state.hasActiveGlobalFilters}
-            clearFilters={state.clearFilters}
-            modelsPopoverOpen={state.modelsPopoverOpen}
-            setModelsPopoverOpen={state.setModelsPopoverOpen}
-            allModelsSelected={state.allModelsSelected}
-            selectedModels={state.selectedModels}
-            availableModels={state.availableModels}
-            getModelVisual={state.getModelVisual}
-            toggleModel={state.toggleModel}
-          />
+        <div className="border-b px-3 pb-3 md:px-4 md:pb-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
+            <div className="min-w-0 flex-1">
+              <PromptsFiltersToolbar
+                currentTab={state.tab}
+                period={state.period}
+                setPeriod={(value) => state.setPeriod(value as PeriodKey)}
+                dateRange={state.dateRange}
+                setDateRange={state.setDateRange}
+                persona={state.persona}
+                setPersona={(value) => state.setPersona(value as "all" | Persona)}
+                availablePersonas={state.availablePersonas}
+                search={state.search}
+                setSearch={state.setSearch}
+                showArchived={state.showArchived}
+                setShowArchived={state.setShowArchived}
+                hasActiveGlobalFilters={state.hasActiveGlobalFilters}
+                clearFilters={state.clearFilters}
+                modelsPopoverOpen={state.modelsPopoverOpen}
+                setModelsPopoverOpen={state.setModelsPopoverOpen}
+                allModelsSelected={state.allModelsSelected}
+                selectedModels={state.selectedModels}
+                availableModels={state.availableModels}
+                getModelVisual={state.getModelVisual}
+                toggleModel={state.toggleModel}
+              />
+            </div>
+            <PromptsPlanProgress
+              promptPlanUsage={state.promptPlanUsage}
+              className="md:mb-1"
+            />
+          </div>
         </div>
 
         <Tabs value={state.tab} onValueChange={(value) => state.setTab(value as "prompts" | "responses")} className="flex min-h-0 min-w-0 flex-1 flex-col">

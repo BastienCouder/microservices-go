@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,15 +18,16 @@ import (
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq                int64                                         `json:"seq"`
-	Projects           map[string]*usecase.Project                   `json:"projects"`
-	Prompts            map[string]*usecase.Prompt                    `json:"prompts"`
-	Competitors        map[string]*usecase.Competitor                `json:"competitors"`
-	Models             map[string]usecase.AIModel                    `json:"models"`
-	ProjectModels      map[string]map[string]bool                    `json:"projectModels"`
-	ImpactIntegrations map[string]*usecase.ProjectImpactIntegrations `json:"impactIntegrations"`
-	Outbox             map[string]*usecase.OutboxEvent               `json:"outbox"`
-	OutboxOrder        []string                                      `json:"outboxOrder"`
+	Seq                   int64                                               `json:"seq"`
+	Projects              map[string]*usecase.Project                         `json:"projects"`
+	Prompts               map[string]*usecase.Prompt                          `json:"prompts"`
+	Competitors           map[string]*usecase.Competitor                      `json:"competitors"`
+	Models                map[string]usecase.AIModel                          `json:"models"`
+	ProjectModels         map[string]map[string]bool                          `json:"projectModels"`
+	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
+	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations       `json:"impactIntegrations"`
+	Outbox                map[string]*usecase.OutboxEvent                     `json:"outbox"`
+	OutboxOrder           []string                                            `json:"outboxOrder"`
 }
 
 type StateStore struct {
@@ -43,14 +45,15 @@ func NewStateStore(db *pgxpool.Pool, secretEncryptionKey string) (*StateStore, e
 
 func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	state := persistedState{
-		Projects:           make(map[string]*usecase.Project),
-		Prompts:            make(map[string]*usecase.Prompt),
-		Competitors:        make(map[string]*usecase.Competitor),
-		Models:             make(map[string]usecase.AIModel),
-		ProjectModels:      make(map[string]map[string]bool),
-		ImpactIntegrations: make(map[string]*usecase.ProjectImpactIntegrations),
-		Outbox:             make(map[string]*usecase.OutboxEvent),
-		OutboxOrder:        make([]string, 0),
+		Projects:              make(map[string]*usecase.Project),
+		Prompts:               make(map[string]*usecase.Prompt),
+		Competitors:           make(map[string]*usecase.Competitor),
+		Models:                make(map[string]usecase.AIModel),
+		ProjectModels:         make(map[string]map[string]bool),
+		ModelSelectionChanges: make(map[string]usecase.ProjectModelSelectionChangeUsage),
+		ImpactIntegrations:    make(map[string]*usecase.ProjectImpactIntegrations),
+		Outbox:                make(map[string]*usecase.OutboxEvent),
+		OutboxOrder:           make([]string, 0),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -84,6 +87,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadProjectModels(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadModelSelectionChanges(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadImpactIntegrations(ctx, &state); err != nil {
@@ -130,6 +136,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		`DELETE FROM prompt_model_schedules`,
 		`DELETE FROM prompt_models`,
 		`DELETE FROM project_models`,
+		`DELETE FROM project_model_selection_changes`,
 		`DELETE FROM project_impact_integrations`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
@@ -160,6 +167,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertProjectSelections(ctx, tx, state.ProjectModels); err != nil {
+		return err
+	}
+	if err := insertModelSelectionChanges(ctx, tx, state.ModelSelectionChanges); err != nil {
 		return err
 	}
 	if err := s.insertImpactIntegrations(ctx, tx, state.ImpactIntegrations); err != nil {
@@ -445,6 +455,32 @@ func (s *StateStore) loadProjectModels(ctx context.Context, state *persistedStat
 	return rows.Err()
 }
 
+func (s *StateStore) loadModelSelectionChanges(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, usage_month, change_count
+		FROM project_model_selection_changes
+		ORDER BY project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select project model selection changes: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var projectID string
+		var usageMonth string
+		var changeCount int
+		if err := rows.Scan(&projectID, &usageMonth, &changeCount); err != nil {
+			return fmt.Errorf("scan project model selection change: %w", err)
+		}
+		state.ModelSelectionChanges[projectID] = usecase.ProjectModelSelectionChangeUsage{
+			Month: usageMonth,
+			Count: changeCount,
+		}
+	}
+	return rows.Err()
+}
+
 func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT project_id,
@@ -671,6 +707,31 @@ func insertProjectSelections(ctx context.Context, tx pgx.Tx, selections map[stri
 			`, projectID, modelID, selections[projectID][modelID]); err != nil {
 				return fmt.Errorf("insert project model %s/%s: %w", projectID, modelID, err)
 			}
+		}
+	}
+	return nil
+}
+
+func insertModelSelectionChanges(
+	ctx context.Context,
+	tx pgx.Tx,
+	items map[string]usecase.ProjectModelSelectionChangeUsage,
+) error {
+	projectIDs := make([]string, 0, len(items))
+	for projectID := range items {
+		projectIDs = append(projectIDs, projectID)
+	}
+	sort.Strings(projectIDs)
+	for _, projectID := range projectIDs {
+		item := items[projectID]
+		if strings.TrimSpace(item.Month) == "" || item.Count <= 0 {
+			continue
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO project_model_selection_changes (project_id, usage_month, change_count, created_at, updated_at)
+			VALUES ($1, $2, $3, NOW(), NOW())
+		`, projectID, item.Month, item.Count); err != nil {
+			return fmt.Errorf("insert project model selection change %s: %w", projectID, err)
 		}
 	}
 	return nil

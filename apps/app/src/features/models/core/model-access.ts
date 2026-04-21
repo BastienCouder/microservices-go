@@ -1,6 +1,8 @@
 import { SELECTED_ORG_KEY } from "@/shared/selection";
-
-export type SimulatedPlan = "starter" | "growth" | "pro" | "agency-enterprise";
+import {
+  getBillingPlanLabel,
+  type SimulatedPlan,
+} from "@/shared/billing-plan";
 
 export type ModelsProjectSummary = {
   id: string;
@@ -36,31 +38,8 @@ export type CatalogModelPayload = {
 export type CatalogModelUpdatePayload = Partial<Omit<CatalogModelPayload, "id">>;
 
 export { SELECTED_ORG_KEY };
-export const SIM_PLAN_KEY_PREFIX = "simulated-billing-plan:";
-
-export function normalizeStoredPlan(rawPlan: string | null): SimulatedPlan {
-  if (rawPlan === "starter" || rawPlan === "growth" || rawPlan === "pro" || rawPlan === "agency-enterprise") {
-    return rawPlan;
-  }
-  if (rawPlan === "free") return "starter";
-  if (rawPlan === "pro-monthly") return "growth";
-  if (rawPlan === "pro-yearly") return "pro";
-  return "starter";
-}
-
-export function getPlanLabel(plan: SimulatedPlan): string {
-  if (plan === "starter") return "Demarrage";
-  if (plan === "growth") return "Croissance";
-  if (plan === "pro") return "Pro";
-  return "Agence / Entreprise";
-}
-
-export function getPlanLimit(plan: SimulatedPlan, availableModelsCount: number): number {
-  if (availableModelsCount <= 0) return 0;
-  if (plan === "starter") return Math.min(3, availableModelsCount);
-  if (plan === "growth") return Math.min(6, availableModelsCount);
-  return availableModelsCount;
-}
+export type { SimulatedPlan };
+export const getPlanLabel = getBillingPlanLabel;
 
 export function readSelectedOrganizationId(): string {
   if (typeof window === "undefined") return "";

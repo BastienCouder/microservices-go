@@ -1,56 +1,92 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
-import { Button } from "@/components/ui/button";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
 type StepAnalysisProps = {
-    hideBack?: boolean;
+  hideBack?: boolean;
 };
 
 export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
-    const { websiteUrl, brandName, selectedPrompts, selectedModels, prevStep } = useOnboarding();
-    const navigate = useNavigate();
-    const [progress, setProgress] = useState(10);
+  const {
+    websiteUrl,
+    attributionSource,
+    brandName,
+    selectedPrompts,
+    selectedModels,
+    prevStep,
+  } = useOnboarding();
+  const { t } = useScopedI18n("onboarding");
+  const navigate = useNavigate();
+  const [progress, setProgress] = useState(10);
+  const attributionLabel =
+    attributionSource === "other"
+      ? t("attributionOptionOther")
+      : attributionSource || t("notProvided");
 
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setProgress((oldProgress) => Math.min(oldProgress + Math.random() * 7, 100));
-        }, 350);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setProgress((currentProgress) => {
+        const nextProgress = Math.min(currentProgress + Math.random() * 7, 100);
+        if (nextProgress >= 100) {
+          window.clearInterval(timer);
+        }
+        return nextProgress;
+      });
+    }, 350);
 
-        return () => {
-            clearInterval(timer);
-        };
-    }, []);
+    return () => window.clearInterval(timer);
+  }, []);
 
-    return (
-        <div className="w-full min-h-[calc(100dvh-180px)] space-y-6 rounded-[32px] border border-white/70 bg-white/95 p-6 text-center shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur sm:min-h-0 sm:p-8">
-            <div>
-                <h2 className="text-xl font-semibold tracking-[-0.02em] text-zinc-950 sm:text-3xl">Analyzing Brand Visibility</h2>
-                <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-                    We are querying {selectedModels.length} AI models with {selectedPrompts.length} prompts for <strong>{brandName || "your brand"}</strong>.
-                </p>
-            </div>
-
-            <div className="space-y-2">
-                <Progress value={progress} className="h-3" />
-                <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Running audit pipeline...</span>
-                    <span>{Math.round(progress)}%</span>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2 text-left text-sm text-zinc-700 sm:grid-cols-2">
-                <div className="rounded-md border border-border/80 p-3">Website: {websiteUrl || "not provided"}</div>
-                <div className="rounded-md border border-border/80 p-3">Competitors benchmarked</div>
-                <div className="rounded-md border border-border/80 p-3">Prompts clustered by intent</div>
-                <div className="rounded-md border border-border/80 p-3">Visibility score generated</div>
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/70 pt-4">
-                {hideBack ? <div /> : <Button variant="outline" onClick={prevStep}>Back</Button>}
-                <Button onClick={() => navigate("/monitoring")} disabled={progress < 95}>Go to monitoring</Button>
-            </div>
+  return (
+    <OnboardingStep
+      title={t("analysisTitle")}
+      description={t("analysisDescription", {
+        models: selectedModels.length,
+        prompts: selectedPrompts.length,
+        brand: brandName || t("yourBrand"),
+      })}
+      footer={
+        <OnboardingStepFooter
+          hideBack={hideBack}
+          onBack={prevStep}
+          onNext={() => navigate("/monitoring")}
+          // nextDisabled={progress < 95}
+          nextLabel={t("goToMonitoring")}
+        />
+      }
+    >
+      <div className="space-y-2">
+        <Progress value={progress} className="h-3" />
+        <div className="flex justify-between text-sm text-muted-foreground">
+          <span>{t("analysisProgressLabel")}</span>
+          <span>{Math.round(progress)}%</span>
         </div>
-    );
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 text-left text-sm text-zinc-700 sm:grid-cols-2">
+        <div className="rounded-md border border-border/80 p-3">
+          {t("analysisWebsite", {
+            website: websiteUrl || t("notProvided"),
+          })}
+        </div>
+        <div className="rounded-md border border-border/80 p-3">
+          {t("analysisAttribution", {
+            source: attributionLabel,
+          })}
+        </div>
+        <div className="rounded-md border border-border/80 p-3">
+          {t("analysisCompetitors")}
+        </div>
+        <div className="rounded-md border border-border/80 p-3">
+          {t("analysisPrompts")}
+        </div>
+        <div className="rounded-md border border-border/80 p-3">
+          {t("analysisVisibility")}
+        </div>
+      </div>
+    </OnboardingStep>
+  );
 }

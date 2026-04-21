@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createGRPCTransport } from "./grpc.js";
+import { createGRPCTransport, isQuotaExceededSchedulerError, SchedulerServiceError } from "./grpc.js";
 import type { SchedulerConfig } from "./types.js";
 
 const baseConfig: SchedulerConfig = {
@@ -35,5 +35,17 @@ describe("createGRPCTransport", () => {
         grpcTLSKey: "",
       }),
     ).toThrow("GRPC_TLS_CERT and GRPC_TLS_KEY must be provided together");
+  });
+
+  test("detects quota exhaustion errors returned by analysis-service", () => {
+    expect(
+      isQuotaExceededSchedulerError(new SchedulerServiceError("quota reached", 8)),
+    ).toBe(true);
+    expect(
+      isQuotaExceededSchedulerError(new SchedulerServiceError("permission denied", 7)),
+    ).toBe(false);
+    expect(
+      isQuotaExceededSchedulerError(new Error("quota reached")),
+    ).toBe(false);
   });
 });
