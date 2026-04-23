@@ -1,6 +1,6 @@
 "use client";
 
-import { SELECTED_ORG_KEY } from "@/features/models/core/model-access";
+import { SELECTED_ORG_KEY } from "@/features/models/_lib/model-access";
 import {
   DEFAULT_PROMPT_CRON,
   DEFAULT_PROMPT_TIMEZONE,
@@ -8,6 +8,7 @@ import {
   normalizeModelName,
   promptScheduleLabel,
 } from "./utils";
+import { buildTrend30dFromRuns } from "./prompt-data-factory";
 import type {
   PromptItem,
   PromptPageResult,
@@ -132,14 +133,7 @@ export function buildScopedPromptMetrics(item: PromptItem, models: string[]): Pr
       : 0;
   const lastRunMinutes =
     scopedRuns.length > 0 ? Math.min(...scopedRuns.map((run) => run.minutesAgo)) : 999999;
-  const trendSeed = scopedRuns.slice(0, 7).map((run) => run.score);
-  const trend30d =
-    trendSeed.length > 0
-      ? Array.from(
-          { length: 7 },
-          (_, trendIndex) => trendSeed[trendIndex] ?? trendSeed[trendSeed.length - 1] ?? 0,
-        )
-      : [0, 0, 0, 0, 0, 0, 0];
+  const trend30d = buildTrend30dFromRuns(scopedRuns);
 
   return {
     ...item,

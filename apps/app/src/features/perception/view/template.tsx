@@ -1,7 +1,4 @@
-import { BrandCanonEditorPageClient } from "../brand-canon/view/client";
 import {
-  BrandCanonLoadingState,
-  BrandCanonUnavailableState,
   PerceptionLoadingState,
   PerceptionUnavailableState,
 } from "../_components";
@@ -11,36 +8,20 @@ import { PerceptionClient } from "./client";
 type PerceptionTemplateProps = {
   apiBaseURL: string;
   routeSearch: string;
-  brandCanonMode?: boolean;
 };
 
 export function PerceptionTemplate({
   apiBaseURL,
   routeSearch,
-  brandCanonMode = false,
 }: PerceptionTemplateProps) {
   const { data, error, loading, reload } = usePerceptionData(apiBaseURL, routeSearch);
 
   if (loading && !data) {
-    return brandCanonMode ? <BrandCanonLoadingState /> : <PerceptionLoadingState />;
+    return <PerceptionLoadingState />;
   }
 
   if (!data) {
-    return brandCanonMode ? (
-      <BrandCanonUnavailableState error={error} onReload={reload} />
-    ) : (
-      <PerceptionUnavailableState error={error} />
-    );
-  }
-
-  if (brandCanonMode) {
-    return (
-      <BrandCanonEditorPageClient
-        initialData={data}
-        apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
-      />
-    );
+    return <PerceptionUnavailableState error={error} />;
   }
 
   return <PerceptionClient initialData={data} />;

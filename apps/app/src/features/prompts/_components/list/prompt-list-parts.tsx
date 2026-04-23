@@ -11,13 +11,11 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
@@ -80,6 +78,9 @@ function PromptActionItem({
         <div className={cn("text-sm font-semibold", tone === "destructive" ? "text-rose-700" : "text-foreground")}>
           {title}
         </div>
+        <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+          {description}
+        </div>
       </div>
       <span
         className={cn(
@@ -112,13 +113,13 @@ export function SortableColumnHeader({
     <button
       type="button"
       className={cn(
-        "inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+        "inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground",
         isActive && "text-foreground",
       )}
       onClick={() => changePromptSort(sortKey)}
     >
       <span>{label}</span>
-      <Icon className={cn("h-3.5 w-3.5", isActive && "text-primary")} />
+      <Icon className={cn("h-4 w-4", isActive && "text-primary")} />
     </button>
   );
 }
@@ -152,9 +153,9 @@ export function PromptModelBadges({
               <TooltipTrigger asChild>
                 <span
                   tabIndex={0}
-                  className="inline-flex shrink-0 cursor-default items-center gap-1 rounded-full border px-2 py-1 text-[11px] outline-none"
+                  className="inline-flex shrink-0 cursor-default items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm outline-none"
                 >
-                  <img src={visual.icon} alt={model} className="h-3 w-3" decoding="async" />
+                  <img src={visual.icon} alt={model} className="h-4 w-4" decoding="async" />
                   {visual.label}
                 </span>
               </TooltipTrigger>
@@ -169,7 +170,7 @@ export function PromptModelBadges({
             <TooltipTrigger asChild>
               <span
                 tabIndex={0}
-                className="inline-flex shrink-0 cursor-default items-center rounded-full border px-2 py-1 text-[11px] text-muted-foreground outline-none"
+                className="inline-flex shrink-0 cursor-default items-center rounded-full border px-2.5 py-1 text-sm text-muted-foreground outline-none"
               >
                 +{remaining}
               </span>
@@ -327,7 +328,7 @@ export function BulkStatusButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-8 rounded-full px-3 text-xs sm:h-7 sm:px-2.5"
+      className="h-8 rounded-full px-3 text-sm sm:h-7 sm:px-2.5"
       disabled={disabled}
       onClick={onClick}
     >

@@ -2,9 +2,10 @@ import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 import type { PeriodKey, PromptItem, PromptSchedule, Stage } from "./types";
 
-export const DEFAULT_PROMPT_PERIOD: PeriodKey = "14d";
+export const DEFAULT_PROMPT_PERIOD: PeriodKey = "all";
 
 export const PERIOD_TO_MINUTES: Record<PeriodKey, number> = {
+  all: Number.POSITIVE_INFINITY,
   today: 24 * 60,
   "7d": 7 * 24 * 60,
   "14d": 14 * 24 * 60,
@@ -51,7 +52,7 @@ export function defaultPromptSchedule(): PromptSchedule {
 export function isValidCronExpression(value: string) {
   const fields = value.trim().split(/\s+/).filter(Boolean);
   if (fields.length !== 5) return false;
-  return fields.every((field) => /^[0-9*/,\-]+$/.test(field));
+  return fields.every((field) => /^[0-9*/,-]+$/.test(field));
 }
 
 function formatHourMinute(hour: number, minute: number) {
@@ -135,10 +136,10 @@ export function relativeRunLabel(minutes: number, locale = "en") {
   });
 }
 
-export function statusBadgeVariant(status: PromptItem["status"]): "secondary" | "outline" | "destructive" {
-  if (status === "active") return "secondary";
-  if (status === "disabled") return "outline";
-  return "destructive";
+export function statusBadgeClassName(status: PromptItem["status"]) {
+  if (status === "active") return "border-transparent bg-emerald-50 text-emerald-700";
+  if (status === "disabled") return "border-transparent bg-slate-100 text-slate-600";
+  return "border-transparent bg-rose-50 text-rose-700";
 }
 
 export function rankTone(rank: number) {

@@ -48,7 +48,7 @@ export function ModelsFilterPopover({
       <PopoverTrigger asChild>
         <Button variant="outline" className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-xs sm:h-8 sm:w-auto sm:min-w-[220px]">
           <span className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
-            <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="shrink-0 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
               {content.models}
             </span>
             <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
@@ -93,7 +93,7 @@ export function ModelsFilterPopover({
                   <div className={cn("truncate text-sm font-semibold leading-tight", highlighted ? "text-primary" : "text-foreground")}>
                     {meta.label}
                   </div>
-                  <div className={cn("line-clamp-1 text-[11px] leading-snug", highlighted ? "text-primary/75" : "text-muted-foreground")}>
+                  <div className={cn("line-clamp-1 text-xs leading-snug", highlighted ? "text-primary/75" : "text-muted-foreground")}>
                     {meta.provider} {meta.name !== meta.label ? `· ${meta.name}` : ""}
                   </div>
                 </div>

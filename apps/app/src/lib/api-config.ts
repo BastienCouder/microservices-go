@@ -43,9 +43,18 @@ export const apiRoutes = {
     delete: (competitorId: string) => `/competitors/${competitorId}`,
   },
   aiModels: {
-    list: (activeOnly = true) => `/projects/ai-models${activeOnly ? "?active_only=true" : ""}`,
+    list: (activeOnly = true) => `/projects/ai-models?active_only=${activeOnly ? "true" : "false"}`,
     create: () => "/projects/ai-models",
-    update: (modelId: string) => `/projects/ai-models/${modelId}`,
+    syncOpenRouter: () => "/projects/ai-models/sync/openrouter",
+    update: (modelId: string) => `/projects/ai-models/${encodeURIComponent(modelId)}`,
+  },
+  llmProviderCredentials: {
+    list: (projectId: string) =>
+      `/projects/${encodeURIComponent(projectId)}/llm-provider-credentials`,
+    update: (projectId: string, provider: string) =>
+      `/projects/${encodeURIComponent(projectId)}/llm-provider-credentials/${encodeURIComponent(provider)}`,
+    delete: (projectId: string, provider: string) =>
+      `/projects/${encodeURIComponent(projectId)}/llm-provider-credentials/${encodeURIComponent(provider)}`,
   },
   billing: {
     quota: (organizationId: string) => `/billing/quotas/${organizationId}`,

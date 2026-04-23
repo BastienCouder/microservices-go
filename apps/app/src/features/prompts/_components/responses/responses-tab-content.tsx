@@ -3,10 +3,6 @@ import type { ModelVisual, PromptRunRow, ResponseView } from "../../_lib/types";
 import { ResponsesContent } from "./responses-table-view";
 
 type ResponsesTabContentProps = {
-  onlyErrors: boolean;
-  setOnlyErrors: (value: boolean) => void;
-  criticalOnly: boolean;
-  setCriticalOnly: (value: boolean) => void;
   noMentionOnly: boolean;
   setNoMentionOnly: (value: boolean) => void;
   showHistorical: boolean;

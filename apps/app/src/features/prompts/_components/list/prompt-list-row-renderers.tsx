@@ -26,7 +26,7 @@ type SharedProps = {
   runningAnyPrompts: boolean;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
-  statusBadgeVariant: (status: PromptItem["status"]) => "secondary" | "outline" | "destructive";
+  statusBadgeClassName: (status: PromptItem["status"]) => string;
   onRunSelect: (runId: string) => void;
   locale: string;
   content: Record<string, string>;
@@ -52,7 +52,7 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
         />
       </TableCell>
       <TableCell className="min-w-[220px] max-w-[260px] xl:min-w-[280px] xl:max-w-[340px]">
-        <div className="truncate font-medium leading-6">{item.prompt}</div>
+        <div className="truncate text-sm font-medium leading-6">{item.prompt}</div>
       </TableCell>
       <TableCell>
         <div className="max-w-[128px] overflow-hidden xl:max-w-[180px]">
@@ -64,16 +64,16 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
         </div>
       </TableCell>
       <TableCell>
-        <div className="max-w-[140px] truncate text-xs font-medium xl:max-w-[180px]">
+        <div className="max-w-[140px] truncate text-sm font-medium xl:max-w-[180px]">
           {promptScheduleLabel(item.schedule, item.effectiveCron, props.locale)}
         </div>
       </TableCell>
       <TableCell>
         {hasResults ? (
           <div className="w-24">
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex items-center justify-between text-sm">
               <span className="font-medium">{item.mentionRate}%</span>
-              <TrendingUp className="h-3 w-3 text-emerald-600" />
+              <TrendingUp className="h-3.5 w-3.5 text-emerald-600" />
             </div>
             <div className="mt-1 h-1.5 rounded-full bg-muted">
               <div className="h-1.5 rounded-full bg-emerald-500" style={{ width: `${item.mentionRate}%` }} />
@@ -81,11 +81,11 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
           </div>
         ) : null}
       </TableCell>
-      <TableCell>{hasResults ? <Badge className={props.rankTone(item.rank)}>{item.rank.toFixed(1)}</Badge> : null}</TableCell>
+      <TableCell>{hasResults ? <Badge className={cn("text-sm", props.rankTone(item.rank))}>{item.rank.toFixed(1)}</Badge> : null}</TableCell>
       <TableCell>
         {hasResults ? (
           <div className="w-16">
-            <div className="text-xs font-medium">{item.sov}%</div>
+            <div className="text-sm font-medium">{item.sov}%</div>
             <div className="mt-1 h-1.5 rounded-full bg-muted">
               <div className="h-1.5 rounded-full bg-primary" style={{ width: `${item.sov}%` }} />
             </div>
@@ -94,19 +94,16 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
       </TableCell>
       <TableCell>
         {hasResults ? (
-          <div className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs">
+          <div className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
             <span
-              className={cn(
-                "h-1.5 w-1.5 rounded-full",
-                item.lastRunMinutes < 60 ? "bg-emerald-500" : "bg-amber-500",
-              )}
+              className="h-1.5 w-1.5 rounded-full bg-primary"
             />
             {relativeRunLabel(item.lastRunMinutes, props.locale)}
           </div>
         ) : null}
       </TableCell>
       <TableCell className="hidden xl:table-cell">
-        <Badge variant={props.statusBadgeVariant(item.status)}>
+        <Badge variant="outline" className={cn("text-sm", props.statusBadgeClassName(item.status))}>
           {promptStatusLabel(item.status, props.locale)}
         </Badge>
       </TableCell>
@@ -170,7 +167,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
               <Badge variant="outline">
                 {props.promptRowMode === "global" ? content.rowModeGlobal : content.rowModeModel}
               </Badge>
-              <Badge variant={props.statusBadgeVariant(item.status)}>
+              <Badge variant="outline" className={props.statusBadgeClassName(item.status)}>
                 {promptStatusLabel(item.status, props.locale)}
               </Badge>
             </div>
@@ -308,7 +305,7 @@ export function RunSelectedButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-8 rounded-full px-3 text-xs sm:h-7 sm:px-2.5"
+      className="h-8 rounded-full px-3 text-sm sm:h-7 sm:px-2.5"
       disabled={disabled}
       onClick={runSelectedPrompts}
     >

@@ -40,7 +40,7 @@ export function BrandVisibilityPanelView({
     <Card className="col-span-1 min-w-0 overflow-hidden rounded-md xl:col-span-2">
       <CardHeader className="pb-2">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 space-y-1">
             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <MonitoringSectionTitle>{content.brandVisibilityTitle}</MonitoringSectionTitle>
             </CardTitle>

@@ -92,7 +92,7 @@ export function PromptModelsDialog({
                   decoding="async"
                 />
                 <span className="min-w-0">
-                  <span className="block text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                  <span className="block text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                     {visual.provider}
                   </span>
                   <span className="block truncate leading-5">{visual.name}</span>

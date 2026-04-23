@@ -43,7 +43,7 @@ export function SidebarNavItem({ href, label, active, indent, collapsed, classNa
             )}
           >
             {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-            <span className="text-xs font-semibold uppercase tracking-[0.18em]">{label.slice(0, 1)}</span>
+            <span className="text-sm font-semibold uppercase tracking-[0.18em]">{label.slice(0, 1)}</span>
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
@@ -74,7 +74,7 @@ export function SidebarNavItem({ href, label, active, indent, collapsed, classNa
     <Link
       to={href}
       className={cn(
-        "group relative flex items-center rounded-[5px] px-2 py-1.5 text-sm transition-colors",
+        "group relative flex items-center rounded-[5px] pl-3 py-1.5 text-sm transition-colors",
         active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
         className,
         )}

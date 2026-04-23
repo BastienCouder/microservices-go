@@ -126,7 +126,7 @@ export function PromptCadenceSection({
                     <div className="flex min-w-0 items-center gap-3">
                       <img src={visual.icon} alt={visual.name} className="h-5 w-5 object-contain" decoding="async" />
                       <div className="min-w-0">
-                        <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                        <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                           {visual.provider}
                         </div>
                         <div className="text-sm font-semibold break-words [overflow-wrap:anywhere]">{visual.name}</div>

@@ -74,10 +74,10 @@ export function PeriodFilterPicker({
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 sm:h-8"
+            className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-sm"
           >
             <span className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
-              <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="shrink-0 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {effectiveLabel}
               </span>
               <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />

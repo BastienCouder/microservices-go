@@ -14,13 +14,13 @@ const buttonVariants = cva(
         default:
           "bg-linear-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] hover:brightness-110 [a]:hover:brightness-110",
         outline: "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
-        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80 aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
+        secondary: "bg-background text-primary hover:bg-background/90 aria-expanded:bg-background/90 aria-expanded:text-primary",
         ghost: "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground",
         destructive: "bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20  text-destructive focus-visible:border-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "gap-1.5 px-4.5 py-2 ring-2 ring-primary/20 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
+        default: "text-sm gap-1.5 px-3.5 md:px-4.5 py-2 ring-2 ring-primary/20 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2",
         xs: "gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3",
         sm: "gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-lg has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 [&_svg:not([class*='size-'])]:size-3.5",
         lg: "gap-1.5 px-2.5 has-data-[icon=inline-end]:pr-3 has-data-[icon=inline-start]:pl-3",

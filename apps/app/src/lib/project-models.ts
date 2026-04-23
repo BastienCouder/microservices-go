@@ -73,6 +73,9 @@ function getIDString(value: unknown): string {
 export function buildProviderLabel(value: string): string {
   const normalized = value.trim();
   if (!normalized) return "AI provider";
+  if (normalized.toLowerCase() === "xai" || normalized.toLowerCase() === "grok") {
+    return "xAI";
+  }
   return normalized
     .replace(/[-_]+/g, " ")
     .replace(/\b\w/g, (char) => char.toUpperCase());

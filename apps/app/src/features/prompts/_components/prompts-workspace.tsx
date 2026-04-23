@@ -1,32 +1,60 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { PromptDetailsSheet } from "../components/prompt-details-sheet";
 import { PromptsFiltersToolbar } from "../components/prompts-filters-toolbar";
 import { PromptsPageHeader } from "../components/prompts-page-header";
-import { PromptsPlanProgress } from "../components/prompts-plan-progress";
 import { ResponseDetailsSheet } from "../components/response-details-sheet";
 import { PromptEditorPage } from "./editor/prompt-editor-page";
 import { PromptsTabContent } from "./list/prompts-tab-content";
 import { ResponsesTabContent } from "./responses/responses-tab-content";
-import { rankTone, statusBadgeVariant, truncate } from "../_lib/utils";
+import { rankTone, statusBadgeClassName, truncate } from "../_lib/utils";
 import { usePromptsResponsesState } from "../_lib/use-prompts-responses-state";
 import type { PeriodKey, Persona, ResponseView } from "../_lib/types";
 
 type PromptsResponsesWorkspaceProps = {
   apiBaseURL: string;
+  routeSearch: string;
 };
 
-export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorkspaceProps) {
+export function PromptsResponsesWorkspace({ apiBaseURL, routeSearch }: PromptsResponsesWorkspaceProps) {
   const content = useI18nScope("prompts-workspace");
   const state = usePromptsResponsesState(apiBaseURL);
+  const { setFocusPromptId, setSelectedResponseId, setTab } = state;
+  const responseDeepLink = useMemo(() => {
+    const params = new URLSearchParams(routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch);
+    return {
+      focusPromptId: params.get("focusPromptId") || "",
+      responseId: params.get("responseId") || "",
+      tab: params.get("tab") || "",
+    };
+  }, [routeSearch]);
   const editorPrompt =
     state.promptEditorState?.mode === "edit"
       ? state.prompts.find(
           (item) => (item.sourcePromptId || item.id) === state.promptEditorState?.promptId,
         ) ?? null
       : null;
+
+  useEffect(() => {
+    if (responseDeepLink.tab !== "responses" && !responseDeepLink.responseId) return;
+    setTab("responses");
+    if (responseDeepLink.focusPromptId) {
+      setFocusPromptId(responseDeepLink.focusPromptId);
+    }
+    if (responseDeepLink.responseId) {
+      setSelectedResponseId(responseDeepLink.responseId);
+    }
+  }, [
+    responseDeepLink.focusPromptId,
+    responseDeepLink.responseId,
+    responseDeepLink.tab,
+    setFocusPromptId,
+    setSelectedResponseId,
+    setTab,
+  ]);
 
   if (state.promptEditorState) {
     return (
@@ -88,17 +116,13 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
                 toggleModel={state.toggleModel}
               />
             </div>
-            <PromptsPlanProgress
-              promptPlanUsage={state.promptPlanUsage}
-              className="md:mb-1"
-            />
           </div>
         </div>
 
         <Tabs value={state.tab} onValueChange={(value) => state.setTab(value as "prompts" | "responses")} className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="border-b px-4 py-3">
-            <TabsList>
-              <TabsTrigger value="prompts">{content.promptsTab}</TabsTrigger>
+            <TabsList className="h-10 p-1.5 space-x-2">
+              <TabsTrigger value="prompts" className="">{content.promptsTab}</TabsTrigger>
               <TabsTrigger value="responses">{content.responsesTab}</TabsTrigger>
             </TabsList>
           </div>
@@ -135,7 +159,7 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
               runSelectedPrompts={state.runSelectedPrompts}
               getModelVisual={state.getModelVisual}
               rankTone={rankTone}
-              statusBadgeVariant={statusBadgeVariant}
+              statusBadgeClassName={statusBadgeClassName}
               onRunSelect={state.setSelectedResponseId}
               promptPage={state.promptPage}
               promptTotalItems={state.promptTotalItems}
@@ -148,10 +172,6 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
 
           <TabsContent value="responses" className="m-0 flex min-h-0 flex-1 flex-col">
             <ResponsesTabContent
-              onlyErrors={state.onlyErrors}
-              setOnlyErrors={state.setOnlyErrors}
-              criticalOnly={state.criticalOnly}
-              setCriticalOnly={state.setCriticalOnly}
               noMentionOnly={state.noMentionOnly}
               setNoMentionOnly={state.setNoMentionOnly}
               showHistorical={state.showHistorical}
@@ -175,8 +195,26 @@ export function PromptsResponsesWorkspace({ apiBaseURL }: PromptsResponsesWorksp
         </Tabs>
       </div>
 
-      <PromptDetailsSheet open={state.isPromptDetailsOpen} onOpenChange={state.setIsPromptDetailsOpen} prompt={state.selectedPrompt} />
-      <ResponseDetailsSheet response={state.selectedResponse} onOpenChange={(open) => !open && state.setSelectedResponseId(null)} />
+      <PromptDetailsSheet
+        open={state.isPromptDetailsOpen}
+        onOpenChange={state.setIsPromptDetailsOpen}
+        prompt={state.selectedPrompt}
+        getModelVisual={state.getModelVisual}
+        onEditPrompt={(prompt) => {
+          state.setIsPromptDetailsOpen(false);
+          state.openEditPromptEditor(prompt.sourcePromptId || prompt.id);
+        }}
+        onSeeMoreResponses={(prompt) => {
+          state.setIsPromptDetailsOpen(false);
+          state.setTab("responses");
+          state.setFocusPromptId(prompt.sourcePromptId || prompt.id);
+        }}
+      />
+      <ResponseDetailsSheet
+        response={state.selectedResponse}
+        onOpenChange={(open) => !open && state.setSelectedResponseId(null)}
+        getModelVisual={state.getModelVisual}
+      />
     </div>
   );
 }

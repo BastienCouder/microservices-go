@@ -93,8 +93,8 @@ function AxisProgressRow({
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border text-sm font-semibold tabular-nums border-2"
-            style={{ borderColor: point.color, color: point.color }}
+            className="grid h-9 w-9 shrink-0 place-items-center text-background rounded-2xl border text-sm font-semibold tabular-nums border-2"
+            style={{ backgroundColor: point.color }}
           >
             {rank}
           </div>
@@ -117,7 +117,7 @@ function AxisProgressRow({
       </div>
 
       <div className="mt-3">
-        <div className="relative h-2.5 overflow-hidden rounded-full bg-muted/50">
+        <div className="relative h-3.5 overflow-hidden rounded-full bg-muted/50">
           <div
             className="absolute inset-y-0 left-0 rounded-full"
             style={{

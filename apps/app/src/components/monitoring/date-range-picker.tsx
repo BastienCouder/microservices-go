@@ -8,6 +8,7 @@ type DatePickerWithRangeProps = {
   setDate: (value: DateRange | undefined) => void;
   period: string;
   setPeriod: (value: string) => void;
+  includeAll?: boolean;
 };
 
 export const MONITORING_PERIOD_OPTIONS = [
@@ -49,8 +50,11 @@ export const MONITORING_PERIOD_OPTIONS = [
   },
 ] as const satisfies readonly PeriodFilterOption[];
 
-function getMonitoringPeriodOptions(content: Record<string, string>): readonly PeriodFilterOption[] {
-  return [
+function getMonitoringPeriodOptions(
+  content: Record<string, string>,
+  includeAll = false,
+): readonly PeriodFilterOption[] {
+  const options: PeriodFilterOption[] = [
     { value: "today", label: content.today },
     { value: "7d", label: content.days7 },
     { value: "14d", label: content.days14 },
@@ -60,7 +64,13 @@ function getMonitoringPeriodOptions(content: Record<string, string>): readonly P
     { value: "365d", label: content.year1 },
     { value: "ytd", label: content.yearToDate },
     { value: "custom", label: content.custom },
-  ] as const;
+  ];
+
+  if (includeAll) {
+    return [{ value: "all", label: content.allTime }, ...options];
+  }
+
+  return options;
 }
 
 export function DatePickerWithRange({
@@ -69,6 +79,7 @@ export function DatePickerWithRange({
   setDate,
   period,
   setPeriod,
+  includeAll = false,
 }: DatePickerWithRangeProps) {
   const content = useI18nScope("monitoring-filters-panel");
 
@@ -77,7 +88,7 @@ export function DatePickerWithRange({
       className={className}
       value={period}
       onValueChange={setPeriod}
-      options={getMonitoringPeriodOptions(content)}
+      options={getMonitoringPeriodOptions(content, includeAll)}
       date={date}
       onDateChange={setDate}
     />

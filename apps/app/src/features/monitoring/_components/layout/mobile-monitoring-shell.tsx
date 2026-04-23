@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
 import { cn } from "@/lib/utils";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 import { useActivityPanelViewModel } from "../../_lib/activity/use-activity-panel-view-model";
@@ -28,6 +29,14 @@ import { MobileMonitoringFiltersSheet } from "../filters/mobile-monitoring-filte
 import { MobileCustomRangePanel } from "./mobile-custom-range-panel";
 import { MobileMonitoringPeriodCarousel } from "./mobile-monitoring-period-carousel";
 import { MobileMonitoringTopNav } from "./mobile-monitoring-top-nav";
+
+function openPromptResponse(prompt: MonitoringPrompt) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("tab", "responses");
+  params.set("focusPromptId", prompt.promptId);
+  params.set("responseId", prompt.responseId);
+  window.location.assign(`/prompts?${params.toString()}`);
+}
 
 export function MobileMonitoringShell() {
   const content = useI18nScope("monitoring-mobile");
@@ -229,6 +238,7 @@ export function MobileMonitoringShell() {
         closeAlert={activityViewModel.closeAlert}
         selectedPrompt={activityViewModel.selectedPrompt}
         closePrompt={activityViewModel.closePrompt}
+        onViewPromptResponse={openPromptResponse}
       />
     </>
   );

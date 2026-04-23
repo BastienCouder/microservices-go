@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronsLeft, ChevronsRight } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { normalizeOrganizationHierarchy } from "@/features/organizations/lib/hierarchy";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
@@ -22,14 +21,18 @@ import {
   storeSelectedProjectID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
-import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS, type SidebarProjectOption } from "./sidebar-constants";
+import { MONITORING_ITEMS, SIDEBAR_LABELS, type SidebarProjectOption } from "./sidebar-constants";
 import { SidebarLanguageSwitcher } from "./sidebar-language-switcher";
 import { SidebarOrganizationSwitcher } from "./sidebar-organization-switcher";
 import { SidebarNavItem } from "./sidebar-nav-item";
+import { SidebarPromptPlanProgress } from "./sidebar-prompt-plan-progress";
+import { normalizeOrganizationHierarchy, selectPreferredID } from "./sidebar-state";
 
 type SidebarMembership = {
   organizationId: string;
 };
+
+const EMPTY_MEMBERSHIPS: SidebarMembership[] = [];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -123,18 +126,12 @@ function SidebarComponent({
   onLogout?: () => Promise<void>;
 }) {
   const content = useI18nScope("sidebar");
-  const pathname = useLocation().pathname;
   const location = useLocation();
+  const pathname = location.pathname;
   const navigate = useNavigate();
   const currentPath = activePath || pathname;
   const canonicalCurrentPath = currentPath;
   const [collapsed, setCollapsed] = useState(false);
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState(
-    readOrganizationIdFromSearch(location.search) || readSelectedOrganizationID(),
-  );
-  const [selectedProjectId, setSelectedProjectId] = useState(
-    readProjectIdFromSearch(location.search) || readSelectedProjectID(),
-  );
   const [orgOpen, setOrgOpen] = useState(false);
 
   const organizationsQuery = useQuery({
@@ -142,25 +139,16 @@ function SidebarComponent({
     enabled: apiBaseURL.trim() !== "",
     queryFn: ({ signal }) => loadSidebarMemberships(apiBaseURL, signal),
   });
-  const memberships = organizationsQuery.data ?? [];
-
-  useEffect(() => {
-    const routeOrganizationId = readOrganizationIdFromSearch(location.search);
-    const storedOrganizationId = readSelectedOrganizationID();
-    const availableIds = new Set(memberships.map((membership) => membership.organizationId));
-
-    const nextOrganizationId =
-      (routeOrganizationId && availableIds.has(routeOrganizationId) ? routeOrganizationId : "") ||
-      (selectedOrganizationId && availableIds.has(selectedOrganizationId) ? selectedOrganizationId : "") ||
-      (storedOrganizationId && availableIds.has(storedOrganizationId) ? storedOrganizationId : "") ||
-      memberships[0]?.organizationId ||
-      "";
-
-    setSelectedOrganizationId((current) => (current === nextOrganizationId ? current : nextOrganizationId));
-    if (nextOrganizationId !== "") {
-      storeSelectedOrganizationID(nextOrganizationId);
-    }
-  }, [location.search, memberships, selectedOrganizationId]);
+  const memberships = organizationsQuery.data ?? EMPTY_MEMBERSHIPS;
+  const routeOrganizationId = readOrganizationIdFromSearch(location.search);
+  const selectedOrganizationId = useMemo(
+    () =>
+      selectPreferredID({
+        candidates: [routeOrganizationId, readSelectedOrganizationID(), memberships[0]?.organizationId],
+        availableIds: memberships.map((membership) => membership.organizationId),
+      }),
+    [routeOrganizationId, memberships],
+  );
 
   const hierarchyQuery = useQuery({
     queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrganizationId),
@@ -169,28 +157,25 @@ function SidebarComponent({
   });
   const hierarchy = hierarchyQuery.data ?? null;
   const projects = useMemo(() => normalizeSidebarProjects(hierarchy), [hierarchy]);
+  const routeProjectId = readProjectIdFromSearch(location.search);
+  const selectedProjectId = useMemo(
+    () =>
+      selectPreferredID({
+        candidates: [routeProjectId, readSelectedProjectID(), projects[0]?.id],
+        availableIds: projects.map((project) => project.id),
+      }),
+    [projects, routeProjectId],
+  );
 
   useEffect(() => {
-    const routeProjectId = readProjectIdFromSearch(location.search);
-    const storedProjectId = readSelectedProjectID();
-    const availableProjectIds = new Set(projects.map((project) => project.id));
-
-    const nextProjectId =
-      (routeProjectId && availableProjectIds.has(routeProjectId) ? routeProjectId : "") ||
-      (selectedProjectId && availableProjectIds.has(selectedProjectId) ? selectedProjectId : "") ||
-      (storedProjectId && availableProjectIds.has(storedProjectId) ? storedProjectId : "") ||
-      projects[0]?.id ||
-      "";
-
-    setSelectedProjectId((current) => (current === nextProjectId ? current : nextProjectId));
-    storeSelectedProjectID(nextProjectId);
-  }, [location.search, projects, selectedProjectId]);
+    storeSelectedOrganizationID(selectedOrganizationId);
+    storeSelectedProjectID(selectedProjectId);
+  }, [selectedOrganizationId, selectedProjectId]);
 
   const activeProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) || projects[0] || null,
     [projects, selectedProjectId],
   );
-  const activeOrganizationName = hierarchy?.organization.name || activeProject?.organizationName || "";
   const projectScopedMonitoringHref = buildScopedHref("/monitoring", {
     projectId: activeProject?.id,
   });
@@ -202,17 +187,6 @@ function SidebarComponent({
       })),
     [activeProject?.id],
   );
-  const organizationScopedItems = useMemo(
-    () =>
-      ORGANIZATION_ITEMS.map((item) => ({
-        ...item,
-        href: buildScopedHref(item.href, {
-          org: selectedOrganizationId,
-          projectId: item.href === "/settings" ? activeProject?.id : activeProject?.id,
-        }),
-      })),
-    [activeProject?.id, selectedOrganizationId],
-  );
   const addProjectHref = buildScopedHref("/organizations", {
     org: selectedOrganizationId,
     projectId: activeProject?.id,
@@ -221,27 +195,9 @@ function SidebarComponent({
   const perceptionHref = buildScopedHref("/perception", {
     projectId: activeProject?.id,
   });
-  const optimizeActionsHref = buildScopedHref("/optimize/actions", {
-    projectId: activeProject?.id,
-  });
-  const contentOptimizerHref = buildScopedHref("/optimize/content-optimizer", {
-    projectId: activeProject?.id,
-  });
-  const impactHref = buildScopedHref("/impact", {
-    projectId: activeProject?.id,
-  });
-  const projectSettingsHref = buildScopedHref("/settings", {
-    org: selectedOrganizationId,
-    projectId: activeProject?.id,
-  });
-  const organizationsHref = buildScopedHref("/organizations", {
-    org: selectedOrganizationId,
-    projectId: activeProject?.id,
-  });
   const isActiveHref = (href: string) => canonicalCurrentPath === href.split("?", 1)[0];
 
   const handleSelectProject = (projectId: string) => {
-    setSelectedProjectId(projectId);
     storeSelectedProjectID(projectId);
     navigate(
       buildScopedHref(`${location.pathname}${location.search}`, {
@@ -267,7 +223,7 @@ function SidebarComponent({
           </div>
           {!collapsed ? (
             <span className="line-clamp-1 text-[15px] font-semibold tracking-tight text-foreground">
-              {activeProject?.name || activeOrganizationName || content.projects}
+              {activeProject?.name || content.projects}
             </span>
           ) : null}
         </div>
@@ -278,11 +234,8 @@ function SidebarComponent({
           collapsed={collapsed}
           projects={projects}
           activeProjectId={activeProject?.id || ""}
-          activeOrganizationName={activeOrganizationName}
           onSelectProject={handleSelectProject}
           addProjectHref={addProjectHref}
-          settingsHref={projectSettingsHref}
-          organizationsHref={organizationsHref}
           orgOpen={orgOpen}
           setOrgOpen={setOrgOpen}
         />
@@ -296,12 +249,12 @@ function SidebarComponent({
               label={content.monitoring}
               active={isActiveHref(projectScopedMonitoringHref)}
               collapsed={collapsed}
-              className="font-bold uppercase tracking-wider text-[11px]"
+              className="font-bold uppercase tracking-wider"
             />
           </div>
 
-          <div className="mb-1 mt-2">
-            <div className="relative space-y-0.5">
+          <div className="mb-4 mt-2">
+            <div className="relative space-y-1.5">
               {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
               {projectScopedItems.map((item) => (
                 <SidebarNavItem
@@ -322,55 +275,18 @@ function SidebarComponent({
               label={content.perception}
               active={isActiveHref(perceptionHref)}
               collapsed={collapsed}
-                  className="font-bold uppercase tracking-wider text-[11px]"
+              className="font-bold uppercase tracking-wider"
             />
-          </div>
-          {/* <div className="mb-1">
-            <SidebarNavItem
-              href={optimizeActionsHref}
-              label={"optimize actions"}
-              active={isActiveHref(optimizeActionsHref)}
-              collapsed={collapsed}
-                  className="font-bold uppercase tracking-wider text-[11px]"
-            />
-          </div> */}
-          {/* <div className="mb-1">
-            <SidebarNavItem
-              href={contentOptimizerHref}
-              label="Content Optimizer"
-              active={isActiveHref(contentOptimizerHref)}
-              collapsed={collapsed}
-                  className="font-bold uppercase tracking-wider text-[11px]"
-            />
-          </div> */}
-          {/* <div className="mb-1">
-            <SidebarNavItem
-              href={impactHref}
-              label={"impact"}
-              active={isActiveHref(impactHref)}
-              collapsed={collapsed}
-                  className="font-bold uppercase tracking-wider text-[11px]"
-            />
-          </div> */}
-
-          <div className="mb-1">
-            <div className="relative mt-1 space-y-0.5">
-              {!collapsed ? <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" /> : null}
-              {organizationScopedItems.map((item) => (
-                <SidebarNavItem
-                  key={item.href}
-                  href={item.href}
-                  label={content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]}
-                  active={isActiveHref(item.href)}
-                  indent={!collapsed}
-                  collapsed={collapsed}
-                />
-              ))}
-            </div>
           </div>
         </nav>
 
         <div className="border-t border-border p-2">
+          <SidebarPromptPlanProgress
+            apiBaseURL={apiBaseURL}
+            organizationId={selectedOrganizationId}
+            projectId={selectedProjectId}
+            collapsed={collapsed}
+          />
           <div className="mb-1">
             <SidebarLanguageSwitcher collapsed={collapsed} />
           </div>

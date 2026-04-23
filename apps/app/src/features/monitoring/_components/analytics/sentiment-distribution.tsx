@@ -51,10 +51,10 @@ export const SentimentDistribution = memo(function SentimentDistribution({
       <CardContent>
         <div className="space-y-4">
           {hasData ? (
-            <div className="h-[220px]">
+            <div className="h-[280px]">
             <ChartContainer config={localizedChartConfig} className="h-full w-full">
               <PieChart>
-                <Pie data={coloredSentimentData} dataKey="value" nameKey="name" innerRadius={82} outerRadius={96} strokeWidth={2}>
+                <Pie data={coloredSentimentData} dataKey="value" nameKey="name" innerRadius={96} outerRadius={110} strokeWidth={2}>
                   {coloredSentimentData.map((entry) => (
                     <Cell key={entry.name} fill={entry.fill} />
                   ))}

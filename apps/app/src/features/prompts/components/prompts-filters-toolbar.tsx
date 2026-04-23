@@ -49,9 +49,6 @@ export function PromptsFiltersToolbar({
   setPeriod,
   dateRange,
   setDateRange,
-  persona,
-  setPersona,
-  availablePersonas,
   search,
   setSearch,
   showArchived,
@@ -73,11 +70,11 @@ export function PromptsFiltersToolbar({
   const filtersContent = (
     <>
       <div className="relative w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
         <Input
           value={search}
           onChange={(event) => setSearch(event.target.value)}
-          className="h-10 pl-9 sm:h-8"
+          className="h-10 pl-11 text-sm"
           placeholder={content.searchPromptsPlaceholder}
         />
       </div>
@@ -89,6 +86,7 @@ export function PromptsFiltersToolbar({
           setDate={setDateRange}
           period={period}
           setPeriod={setPeriod}
+          includeAll
         />
       ) : null}
 
@@ -108,7 +106,7 @@ export function PromptsFiltersToolbar({
         variant="outline"
         aria-pressed={showArchived}
         className={cn(
-          "h-10 shrink-0 rounded-full px-3 text-xs font-medium transition-colors sm:h-8",
+          "h-10 shrink-0 rounded-full px-4 text-sm font-medium transition-colors",
           showArchived
             ? "border-amber-300 bg-amber-50 text-amber-900 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.25)]"
             : "border-border/80 text-foreground hover:border-amber-200 hover:bg-amber-50/60 hover:text-amber-900",
@@ -130,7 +128,7 @@ export function PromptsFiltersToolbar({
         <Button
           size="sm"
           variant="ghost"
-          className="h-10 justify-center rounded-full px-4 text-xs sm:h-8"
+          className="h-10 justify-center rounded-full px-4 text-sm"
           onClick={clearFilters}
         >
           {content.clearAll}
@@ -146,9 +144,9 @@ export function PromptsFiltersToolbar({
           <Button
             type="button"
             variant="outline"
-            className="flex h-10 w-full items-center justify-between rounded-2xl px-4"
+            className="flex h-11 w-full items-center justify-between rounded-2xl px-4"
           >
-            <span className="inline-flex items-center gap-2 text-sm">
+            <span className="inline-flex items-center gap-2 text-sm font-medium">
               <SlidersHorizontal className="h-4 w-4" />
               {content.filters}
             </span>

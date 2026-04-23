@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { differenceInCalendarDays } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import {

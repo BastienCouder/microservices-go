@@ -48,10 +48,10 @@ export const virtuosoTableComponents = {
     <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
   )),
   TableBody: forwardRef<HTMLTableSectionElement, ComponentProps<"tbody">>(({ className, ...props }, ref) => (
-    <tbody ref={ref} className={cn("[&_tr:last-child]:border-0", className)} {...props} />
+    <tbody ref={ref} className={cn("[&_tr:last-child]:border-0 [&_td]:px-3 [&_td]:py-3", className)} {...props} />
   )),
   TableRow: ({ className, ...props }: ComponentProps<"tr">) => (
-    <tr className={cn("hover:bg-muted/50 border-b transition-colors", className)} {...props} />
+    <tr className={cn("cursor-pointer border-b transition-colors hover:bg-muted/50", className)} {...props} />
   ),
 };
 
@@ -75,7 +75,7 @@ export function ResponseFilterToggle({
       variant="outline"
       aria-pressed={active}
       className={cn(
-        "h-8 rounded-full px-3 text-xs font-medium transition-all sm:h-7 sm:px-2.5",
+        "h-9 rounded-full px-4 text-sm font-medium transition-all",
         active ? toneClasses.active : toneClasses.inactive,
       )}
       onClick={onToggle}
@@ -83,12 +83,12 @@ export function ResponseFilterToggle({
       <span
         aria-hidden="true"
         className={cn(
-          "mr-2 flex h-3.5 w-3.5 items-center justify-center rounded-full border transition-colors",
+          "mr-2 flex h-4 w-4 items-center justify-center rounded-full border transition-colors",
           toneClasses.dot,
           active ? "scale-100" : "scale-95 opacity-85",
         )}
       >
-        <span className={cn("h-1.5 w-1.5 rounded-full", toneClasses.dotInner)} />
+        <span className={cn("h-2 w-2 rounded-full", toneClasses.dotInner)} />
       </span>
       {label}
     </Button>
@@ -102,7 +102,7 @@ export function ResponseCompetitorsCell({ competitors }: { competitors: string[]
 
   if (hiddenCompetitors.length === 0) {
     return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-sm">
         {visibleCompetitor}
       </span>
     );
@@ -110,14 +110,14 @@ export function ResponseCompetitorsCell({ competitors }: { competitors: string[]
 
   return (
     <div className="flex items-center gap-1.5">
-      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
+      <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-sm">
         {visibleCompetitor}
       </span>
       <Tooltip>
         <TooltipTrigger asChild>
           <button
             type="button"
-            className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-border/70 bg-background px-2 text-[11px] font-medium text-muted-foreground"
+            className="inline-flex h-7 min-w-7 items-center justify-center rounded-full border border-border/70 bg-background px-2 text-sm font-medium text-muted-foreground"
             aria-label={`${hiddenCompetitors.length} ${content.additionalCompetitors}`}
           >
             +{hiddenCompetitors.length}

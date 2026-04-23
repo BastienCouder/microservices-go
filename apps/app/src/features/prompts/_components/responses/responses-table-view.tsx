@@ -40,10 +40,6 @@ function competitorBadgeClassName() {
 }
 
 type ResponsesViewProps = {
-  onlyErrors: boolean;
-  setOnlyErrors: (value: boolean) => void;
-  criticalOnly: boolean;
-  setCriticalOnly: (value: boolean) => void;
   noMentionOnly: boolean;
   setNoMentionOnly: (value: boolean) => void;
   showHistorical: boolean;
@@ -82,35 +78,21 @@ export function ResponsesContent(props: ResponsesViewProps) {
     { id: "rank", label: content.rank },
     { id: "competitor", label: content.competitor },
     { id: "score", label: content.score },
-    { id: "error", label: content.error },
-    { id: "action", label: content.action, className: "text-right" },
   ] as const;
 
   return (
     <>
       <div className="border-b  px-4 pt-2 pb-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <Badge variant="outline" className="h-9 justify-center px-3 sm:h-7">
+          <Badge variant="outline" className="h-9 justify-center px-3 text-sm">
             {props.filteredResponses.length} / {props.filteredResponsesTotal} {content.responsesCount}
           </Badge>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
             <div className="flex flex-wrap items-center gap-2">
               <ResponseFilterToggle
-                label={content.errors}
-                tone="amber"
-                active={props.onlyErrors}
-                onToggle={() => props.setOnlyErrors(!props.onlyErrors)}
-              />
-              <ResponseFilterToggle
-                label={content.critical}
-                tone="rose"
-                active={props.criticalOnly}
-                onToggle={() => props.setCriticalOnly(!props.criticalOnly)}
-              />
-              <ResponseFilterToggle
                 label={content.withoutMention}
-                tone="emerald"
+                tone="rose"
                 active={props.noMentionOnly}
                 onToggle={() => props.setNoMentionOnly(!props.noMentionOnly)}
               />
@@ -125,11 +107,11 @@ export function ResponsesContent(props: ResponsesViewProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-xs sm:h-8 sm:w-auto sm:min-w-[240px] sm:max-w-[360px]"
+                    className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-sm sm:w-auto sm:min-w-[240px] sm:max-w-[360px]"
                     title={selectedCompetitorLabel}
                   >
                     <span className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
-                      <span className="shrink-0 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                      <span className="shrink-0 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
                         {content.competitors}
                       </span>
                       <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
@@ -211,12 +193,12 @@ export function ResponsesContent(props: ResponsesViewProps) {
             </div>
 
             <div className="flex w-full gap-1 rounded-full border p-1 sm:w-auto">
-              <Button size="sm" variant={props.viewMode === "timeline" ? "default" : "ghost"} className="h-9 flex-1 rounded-full px-3 sm:h-7 sm:flex-none sm:px-2" onClick={() => props.setViewMode("timeline")}>
-                <Workflow className="mr-1 h-3.5 w-3.5" />
+              <Button size="sm" variant={props.viewMode === "timeline" ? "default" : "ghost"} className="h-9 flex-1 rounded-full px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("timeline")}>
+                <Workflow className="mr-1.5 h-4 w-4" />
                 {content.timeline}
               </Button>
-              <Button size="sm" variant={props.viewMode === "table" ? "default" : "ghost"} className="h-9 flex-1 rounded-full px-3 sm:h-7 sm:flex-none sm:px-2" onClick={() => props.setViewMode("table")}>
-                <Table2 className="mr-1 h-3.5 w-3.5" />
+              <Button size="sm" variant={props.viewMode === "table" ? "default" : "ghost"} className="h-9 flex-1 rounded-full px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("table")}>
+                <Table2 className="mr-1.5 h-4 w-4" />
                 {content.table}
               </Button>
             </div>
@@ -233,13 +215,13 @@ export function ResponsesContent(props: ResponsesViewProps) {
               style={{ height: "100%" }}
               data={props.filteredResponses}
               computeItemKey={(_, item) => item.id}
-              defaultItemHeight={74}
+              defaultItemHeight={82}
               endReached={handleEndReached}
               increaseViewportBy={{ top: 96, bottom: 160 }}
               fixedHeaderContent={() => (
                 <tr>
                   {responsesColumns.map((column) => (
-                    <TableHead key={column.id} className={cn("bg-background", column.className)}>
+                    <TableHead key={column.id} className={cn("h-12 bg-background px-3 text-sm font-semibold text-muted-foreground", column.className)}>
                       {column.label}
                     </TableHead>
                   ))}
@@ -247,61 +229,49 @@ export function ResponsesContent(props: ResponsesViewProps) {
               )}
               itemContent={(_, item) => {
                 const modelVisual = props.getModelVisual(item.model);
+                const openResponse = () => props.setSelectedResponseId(item.id);
+                const cellClassName = "cursor-pointer";
 
                 return (
                   <>
-                    <TableCell>
-                      <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs">
-                        <Timer className="h-3.5 w-3.5 text-muted-foreground" />
+                    <TableCell className={cellClassName} onClick={openResponse}>
+                      <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
+                        <Timer className="h-4 w-4 text-muted-foreground" />
                         {item.time}
                       </span>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={cellClassName} onClick={openResponse}>
                       <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="inline-flex items-center gap-1 rounded-full border px-2 py-1 text-xs">
-                          <img src={modelVisual.icon} alt={item.model} className="h-3 w-3" decoding="async" />
+                        <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
+                          <img src={modelVisual.icon} alt={item.model} className="h-4 w-4" decoding="async" />
                           {modelVisual.label}
                         </span>
-                        {item.isHistorical ? <Badge variant="outline" className="font-normal">{content.history}</Badge> : null}
+                        {item.isHistorical ? <Badge variant="outline" className="text-sm font-normal">{content.history}</Badge> : null}
                       </div>
                     </TableCell>
-                    <TableCell className="min-w-[280px] max-w-[360px]">
-                      <div className="line-clamp-2 font-medium leading-6">{props.truncate(item.prompt, 96)}</div>
+                    <TableCell className={cn("min-w-[280px] max-w-[360px]", cellClassName)} onClick={openResponse}>
+                      <div className="line-clamp-2 text-sm font-medium leading-6">{props.truncate(item.prompt, 96)}</div>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className={mentionBadgeClassName(item.mention)}>
+                    <TableCell className={cellClassName} onClick={openResponse}>
+                      <Badge variant="secondary" className={cn("border-transparent text-sm", mentionBadgeClassName(item.mention))}>
                         {item.mention ? content.mentioned : content.missing}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className={cellClassName} onClick={openResponse}>
                       {item.rank ? (
-                        <Badge className={props.rankTone(item.rank)}>#{item.rank}</Badge>
+                        <Badge className={cn("text-sm", props.rankTone(item.rank))}>#{item.rank}</Badge>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
                     </TableCell>
-                    <TableCell><ResponseCompetitorsCell competitors={item.competitors} /></TableCell>
-                    <TableCell>
+                    <TableCell className={cellClassName} onClick={openResponse}><ResponseCompetitorsCell competitors={item.competitors} /></TableCell>
+                    <TableCell className={cellClassName} onClick={openResponse}>
                       <div className="w-20">
-                        <div className="text-xs font-medium">{item.score}</div>
+                        <div className="text-sm font-medium">{item.score}</div>
                         <div className="mt-1 h-1.5 rounded-full bg-muted">
                           <div className={cn("h-1.5 rounded-full", item.score >= 80 ? "bg-emerald-500" : item.score >= 50 ? "bg-amber-500" : "bg-rose-500")} style={{ width: `${item.score}%` }} />
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>
-                      {item.error ? (
-                        <Badge variant="destructive" className="font-normal">
-                          {item.error}
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="font-normal">
-                          {content.noError}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" onClick={() => props.setSelectedResponseId(item.id)}>{content.view}</Button>
                     </TableCell>
                   </>
                 );
@@ -333,12 +303,12 @@ export function ResponsesContent(props: ResponsesViewProps) {
                       <div className="flex items-center gap-2 font-medium">
                         <Timer className="h-4 w-4 text-muted-foreground" />
                         <span>{item.time} ·</span>
-                        <span className="inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs">
-                          <img src={modelVisual.icon} alt={item.model} className="h-3 w-3" decoding="async" />
+                        <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
+                          <img src={modelVisual.icon} alt={item.model} className="h-4 w-4" decoding="async" />
                           {modelVisual.label}  
                         </span>
                         {item.model !== modelVisual.label && (
-                          <span className="text-xs text-muted-foreground">{item.model}</span>
+                          <span className="text-sm text-muted-foreground">{item.model}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

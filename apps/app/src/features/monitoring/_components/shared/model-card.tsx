@@ -12,6 +12,8 @@ type ModelCardProps = {
   onClick: () => void;
   modelGroup: string;
   size?: "monitoring" | "models";
+  disabled?: boolean;
+  disabledLabel?: string;
 };
 
 export const ModelCard = memo(function ModelCard({
@@ -22,20 +24,29 @@ export const ModelCard = memo(function ModelCard({
   onClick,
   modelGroup,
   size = "monitoring",
+  disabled = false,
+  disabledLabel,
 }: ModelCardProps) {
   const safeIcon = toSafeImageAssetPath(icon);
   const isModelsSize = size === "models";
+  const label = [modelGroup, name, description, disabledLabel]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-label={label}
       className={cn(
-        "relative border flex h-full w-full min-w-0 cursor-pointer flex-col items-start text-left transition-all",
+        "relative border flex h-full w-full min-w-0 flex-col items-start text-left transition-all disabled:cursor-not-allowed",
         isModelsSize
           ? "gap-4 rounded-[24px] px-4 py-4"
           : "gap-2 rounded-lg px-3 py-3",
-        selected
+        disabled
+          ? "border-border/60 bg-muted/20 opacity-55"
+          : selected
           ? "border-transparent bg-primary/[0.045]"
           : "border-border/80 bg-card hover:border-muted-foreground/25 hover:bg-muted/25",
       )}
@@ -84,6 +95,11 @@ export const ModelCard = memo(function ModelCard({
             )}
           >
             {name}
+          </div>
+        ) : null}
+        {disabledLabel ? (
+          <div className="mt-2 w-fit rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
+            {disabledLabel}
           </div>
         ) : null}
       </div>

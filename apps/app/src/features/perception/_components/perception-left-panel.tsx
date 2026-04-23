@@ -22,8 +22,8 @@ import {
 } from "@/lib/project-models";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
-import { BrandCanonHeroInsightCard } from "../brand-canon/_components";
-import { buildBrandCanonHeroInsight } from "../brand-canon/_lib";
+// import { BrandCanonHeroInsightCard } from "../brand-canon/_components";
+// import { buildBrandCanonHeroInsight } from "../brand-canon/_lib";
 import { buildPerceptionPeriodOptions } from "../_lib";
 import { BrandCanonSummary } from "./brand-canon-summary";
 
@@ -31,10 +31,10 @@ const MODELS_COUNT = 4;
 
 export function PerceptionLeftPanel({
   canon,
-  radar,
-  trendData,
-  windowLabel,
-  analyzedResponses,
+  // radar,
+  // trendData,
+  // windowLabel,
+  // analyzedResponses,
   selectedModels,
   modelOptions,
   selectedPeriod,
@@ -64,7 +64,7 @@ export function PerceptionLeftPanel({
   onToggleModelFilterMode: (value: boolean) => void;
   isDemo: boolean;
 }) {
-  const { locale, t } = useScopedI18n("perception");
+  const { t } = useScopedI18n("perception");
   const location = useLocation();
   const brandEditSearch = useMemo(() => {
     const params = new URLSearchParams(location.search.startsWith("?") ? location.search.slice(1) : location.search);
@@ -72,20 +72,22 @@ export function PerceptionLeftPanel({
     const search = params.toString();
     return search ? `?${search}` : "";
   }, [location.search]);
-  const heroInsight = useMemo(
-    () =>
-      buildBrandCanonHeroInsight(radar, trendData, {
-        windowLabel,
-        analyzedResponses,
-      }, locale),
-    [analyzedResponses, locale, radar, trendData, windowLabel],
-  );
+  // const heroInsight = useMemo(
+  //   () =>
+  //     buildBrandCanonHeroInsight(radar, trendData, {
+  //       windowLabel,
+  //       analyzedResponses,
+  //     }, locale),
+  //   [analyzedResponses, locale, radar, trendData, windowLabel],
+  // );
 
   return (
     <div className="flex h-auto flex-col xl:h-full">
-      <div className="m-2 mb-4 shrink-0">
-        <BrandCanonHeroInsightCard insight={heroInsight} />
-      </div>
+      {/*
+        <div className="m-2 mb-4 shrink-0">
+          <BrandCanonHeroInsightCard insight={heroInsight} />
+        </div>
+      */}
 
       <Tabs defaultValue="brand" className="min-h-0 flex-1 flex-col">
         <div className="shrink-0 px-2 pb-2">

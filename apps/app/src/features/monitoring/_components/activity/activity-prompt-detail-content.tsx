@@ -1,8 +1,7 @@
-import { Copy, Link2 } from "lucide-react";
+import type { ReactNode } from "react";
+import { Link2 } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
 import { cn } from "@/lib/utils";
 
@@ -10,26 +9,23 @@ import {
   getScoreToneClass,
   getSentimentMeta,
 } from "../../_lib/activity/activity-detail-helpers";
-import { DetailSection, MetricLine } from "./activity-detail-primitives";
 
 type ActivityPromptDetailContentProps = {
   content: Record<string, string>;
   copyState: "idle" | "done" | "error";
   handleCopyPrompt: () => void | Promise<void>;
+  onViewResponse: (prompt: MonitoringPrompt) => void;
   selectedPrompt: MonitoringPrompt;
-  headerClassName?: string;
-  bodyClassName?: string;
-  useNativeScroll?: boolean;
+  mobile: boolean;
 };
 
 export function ActivityPromptDetailContent({
   content,
   copyState,
   handleCopyPrompt,
+  onViewResponse,
   selectedPrompt,
-  headerClassName,
-  bodyClassName,
-  useNativeScroll,
+  mobile,
 }: ActivityPromptDetailContentProps) {
   const selectedPromptIconSrc = selectedPrompt.modelIconPath || undefined;
   const selectedPromptModelGroup =
@@ -41,201 +37,164 @@ export function ActivityPromptDetailContent({
   const selectedPromptSentiment = getSentimentMeta(selectedPrompt.sentiment, content);
   const citationCount = selectedPrompt.citedUrls.length;
   const noDataLabel = content.noDataAvailable;
-  const notAvailableLabel = content.notAvailable;
-
-  const contentBody = (
-    <div className={bodyClassName}>
-      <DetailSection title={content.analysisSummary} eyebrow={content.responseWithHighlights}>
-        <div className="grid gap-5 border-t border-border/50 pt-4 sm:grid-cols-2 sm:gap-6">
-          <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {content.model}
-            </p>
-            <p className="text-sm font-medium text-foreground">{selectedPromptModelGroup}</p>
-            {selectedPromptModelName && selectedPromptModelName !== selectedPromptModelGroup ? (
-              <p className="mt-1 text-xs text-muted-foreground">{selectedPromptModelName}</p>
-            ) : null}
-          </div>
-
-          {/* Persona block is intentionally paused for now. */}
-          {/* <div className="space-y-1">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {content.persona}
-            </p>
-            <p className="text-sm font-medium text-foreground">
-              {selectedPrompt.persona || notAvailableLabel}
-            </p>
-          </div> */}
-
-          <div className="space-y-1 sm:col-span-2">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {content.competitors}
-            </p>
-            <p className="text-sm leading-6 text-foreground">
-              {selectedPrompt.competitorsMentioned.length > 0
-                ? selectedPrompt.competitorsMentioned.join(", ")
-                : noDataLabel}
-            </p>
-          </div>
-        </div>
-      </DetailSection>
-
-      <DetailSection title={content.summaryReadingTitle}>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <MetricLine
-            label={content.visibility}
-            value={`${selectedPrompt.score}%`}
-            hint={
-              selectedPrompt.score >= 80
-                ? content.visibilityStrongHint
-                : selectedPrompt.score >= 55
-                  ? content.visibilityMediumHint
-                  : content.visibilityWeakHint
-            }
-            valueClassName={getScoreToneClass(selectedPrompt.score)}
-          />
-          <MetricLine
-            label={content.mention}
-            value={selectedPrompt.mention ? content.yes : content.no}
-            hint={
-              selectedPrompt.mention
-                ? content.mentionPresentHint
-                : content.mentionMissingHint
-            }
-            valueClassName={
-              selectedPrompt.mention ? "text-emerald-700" : "text-muted-foreground"
-            }
-          />
-          <MetricLine
-            label={content.responseTone}
-            value={selectedPromptSentiment.label || notAvailableLabel}
-            hint={content.toneQualificationHint}
-            valueClassName={selectedPromptSentiment.toneClass}
-          />
-          <MetricLine
-            label={content.sourceCoverage}
-            value={citationCount > 0 ? `${citationCount}` : "0"}
-            hint={
-              citationCount > 0
-                ? content.sourcesDetectedHint
-                : content.noSourceDetectedHint
-            }
-            valueClassName={citationCount > 0 ? "text-primary" : "text-muted-foreground"}
-          />
-        </div>
-      </DetailSection>
-
-      <DetailSection title={content.pagesCited} eyebrow={content.factualAccuracyLabel}>
-        {selectedPrompt.citedUrls.length > 0 ? (
-          <div className="space-y-2 border-t border-border/50 pt-4">
-            {selectedPrompt.citedUrls.map((url) => (
-              <div key={url} className="flex items-start gap-3 rounded-2xl bg-muted/18 px-4 py-3">
-                <div className="mt-0.5 text-muted-foreground">
-                  <Link2 className="h-3.5 w-3.5" />
-                </div>
-                <span className="min-w-0 break-all text-sm leading-6 text-foreground/88">
-                  {url}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-muted/18 px-4 py-5 text-sm text-muted-foreground">
-            {noDataLabel}
-          </div>
-        )}
-      </DetailSection>
-    </div>
-  );
+  const rankLabel = selectedPrompt.rank ? `#${selectedPrompt.rank}` : "Non classé";
 
   return (
-    <>
-      <div className={cn("border-b border-border/60 bg-background", headerClassName)}>
-        <div className="flex flex-col gap-4">
-          <div className="flex items-start justify-between gap-4">
+    <div className={cn("flex h-full flex-col bg-white font-sans antialiased", mobile && "overflow-y-auto")}>
+      <div className={cn("px-8 pt-10", mobile && "px-6 pt-6")}>
+        <div className="mb-10 flex flex-col items-start justify-between gap-4">
+          <div className="min-w-0 space-y-4">
             <div className="flex min-w-0 items-center gap-3">
               {selectedPromptIconSrc ? (
-                <div className="rounded-md bg-muted/30 p-2">
+                <div className="rounded-md border border-border/50 bg-white p-1.5">
                   <img
                     src={selectedPromptIconSrc}
                     alt={selectedPromptModelGroup}
-                    width={28}
-                    height={28}
+                    width={20}
+                    height={20}
                     loading="lazy"
                     decoding="async"
+                    className="h-5 w-5 object-contain"
                   />
                 </div>
               ) : null}
               <div className="min-w-0">
-                <p className="truncate text-base font-semibold tracking-tight sm:text-lg">
+                <p className="truncate text-sm font-semibold text-foreground capitalize">
                   {selectedPromptModelGroup}
                 </p>
-                {selectedPromptModelName && selectedPromptModelName !== selectedPromptModelGroup ? (
-                  <p className="truncate text-sm text-muted-foreground">{selectedPromptModelName}</p>
-                ) : null}
-                <p className="mt-1 text-xs text-muted-foreground">{selectedPrompt.time}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {selectedPromptModelName && selectedPromptModelName !== selectedPromptModelGroup
+                    ? selectedPromptModelName
+                    : selectedPrompt.time}
+                </p>
               </div>
             </div>
-
+            <h1 className="[overflow-wrap:anywhere] text-xl leading-tight tracking-tight md:text-3xl">
+              {selectedPrompt.text}
+            </h1>
+          </div>
+          <div className="flex w-full flex-wrap gap-2">
             <Button
-              size="sm"
+              type="button"
+              variant="default"
+              className="min-w-0 rounded-full"
+              onClick={() => onViewResponse(selectedPrompt)}
+            >
+              <span className="truncate">Voir la réponse</span>
+            </Button>
+            <Button
+              type="button"
               variant="outline"
-              className="h-9 gap-2 border-border/60 bg-background px-3 text-xs sm:text-sm"
+              className="min-w-0 rounded-full"
               onClick={() => void handleCopyPrompt()}
             >
-              <Copy className="h-3.5 w-3.5" />
-              {copyState === "done"
-                ? content.promptCopied
-                : copyState === "error"
-                  ? content.copyUnavailable
-                  : content.copyPrompt}
+              <span className="truncate">
+                {copyState === "done"
+                  ? content.promptCopied
+                  : copyState === "error"
+                    ? content.copyUnavailable
+                    : content.copyPrompt}
+              </span>
             </Button>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge
-              variant="secondary"
-              className={cn(
-                "h-7 rounded-full border-0 px-3 text-[11px] font-semibold uppercase tracking-[0.08em]",
-                selectedPrompt.mention
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-muted/50 text-muted-foreground",
-              )}
-            >
-              {content.mention}: {selectedPrompt.mention ? content.yes : content.no}
-            </Badge>
-            <Badge
-              variant="secondary"
-              className={cn(
-                "h-7 rounded-full border-0 px-3 text-[11px] font-semibold uppercase tracking-[0.08em]",
-                selectedPromptSentiment.badgeClass,
-              )}
-            >
-              {content.responseTone}: {selectedPromptSentiment.label}
-            </Badge>
-            <Badge
-              variant="secondary"
-              className="h-7 rounded-full border-0 bg-muted/50 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-            >
-              {content.citations}: {citationCount}
-            </Badge>
-            {selectedPrompt.rank ? (
-              <Badge
-                variant="secondary"
-                className="h-7 rounded-full border-0 bg-primary/10 px-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-primary"
-              >
-                {content.rank}: #{selectedPrompt.rank}
-              </Badge>
-            ) : null}
           </div>
         </div>
       </div>
 
-      {useNativeScroll ? (
-        <div className="min-h-0 flex-1 overflow-y-auto">{contentBody}</div>
-      ) : (
-        <ScrollArea className="min-h-0 flex-1">{contentBody}</ScrollArea>
-      )}
-    </>
+      <div className={cn("flex-1 px-8 pb-8", mobile ? "px-6" : "overflow-y-auto")}>
+        <div className="grid grid-cols-1 gap-y-12">
+          <div className="flex items-baseline justify-between">
+            <span className="text-xs font-bold text-primary">{content.score}</span>
+            <div className="flex items-baseline gap-3">
+              <span className={cn("text-4xl md:text-6xl font-extralight tracking-tighter", getScoreToneClass(selectedPrompt.score))}>
+                {selectedPrompt.score}%
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-7">
+            <DetailRow
+              label={content.mention}
+              value={selectedPrompt.mention ? content.yes : content.no}
+              valueClassName={selectedPrompt.mention ? "text-emerald-700" : "text-muted-foreground"}
+            />
+            <DetailRow
+              label={content.rank}
+              value={rankLabel}
+              valueClassName={selectedPrompt.rank === 1 ? "text-primary" : undefined}
+            />
+            <DetailRow
+              label={content.responseTone}
+              value={selectedPromptSentiment.label}
+              valueClassName={selectedPromptSentiment.toneClass}
+            />
+            <DetailRow label={content.sourceCoverage} value={`${citationCount}`} />
+            <DetailRow
+              label={content.competitors}
+              value={
+                selectedPrompt.competitorsMentioned.length > 0
+                  ? selectedPrompt.competitorsMentioned.join(", ")
+                  : noDataLabel
+              }
+            />
+          </div>
+
+          <section className="space-y-4">
+            <div className="text-xs font-bold text-primary">
+              {content.detailedAnalysis}
+            </div>
+            <div className="rounded-md bg-background">
+              <p className="text-sm font-medium leading-7 text-foreground/90 [overflow-wrap:anywhere]">
+                &quot;{selectedPrompt.response || noDataLabel}&quot;
+              </p>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="text-xs font-bold text-primary">
+              {content.pagesCited}
+            </div>
+            {selectedPrompt.citedUrls.length > 0 ? (
+              <div className="space-y-2">
+                {selectedPrompt.citedUrls.map((url) => (
+                  <a
+                    key={url}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex items-start gap-3 rounded-md bg-background px-4 py-3 text-sm leading-6 text-foreground/88 transition-all ring-2 ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  >
+                    <Link2 className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 break-all">{url}</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-md bg-background py-5 text-sm text-muted-foreground">
+                {noDataLabel}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DetailRow({
+  label,
+  value,
+  valueClassName,
+}: {
+  label: string;
+  value: ReactNode;
+  valueClassName?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-5">
+      <span className="text-xs font-bold text-primary">{label}</span>
+      <span className={cn("min-w-0 text-right text-sm font-semibold [overflow-wrap:anywhere]", valueClassName)}>
+        {value}
+      </span>
+    </div>
   );
 }

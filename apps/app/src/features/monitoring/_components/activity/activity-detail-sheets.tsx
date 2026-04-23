@@ -10,6 +10,7 @@ type ActivityDetailSheetsProps = {
   closeAlert: () => void;
   selectedPrompt: MonitoringPrompt | null;
   closePrompt: () => void;
+  onViewPromptResponse: (prompt: MonitoringPrompt) => void;
 };
 
 export function ActivityDetailSheets({
@@ -17,11 +18,16 @@ export function ActivityDetailSheets({
   closeAlert,
   selectedPrompt,
   closePrompt,
+  onViewPromptResponse,
 }: ActivityDetailSheetsProps) {
   return (
     <>
       <ActivityAlertDetailSheet selectedAlert={selectedAlert} onClose={closeAlert} />
-      <ActivityPromptDetailSheet selectedPrompt={selectedPrompt} onClose={closePrompt} />
+      <ActivityPromptDetailSheet
+        selectedPrompt={selectedPrompt}
+        onClose={closePrompt}
+        onViewResponse={onViewPromptResponse}
+      />
     </>
   );
 }

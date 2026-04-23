@@ -8,11 +8,13 @@ import { cn } from "@/shared/utils";
 type PromptsPlanProgressProps = {
   promptPlanUsage: PromptPlanUsageSummary;
   className?: string;
+  compact?: boolean;
 };
 
 export function PromptsPlanProgress({
   promptPlanUsage,
   className,
+  compact = false,
 }: PromptsPlanProgressProps) {
   const { t } = useScopedI18n("prompts-workspace");
   const isDanger = promptPlanUsage.progress >= 100;
@@ -29,14 +31,14 @@ export function PromptsPlanProgress({
       : "text-muted-foreground";
 
   return (
-    <div className={cn("w-full md:w-[460px] md:shrink-0", className)}>
-      <div className="flex items-center gap-3">
+    <div className={cn(compact ? "w-full" : "w-full md:w-[460px] md:shrink-0", className)}>
+      <div className={cn(compact ? "space-y-1.5" : "flex items-center gap-3")}>
         <Progress
           value={promptPlanUsage.progress}
-          className="h-2 flex-1"
+          className={cn("flex-1", compact ? "h-1.5" : "h-2")}
           indicatorClassName={indicatorClassName}
         />
-        <div className={cn("shrink-0 text-xs font-medium", usageClassName)}>
+        <div className={cn("shrink-0 text-xs font-medium", compact && "truncate", usageClassName)}>
           {t("planPromptUsage", {
             used: promptPlanUsage.usedPrompts,
             limit: promptPlanUsage.limit,

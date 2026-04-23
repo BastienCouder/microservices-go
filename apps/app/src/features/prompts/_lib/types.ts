@@ -1,4 +1,5 @@
 export type PeriodKey =
+  | "all"
   | "today"
   | "7d"
   | "14d"
@@ -35,6 +36,7 @@ export type PromptSchedule = {
 export type PromptRun = {
   id: string;
   time: string;
+  createdAt?: string;
   model: AIModel;
   isHistorical?: boolean;
   minutesAgo: number;

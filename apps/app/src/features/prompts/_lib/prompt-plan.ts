@@ -2,6 +2,7 @@ import { type SimulatedPlan } from "@/shared/billing-plan";
 
 const PROMPT_PLAN_LIMITS: Record<SimulatedPlan, number> = {
   starter: 100,
+  developer: 500,
   growth: 250,
   pro: 500,
   "agency-enterprise": 5000,

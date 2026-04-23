@@ -1,1 +1,0 @@
-export { OrganizationsPage } from "./view";

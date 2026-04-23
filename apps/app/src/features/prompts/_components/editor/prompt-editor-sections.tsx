@@ -154,7 +154,7 @@ export function PromptCoverageSection({
               <img src={visual.icon} alt={visual.name} className="mt-0.5 h-4 w-4 object-contain" decoding="async" />
 
               <div className="min-w-0 pr-5">
-                <div className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
                   {visual.provider}
                 </div>
                 <div className="truncate text-sm font-semibold leading-6">{visual.name}</div>

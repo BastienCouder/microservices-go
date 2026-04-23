@@ -10,7 +10,16 @@ export type SidebarProjectOption = {
 
 export type SidebarItem = {
   href: string;
-  labelKey: "prompts" | "pages" | "brands" | "models" | "organizations" | "team" | "billing" | "settings";
+  labelKey:
+    | "prompts"
+    | "pages"
+    | "brands"
+    | "models"
+    | "adminModels"
+    | "organizations"
+    | "team"
+    | "billing"
+    | "settings";
 };
 
 export const SIDEBAR_LABELS = {
@@ -18,6 +27,7 @@ export const SIDEBAR_LABELS = {
   pages: "pages",
   brands: "brands",
   models: "models",
+  adminModels: "admin models",
   organizations: "organizations",
   team: "team",
   billing: "billing",
@@ -32,6 +42,7 @@ export const MONITORING_ITEMS: SidebarItem[] = [
 ];
 
 export const ORGANIZATION_ITEMS: SidebarItem[] = [
+  { href: "/admin/models", labelKey: "adminModels" },
   { href: "/organizations", labelKey: "organizations" },
   { href: "/billing", labelKey: "billing" },
   { href: "/settings", labelKey: "settings" },

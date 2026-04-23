@@ -2,6 +2,15 @@ import { ActivityDetailSheets } from "./activity-detail-sheets";
 import { ActivityPanelLoading } from "./activity-panel-loading";
 import { ActivityPanelView } from "./activity-panel-view";
 import { useActivityPanelViewModel } from "../../_lib/activity/use-activity-panel-view-model";
+import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
+
+function openPromptResponse(prompt: MonitoringPrompt) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("tab", "responses");
+  params.set("focusPromptId", prompt.promptId);
+  params.set("responseId", prompt.responseId);
+  window.location.assign(`/prompts?${params.toString()}`);
+}
 
 export function ActivityPanel() {
   const viewModel = useActivityPanelViewModel();
@@ -23,6 +32,7 @@ export function ActivityPanel() {
         closeAlert={viewModel.closeAlert}
         selectedPrompt={viewModel.selectedPrompt}
         closePrompt={viewModel.closePrompt}
+        onViewPromptResponse={openPromptResponse}
       />
     </>
   );

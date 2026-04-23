@@ -13,7 +13,7 @@ export function PromptsClient({ apiBaseURL, routeSearch }: PromptsClientProps) {
       routeSearch={routeSearch}
       includeHistoricalModels
     >
-      <PromptsResponsesWorkspace apiBaseURL={apiBaseURL} />
+      <PromptsResponsesWorkspace apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
     </MonitoringDataProvider>
   );
 }

@@ -76,7 +76,7 @@ export function FiltersPanelView(props: FiltersPanelViewProps) {
                 variant="ghost"
                 size="sm"
                 className={cn(
-                  "h-8 min-w-[9rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[7.5rem] lg:px-2 lg:text-[10px]",
+                  "h-8 min-w-[9rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[7.5rem] lg:px-2 lg:text-xs",
                   !props.showResetFilters && "invisible pointer-events-none",
                 )}
                 onClick={props.onResetFilters}

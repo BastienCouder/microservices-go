@@ -15,6 +15,7 @@ type MonitoringPromptInput = {
   modelDisplayName: string;
   modelProviderModelId: string;
   time: string;
+  createdAt?: string;
   mention: boolean;
   rank?: number | null;
   score: number;
@@ -82,6 +83,44 @@ function dedupeCompetitors(values: string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function dayKey(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfUtcDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+export function buildTrend30dFromRuns(runs: Array<{ createdAt?: string; score: number }>) {
+  const today = startOfUtcDay(new Date());
+  const firstDay = new Date(today);
+  firstDay.setUTCDate(today.getUTCDate() - 29);
+
+  const dailyScores = new Map<string, number[]>();
+
+  for (const run of runs) {
+    if (!run.createdAt) continue;
+    const createdAt = new Date(run.createdAt);
+    if (Number.isNaN(createdAt.getTime())) continue;
+
+    const runDay = startOfUtcDay(createdAt);
+    if (runDay < firstDay || runDay > today) continue;
+
+    const key = dayKey(runDay);
+    const bucket = dailyScores.get(key) ?? [];
+    bucket.push(Math.max(0, Math.min(100, run.score ?? 0)));
+    dailyScores.set(key, bucket);
+  }
+
+  return Array.from({ length: 30 }, (_, index) => {
+    const day = new Date(firstDay);
+    day.setUTCDate(firstDay.getUTCDate() + index);
+    const scores = dailyScores.get(dayKey(day));
+    if (!scores || scores.length === 0) return 0;
+    return Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length);
+  });
+}
+
 function normalizePromptScheduleValue(input?: Partial<PromptSchedule> | null): PromptSchedule {
   const base = defaultPromptSchedule();
   return {
@@ -137,6 +176,7 @@ export function buildPromptPageItems({
       return {
         id: item.responseId || `${projectPrompt.id}-run-${runIndex + 1}`,
         time: item.time,
+        createdAt: item.createdAt,
         model,
         minutesAgo: minutes,
         mention: item.mention,
@@ -170,16 +210,7 @@ export function buildPromptPageItems({
         : 0;
     const lastRunMinutes =
       runs.length > 0 ? Math.min(...runs.map((item) => item.minutesAgo)) : 999999;
-    const trendSeed = runsSource
-      .slice(0, 7)
-      .map((item) => Math.max(0, Math.min(100, item.score ?? 0)));
-    const trend30d =
-      trendSeed.length > 0
-        ? Array.from(
-            { length: 7 },
-            (_, trendIndex) => trendSeed[trendIndex] ?? trendSeed[trendSeed.length - 1] ?? 0,
-          )
-        : [0, 0, 0, 0, 0, 0, 0];
+    const trend30d = buildTrend30dFromRuns(runs);
     const promptModels = Array.from(
       new Set([
         ...(projectPrompt.modelIds ?? []),
@@ -244,6 +275,7 @@ export function buildResponseRows({
       models: [model],
       isHistorical: false,
       time: item.time,
+      createdAt: item.createdAt,
       model,
       minutesAgo,
       mention: item.mention,

@@ -34,7 +34,7 @@ export function BrandVisibilityChart({
     <div className="min-w-0 border-b border-border/50 p-3 xl:col-span-7 xl:border-b-0 xl:border-r">
       <ChartContainer
         config={BRAND_VISIBILITY_CHART_CONFIG}
-        className="h-[170px] w-full xl:h-[240px]"
+        className="h-[170px] w-full xl:h-[280px]"
       >
         <BarChart data={rows} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>
           <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />

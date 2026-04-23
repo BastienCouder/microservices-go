@@ -2,6 +2,7 @@
 
 import { Fragment, ReactNode } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 
 export type WorkspaceTableColumn = {
   id: string;
@@ -31,13 +32,16 @@ export function WorkspaceTable<T>({
       <TableHeader className="sticky top-0 z-10 bg-background">
         <TableRow>
           {columns.map((column) => (
-            <TableHead key={column.id} className={column.className}>
+            <TableHead
+              key={column.id}
+              className={cn("h-12 px-3 text-sm font-semibold text-muted-foreground", column.className)}
+            >
               {column.label}
             </TableHead>
           ))}
         </TableRow>
       </TableHeader>
-      <TableBody>
+      <TableBody className="[&_td]:px-3 [&_td]:py-3">
         {rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={columns.length} className="py-8 text-center text-sm text-muted-foreground">

@@ -9,6 +9,7 @@ import {
 describe("prompt plan usage", () => {
   test("returns the expected prompt limit for each simulated plan", () => {
     expect(getPromptPlanLimit("starter")).toBe(100);
+    expect(getPromptPlanLimit("developer")).toBe(500);
     expect(getPromptPlanLimit("growth")).toBe(250);
     expect(getPromptPlanLimit("pro")).toBe(500);
     expect(getPromptPlanLimit("agency-enterprise")).toBe(5000);

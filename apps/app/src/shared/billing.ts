@@ -10,7 +10,6 @@ export type BillingEntitlements = {
   monthlyQuota: number;
   seats: number;
   modelSelectionLimit: number;
-  monthlyModelChangeLimit: number;
 };
 
 function asObject(value: unknown): JsonObject {
@@ -38,7 +37,6 @@ export function normalizeBillingEntitlements(value: unknown): BillingEntitlement
     monthlyQuota: asNumber(payload.monthly_quota),
     seats: asNumber(payload.seats),
     modelSelectionLimit: asNumber(payload.model_selection_limit),
-    monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
   };
 }
 

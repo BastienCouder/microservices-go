@@ -16,7 +16,7 @@ import {
   readSelectedOrganizationId,
   RESPONSES_BATCH_SIZE,
 } from "./prompt-normalizers";
-import { DEFAULT_PROMPT_PERIOD, rankTone, statusBadgeVariant, truncate } from "./utils";
+import { DEFAULT_PROMPT_PERIOD, rankTone, statusBadgeClassName, truncate } from "./utils";
 import { usePromptsDerivedState } from "./use-prompts-derived-state";
 import { usePromptsMutations } from "./use-prompts-mutations";
 import { usePromptsSourceData } from "./use-prompts-source-data";
@@ -332,7 +332,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
       mutations.updatePromptModelsMutation.isPending ||
       mutations.updatePromptScheduleMutation.isPending,
     rankTone,
-    statusBadgeVariant,
+    statusBadgeClassName,
     truncate,
   };
 }

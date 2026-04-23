@@ -122,12 +122,12 @@
   /* 24px */
 
   /* Small (12px) */
-  --text-sm: 0.9rem;
+  --text-sm: 0.85rem;
   --text-sm--line-height: 1rem;
   /* 16px */
 
   /* XS (12px) */
-  --text-xs: 0.8rem;
+  --text-xs: 0.75rem;
   --text-xs--line-height: 1rem;
   /* 16px */
 

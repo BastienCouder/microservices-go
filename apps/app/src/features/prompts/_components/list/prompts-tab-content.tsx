@@ -53,7 +53,7 @@ type PromptsTabContentProps = {
   runSelectedPrompts: () => void;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
-  statusBadgeVariant: (status: PromptItem["status"]) => "secondary" | "outline" | "destructive";
+  statusBadgeClassName: (status: PromptItem["status"]) => string;
   onRunSelect: (runId: string) => void;
   promptPage: number;
   promptTotalItems: number;
@@ -222,7 +222,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                       runningAnyPrompts: props.runningAnyPrompts,
                       getModelVisual: props.getModelVisual,
                       rankTone: props.rankTone,
-                      statusBadgeVariant: props.statusBadgeVariant,
+                      statusBadgeClassName: props.statusBadgeClassName,
                       onRunSelect: props.onRunSelect,
                       locale,
                       content,
@@ -258,7 +258,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     runningAnyPrompts={props.runningAnyPrompts}
                     getModelVisual={props.getModelVisual}
                     rankTone={props.rankTone}
-                    statusBadgeVariant={props.statusBadgeVariant}
+                    statusBadgeClassName={props.statusBadgeClassName}
                     onRunSelect={props.onRunSelect}
                     locale={locale}
                     content={content}
