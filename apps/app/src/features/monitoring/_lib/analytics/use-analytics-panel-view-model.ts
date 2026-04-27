@@ -77,21 +77,12 @@ export function useAnalyticsPanelViewModel(): AnalyticsPanelViewModel {
     [filteredPrompts, filters.dateRange, filters.period],
   );
   const promptsForVisibilityAnalyticsPeriod = useMemo(() => {
-    const periodScopedPrompts = filteredPrompts.filter((prompt) =>
-      promptIsInPeriodWithDateRange(prompt, filters.period, filters.dateRange),
-    );
-
     if (filters.selectedCompetitors.length > 0) {
-      return periodScopedPrompts.filter((prompt) => prompt.mention);
+      return promptsForKpiCards.filter((prompt) => prompt.mention);
     }
 
-    return periodScopedPrompts;
-  }, [
-    filteredPrompts,
-    filters.dateRange,
-    filters.period,
-    filters.selectedCompetitors.length,
-  ]);
+    return promptsForKpiCards;
+  }, [filters.selectedCompetitors.length, promptsForKpiCards]);
 
   const baselineMetrics = useMemo(
     () => getPromptMetrics(recent_prompts),

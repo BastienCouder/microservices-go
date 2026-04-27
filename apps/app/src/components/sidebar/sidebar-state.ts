@@ -1,4 +1,5 @@
 import type { OrganizationHierarchy, OrganizationProjectSummary } from "@/shared/models";
+import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 
 type SelectPreferredIDOptions = {
   candidates: Array<string | null | undefined>;
@@ -45,6 +46,7 @@ function normalizeProject(value: unknown): OrganizationProjectSummary | null {
 
   return {
     id,
+    slug: "",
     organizationId: normalizeID(getField(value, ["organizationId", "OrganizationID"])),
     name: normalizeString(getField(value, ["name", "Name"])) || "Project",
     status: normalizeString(getField(value, ["status", "Status"])) || "draft",
@@ -68,9 +70,12 @@ export function normalizeOrganizationHierarchy(
   const projectsValue = getField(payload, ["projects", "Projects"]);
 
   const projects = Array.isArray(projectsValue)
-    ? projectsValue
-      .map((project) => normalizeProject(project))
-      .filter((project): project is OrganizationProjectSummary => project !== null)
+    ? attachStableSlugs(
+        projectsValue
+          .map((project) => normalizeProject(project))
+          .filter((project): project is OrganizationProjectSummary => project !== null),
+        "project",
+      )
     : [];
 
   const organizationID = normalizeID(getField(organizationRecord, ["id", "ID"])) || fallbackOrganizationId;
@@ -84,6 +89,7 @@ export function normalizeOrganizationHierarchy(
   return {
     organization: {
       id: organizationID,
+      slug: slugifyPublicName(organizationName, "organization"),
       name: organizationName,
       ownerIdentityId: normalizeID(getField(organizationRecord, ["ownerIdentityId", "OwnerIdentityID"])),
       createdAt: normalizeString(getField(organizationRecord, ["createdAt", "CreatedAt"])),

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
-import { ModelCard } from "@/features/monitoring/_components/shared/model-card";
+import { ModelCard } from "@/components/shared/model-card";
 import {
   createProviderCredentialLookup,
   getCatalogDefaultSelection,
@@ -17,8 +17,8 @@ import {
   type LLMProviderCredentialStatus,
   type ModelCatalogItem,
 } from "@/features/models/_lib/model-access";
-import { ProviderApiKeysPanel } from "@/features/models/_components/provider-api-keys-panel";
-import { useProviderCredentialMutations } from "@/features/models/_hooks/use-provider-credential-mutations";
+import { ProviderApiKeysPanel } from "@/features/models/_components/provider-keys/provider-api-keys-panel";
+import { useProviderCredentialMutations } from "@/features/models/_lib/models-panel/use-provider-credential-mutations";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
@@ -426,7 +426,7 @@ export function StepModels({
               selected={selected}
               onClick={() => toggleModel(model.id)}
               modelGroup={model.modelGroup}
-              size="models"
+              size="large"
               disabled={disabledByApiKey}
               disabledLabel={
                 disabledByApiKey ? t("modelsDeveloperModelDisabled") : undefined

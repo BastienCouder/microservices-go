@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileFloatingNav } from "@/components/sidebar/mobile-floating-nav";
+import { AppToaster } from "@/components/ui/toaster";
 
 type AppLayoutProps = {
   apiBaseURL: string;
@@ -29,6 +30,8 @@ export function AppLayout({ apiBaseURL, busy, children, feedback, onLogout, onRe
                     <Footer />
                 </div> */}
             </div>
+
+            <AppToaster />
         </div>
   );
 }

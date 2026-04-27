@@ -18,12 +18,14 @@ const (
 )
 
 type ExecutePromptInput struct {
-	PromptID     string
-	PromptText   string
-	ModelID      string
-	BrandName    string
-	Competitors  []string
-	MockResponse string
+	PromptID       string
+	PromptText     string
+	ModelID        string
+	ProviderID     string
+	ProviderAPIKey string
+	BrandName      string
+	Competitors    []string
+	MockResponse   string
 }
 
 type PromptExecutionMetadata struct {
@@ -72,8 +74,15 @@ type ProviderResult struct {
 	TokensUsed  int
 }
 
+type ProviderGenerateInput struct {
+	ProviderID string
+	ModelID    string
+	APIKey     string
+	Prompt     string
+}
+
 type PromptProvider interface {
-	Generate(ctx context.Context, modelID, prompt string) (ProviderResult, error)
+	Generate(ctx context.Context, input ProviderGenerateInput) (ProviderResult, error)
 }
 
 type Dependencies struct {

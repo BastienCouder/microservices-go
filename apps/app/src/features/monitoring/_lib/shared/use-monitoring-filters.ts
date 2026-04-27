@@ -60,22 +60,12 @@ export function useMonitoringFilterActions(): MonitoringFilterActions {
   return useMonitoringStore(selectMonitoringActions, shallow);
 }
 
-export function getActiveMonitoringFilterCount(filters: MonitoringFiltersSnapshot): number {
-  let count =
-    filters.selectedModels.length +
-    filters.selectedCompetitors.length;
-
-  if (filters.period !== "14d" || filters.dateRange !== undefined) {
-    count += 1;
-  }
-
-  if (filters.showUniqueModelFilters) {
-    count += 1;
-  }
-
-  return count;
-}
-
 export function hasActiveMonitoringFilters(filters: MonitoringFiltersSnapshot): boolean {
-  return getActiveMonitoringFilterCount(filters) > 0;
+  return (
+    filters.selectedModels.length > 0 ||
+    filters.selectedCompetitors.length > 0 ||
+    filters.period !== "14d" ||
+    filters.dateRange !== undefined ||
+    filters.showUniqueModelFilters
+  );
 }

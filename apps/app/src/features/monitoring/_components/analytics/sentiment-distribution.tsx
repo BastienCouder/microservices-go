@@ -6,8 +6,8 @@ import { ChartContainer } from "@/components/ui/chart";
 import { Cell, Pie, PieChart } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { AI_SENTIMENT_COLORS } from "@/lib/app-data";
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
 import { chartConfig } from "../../_lib/analytics/analytics-utils";
 
 type SentimentItem = { name: string; value: number; fill: string };
@@ -43,7 +43,7 @@ export const SentimentDistribution = memo(function SentimentDistribution({
       <CardHeader className="pb-2">
         <div className="space-y-1">
           <CardTitle className="text-lg font-semibold">
-            <MonitoringSectionTitle>{content.aiSentimentTitle}</MonitoringSectionTitle>
+            <SectionTitle>{content.aiSentimentTitle}</SectionTitle>
           </CardTitle>
           <CardDescription className="text-xs leading-relaxed md:text-sm">{content.aiSentimentDescription}</CardDescription>
         </div>
@@ -110,7 +110,7 @@ export const SentimentDistribution = memo(function SentimentDistribution({
             </ChartContainer>
             </div>
           ) : (
-            <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
+            <EmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
           )}
 
           <div className="grid grid-cols-3 gap-2">

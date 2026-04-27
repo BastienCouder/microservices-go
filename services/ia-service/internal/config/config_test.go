@@ -20,6 +20,23 @@ func TestLoadProviderModeDefaultsToOpenRouterBaseURL(t *testing.T) {
 	}
 }
 
+func TestLoadProviderModeAllowsMissingFallbackProviderAPIKey(t *testing.T) {
+	t.Setenv("HTTP_ADDR", ":8091")
+	t.Setenv("GRPC_ADDR", ":9091")
+	t.Setenv("INTERNAL_JWT_SECRET", "secret")
+	t.Setenv("INTERNAL_JWT_ISSUER", "api-gateway")
+	t.Setenv("IA_EXECUTION_MODE", "provider")
+	t.Setenv("IA_PROVIDER_TIMEOUT_MS", "5000")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if cfg.ProviderAPIKey != "" {
+		t.Fatalf("expected empty fallback provider api key, got %q", cfg.ProviderAPIKey)
+	}
+}
+
 func TestLoadProviderModeReadsOpenRouterAttributionHeaders(t *testing.T) {
 	t.Setenv("HTTP_ADDR", ":8091")
 	t.Setenv("GRPC_ADDR", ":9091")

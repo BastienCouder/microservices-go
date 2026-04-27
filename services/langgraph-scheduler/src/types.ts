@@ -32,7 +32,14 @@ export interface ScheduledAnalysisJobDefinition {
   promptId: string;
   promptText: string;
   modelIds: string[];
+  providerCredentials?: Record<string, ModelProviderCredential>;
   schedule: PromptSchedule;
+}
+
+export interface ModelProviderCredential {
+  providerId: string;
+  providerModelId: string;
+  providerApiKey: string;
 }
 
 export interface DueAnalysisJob extends Omit<ScheduledAnalysisJobDefinition, "modelIds"> {

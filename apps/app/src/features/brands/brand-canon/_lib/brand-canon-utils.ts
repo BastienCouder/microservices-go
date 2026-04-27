@@ -23,6 +23,13 @@ export function buildBackSearch(search: string): string {
   return query ? `?${query}` : "";
 }
 
+export function buildBrandsLocation(search: string) {
+  return {
+    pathname: "/brands" as const,
+    search: buildBackSearch(search),
+  };
+}
+
 export function sanitizeList(items: string[]): string[] {
   const seen = new Set<string>();
   const nextItems: string[] = [];

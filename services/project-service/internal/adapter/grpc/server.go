@@ -114,16 +114,25 @@ func (s *Server) ListScheduledAnalysisJobs(ctx context.Context, _ *projectv1.Lis
 		Jobs: make([]*projectv1.ScheduledAnalysisJob, 0, len(jobs)),
 	}
 	for _, job := range jobs {
+		providerCredentials := make(map[string]*projectv1.ScheduledModelProviderCredential, len(job.ProviderCredentials))
+		for modelID, credential := range job.ProviderCredentials {
+			providerCredentials[modelID] = &projectv1.ScheduledModelProviderCredential{
+				ProviderId:      credential.ProviderID,
+				ProviderModelId: credential.ProviderModelID,
+				ProviderApiKey:  credential.ProviderAPIKey,
+			}
+		}
 		response.Jobs = append(response.Jobs, &projectv1.ScheduledAnalysisJob{
-			ProjectId:      job.ProjectID,
-			ProjectName:    job.ProjectName,
-			OrganizationId: job.OrganizationID,
-			CreatedBy:      job.CreatedBy,
-			BrandName:      job.BrandName,
-			Competitors:    append([]string(nil), job.Competitors...),
-			PromptId:       job.PromptID,
-			PromptText:     job.PromptText,
-			ModelIds:       append([]string(nil), job.ModelIDs...),
+			ProjectId:           job.ProjectID,
+			ProjectName:         job.ProjectName,
+			OrganizationId:      job.OrganizationID,
+			CreatedBy:           job.CreatedBy,
+			BrandName:           job.BrandName,
+			Competitors:         append([]string(nil), job.Competitors...),
+			PromptId:            job.PromptID,
+			PromptText:          job.PromptText,
+			ModelIds:            append([]string(nil), job.ModelIDs...),
+			ProviderCredentials: providerCredentials,
 			Schedule: &projectv1.PromptSchedule{
 				Mode:       job.Schedule.Mode,
 				Cron:       job.Schedule.Cron,

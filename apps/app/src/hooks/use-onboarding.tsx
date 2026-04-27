@@ -23,6 +23,7 @@ export type CompetitorItem = {
 
 export type OnboardingState = {
   step: number;
+  organizationName: string;
   websiteUrl: string;
   attributionSource: string;
   brandName: string;
@@ -40,6 +41,7 @@ type OnboardingContextValue = OnboardingState & {
   totalSteps: number;
   brandPreparationCompleted: boolean;
   setStep: (step: number) => void;
+  setOrganizationName: (name: string) => void;
   setWebsiteUrl: (url: string) => void;
   setAttributionSource: (source: string) => void;
   setBrandName: (name: string) => void;
@@ -58,6 +60,7 @@ type OnboardingContextValue = OnboardingState & {
 
 const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   step: 1,
+  organizationName: "",
   websiteUrl: "",
   attributionSource: "",
   brandName: "",
@@ -90,6 +93,9 @@ export function OnboardingProvider({
   );
 
   const [step, setStep] = useState(mergedState.step);
+  const [organizationName, setOrganizationName] = useState(
+    mergedState.organizationName,
+  );
   const [websiteUrl, setWebsiteUrl] = useState(mergedState.websiteUrl);
   const [attributionSource, setAttributionSource] = useState(
     mergedState.attributionSource,
@@ -123,6 +129,7 @@ export function OnboardingProvider({
   const value = useMemo<OnboardingContextValue>(
     () => ({
       step,
+      organizationName,
       websiteUrl,
       attributionSource,
       brandName,
@@ -137,6 +144,7 @@ export function OnboardingProvider({
       totalSteps,
       brandPreparationCompleted,
       setStep,
+      setOrganizationName,
       setWebsiteUrl,
       setAttributionSource,
       setBrandName,
@@ -159,6 +167,7 @@ export function OnboardingProvider({
       brandPreparationCompleted,
       brandShortDescription,
       competitors,
+      organizationName,
       attributionSource,
       industry,
       keyFeatures,

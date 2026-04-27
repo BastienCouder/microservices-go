@@ -3,7 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { PERCEPTION_HEATMAP_AXIS_COLORS } from "@/lib/app-data";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionAxisLabel, getPerceptionHeatmapGradeLabel } from "../_lib";
 
@@ -46,7 +46,7 @@ export function PerceptionModelAxisHeatmap({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <CardTitle className="text-base">
-              <MonitoringSectionTitle>{t("heatmapTitle")}</MonitoringSectionTitle>
+              <SectionTitle>{t("heatmapTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription>{t("heatmapDescription")}</CardDescription>
           </div>

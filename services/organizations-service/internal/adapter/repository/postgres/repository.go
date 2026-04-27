@@ -226,6 +226,7 @@ func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]d
 		From("organization_members m").
 		LeftJoin("member_roles r ON r.organization_id = m.organization_id AND r.user_id = m.user_id").
 		Where(sq.Eq{"m.organization_id": organizationID}).
+		Where("m.deleted_at IS NULL").
 		GroupBy("m.organization_id, m.user_id, m.team_id, m.added_at").
 		OrderBy("m.user_id")
 
@@ -256,6 +257,76 @@ func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]d
 	}
 
 	return members, nil
+}
+
+func (r *Repository) UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
+	memberRow, err := r.queries.GetMemberByOrgAndUser(ctx, sqlc.GetMemberByOrgAndUserParams{
+		OrganizationID: organizationID,
+		UserID:         userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			if _, orgErr := r.GetByID(ctx, organizationID); orgErr != nil {
+				return nil, orgErr
+			}
+			return nil, domain.ErrMemberNotFound
+		}
+		return nil, fmt.Errorf("get member before team update: %w", err)
+	}
+
+	if teamID > 0 {
+		var teamExists bool
+		if err := r.db.QueryRow(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM teams
+				WHERE organization_id = $1
+				  AND id = $2
+				  AND deleted_at IS NULL
+			)
+		`, organizationID, teamID).Scan(&teamExists); err != nil {
+			return nil, fmt.Errorf("check team before member update: %w", err)
+		}
+		if !teamExists {
+			return nil, domain.ErrTeamNotFound
+		}
+	}
+
+	var updated domain.Member
+	var deletedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		UPDATE organization_members
+		SET team_id = $3
+		WHERE organization_id = $1
+		  AND user_id = $2
+		  AND deleted_at IS NULL
+		RETURNING organization_id, user_id, COALESCE(team_id, 0), added_at, deleted_at
+	`, organizationID, userID, nullableTeamID(teamID)).Scan(
+		&updated.OrganizationID,
+		&updated.UserID,
+		&updated.TeamID,
+		&updated.AddedAt,
+		&deletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrMemberNotFound
+		}
+		return nil, fmt.Errorf("update member team: %w", err)
+	}
+	updated.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	if updated.AddedAt.IsZero() {
+		updated.AddedAt = fromPgTimestamptz(memberRow.AddedAt)
+	}
+
+	roles, err := r.queries.ListMemberRolesByOrgAndUser(ctx, sqlc.ListMemberRolesByOrgAndUserParams{
+		OrganizationID: organizationID,
+		UserID:         userID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list member roles after team update: %w", err)
+	}
+	updated.Roles = append([]string(nil), roles...)
+	return &updated, nil
 }
 
 func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
@@ -302,9 +373,141 @@ func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int6
 	}, nil
 }
 
+func (r *Repository) UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	if _, err := r.GetByID(ctx, organizationID); err != nil {
+		return nil, err
+	}
+
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin update member roles transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	member, err := getActiveMember(ctx, tx, organizationID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM member_roles
+		WHERE organization_id = $1
+		  AND user_id = $2
+	`, organizationID, userID); err != nil {
+		return nil, fmt.Errorf("delete member roles: %w", err)
+	}
+
+	for _, role := range roles {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO member_roles (organization_id, user_id, role)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (organization_id, user_id, role) DO NOTHING
+		`, organizationID, userID, role); err != nil {
+			return nil, fmt.Errorf("insert member role: %w", err)
+		}
+	}
+
+	member.Roles = append([]string(nil), roles...)
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit update member roles transaction: %w", err)
+	}
+	return member, nil
+}
+
+func (r *Repository) RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error {
+	if _, err := r.GetByID(ctx, organizationID); err != nil {
+		return err
+	}
+
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin remove member transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := getActiveMember(ctx, tx, organizationID, userID); err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM member_roles
+		WHERE organization_id = $1
+		  AND user_id = $2
+	`, organizationID, userID); err != nil {
+		return fmt.Errorf("delete member roles before removal: %w", err)
+	}
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE organization_members
+		SET deleted_at = $3
+		WHERE organization_id = $1
+		  AND user_id = $2
+		  AND deleted_at IS NULL
+	`, organizationID, userID, toPgTimestamptz(removedAt.UTC()))
+	if err != nil {
+		return fmt.Errorf("remove member: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrMemberNotFound
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit remove member transaction: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) SetMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
+	if _, err := r.GetByID(ctx, organizationID); err != nil {
+		return nil, err
+	}
+
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("begin set member banned transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	member, err := getActiveMember(ctx, tx, organizationID, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	if banned {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO member_roles (organization_id, user_id, role)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (organization_id, user_id, role) DO NOTHING
+		`, organizationID, userID, domain.RoleBanned); err != nil {
+			return nil, fmt.Errorf("insert banned role: %w", err)
+		}
+	} else {
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM member_roles
+			WHERE organization_id = $1
+			  AND user_id = $2
+			  AND role = $3
+		`, organizationID, userID, domain.RoleBanned); err != nil {
+			return nil, fmt.Errorf("delete banned role: %w", err)
+		}
+	}
+
+	roles, err := listActiveMemberRoles(ctx, tx, organizationID, userID)
+	if err != nil {
+		return nil, err
+	}
+	member.Roles = roles
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, fmt.Errorf("commit set member banned transaction: %w", err)
+	}
+	return member, nil
+}
+
 func (r *Repository) CreateInvitation(ctx context.Context, invitation *domain.Invitation) error {
 	created, err := r.queries.CreateInvitation(ctx, sqlc.CreateInvitationParams{
 		OrganizationID:  invitation.OrganizationID,
+		ProjectID:       invitation.ProjectID,
 		Email:           invitation.Email,
 		Role:            invitation.Role,
 		Token:           invitation.Token,
@@ -448,10 +651,14 @@ func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, 
 		}
 		return nil, nil, fmt.Errorf("upsert invited member: %w", err)
 	}
+	memberRole := invitation.Role
+	if invitation.ProjectID != "" {
+		memberRole = "project_member"
+	}
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
 		OrganizationID: invitation.OrganizationID,
 		UserID:         userID,
-		Role:           invitation.Role,
+		Role:           memberRole,
 	}); err != nil {
 		return nil, nil, fmt.Errorf("insert invited member role: %w", err)
 	}
@@ -534,6 +741,58 @@ func nullableTeamID(teamID int64) pgtype.Int8 {
 	return pgtype.Int8{Int64: teamID, Valid: true}
 }
 
+func getActiveMember(ctx context.Context, tx pgx.Tx, organizationID, userID int64) (*domain.Member, error) {
+	var member domain.Member
+	var deletedAt pgtype.Timestamptz
+	if err := tx.QueryRow(ctx, `
+		SELECT organization_id, user_id, COALESCE(team_id, 0), added_at, deleted_at
+		FROM organization_members
+		WHERE organization_id = $1
+		  AND user_id = $2
+		  AND deleted_at IS NULL
+	`, organizationID, userID).Scan(
+		&member.OrganizationID,
+		&member.UserID,
+		&member.TeamID,
+		&member.AddedAt,
+		&deletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrMemberNotFound
+		}
+		return nil, fmt.Errorf("get active member: %w", err)
+	}
+	member.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &member, nil
+}
+
+func listActiveMemberRoles(ctx context.Context, tx pgx.Tx, organizationID, userID int64) ([]string, error) {
+	rows, err := tx.Query(ctx, `
+		SELECT role
+		FROM member_roles
+		WHERE organization_id = $1
+		  AND user_id = $2
+		ORDER BY role
+	`, organizationID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list member roles: %w", err)
+	}
+	defer rows.Close()
+
+	roles := make([]string, 0)
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, fmt.Errorf("scan member role: %w", err)
+		}
+		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate member roles: %w", err)
+	}
+	return roles, nil
+}
+
 func toPgNullableTimestamptz(value *time.Time) pgtype.Timestamptz {
 	if value == nil {
 		return pgtype.Timestamptz{}
@@ -564,6 +823,7 @@ func mapInvitation(row sqlc.OrganizationInvitation) domain.Invitation {
 	return domain.Invitation{
 		ID:               row.ID,
 		OrganizationID:   row.OrganizationID,
+		ProjectID:        row.ProjectID,
 		Email:            row.Email,
 		Role:             row.Role,
 		Token:            row.Token,

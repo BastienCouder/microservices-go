@@ -17,6 +17,7 @@ type MemberRole struct {
 type OrganizationInvitation struct {
 	ID               int64
 	OrganizationID   int64
+	ProjectID        string
 	Email            string
 	Role             string
 	Token            string

@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
 )
 
 func TestGenerateMapsInternalModelIDsAndSetsOpenRouterHeaders(t *testing.T) {
@@ -41,7 +43,10 @@ func TestGenerateMapsInternalModelIDsAndSetsOpenRouterHeaders(t *testing.T) {
 
 	client := NewClient(server.URL, "test-key", "https://microservices-go.local", "microservices-go", server.Client())
 
-	result, err := client.Generate(context.Background(), "gpt-oss-20b-free", "Analyse la marque")
+	result, err := client.Generate(context.Background(), usecase.ProviderGenerateInput{
+		ModelID: "gpt-oss-20b-free",
+		Prompt:  "Analyse la marque",
+	})
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -64,12 +69,38 @@ func TestGenerateReturnsProviderErrorMessage(t *testing.T) {
 
 	client := NewClient(server.URL, "test-key", "", "", server.Client())
 
-	_, err := client.Generate(context.Background(), "gpt-4o-mini", "Analyse la marque")
+	_, err := client.Generate(context.Background(), usecase.ProviderGenerateInput{
+		ModelID: "gpt-4o-mini",
+		Prompt:  "Analyse la marque",
+	})
 	if err == nil {
 		t.Fatalf("expected provider error")
 	}
 	if !strings.Contains(err.Error(), "model is unavailable") {
 		t.Fatalf("expected provider error message, got %v", err)
+	}
+}
+
+func TestGenerateUsesProjectAPIKeyWhenProvided(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer project-key" {
+			t.Fatalf("expected project bearer auth header, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Acme est visible"}}],"usage":{"total_tokens":12}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "global-key", "", "", server.Client())
+
+	if _, err := client.Generate(context.Background(), usecase.ProviderGenerateInput{
+		ModelID: "openai/gpt-oss-20b:free",
+		APIKey:  "project-key",
+		Prompt:  "Analyse la marque",
+	}); err != nil {
+		t.Fatalf("generate: %v", err)
 	}
 }
 

@@ -7,8 +7,8 @@ import { ChartContainer } from "@/components/ui/chart";
 import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { VISIBILITY_ANALYTICS_COLORS } from "@/lib/app-data";
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
 import { chartConfig } from "../../_lib/analytics/analytics-utils";
 
 type VisibilityBarDatum = { id: string; label: string; value: number; fill: string };
@@ -43,7 +43,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 space-y-1">
             <CardTitle className="text-base font-semibold sm:text-lg">
-              <MonitoringSectionTitle>{title || content.visibilityAnalyticsTitle}</MonitoringSectionTitle>
+              <SectionTitle>{title || content.visibilityAnalyticsTitle}</SectionTitle>
             </CardTitle>
             <CardDescription className="text-xs leading-relaxed md:text-sm">
               {content.modelVisibilityMetricDescription}
@@ -59,7 +59,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
       </CardHeader>
       <CardContent className="min-w-0">
         {!hasData ? (
-          <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
+          <EmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
         ) : (
           <div className="flex min-w-0 flex-col">
           <ChartContainer

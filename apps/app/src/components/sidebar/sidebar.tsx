@@ -8,9 +8,14 @@ import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
+import {
+  loadOrganizationSummaries,
+  type OrganizationSummary,
+} from "@/features/organizations/_lib/shared/organization-page-api";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { OrganizationHierarchy } from "@/shared/models";
+import { findBySlugOrId } from "@/shared/public-slugs";
 import {
   buildScopedHref,
   readOrganizationIdFromSearch,
@@ -28,32 +33,7 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarPromptPlanProgress } from "./sidebar-prompt-plan-progress";
 import { normalizeOrganizationHierarchy, selectPreferredID } from "./sidebar-state";
 
-type SidebarMembership = {
-  organizationId: string;
-};
-
-const EMPTY_MEMBERSHIPS: SidebarMembership[] = [];
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function getIDString(value: unknown): string {
-  if (typeof value === "string") return value.trim();
-  if (typeof value === "number" && Number.isFinite(value)) return String(value);
-  return "";
-}
-
-function normalizeMemberships(value: unknown): SidebarMembership[] {
-  if (!Array.isArray(value)) return [];
-
-  return value
-    .filter((item): item is Record<string, unknown> => isRecord(item))
-    .map((item) => ({
-      organizationId: getIDString(item.organizationId ?? item.id),
-    }))
-    .filter((item) => item.organizationId !== "");
-}
+const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 
 function getInitials(value: string): string {
   const parts = value.trim().split(/\s+/).filter(Boolean);
@@ -69,29 +49,15 @@ function normalizeSidebarProjects(hierarchy: OrganizationHierarchy | null): Side
     .sort((left, right) => left.name.localeCompare(right.name, "en"))
     .map((project) => ({
       id: project.id,
+      slug: project.slug,
       name: project.name,
       organizationId: hierarchy.organization.id,
+      organizationSlug: hierarchy.organization.slug,
       organizationName: hierarchy.organization.name,
       brandName: project.brandName,
       status: project.status,
       initials: getInitials(project.name),
     }));
-}
-
-async function loadSidebarMemberships(apiBaseURL: string, signal?: AbortSignal): Promise<SidebarMembership[]> {
-  const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
-    method: "GET",
-    signal,
-  });
-
-  if (!response.ok) {
-    if (response.status === 401) {
-      return [];
-    }
-    throw new Error("Impossible de charger les organisations du user.");
-  }
-
-  return normalizeMemberships(response.data);
 }
 
 async function loadSidebarHierarchy(
@@ -137,17 +103,21 @@ function SidebarComponent({
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadSidebarMemberships(apiBaseURL, signal),
+    queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
   });
-  const memberships = organizationsQuery.data ?? EMPTY_MEMBERSHIPS;
-  const routeOrganizationId = readOrganizationIdFromSearch(location.search);
+  const organizations = organizationsQuery.data ?? EMPTY_ORGANIZATIONS;
+  const routeOrganizationToken = readOrganizationIdFromSearch(location.search);
+  const routeOrganization = useMemo(
+    () => findBySlugOrId(organizations, routeOrganizationToken),
+    [organizations, routeOrganizationToken],
+  );
   const selectedOrganizationId = useMemo(
     () =>
       selectPreferredID({
-        candidates: [routeOrganizationId, readSelectedOrganizationID(), memberships[0]?.organizationId],
-        availableIds: memberships.map((membership) => membership.organizationId),
+        candidates: [routeOrganization?.id, readSelectedOrganizationID(), organizations[0]?.id],
+        availableIds: organizations.map((organization) => organization.id),
       }),
-    [routeOrganizationId, memberships],
+    [organizations, routeOrganization],
   );
 
   const hierarchyQuery = useQuery({
@@ -157,14 +127,18 @@ function SidebarComponent({
   });
   const hierarchy = hierarchyQuery.data ?? null;
   const projects = useMemo(() => normalizeSidebarProjects(hierarchy), [hierarchy]);
-  const routeProjectId = readProjectIdFromSearch(location.search);
+  const routeProjectToken = readProjectIdFromSearch(location.search);
+  const routeProject = useMemo(
+    () => findBySlugOrId(projects, routeProjectToken),
+    [projects, routeProjectToken],
+  );
   const selectedProjectId = useMemo(
     () =>
       selectPreferredID({
-        candidates: [routeProjectId, readSelectedProjectID(), projects[0]?.id],
+        candidates: [routeProject?.id, readSelectedProjectID(), projects[0]?.id],
         availableIds: projects.map((project) => project.id),
       }),
-    [projects, routeProjectId],
+    [projects, routeProject],
   );
 
   useEffect(() => {
@@ -176,33 +150,39 @@ function SidebarComponent({
     () => projects.find((project) => project.id === selectedProjectId) || projects[0] || null,
     [projects, selectedProjectId],
   );
+  const activeOrganization =
+    organizations.find((organization) => organization.id === selectedOrganizationId) || null;
   const projectScopedMonitoringHref = buildScopedHref("/monitoring", {
-    projectId: activeProject?.id,
+    project: activeProject?.slug,
+  });
+  const organizationHref = buildScopedHref("/organizations", {
+    org: activeOrganization?.slug,
   });
   const projectScopedItems = useMemo(
     () =>
       MONITORING_ITEMS.map((item) => ({
         ...item,
-        href: buildScopedHref(item.href, { projectId: activeProject?.id }),
+        href: buildScopedHref(item.href, { project: activeProject?.slug }),
       })),
-    [activeProject?.id],
+    [activeProject?.slug],
   );
   const addProjectHref = buildScopedHref("/organizations", {
-    org: selectedOrganizationId,
-    projectId: activeProject?.id,
+    org: activeOrganization?.slug || activeProject?.organizationSlug,
+    project: activeProject?.slug,
     createProject: "1",
   });
   const perceptionHref = buildScopedHref("/perception", {
-    projectId: activeProject?.id,
+    project: activeProject?.slug,
   });
   const isActiveHref = (href: string) => canonicalCurrentPath === href.split("?", 1)[0];
 
   const handleSelectProject = (projectId: string) => {
+    const nextProject = projects.find((project) => project.id === projectId);
     storeSelectedProjectID(projectId);
     navigate(
       buildScopedHref(`${location.pathname}${location.search}`, {
-        projectId,
-        org: selectedOrganizationId,
+        project: nextProject?.slug,
+        org: nextProject?.organizationSlug || activeOrganization?.slug,
         createProject: null,
       }),
     );
@@ -274,6 +254,13 @@ function SidebarComponent({
               href={perceptionHref}
               label={content.perception}
               active={isActiveHref(perceptionHref)}
+              collapsed={collapsed}
+              className="font-bold uppercase tracking-wider"
+            />
+            <SidebarNavItem
+              href={organizationHref}
+              label={content.organisation}
+              active={isActiveHref(organizationHref)}
               collapsed={collapsed}
               className="font-bold uppercase tracking-wider"
             />

@@ -2,8 +2,6 @@ package usecase
 
 import "github.com/bastiencouder/microservices-go/services/billing-service/internal/domain"
 
-const defaultMonthlyModelChangeLimit = 3
-
 type OrganizationEntitlements struct {
 	OrganizationID          int64  `json:"organization_id"`
 	Plan                    string `json:"plan"`
@@ -51,5 +49,5 @@ func ModelSelectionLimitForPlan(plan string) int {
 }
 
 func MonthlyModelChangeLimitForPlan(_ string) int {
-	return defaultMonthlyModelChangeLimit
+	return 0
 }

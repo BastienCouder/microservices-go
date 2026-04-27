@@ -5,7 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { PageHeader } from "@/features/shared/view/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PROMPT_MAX_LENGTH,

@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { appQueryKeys } from "@/lib/query-keys";
-import { PromptsPlanProgress } from "@/features/prompts/components/prompts-plan-progress";
+import { PromptsPlanProgress } from "@/components/shared/prompts-plan-progress";
 import { buildPromptPlanUsageSummary } from "@/features/prompts/_lib/prompt-plan";
 import { loadPromptQuotaUsage } from "@/features/prompts/_lib/prompt-quota";
 import { useI18nScope } from "@/shared/hooks/use-i18n";

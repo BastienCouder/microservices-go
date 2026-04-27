@@ -1,1 +1,0 @@
-export { BrandsPage } from "./view";

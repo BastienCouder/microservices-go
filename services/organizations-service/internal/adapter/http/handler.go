@@ -184,6 +184,22 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodGet:
 		h.listMembers(w, r, organizationID)
 		return
+	case len(parts) == 3 && parts[1] == "members" && (r.Method == http.MethodPatch || r.Method == http.MethodPut):
+		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || userID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+		h.updateMemberRoles(w, r, organizationID, userID)
+		return
+	case len(parts) == 3 && parts[1] == "members" && r.Method == http.MethodDelete:
+		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || userID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+		h.removeMember(w, r, organizationID, userID)
+		return
 	case len(parts) == 4 && parts[1] == "members" && parts[3] == "roles" && r.Method == http.MethodPost:
 		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || userID <= 0 {
@@ -192,6 +208,32 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 		}
 		h.assignRole(w, r, organizationID, userID)
 		return
+	case len(parts) == 4 && parts[1] == "members" && parts[3] == "ban" && r.Method == http.MethodPost:
+		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || userID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+		h.setMemberBanned(w, r, organizationID, userID, true)
+		return
+	case len(parts) == 4 && parts[1] == "members" && parts[3] == "unban" && r.Method == http.MethodPost:
+		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+		if parseErr != nil || userID <= 0 {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			return
+		}
+		h.setMemberBanned(w, r, organizationID, userID, false)
+		return
+	// Teams are disabled in the organization page for now.
+	// Keep this API path documented but inactive until the UI needs it again.
+	// case len(parts) == 4 && parts[1] == "members" && parts[3] == "team" && r.Method == http.MethodPatch:
+	// 	userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
+	// 	if parseErr != nil || userID <= 0 {
+	// 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+	// 		return
+	// 	}
+	// 	h.updateMemberTeam(w, r, organizationID, userID)
+	// 	return
 	default:
 		http.NotFound(w, r)
 		return
@@ -229,7 +271,13 @@ func (h *Handler) getOrganizationByID(w http.ResponseWriter, r *http.Request, or
 }
 
 func (h *Handler) getOrganizationHierarchy(w http.ResponseWriter, r *http.Request, organizationID int64) {
-	hierarchy, err := h.svc.GetOrganizationHierarchy(r.Context(), organizationID)
+	var hierarchy usecase.OrganizationHierarchy
+	var err error
+	if userID, ok := authenticatedUserID(r); ok {
+		hierarchy, err = h.svc.GetOrganizationHierarchyForUser(r.Context(), organizationID, userID)
+	} else {
+		hierarchy, err = h.svc.GetOrganizationHierarchy(r.Context(), organizationID)
+	}
 	if err != nil {
 		h.writeDomainError(w, err)
 		return
@@ -320,6 +368,7 @@ type createInvitationRequest struct {
 	Email     string `json:"email"`
 	Role      string `json:"role"`
 	Message   string `json:"message"`
+	ProjectID string `json:"projectId"`
 	ExpiresAt string `json:"expires_at"`
 }
 
@@ -343,7 +392,21 @@ func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request, organ
 		return
 	}
 
-	invitation, err := h.svc.CreateInvitation(r.Context(), organizationID, authUserID, req.Email, req.Role, req.Message, expiresAt)
+	var invitation *domain.Invitation
+	if strings.TrimSpace(req.ProjectID) == "" {
+		invitation, err = h.svc.CreateInvitation(r.Context(), organizationID, authUserID, req.Email, req.Role, req.Message, expiresAt)
+	} else {
+		invitation, err = h.svc.CreateProjectInvitation(
+			r.Context(),
+			organizationID,
+			authUserID,
+			req.Email,
+			req.Role,
+			req.Message,
+			req.ProjectID,
+			expiresAt,
+		)
+	}
 	if err != nil {
 		h.writeDomainError(w, err)
 		auditSecurityEvent("organization_invitation_create", map[string]any{
@@ -516,6 +579,148 @@ func (h *Handler) refuseInvitation(w http.ResponseWriter, r *http.Request, token
 
 type assignRoleRequest struct {
 	Role string `json:"role"`
+}
+
+type updateMemberRolesRequest struct {
+	Roles []string `json:"roles"`
+}
+
+// Teams are disabled in the organization page for now.
+// Keep this handler as a commented reference for the future member-team API.
+// type updateMemberTeamRequest struct {
+// 	TeamID int64 `json:"teamId"`
+// }
+//
+// func (h *Handler) updateMemberTeam(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
+// 	if _, ok := authenticatedUserID(r); !ok {
+// 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+// 		return
+// 	}
+//
+// 	var req updateMemberTeamRequest
+// 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+// 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+// 		return
+// 	}
+//
+// 	member, err := h.svc.UpdateMemberTeam(r.Context(), organizationID, userID, req.TeamID)
+// 	if err != nil {
+// 		h.writeDomainError(w, err)
+// 		auditSecurityEvent("organization_member_team_update", map[string]any{
+// 			"organization_id": organizationID,
+// 			"user_id":         userID,
+// 			"team_id":         req.TeamID,
+// 			"result":          "error",
+// 		})
+// 		return
+// 	}
+// 	auditSecurityEvent("organization_member_team_update", map[string]any{
+// 		"organization_id": organizationID,
+// 		"user_id":         userID,
+// 		"team_id":         req.TeamID,
+// 		"result":          "success",
+// 	})
+// 	writeJSON(w, http.StatusOK, member)
+// }
+
+func (h *Handler) updateMemberRoles(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	var req updateMemberRolesRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	member, err := h.svc.UpdateMemberRoles(r.Context(), organizationID, userID, req.Roles)
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_member_roles_update", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         userID,
+			"actor_user_id":   authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_member_roles_update", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         userID,
+		"actor_user_id":   authUserID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusOK, member)
+}
+
+func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	if err := h.svc.RemoveMember(r.Context(), organizationID, userID); err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_member_remove", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         userID,
+			"actor_user_id":   authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_member_remove", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         userID,
+		"actor_user_id":   authUserID,
+		"result":          "success",
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) setMemberBanned(w http.ResponseWriter, r *http.Request, organizationID, userID int64, banned bool) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	var (
+		member *domain.Member
+		err    error
+	)
+	if banned {
+		member, err = h.svc.BanMember(r.Context(), organizationID, userID)
+	} else {
+		member, err = h.svc.UnbanMember(r.Context(), organizationID, userID)
+	}
+	event := "organization_member_unban"
+	if banned {
+		event = "organization_member_ban"
+	}
+	if err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent(event, map[string]any{
+			"organization_id": organizationID,
+			"user_id":         userID,
+			"actor_user_id":   authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent(event, map[string]any{
+		"organization_id": organizationID,
+		"user_id":         userID,
+		"actor_user_id":   authUserID,
+		"result":          "success",
+	})
+	writeJSON(w, http.StatusOK, member)
 }
 
 func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {

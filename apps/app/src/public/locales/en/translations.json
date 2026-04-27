@@ -655,6 +655,8 @@
     "remove": "Remove",
     "websiteTitle": "Welcome!",
     "websiteDescription": "We'll scan your homepage to automatically detect your brand details, industry and personas.",
+    "organizationNameLabel": "Organization name",
+    "organizationNamePlaceholder": "Your organization",
     "brandNameLabel": "Brand name",
     "brandNamePlaceholder": "Your brand name",
     "websiteUrlLabel": "Website URL",

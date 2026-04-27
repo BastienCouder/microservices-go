@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { readOrganizationIdFromSearch, readSelectedOrganizationID } from "@/shared/selection";
 import {
   OnboardingProvider,
   useOnboarding,
@@ -17,20 +18,24 @@ import { OnboardingLanguageSwitcher } from "./language-switcher";
 
 type OnboardingPageProps = {
   apiBaseURL: string;
+  routeSearch?: string;
 };
 
-function OnboardingContent({ apiBaseURL }: OnboardingPageProps) {
+function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps) {
   const { step } = useOnboarding();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const selectedOrganizationId =
+    readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch);
+  const hasOrganizationContext = selectedOrganizationId !== "";
 
   const steps = [
-    { component: <StepWebsite />, id: 1 },
-    { component: <StepAttribution />, id: 2 },
-    { component: <StepBrand />, id: 3 },
-    { component: <StepCompetitors />, id: 4 },
-    { component: <StepPrompts />, id: 5 },
-    { component: <StepModels apiBaseURL={apiBaseURL} />, id: 6 },
-    { component: <StepAnalysis />, id: 7 },
+    { component: <StepWebsite askOrganizationName={!hasOrganizationContext} />, id: 1 },
+    ...(!hasOrganizationContext ? [{ component: <StepAttribution />, id: 2 }] : []),
+    { component: <StepBrand />, id: hasOrganizationContext ? 2 : 3 },
+    { component: <StepCompetitors />, id: hasOrganizationContext ? 3 : 4 },
+    { component: <StepPrompts />, id: hasOrganizationContext ? 4 : 5 },
+    { component: <StepModels apiBaseURL={apiBaseURL} />, id: hasOrganizationContext ? 5 : 6 },
+    { component: <StepAnalysis apiBaseURL={apiBaseURL} />, id: hasOrganizationContext ? 6 : 7 },
   ];
 
   useEffect(() => {
@@ -66,10 +71,14 @@ function OnboardingContent({ apiBaseURL }: OnboardingPageProps) {
   );
 }
 
-export function OnboardingPage({ apiBaseURL }: OnboardingPageProps) {
+export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps) {
+  const selectedOrganizationId =
+    readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch ?? "");
+  const totalSteps = selectedOrganizationId ? 6 : 7;
+
   return (
-    <OnboardingProvider totalSteps={7}>
-      <OnboardingContent apiBaseURL={apiBaseURL} />
+    <OnboardingProvider totalSteps={totalSteps}>
+      <OnboardingContent apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
     </OnboardingProvider>
   );
 }

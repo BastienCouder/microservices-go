@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -12,9 +13,10 @@ import (
 )
 
 type Service struct {
-	repo          domain.Repository
-	projectLister ProjectLister
-	now           func() time.Time
+	repo                  domain.Repository
+	projectLister         ProjectLister
+	projectMemberAssigner ProjectMemberAssigner
+	now                   func() time.Time
 }
 
 func NewService(repo domain.Repository) *Service {
@@ -23,6 +25,10 @@ func NewService(repo domain.Repository) *Service {
 
 func (s *Service) EnableProjectHierarchy(projectLister ProjectLister) {
 	s.projectLister = projectLister
+}
+
+func (s *Service) EnableProjectMemberAssignments(assigner ProjectMemberAssigner) {
+	s.projectMemberAssigner = assigner
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIdentityID int64) (*domain.Organization, error) {
@@ -51,6 +57,17 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 }
 
 func (s *Service) GetOrganizationHierarchy(ctx context.Context, organizationID int64) (OrganizationHierarchy, error) {
+	return s.getOrganizationHierarchy(ctx, organizationID, 0)
+}
+
+func (s *Service) GetOrganizationHierarchyForUser(ctx context.Context, organizationID, userID int64) (OrganizationHierarchy, error) {
+	if userID <= 0 {
+		return OrganizationHierarchy{}, fmt.Errorf("%w: user id must be positive", domain.ErrInvalidMember)
+	}
+	return s.getOrganizationHierarchy(ctx, organizationID, userID)
+}
+
+func (s *Service) getOrganizationHierarchy(ctx context.Context, organizationID, userID int64) (OrganizationHierarchy, error) {
 	if organizationID <= 0 {
 		return OrganizationHierarchy{}, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidOrganization)
 	}
@@ -65,12 +82,50 @@ func (s *Service) GetOrganizationHierarchy(ctx context.Context, organizationID i
 		return hierarchy, nil
 	}
 
-	projects, err := s.projectLister.ListProjectsByOrganization(ctx, organizationID)
-	if err != nil {
-		return OrganizationHierarchy{}, fmt.Errorf("list organization projects: %w", err)
+	var projects []ProjectSummary
+	var projectErr error
+	if userID > 0 {
+		canManageAllProjects, err := s.userCanManageAllProjects(ctx, org, userID)
+		if err != nil {
+			return OrganizationHierarchy{}, err
+		}
+		if canManageAllProjects {
+			projects, projectErr = s.projectLister.ListProjectsByOrganization(ctx, organizationID)
+		} else if projectUserLister, ok := s.projectLister.(ProjectUserLister); ok {
+			projects, projectErr = projectUserLister.ListProjectsByOrganizationForUser(ctx, organizationID, userID)
+		} else {
+			projects, projectErr = s.projectLister.ListProjectsByOrganization(ctx, organizationID)
+		}
+	} else {
+		projects, projectErr = s.projectLister.ListProjectsByOrganization(ctx, organizationID)
+	}
+	if projectErr != nil {
+		return OrganizationHierarchy{}, fmt.Errorf("list organization projects: %w", projectErr)
 	}
 	hierarchy.Projects = projects
 	return hierarchy, nil
+}
+
+func (s *Service) userCanManageAllProjects(ctx context.Context, organization *domain.Organization, userID int64) (bool, error) {
+	if organization != nil && organization.OwnerIdentityID == userID {
+		return true, nil
+	}
+	memberships, err := s.repo.ListOrganizationsByUser(ctx, userID)
+	if err != nil {
+		return false, fmt.Errorf("list user organization roles: %w", err)
+	}
+	for _, membership := range memberships {
+		if organization == nil || membership.OrganizationID != organization.ID {
+			continue
+		}
+		for _, role := range membership.Roles {
+			switch strings.TrimSpace(strings.ToLower(role)) {
+			case "owner", "admin", "super_admin":
+				return true, nil
+			}
+		}
+	}
+	return false, nil
 }
 
 func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
@@ -142,6 +197,21 @@ func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]doma
 	return members, nil
 }
 
+func (s *Service) UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
+	}
+	if teamID < 0 {
+		return nil, fmt.Errorf("%w: team id must be zero or positive", domain.ErrInvalidMember)
+	}
+
+	member, err := s.repo.UpdateMemberTeam(ctx, organizationID, userID, teamID)
+	if err != nil {
+		return nil, fmt.Errorf("update member team: %w", err)
+	}
+	return member, nil
+}
+
 func (s *Service) AssignRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
 	normalizedRole, err := domain.NormalizeRole(role)
 	if err != nil {
@@ -158,10 +228,97 @@ func (s *Service) AssignRole(ctx context.Context, organizationID, userID int64, 
 	return member, nil
 }
 
+func (s *Service) UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
+	}
+	normalizedRoles, err := normalizeMemberRoles(roles)
+	if err != nil {
+		return nil, err
+	}
+
+	member, err := s.repo.UpdateMemberRoles(ctx, organizationID, userID, normalizedRoles)
+	if err != nil {
+		return nil, fmt.Errorf("update member roles: %w", err)
+	}
+	return member, nil
+}
+
+func (s *Service) RemoveMember(ctx context.Context, organizationID, userID int64) error {
+	if organizationID <= 0 || userID <= 0 {
+		return fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
+	}
+	if err := s.repo.RemoveMember(ctx, organizationID, userID, s.now().UTC()); err != nil {
+		return fmt.Errorf("remove member: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) BanMember(ctx context.Context, organizationID, userID int64) (*domain.Member, error) {
+	return s.setMemberBanned(ctx, organizationID, userID, true)
+}
+
+func (s *Service) UnbanMember(ctx context.Context, organizationID, userID int64) (*domain.Member, error) {
+	return s.setMemberBanned(ctx, organizationID, userID, false)
+}
+
+func (s *Service) setMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
+	}
+	member, err := s.repo.SetMemberBanned(ctx, organizationID, userID, banned)
+	if err != nil {
+		return nil, fmt.Errorf("set member banned: %w", err)
+	}
+	return member, nil
+}
+
+func normalizeMemberRoles(roles []string) ([]string, error) {
+	normalized := make([]string, 0, len(roles))
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		next, err := domain.NormalizeRole(role)
+		if err != nil {
+			return nil, err
+		}
+		if _, exists := seen[next]; exists {
+			continue
+		}
+		seen[next] = struct{}{}
+		normalized = append(normalized, next)
+	}
+	if len(normalized) == 0 {
+		return nil, fmt.Errorf("%w: at least one role is required", domain.ErrInvalidRole)
+	}
+	slices.Sort(normalized)
+	return normalized, nil
+}
+
 func (s *Service) CreateInvitation(
 	ctx context.Context,
 	organizationID, invitedByUserID int64,
 	email, role, message string,
+	expiresAt *time.Time,
+) (*domain.Invitation, error) {
+	return s.createInvitation(ctx, organizationID, invitedByUserID, email, role, message, "", expiresAt)
+}
+
+func (s *Service) CreateProjectInvitation(
+	ctx context.Context,
+	organizationID, invitedByUserID int64,
+	email, role, message, projectID string,
+	expiresAt *time.Time,
+) (*domain.Invitation, error) {
+	if strings.TrimSpace(projectID) == "" {
+		return nil, fmt.Errorf("%w: project id is required", domain.ErrInvalidInvitation)
+	}
+	return s.createInvitation(ctx, organizationID, invitedByUserID, email, role, message, strings.TrimSpace(projectID), expiresAt)
+}
+
+func (s *Service) createInvitation(
+	ctx context.Context,
+	organizationID, invitedByUserID int64,
+	email, role, message, projectID string,
 	expiresAt *time.Time,
 ) (*domain.Invitation, error) {
 	normalizedEmail, err := domain.NormalizeInvitationEmail(email)
@@ -176,6 +333,9 @@ func (s *Service) CreateInvitation(
 			return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
 		}
 	}
+	if normalizedRole == "owner" {
+		return nil, fmt.Errorf("%w: owner role cannot be assigned by invitation", domain.ErrInvalidInvitation)
+	}
 
 	token, err := generateSecureTokenHex(24)
 	if err != nil {
@@ -185,6 +345,7 @@ func (s *Service) CreateInvitation(
 	now := s.now().UTC()
 	invitation := &domain.Invitation{
 		OrganizationID:  organizationID,
+		ProjectID:       strings.TrimSpace(projectID),
 		Email:           normalizedEmail,
 		Role:            normalizedRole,
 		Token:           token,
@@ -243,6 +404,9 @@ func (s *Service) UpdateInvitation(
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
 	}
+	if normalizedRole == "owner" {
+		return nil, fmt.Errorf("%w: owner role cannot be assigned by invitation", domain.ErrInvalidInvitation)
+	}
 
 	invitation := &domain.Invitation{
 		ID:             invitationID,
@@ -277,6 +441,20 @@ func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int
 	invitation, member, err := s.repo.AcceptInvitationByToken(ctx, trimmedToken, userID, s.now().UTC())
 	if err != nil {
 		return nil, nil, fmt.Errorf("accept invitation: %w", err)
+	}
+	if strings.TrimSpace(invitation.ProjectID) != "" {
+		if s.projectMemberAssigner == nil {
+			return nil, nil, fmt.Errorf("%w: project invitation assignment is not configured", domain.ErrInvalidInvitation)
+		}
+		if err := s.projectMemberAssigner.AssignProjectMember(
+			ctx,
+			invitation.ProjectID,
+			invitation.OrganizationID,
+			userID,
+			invitation.Role,
+		); err != nil {
+			return nil, nil, fmt.Errorf("assign project invitation member: %w", err)
+		}
 	}
 	return invitation, member, nil
 }

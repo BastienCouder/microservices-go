@@ -1,9 +1,6 @@
 import type { DateRange } from "react-day-picker";
 
-import {
-  buildProjectModelFilterItems,
-  buildSelectedProjectModelFilterIds,
-} from "@/lib/project-models";
+import { buildProjectModelFilterItems } from "@/lib/project-models";
 import type { MonitoringFiltersSnapshot } from "../shared/use-monitoring-filters";
 import {
   filterPromptsByAudience,
@@ -12,7 +9,6 @@ import {
   promptIsInPeriodWithDateRange,
 } from "../shared/prompt-filters";
 import type {
-  FilterModelCard,
   FilterModelItem,
   MonitoringModel,
   MonitoringProject,
@@ -112,32 +108,6 @@ export function buildVisibleModelFilterItems(
 
     return MODEL_FILTER_LABEL_COLLATOR.compare(left.id, right.id);
   });
-}
-
-export function buildModelCards(
-  items: FilterModelItem[],
-  showUniqueModelFilters: boolean,
-): FilterModelCard[] {
-  return items.map((model) => ({
-    id: model.id,
-    name: showUniqueModelFilters ? model.displayName : "",
-    description: model.description,
-    icon: model.iconPath,
-    live: model.live,
-    modelGroup: model.groupName,
-  }));
-}
-
-export function buildSelectedModelFilterIds(
-  selectedModels: string[],
-  visibleModelFilterItems: FilterModelItem[],
-  showUniqueModelFilters: boolean,
-): string[] {
-  return buildSelectedProjectModelFilterIds(
-    selectedModels,
-    visibleModelFilterItems,
-    showUniqueModelFilters,
-  );
 }
 
 export function buildProjectWithDynamicCompetitors(

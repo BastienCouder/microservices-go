@@ -83,6 +83,55 @@ func TestInvitationCRUDFlow(t *testing.T) {
 	}
 }
 
+func TestInvitationCannotAssignOwnerRole(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+
+	_, err = svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"owner@acme.io",
+		"owner",
+		"",
+		nil,
+	)
+	if !errors.Is(err, domain.ErrInvalidInvitation) {
+		t.Fatalf("expected ErrInvalidInvitation for owner create, got %v", err)
+	}
+
+	invitation, err := svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"member@acme.io",
+		"member",
+		"",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create invitation: %v", err)
+	}
+
+	_, err = svc.UpdateInvitation(
+		context.Background(),
+		org.ID,
+		invitation.ID,
+		"member@acme.io",
+		"owner",
+		"",
+		nil,
+	)
+	if !errors.Is(err, domain.ErrInvalidInvitation) {
+		t.Fatalf("expected ErrInvalidInvitation for owner update, got %v", err)
+	}
+}
+
 func TestInvitationAcceptRefuseFlow(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewService(repo)
@@ -140,5 +189,52 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 	}
 	if refusedInvitation.Status != domain.InvitationStatusRefused {
 		t.Fatalf("expected refused status, got %s", refusedInvitation.Status)
+	}
+}
+
+func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
+	repo := newFakeRepo()
+	assigner := &fakeProjectMemberAssigner{}
+	svc := NewService(repo)
+	svc.EnableProjectMemberAssignments(assigner)
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+
+	invitation, err := svc.CreateProjectInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"project-user@acme.io",
+		"viewer",
+		"Projet seulement",
+		"prj-42",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create project invitation: %v", err)
+	}
+	if invitation.ProjectID != "prj-42" {
+		t.Fatalf("expected project id prj-42, got %q", invitation.ProjectID)
+	}
+
+	acceptedInvitation, acceptedMember, err := svc.AcceptInvitation(context.Background(), invitation.Token, 42)
+	if err != nil {
+		t.Fatalf("accept project invitation: %v", err)
+	}
+	if acceptedInvitation.Status != domain.InvitationStatusAccepted {
+		t.Fatalf("expected accepted status, got %s", acceptedInvitation.Status)
+	}
+	if len(acceptedMember.Roles) != 1 || acceptedMember.Roles[0] != "project_member" {
+		t.Fatalf("expected project_member org role only, got %v", acceptedMember.Roles)
+	}
+	if len(assigner.calls) != 1 {
+		t.Fatalf("expected 1 project assignment, got %d", len(assigner.calls))
+	}
+	call := assigner.calls[0]
+	if call.projectID != "prj-42" || call.organizationID != org.ID || call.userID != 42 || call.role != "viewer" {
+		t.Fatalf("unexpected project assignment call: %+v", call)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -23,11 +24,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /projects", h.createProject)
 	mux.HandleFunc("GET /projects", h.listProjects)
+	mux.HandleFunc("GET /projects/llm-provider-credentials", h.listLLMProviderCredentials)
+	mux.HandleFunc("PUT /projects/llm-provider-credentials/{provider}", h.updateLLMProviderCredential)
+	mux.HandleFunc("DELETE /projects/llm-provider-credentials/{provider}", h.deleteLLMProviderCredential)
 	mux.HandleFunc("GET /internal/scheduled-analysis/jobs", h.listScheduledAnalysisJobs)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
 	mux.HandleFunc("POST /projects/ai-models", h.createModel)
 	mux.HandleFunc("GET /projects/ai-models", h.listModels)
 	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
+	mux.HandleFunc("POST /projects/ai-models/sync/openrouter", h.syncOpenRouterModels)
 	mux.HandleFunc("/projects/ai-models/", h.projectAIModelRoutes)
 	mux.HandleFunc("/projects/", h.projectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
@@ -35,6 +40,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /ai-models", h.createModel)
 	mux.HandleFunc("GET /ai-models", h.listModels)
 	mux.HandleFunc("POST /ai-models/seed", h.seedModels)
+	mux.HandleFunc("POST /ai-models/sync/openrouter", h.syncOpenRouterModels)
 	mux.HandleFunc("/ai-models/", h.aiModelRoutes)
 }
 
@@ -47,12 +53,16 @@ func (h *Handler) projectAIModelRoutes(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) aiModelRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
-	parts := splitPathAfter(r.URL.Path, prefix)
+	parts := splitPathAfter(r.URL.EscapedPath(), prefix)
 	if len(parts) != 1 || parts[0] == "" {
 		http.NotFound(w, r)
 		return
 	}
-	modelID := parts[0]
+	modelID, err := url.PathUnescape(parts[0])
+	if err != nil || strings.TrimSpace(modelID) == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid model id"})
+		return
+	}
 
 	switch r.Method {
 	case http.MethodPatch:
@@ -144,7 +154,13 @@ func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	projects, err := h.svc.ListProjects(r.Context(), organizationID)
+	var projects []usecase.Project
+	var err error
+	if userID, ok := authenticatedUserID(r); ok {
+		projects, err = h.svc.ListProjectsForUser(r.Context(), organizationID, userID)
+	} else {
+		projects, err = h.svc.ListProjects(r.Context(), organizationID)
+	}
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -159,6 +175,11 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	projectID := parts[0]
+	if organizationID, ok := authenticatedOrganizationID(r); ok {
+		if !isProjectMembersRoute(parts) && !h.allowProjectRequest(w, r, projectID, organizationID) {
+			return
+		}
+	}
 
 	switch {
 	case len(parts) == 1 && r.Method == http.MethodGet:
@@ -179,6 +200,18 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.addCompetitors(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodGet:
 		h.listCompetitors(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodPost:
+		h.assignProjectMember(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodGet:
+		h.listProjectMembers(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "members" && r.Method == http.MethodDelete:
+		h.removeProjectMember(w, r, projectID, parts[2])
+	case len(parts) == 2 && parts[1] == "llm-provider-credentials" && r.Method == http.MethodGet:
+		h.listLLMProviderCredentialsForProject(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "llm-provider-credentials" && r.Method == http.MethodPut:
+		h.updateLLMProviderCredentialForProject(w, r, projectID, parts[2])
+	case len(parts) == 3 && parts[1] == "llm-provider-credentials" && r.Method == http.MethodDelete:
+		h.deleteLLMProviderCredentialForProject(w, r, projectID, parts[2])
 	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodGet:
 		h.listProjectModels(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodPatch:
@@ -190,6 +223,106 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func isProjectMembersRoute(parts []string) bool {
+	return len(parts) >= 2 && parts[1] == "members"
+}
+
+func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) bool {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		return true
+	}
+	if err := h.svc.EnforceUserProjectAccess(r.Context(), projectID, organizationID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) allowPromptRequest(w http.ResponseWriter, r *http.Request, promptID string, organizationID int64) bool {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		return true
+	}
+	if err := h.svc.EnforceUserPromptAccess(r.Context(), promptID, organizationID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return false
+	}
+	return true
+}
+
+func (h *Handler) allowCompetitorRequest(w http.ResponseWriter, r *http.Request, competitorID string, organizationID int64) bool {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		return true
+	}
+	if err := h.svc.EnforceUserCompetitorAccess(r.Context(), competitorID, organizationID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return false
+	}
+	return true
+}
+
+type assignProjectMemberRequest struct {
+	UserID int64  `json:"userId"`
+	Role   string `json:"role"`
+}
+
+func (h *Handler) assignProjectMember(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req assignProjectMemberRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	member, err := h.svc.AssignProjectMember(r.Context(), projectID, organizationID, req.UserID, req.Role)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, member)
+}
+
+func (h *Handler) listProjectMembers(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	members, err := h.svc.ListProjectMembers(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, members)
+}
+
+func (h *Handler) removeProjectMember(w http.ResponseWriter, r *http.Request, projectID string, rawUserID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	userID, err := strconv.ParseInt(strings.TrimSpace(rawUserID), 10, 64)
+	if err != nil || userID <= 0 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+		return
+	}
+
+	if err := h.svc.RemoveProjectMember(r.Context(), projectID, organizationID, userID); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) promptRoutes(w http.ResponseWriter, r *http.Request) {
@@ -464,6 +597,9 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
+	if !h.allowPromptRequest(w, r, promptID, organizationID) {
+		return
+	}
 	var req updatePromptRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -515,6 +651,9 @@ func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	if !h.allowPromptRequest(w, r, promptID, organizationID) {
 		return
 	}
 	if err := h.svc.DeletePrompt(r.Context(), promptID, organizationID); err != nil {
@@ -574,6 +713,9 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
+	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
+		return
+	}
 	var req updateCompetitorRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -596,6 +738,9 @@ func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, compe
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
 		return
 	}
 	if err := h.svc.DeleteCompetitor(r.Context(), competitorID, organizationID); err != nil {
@@ -621,6 +766,106 @@ func (h *Handler) listModels(w http.ResponseWriter, r *http.Request) {
 	writeSuccess(w, http.StatusOK, models)
 }
 
+func (h *Handler) listLLMProviderCredentials(w http.ResponseWriter, r *http.Request) {
+	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
+	if projectID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "projectId is required"})
+		return
+	}
+	h.listLLMProviderCredentialsForProject(w, r, projectID)
+}
+
+func (h *Handler) listLLMProviderCredentialsForProject(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	if !h.allowProjectRequest(w, r, projectID, organizationID) {
+		return
+	}
+	credentials, err := h.svc.ListLLMProviderCredentials(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, credentials)
+}
+
+type updateLLMProviderCredentialRequest struct {
+	APIKey string `json:"apiKey"`
+}
+
+func (h *Handler) updateLLMProviderCredential(w http.ResponseWriter, r *http.Request) {
+	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
+	if projectID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "projectId is required"})
+		return
+	}
+	h.updateLLMProviderCredentialForProject(w, r, projectID, r.PathValue("provider"))
+}
+
+func (h *Handler) updateLLMProviderCredentialForProject(w http.ResponseWriter, r *http.Request, projectID string, provider string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	if !h.allowProjectRequest(w, r, projectID, organizationID) {
+		return
+	}
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider"})
+		return
+	}
+
+	var req updateLLMProviderCredentialRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	credential, err := h.svc.SaveLLMProviderCredential(r.Context(), projectID, organizationID, provider, req.APIKey)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, credential)
+}
+
+func (h *Handler) deleteLLMProviderCredential(w http.ResponseWriter, r *http.Request) {
+	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
+	if projectID == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "projectId is required"})
+		return
+	}
+	h.deleteLLMProviderCredentialForProject(w, r, projectID, r.PathValue("provider"))
+}
+
+func (h *Handler) deleteLLMProviderCredentialForProject(w http.ResponseWriter, r *http.Request, projectID string, provider string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	if !h.allowProjectRequest(w, r, projectID, organizationID) {
+		return
+	}
+	provider = strings.TrimSpace(provider)
+	if provider == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid provider"})
+		return
+	}
+
+	credential, err := h.svc.DeleteLLMProviderCredential(r.Context(), projectID, organizationID, provider)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, credential)
+}
+
 func (h *Handler) seedModels(w http.ResponseWriter, r *http.Request) {
 	models, err := h.svc.SeedDefaultModels(r.Context())
 	if err != nil {
@@ -628,6 +873,41 @@ func (h *Handler) seedModels(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeSuccess(w, http.StatusOK, models)
+}
+
+type syncOpenRouterModelsRequest struct {
+	OnlyFree                  bool     `json:"onlyFree"`
+	MinContext                int      `json:"minContext"`
+	SupportsTools             bool     `json:"supportsTools"`
+	Variant                   string   `json:"variant"`
+	Providers                 []string `json:"providers"`
+	SearchQuery               string   `json:"searchQuery"`
+	ActivateImported          bool     `json:"activateImported"`
+	PurgeUnsupportedProviders bool     `json:"purgeUnsupportedProviders"`
+}
+
+func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
+	var req syncOpenRouterModelsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := h.svc.SyncOpenRouterModels(r.Context(), usecase.SyncOpenRouterModelsInput{
+		OnlyFree:                  req.OnlyFree,
+		MinContext:                req.MinContext,
+		SupportsTools:             req.SupportsTools,
+		Variant:                   req.Variant,
+		Providers:                 req.Providers,
+		SearchQuery:               req.SearchQuery,
+		ActivateImported:          req.ActivateImported,
+		PurgeUnsupportedProviders: req.PurgeUnsupportedProviders,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
 }
 
 func (h *Handler) listProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {

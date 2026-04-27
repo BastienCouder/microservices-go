@@ -22,14 +22,16 @@ const (
 )
 
 type ExecutePromptRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	PromptId      string                 `protobuf:"bytes,1,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
-	PromptText    string                 `protobuf:"bytes,2,opt,name=prompt_text,json=promptText,proto3" json:"prompt_text,omitempty"`
-	ModelId       string                 `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
-	BrandName     string                 `protobuf:"bytes,4,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
-	Competitors   []string               `protobuf:"bytes,5,rep,name=competitors,proto3" json:"competitors,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	PromptId       string                 `protobuf:"bytes,1,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
+	PromptText     string                 `protobuf:"bytes,2,opt,name=prompt_text,json=promptText,proto3" json:"prompt_text,omitempty"`
+	ModelId        string                 `protobuf:"bytes,3,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	BrandName      string                 `protobuf:"bytes,4,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
+	Competitors    []string               `protobuf:"bytes,5,rep,name=competitors,proto3" json:"competitors,omitempty"`
+	ProviderId     string                 `protobuf:"bytes,6,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	ProviderApiKey string                 `protobuf:"bytes,7,opt,name=provider_api_key,json=providerApiKey,proto3" json:"provider_api_key,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ExecutePromptRequest) Reset() {
@@ -95,6 +97,20 @@ func (x *ExecutePromptRequest) GetCompetitors() []string {
 		return x.Competitors
 	}
 	return nil
+}
+
+func (x *ExecutePromptRequest) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ExecutePromptRequest) GetProviderApiKey() string {
+	if x != nil {
+		return x.ProviderApiKey
+	}
+	return ""
 }
 
 type PromptExecutionAnalysis struct {
@@ -245,7 +261,7 @@ var File_proto_ia_v1_ia_proto protoreflect.FileDescriptor
 
 const file_proto_ia_v1_ia_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto/ia/v1/ia.proto\x12\x05ia.v1\"\xb0\x01\n" +
+	"\x14proto/ia/v1/ia.proto\x12\x05ia.v1\"\xfb\x01\n" +
 	"\x14ExecutePromptRequest\x12\x1b\n" +
 	"\tprompt_id\x18\x01 \x01(\tR\bpromptId\x12\x1f\n" +
 	"\vprompt_text\x18\x02 \x01(\tR\n" +
@@ -253,7 +269,10 @@ const file_proto_ia_v1_ia_proto_rawDesc = "" +
 	"\bmodel_id\x18\x03 \x01(\tR\amodelId\x12\x1d\n" +
 	"\n" +
 	"brand_name\x18\x04 \x01(\tR\tbrandName\x12 \n" +
-	"\vcompetitors\x18\x05 \x03(\tR\vcompetitors\"\xcd\x01\n" +
+	"\vcompetitors\x18\x05 \x03(\tR\vcompetitors\x12\x1f\n" +
+	"\vprovider_id\x18\x06 \x01(\tR\n" +
+	"providerId\x12(\n" +
+	"\x10provider_api_key\x18\a \x01(\tR\x0eproviderApiKey\"\xcd\x01\n" +
 	"\x17PromptExecutionAnalysis\x12'\n" +
 	"\x0fbrand_mentioned\x18\x01 \x01(\bR\x0ebrandMentioned\x12%\n" +
 	"\x0ebrand_position\x18\x02 \x01(\tR\rbrandPosition\x12%\n" +

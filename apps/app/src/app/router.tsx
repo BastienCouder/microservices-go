@@ -2,20 +2,18 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import type { AppRouterProps } from "./App";
-import { loadPromptsPageModule } from "./route-preloads";
-
-import { MonitoringPage } from "@/features/monitoring";
-import { ModelsPage } from "@/features/models";
+import { MonitoringPage } from "@/features/monitoring/index";
+import { ModelsPage } from "@/features/models/index";
 import { PerceptionPage } from "@/features/perception";
+import { PromptsPage } from "@/features/prompts/index";
 
-const PromptsPage = lazy(loadPromptsPageModule);
 const OnboardingPage = lazy(() =>
   import("@/features/onboarding").then((module) => ({
     default: module.OnboardingPage,
   })),
 );
 const PagesPage = lazy(() =>
-  import("@/features/pages").then((module) => ({
+  import("@/features/pages/index").then((module) => ({
     default: module.PagesPage,
   })),
 );
@@ -25,25 +23,30 @@ const AdminModelsPage = lazy(() =>
   })),
 );
 const BrandsPage = lazy(() =>
-  import("@/features/brands").then((module) => ({
+  import("@/features/brands/index").then((module) => ({
     default: module.BrandsPage,
+  })),
+);
+const OrganizationsPage = lazy(() =>
+  import("@/features/organizations/index").then((module) => ({
+    default: module.OrganizationsPage,
   })),
 );
 
 const PerceptionBrandCanonPage = lazy(() =>
-  import("@/features/brands/brand-canon").then((module) => ({
+  import("@/features/brands/brand-canon/index").then((module) => ({
     default: module.BrandCanonPage,
   })),
 );
 
-export function AppRouter({ apiBaseURL, routeSearch }: AppRouterProps) {
+export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
   return (
     <Routes>
       <Route
         path="/onboarding"
         element={
           <Suspense fallback={null}>
-            <OnboardingPage apiBaseURL={apiBaseURL} />
+            <OnboardingPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />
@@ -107,10 +110,23 @@ export function AppRouter({ apiBaseURL, routeSearch }: AppRouterProps) {
         }
       />
       <Route
-        path="/perception/brand-canon"
+        path="/brand-canon"
         element={
           <Suspense fallback={null}>
             <PerceptionBrandCanonPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/organizations"
+        element={
+          <Suspense fallback={null}>
+            <OrganizationsPage
+              apiBaseURL={apiBaseURL}
+              busy={busy}
+              routeSearch={routeSearch}
+              user={user}
+            />
           </Suspense>
         }
       />

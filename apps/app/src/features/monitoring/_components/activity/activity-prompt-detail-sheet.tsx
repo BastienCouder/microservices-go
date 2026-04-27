@@ -1,7 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 
-import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
@@ -14,21 +26,25 @@ type ActivityPromptDetailSheetProps = {
   onViewResponse: (prompt: MonitoringPrompt) => void;
 };
 
-export function ActivityPromptDetailSheet({
+function ActivityPromptDetailPanel({
   selectedPrompt,
-  onClose,
+  content,
   onViewResponse,
-}: ActivityPromptDetailSheetProps) {
-  const isMobile = useIsMobile();
-  const content = useI18nScope("monitoring-activity-panel");
+  mobile,
+}: {
+  selectedPrompt: MonitoringPrompt;
+  content: Record<string, string>;
+  onViewResponse: (prompt: MonitoringPrompt) => void;
+  mobile: boolean;
+}) {
   const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
 
-  useEffect(() => {
-    setCopyState("idle");
-  }, [selectedPrompt]);
-
   const handleCopyPrompt = useCallback(async () => {
-    if (!selectedPrompt?.text || typeof navigator === "undefined" || !navigator.clipboard) {
+    if (
+      !selectedPrompt.text ||
+      typeof navigator === "undefined" ||
+      !navigator.clipboard
+    ) {
       setCopyState("error");
       return;
     }
@@ -39,23 +55,47 @@ export function ActivityPromptDetailSheet({
     } catch {
       setCopyState("error");
     }
-  }, [selectedPrompt]);
+  }, [selectedPrompt.text]);
+
+  return (
+    <ActivityPromptDetailContent
+      content={content}
+      copyState={copyState}
+      handleCopyPrompt={handleCopyPrompt}
+      onViewResponse={onViewResponse}
+      selectedPrompt={selectedPrompt}
+      mobile={mobile}
+    />
+  );
+}
+
+export function ActivityPromptDetailSheet({
+  selectedPrompt,
+  onClose,
+  onViewResponse,
+}: ActivityPromptDetailSheetProps) {
+  const isMobile = useIsMobile();
+  const content = useI18nScope("monitoring-activity-panel");
+
+  const title = selectedPrompt?.modelGroupName || content.defaultModel;
+  const description = selectedPrompt?.text || content.userPrompt;
+  const open = !!selectedPrompt;
 
   if (isMobile) {
     return (
-      <Drawer open={!!selectedPrompt} onOpenChange={(open) => !open && onClose()}>
-        <DrawerContent className="h-[94vh] border-none bg-white rounded-t-[32px]">
+      <Drawer open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
+        <DrawerContent className="h-[94vh] rounded-t-[32px] border-none bg-white">
           <DrawerHeader className="sr-only">
-            <DrawerTitle>{selectedPrompt?.modelGroupName || content.defaultModel}</DrawerTitle>
-            <DrawerDescription>{selectedPrompt?.text || content.userPrompt}</DrawerDescription>
+            <DrawerTitle>{title}</DrawerTitle>
+            <DrawerDescription>{description}</DrawerDescription>
           </DrawerHeader>
+
           {selectedPrompt ? (
-            <ActivityPromptDetailContent
-              content={content}
-              copyState={copyState}
-              handleCopyPrompt={handleCopyPrompt}
-              onViewResponse={onViewResponse}
+            <ActivityPromptDetailPanel
+              key={selectedPrompt.text}
               selectedPrompt={selectedPrompt}
+              content={content}
+              onViewResponse={onViewResponse}
               mobile
             />
           ) : null}
@@ -65,19 +105,19 @@ export function ActivityPromptDetailSheet({
   }
 
   return (
-    <Sheet open={!!selectedPrompt} onOpenChange={(open) => !open && onClose()}>
+    <Sheet open={open} onOpenChange={(nextOpen) => !nextOpen && onClose()}>
       <SheetContent side="right" className="!max-w-2xl">
         <SheetHeader className="sr-only">
-          <SheetTitle>{selectedPrompt?.modelGroupName || content.defaultModel}</SheetTitle>
-          <SheetDescription>{selectedPrompt?.text || content.userPrompt}</SheetDescription>
+          <SheetTitle>{title}</SheetTitle>
+          <SheetDescription>{description}</SheetDescription>
         </SheetHeader>
+
         {selectedPrompt ? (
-          <ActivityPromptDetailContent
-            content={content}
-            copyState={copyState}
-            handleCopyPrompt={handleCopyPrompt}
-            onViewResponse={onViewResponse}
+          <ActivityPromptDetailPanel
+            key={selectedPrompt.text}
             selectedPrompt={selectedPrompt}
+            content={content}
+            onViewResponse={onViewResponse}
             mobile={false}
           />
         ) : null}

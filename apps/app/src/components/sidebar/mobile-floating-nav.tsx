@@ -10,8 +10,6 @@ import {
   buildScopedHref,
   readOrganizationIdFromSearch,
   readProjectIdFromSearch,
-  readSelectedOrganizationID,
-  readSelectedProjectID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS } from "./sidebar-constants";
@@ -43,29 +41,29 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
   const content = useI18nScope("sidebar");
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const activeProjectId = readProjectIdFromSearch(location.search) || readSelectedProjectID();
-  const activeOrganizationId = readOrganizationIdFromSearch(location.search) || readSelectedOrganizationID();
+  const activeProjectToken = readProjectIdFromSearch(location.search);
+  const activeOrganizationToken = readOrganizationIdFromSearch(location.search);
 
   const navigationItems = useMemo(
     () => [
-      { href: buildScopedHref("/monitoring", { projectId: activeProjectId }), label: content.monitoring },
+      { href: buildScopedHref("/monitoring", { project: activeProjectToken }), label: content.monitoring },
       ...MONITORING_ITEMS.map((item) => ({
-        href: buildScopedHref(item.href, { projectId: activeProjectId }),
+        href: buildScopedHref(item.href, { project: activeProjectToken }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      { href: buildScopedHref("/perception", { projectId: activeProjectId }), label: content.perception },
-      { href: buildScopedHref("/optimize/actions", { projectId: activeProjectId }), label: "Optimize actions" },
-      { href: buildScopedHref("/optimize/content-optimizer", { projectId: activeProjectId }), label: "Content optimizer" },
-      { href: buildScopedHref("/impact", { projectId: activeProjectId }), label: "Impact" },
+      { href: buildScopedHref("/perception", { project: activeProjectToken }), label: content.perception },
+      { href: buildScopedHref("/optimize/actions", { project: activeProjectToken }), label: "Optimize actions" },
+      { href: buildScopedHref("/optimize/content-optimizer", { project: activeProjectToken }), label: "Content optimizer" },
+      { href: buildScopedHref("/impact", { project: activeProjectToken }), label: "Impact" },
       ...ORGANIZATION_ITEMS.map((item) => ({
         href: buildScopedHref(item.href, {
-          org: activeOrganizationId,
-          projectId: activeProjectId,
+          org: activeOrganizationToken,
+          project: activeProjectToken,
         }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
     ],
-    [activeOrganizationId, activeProjectId, content],
+    [activeOrganizationToken, activeProjectToken, content],
   );
 
   return (

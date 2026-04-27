@@ -20,9 +20,13 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
+func roleGrantsFullAccess(role string) bool {
+	return role == "admin" || role == "owner" || role == "super_admin"
+}
+
 func (r *Repository) Check(ctx context.Context, in domain.CheckInput) (domain.CheckResult, error) {
 	for _, role := range in.Roles {
-		if role == "admin" || role == "owner" {
+		if roleGrantsFullAccess(role) {
 			return domain.CheckResult{Allowed: true, Reason: "role grants full access"}, nil
 		}
 	}

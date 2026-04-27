@@ -10,10 +10,12 @@ type stubProvider struct {
 	result ProviderResult
 	err    error
 	called bool
+	input  ProviderGenerateInput
 }
 
-func (s *stubProvider) Generate(_ context.Context, _ string, _ string) (ProviderResult, error) {
+func (s *stubProvider) Generate(_ context.Context, input ProviderGenerateInput) (ProviderResult, error) {
 	s.called = true
+	s.input = input
 	if s.err != nil {
 		return ProviderResult{}, s.err
 	}
@@ -55,11 +57,13 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	}
 
 	result, err := svc.ExecutePrompt(context.Background(), ExecutePromptInput{
-		PromptID:    "prompt-1",
-		PromptText:  "Meilleur CRM",
-		ModelID:     "gpt-oss-20b-free",
-		BrandName:   "Acme",
-		Competitors: []string{"HubSpot"},
+		PromptID:       "prompt-1",
+		PromptText:     "Meilleur CRM",
+		ModelID:        "gpt-oss-20b-free",
+		ProviderID:     "openrouter",
+		ProviderAPIKey: "sk-project",
+		BrandName:      "Acme",
+		Competitors:    []string{"HubSpot"},
 	})
 	if err != nil {
 		t.Fatalf("execute prompt in provider mode: %v", err)
@@ -69,6 +73,12 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	}
 	if result.RawMetadata.TokensUsed != 123 {
 		t.Fatalf("expected provider token count 123, got %d", result.RawMetadata.TokensUsed)
+	}
+	if provider.input.ProviderID != "openrouter" {
+		t.Fatalf("expected provider id openrouter, got %q", provider.input.ProviderID)
+	}
+	if provider.input.APIKey != "sk-project" {
+		t.Fatalf("expected provider api key to be forwarded")
 	}
 }
 

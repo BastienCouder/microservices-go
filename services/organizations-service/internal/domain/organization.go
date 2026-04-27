@@ -10,16 +10,16 @@ import (
 )
 
 var (
-	ErrOrganizationNotFound    = errors.New("organization not found")
-	ErrInvalidOrganization     = errors.New("invalid organization")
-	ErrTeamNotFound            = errors.New("team not found")
-	ErrInvalidTeam             = errors.New("invalid team")
-	ErrMemberNotFound          = errors.New("member not found")
-	ErrInvalidMember           = errors.New("invalid member")
-	ErrInvalidRole             = errors.New("invalid role")
-	ErrInvitationNotFound      = errors.New("invitation not found")
-	ErrInvalidInvitation       = errors.New("invalid invitation")
-	ErrInvitationExpired       = errors.New("invitation expired")
+	ErrOrganizationNotFound     = errors.New("organization not found")
+	ErrInvalidOrganization      = errors.New("invalid organization")
+	ErrTeamNotFound             = errors.New("team not found")
+	ErrInvalidTeam              = errors.New("invalid team")
+	ErrMemberNotFound           = errors.New("member not found")
+	ErrInvalidMember            = errors.New("invalid member")
+	ErrInvalidRole              = errors.New("invalid role")
+	ErrInvitationNotFound       = errors.New("invitation not found")
+	ErrInvalidInvitation        = errors.New("invalid invitation")
+	ErrInvitationExpired        = errors.New("invitation expired")
 	ErrInvitationAlreadyHandled = errors.New("invitation already handled")
 )
 
@@ -105,6 +105,10 @@ func AddRole(roles []string, role string) []string {
 type InvitationStatus string
 
 const (
+	RoleBanned = "banned"
+)
+
+const (
 	InvitationStatusPending  InvitationStatus = "pending"
 	InvitationStatusAccepted InvitationStatus = "accepted"
 	InvitationStatusRefused  InvitationStatus = "refused"
@@ -114,6 +118,7 @@ const (
 type Invitation struct {
 	ID               int64
 	OrganizationID   int64
+	ProjectID        string
 	Email            string
 	Role             string
 	Token            string

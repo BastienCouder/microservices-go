@@ -132,6 +132,9 @@ func TestOutboxEventProcessingRunsPipelineOnce(t *testing.T) {
 	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1", "Q2"}); err != nil {
 		t.Fatalf("add prompts: %v", err)
 	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
 
 	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
 		t.Fatalf("finalize: %v", err)
@@ -194,6 +197,9 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace project models: %v", err)
 	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
 
 	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1", "Q2"})
 	if err != nil {
@@ -240,10 +246,76 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 		gotCoverage[call.PromptID] = append(gotCoverage[call.PromptID], call.ModelID)
 	}
 
-	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"gpt-oss-120b-free"}) {
-		t.Fatalf("expected first prompt coverage [gpt-oss-120b-free], got %#v", gotCoverage[prompts[0].ID])
+	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"openai/gpt-oss-120b:free"}) {
+		t.Fatalf("expected first prompt coverage [openai/gpt-oss-120b:free], got %#v", gotCoverage[prompts[0].ID])
 	}
-	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"gemma-3-27b-free"}) {
-		t.Fatalf("expected second prompt coverage [gemma-3-27b-free], got %#v", gotCoverage[prompts[1].ID])
+	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"google/gemma-3-27b-it:free"}) {
+		t.Fatalf("expected second prompt coverage [google/gemma-3-27b-it:free], got %#v", gotCoverage[prompts[1].ID])
+	}
+}
+
+func TestOutboxEventProcessingPassesProjectProviderAPIKey(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openai", "sk-project-openai"); err != nil {
+		t.Fatalf("save project provider credential: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-20b-free"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1"}); err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	events, err := svc.ListOutboxEventsToPublish(ctx, 10)
+	if err != nil {
+		t.Fatalf("list outbox events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d", len(events))
+	}
+	if err := svc.MarkOutboxEventPublished(ctx, events[0].ID); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if err := svc.ProcessFinalizedProjectOutboxEvent(ctx, events[0].ID); err != nil {
+		t.Fatalf("process outbox event: %v", err)
+	}
+
+	if len(iaSpy.execInputs) == 0 {
+		t.Fatalf("expected ia execution")
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openai" {
+		t.Fatalf("expected provider openai, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "sk-project-openai" {
+		t.Fatalf("expected project provider api key to be passed, got %q", got.ProviderAPIKey)
+	}
+	if got.ModelID != "openai/gpt-oss-20b:free" {
+		t.Fatalf("expected provider model id, got %q", got.ModelID)
 	}
 }

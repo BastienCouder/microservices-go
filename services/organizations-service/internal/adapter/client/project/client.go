@@ -1,11 +1,13 @@
 package project
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -37,6 +39,17 @@ func NewClient(baseURL, jwtSecret, jwtIssuer string) (*Client, error) {
 }
 
 func (c *Client) ListProjectsByOrganization(ctx context.Context, organizationID int64) ([]usecase.ProjectSummary, error) {
+	return c.listProjects(ctx, organizationID, 0)
+}
+
+func (c *Client) ListProjectsByOrganizationForUser(ctx context.Context, organizationID, userID int64) ([]usecase.ProjectSummary, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("user id must be positive")
+	}
+	return c.listProjects(ctx, organizationID, userID)
+}
+
+func (c *Client) listProjects(ctx context.Context, organizationID, userID int64) ([]usecase.ProjectSummary, error) {
 	if organizationID <= 0 {
 		return nil, fmt.Errorf("organization id must be positive")
 	}
@@ -46,7 +59,7 @@ func (c *Client) ListProjectsByOrganization(ctx context.Context, organizationID 
 		c.jwtIssuer,
 		"project-service",
 		"organizations-service",
-		internaljwt.TokenClaims{OrganizationID: organizationID},
+		internaljwt.TokenClaims{OrganizationID: organizationID, UserID: userID},
 		60*time.Second,
 	)
 	if err != nil {
@@ -122,4 +135,60 @@ func (c *Client) ListProjectsByOrganization(ctx context.Context, organizationID 
 	}
 
 	return projects, nil
+}
+
+func (c *Client) AssignProjectMember(ctx context.Context, projectID string, organizationID, userID int64, role string) error {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return fmt.Errorf("project id is required")
+	}
+	if organizationID <= 0 || userID <= 0 {
+		return fmt.Errorf("organization id and user id must be positive")
+	}
+
+	token, err := internaljwt.SignHS256(
+		c.jwtSecret,
+		c.jwtIssuer,
+		"project-service",
+		"organizations-service",
+		internaljwt.TokenClaims{OrganizationID: organizationID},
+		60*time.Second,
+	)
+	if err != nil {
+		return fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	payload, err := json.Marshal(struct {
+		UserID int64  `json:"userId"`
+		Role   string `json:"role"`
+	}{
+		UserID: userID,
+		Role:   strings.TrimSpace(role),
+	})
+	if err != nil {
+		return fmt.Errorf("encode project member request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/projects/"+url.PathEscape(projectID)+"/members", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("create project member request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("send project member request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(raw))
+		if message == "" {
+			message = http.StatusText(resp.StatusCode)
+		}
+		return fmt.Errorf("project service error (%d): %s", resp.StatusCode, message)
+	}
+	return nil
 }

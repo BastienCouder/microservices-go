@@ -1,52 +1,45 @@
 # Features Pattern
 
-Chaque feature doit suivre la meme structure de base:
+La structure de reference est celle de `features/monitoring`.
 
 ```text
 features/<feature>/
-  index.ts
-  core/
-  hooks/
-  components/
-  view/
-    index.tsx
-    template.tsx
-    client.tsx
+  index.tsx
+  layout.tsx
+  _components/
+    <panel>/
+      index.tsx
+      template.tsx
+      *.tsx
+  _lib/
+    <panel>/
+      use-<panel>-panel-view-model.ts
+      *.ts
+      types.ts
+    shared/
+      *.ts
 ```
 
 Regles:
 
-- `index.ts` est l'entree publique de la feature. Les imports externes passent par la.
-- `view/index.tsx` est le point d'entree de page ou de route.
-- `view/template.tsx` porte le layout de la page, les etats `loading`, `empty`, `error`.
-- `view/client.tsx` porte l'orchestration UI, les filtres, la composition et l'etat local lourd.
-- `components/` contient les blocs UI internes a la feature.
-- `core/` contient la logique de domaine de la feature: acces donnees, mapping, config, contrats.
-- `hooks/` contient seulement les hooks propres a la feature.
+- `index.tsx` est l'entree publique de la feature. Il compose les providers propres a la feature et rend le layout.
+- `layout.tsx` porte la composition generale de la page ou de la feature.
+- `_components/<panel>/index.tsx` est le conteneur du panel: view-model, etats de chargement, composition UI.
+- `_components/<panel>/template.tsx` porte le skeleton/loading state du panel.
+- `_components/<panel>/*.tsx` contient les composants UI internes au panel.
+- `_lib/<panel>/use-*-view-model.ts` porte l'orchestration UI, les donnees derivees et les callbacks.
+- `_lib/<panel>/*.ts` contient les helpers, mappers, constantes et types locaux au panel.
+- `_lib/shared/` contient la logique partagee par plusieurs panels de la meme feature.
 
 Conventions:
 
-- pas de dossier `_components`
-- pas de dossier `views`
-- pas de fichier `*-client.tsx` a la racine de la feature
-- pas de suffixe `.view.tsx` dans les noms de fichiers
-- si une feature est simple, `template.tsx` et `client.tsx` sont optionnels
+- utiliser cette structure pour les nouvelles features et les migrations.
+- ne pas melanger ce pattern avec `view/`, `views/`, `components/`, `hooks/` ou `core/` dans une feature migree.
+- garder les dossiers prives de feature prefixes par `_`: `_components`, `_lib`.
+- utiliser des noms de fichiers en kebab-case.
+- garder `layout.tsx` fin: pas de mapping metier, pas de gros etat local.
+- placer le partage transversal dans `apps/app/src/components/shared` ou `features/shared`, pas dans les `_components` d'une autre feature.
 
-Sous-features:
+Skill associe:
 
-```text
-features/perception/
-  components/
-  core/
-  view/
-  brand-canon/
-    index.ts
-    view/
-      index.tsx
-      client.tsx
-```
-
-Exceptions acceptees:
-
-- les parcours en etapes comme `onboarding/step-*.tsx` peuvent rester plats tant que le flux est plus lisible ainsi
-- `shared/` expose des briques transverses et ne suit pas forcement une structure de page
+- `.agents/skills/frontend/feature-structure/SKILL.md`

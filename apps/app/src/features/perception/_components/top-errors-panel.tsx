@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { getModelIconForName } from "@/lib/app-data";
 import { cn } from "@/lib/utils";
 import type { PerceptionError } from "@/lib/perception-data";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   formatPerceptionErrorTypeLabel as formatPerceptionErrorTypeLabelI18n,
@@ -30,7 +30,7 @@ export function TopErrorsPanel({
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h4>
-            <MonitoringSectionTitle>{t("topErrorsTitle")}</MonitoringSectionTitle>
+            <SectionTitle>{t("topErrorsTitle")}</SectionTitle>
           </h4>
         </div>
         <Badge variant="secondary" className="h-5 bg-primary/10 px-1.5 font-mono text-[10px] text-primary">

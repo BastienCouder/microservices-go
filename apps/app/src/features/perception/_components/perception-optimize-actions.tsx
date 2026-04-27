@@ -2,7 +2,7 @@
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   formatPerceptionFixTypeLabel,
@@ -32,7 +32,7 @@ export function PerceptionOptimizeActions({
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base">
-          <MonitoringSectionTitle>{t("optimizeActionsTitle")}</MonitoringSectionTitle>
+          <SectionTitle>{t("optimizeActionsTitle")}</SectionTitle>
         </CardTitle>
         <CardDescription>{t("optimizeActionsDescription")}</CardDescription>
       </CardHeader>

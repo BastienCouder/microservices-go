@@ -49,16 +49,24 @@ func NewClient(baseURL, apiKey string, httpClient *http.Client) *Client {
 	}
 }
 
-func (c *Client) Generate(ctx context.Context, modelID, prompt string) (usecase.ProviderResult, error) {
+func (c *Client) Generate(ctx context.Context, input usecase.ProviderGenerateInput) (usecase.ProviderResult, error) {
+	apiKey := strings.TrimSpace(input.APIKey)
+	if apiKey == "" {
+		apiKey = c.apiKey
+	}
+	if apiKey == "" {
+		return usecase.ProviderResult{}, fmt.Errorf("provider api key is required")
+	}
+
 	requestBody := chatCompletionRequest{
-		Model:       modelID,
+		Model:       input.ModelID,
 		Temperature: 0.2,
 		Messages: []struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		}{
 			{Role: "system", Content: "You are an assistant specialized in brand visibility analysis. Provide concise factual answers."},
-			{Role: "user", Content: prompt},
+			{Role: "user", Content: input.Prompt},
 		},
 	}
 
@@ -72,7 +80,7 @@ func (c *Client) Generate(ctx context.Context, modelID, prompt string) (usecase.
 		return usecase.ProviderResult{}, fmt.Errorf("create provider request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.apiKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey)
 
 	resp, err := c.http.Do(req)
 	if err != nil {

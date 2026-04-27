@@ -49,6 +49,14 @@ type Project struct {
 	UpdatedAt         time.Time `json:"updatedAt"`
 }
 
+type ProjectMember struct {
+	ProjectID      string    `json:"projectId"`
+	OrganizationID int64     `json:"organizationId"`
+	UserID         int64     `json:"userId"`
+	Role           string    `json:"role"`
+	AddedAt        time.Time `json:"addedAt"`
+}
+
 type ProjectImpactIntegrations struct {
 	ProjectID string                      `json:"projectId"`
 	GA4       ProjectGA4Integration       `json:"ga4"`
@@ -115,6 +123,19 @@ type ProjectImpactContext struct {
 	Integrations   ProjectImpactIntegrations `json:"integrations"`
 }
 
+type LLMProviderCredentialStatus struct {
+	ProjectID string    `json:"projectId,omitempty"`
+	Provider  string    `json:"provider"`
+	HasAPIKey bool      `json:"hasApiKey"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type LLMProviderCredentialRecord struct {
+	APIKey    string    `json:"apiKey,omitempty"`
+	HasAPIKey bool      `json:"hasApiKey"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 type Prompt struct {
 	ID        string         `json:"id"`
 	ProjectID string         `json:"projectId"`
@@ -136,16 +157,23 @@ type PromptSchedule struct {
 }
 
 type ScheduledAnalysisJob struct {
-	ProjectID      string         `json:"projectId"`
-	ProjectName    string         `json:"projectName"`
-	OrganizationID int64          `json:"organizationId"`
-	CreatedBy      int64          `json:"createdBy"`
-	BrandName      string         `json:"brandName"`
-	Competitors    []string       `json:"competitors"`
-	PromptID       string         `json:"promptId"`
-	PromptText     string         `json:"promptText"`
-	ModelIDs       []string       `json:"modelIds"`
-	Schedule       PromptSchedule `json:"schedule"`
+	ProjectID           string                                      `json:"projectId"`
+	ProjectName         string                                      `json:"projectName"`
+	OrganizationID      int64                                       `json:"organizationId"`
+	CreatedBy           int64                                       `json:"createdBy"`
+	BrandName           string                                      `json:"brandName"`
+	Competitors         []string                                    `json:"competitors"`
+	PromptID            string                                      `json:"promptId"`
+	PromptText          string                                      `json:"promptText"`
+	ModelIDs            []string                                    `json:"modelIds"`
+	ProviderCredentials map[string]ScheduledModelProviderCredential `json:"providerCredentials,omitempty"`
+	Schedule            PromptSchedule                              `json:"schedule"`
+}
+
+type ScheduledModelProviderCredential struct {
+	ProviderID      string `json:"providerId"`
+	ProviderModelID string `json:"providerModelId"`
+	ProviderAPIKey  string `json:"providerApiKey,omitempty"`
 }
 
 type Competitor struct {
@@ -348,11 +376,13 @@ type AnalysisRecordResponseInput struct {
 }
 
 type IAExecutePromptInput struct {
-	PromptID    string
-	PromptText  string
-	ModelID     string
-	BrandName   string
-	Competitors []string
+	PromptID       string
+	PromptText     string
+	ModelID        string
+	ProviderID     string
+	ProviderAPIKey string
+	BrandName      string
+	Competitors    []string
 }
 
 type IAExecutePromptResult struct {
@@ -424,14 +454,16 @@ type Dependencies struct {
 }
 
 type persistedState struct {
-	Seq                   int64                                       `json:"seq"`
-	Projects              map[string]*Project                         `json:"projects"`
-	Prompts               map[string]*Prompt                          `json:"prompts"`
-	Competitors           map[string]*Competitor                      `json:"competitors"`
-	Models                map[string]AIModel                          `json:"models"`
-	ProjectModels         map[string]map[string]bool                  `json:"projectModels"`
-	ModelSelectionChanges map[string]ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
-	ImpactIntegrations    map[string]*ProjectImpactIntegrations       `json:"impactIntegrations"`
-	Outbox                map[string]*OutboxEvent                     `json:"outbox"`
-	OutboxOrder           []string                                    `json:"outboxOrder"`
+	Seq                   int64                                              `json:"seq"`
+	Projects              map[string]*Project                                `json:"projects"`
+	Prompts               map[string]*Prompt                                 `json:"prompts"`
+	Competitors           map[string]*Competitor                             `json:"competitors"`
+	Models                map[string]AIModel                                 `json:"models"`
+	ProjectModels         map[string]map[string]bool                         `json:"projectModels"`
+	ProjectMembers        map[string]map[int64]*ProjectMember                `json:"projectMembers"`
+	ModelSelectionChanges map[string]ProjectModelSelectionChangeUsage        `json:"modelSelectionChanges"`
+	ImpactIntegrations    map[string]*ProjectImpactIntegrations              `json:"impactIntegrations"`
+	ProviderCredentials   map[string]map[string]*LLMProviderCredentialRecord `json:"providerCredentials"`
+	Outbox                map[string]*OutboxEvent                            `json:"outbox"`
+	OutboxOrder           []string                                           `json:"outboxOrder"`
 }

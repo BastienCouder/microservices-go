@@ -2,7 +2,7 @@
 
 import { memo } from "react";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { KpiCard } from "../shared/kpi-card";
+import { KpiCard } from "../../../../components/shared/kpi-card";
 
 type KpiGridProps = {
   mentionRateValue: string;

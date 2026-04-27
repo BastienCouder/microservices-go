@@ -45,6 +45,7 @@ func main() {
 			log.Fatalf("init project client: %v", err)
 		}
 		svc.EnableProjectHierarchy(projectLister)
+		svc.EnableProjectMemberAssignments(projectLister)
 	}
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 

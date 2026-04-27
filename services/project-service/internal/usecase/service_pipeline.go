@@ -235,12 +235,19 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		}
 
 		for _, modelID := range promptModelIDs {
+			credential, err := s.resolveProviderCredentialForModel(ctx, project.ID, project.OrganizationID, modelID)
+			if err != nil {
+				return fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
+			}
+
 			iaResult, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{
-				PromptID:    promptRun.PromptID,
-				PromptText:  promptRun.PromptText,
-				ModelID:     modelID,
-				BrandName:   project.BrandName,
-				Competitors: competitors,
+				PromptID:       promptRun.PromptID,
+				PromptText:     promptRun.PromptText,
+				ModelID:        credential.ProviderModelID,
+				ProviderID:     credential.ProviderID,
+				ProviderAPIKey: credential.ProviderAPIKey,
+				BrandName:      project.BrandName,
+				Competitors:    competitors,
 			})
 			if err != nil {
 				return fmt.Errorf("execute ia prompt %s on %s: %w", promptRun.PromptID, modelID, err)

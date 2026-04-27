@@ -2,10 +2,84 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
+	"time"
 )
+
+var (
+	openRouterModelsURL = "https://openrouter.ai/api/v1/models"
+	openRouterClient    = &http.Client{Timeout: 20 * time.Second}
+)
+
+var defaultOpenRouterProviderIDs = []string{
+	"openai",
+	"anthropic",
+	"google",
+	"perplexity",
+	"qwen",
+	"deepseek",
+	"mistral",
+	"zai",
+	"xai",
+	"groq",
+	"copilot",
+	"meta",
+}
+
+var openRouterProviderPrefixesByID = map[string][]string{
+	"openai":     {"openai"},
+	"anthropic":  {"anthropic"},
+	"google":     {"google", "gemini"},
+	"perplexity": {"perplexity"},
+	"qwen":       {"qwen"},
+	"deepseek":   {"deepseek"},
+	"mistral":    {"mistral", "mistralai"},
+	"zai":        {"z-ai", "zai", "z"},
+	"xai":        {"x-ai", "xai", "grok"},
+	"groq":       {"groq"},
+	"copilot":    {"copilot"},
+	"meta":       {"meta-llama", "meta"},
+}
+
+type SyncOpenRouterModelsInput struct {
+	OnlyFree                  bool
+	MinContext                int
+	SupportsTools             bool
+	Variant                   string
+	Providers                 []string
+	SearchQuery               string
+	ActivateImported          bool
+	PurgeUnsupportedProviders bool
+}
+
+type SyncOpenRouterModelsResult struct {
+	Imported int       `json:"imported"`
+	Created  int       `json:"created"`
+	Updated  int       `json:"updated"`
+	Purged   int       `json:"purged"`
+	Models   []AIModel `json:"models"`
+}
+
+type openRouterModelsResponse struct {
+	Data []openRouterModelPayload `json:"data"`
+}
+
+type openRouterModelPayload struct {
+	ID                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	ContextLength       int                           `json:"context_length"`
+	Architecture        openRouterArchitecturePayload `json:"architecture"`
+	Pricing             map[string]string             `json:"pricing"`
+	SupportedParameters []string                      `json:"supported_parameters"`
+}
+
+type openRouterArchitecturePayload struct {
+	InstructType string `json:"instruct_type"`
+}
 
 func (s *Service) ListModels(ctx context.Context, onlyActive bool) ([]AIModel, error) {
 	s.mu.Lock()
@@ -123,17 +197,6 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 		)
 	}
 
-	currentSelection := filterEnabledModels(s.projectModels, s.models, projectID)
-	selectionChanged := !sameNormalizedModelIDs(currentSelection, normalized)
-	modelChangeUsage := s.currentModelSelectionChangeUsageLocked(projectID)
-	shouldIncrementUsage := selectionChanged && len(currentSelection) > 0
-	if shouldIncrementUsage && entitlements.MonthlyModelChangeLimit > 0 && modelChangeUsage.Count >= entitlements.MonthlyModelChangeLimit {
-		return ReplaceProjectModelsResult{}, fmt.Errorf(
-			"%w: monthly model change limit reached",
-			ErrValidation,
-		)
-	}
-
 	backup := s.snapshotLocked()
 	replacement := make(map[string]bool, len(normalized))
 	for _, modelID := range normalized {
@@ -152,9 +215,6 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 		}
 		prompt.Schedule = schedule
 	}
-	if shouldIncrementUsage {
-		s.incrementModelSelectionChangeUsageLocked(projectID)
-	}
 	if err := s.persistLocked(ctx); err != nil {
 		s.restoreLocked(backup)
 		return ReplaceProjectModelsResult{}, err
@@ -169,7 +229,7 @@ func (s *Service) resolveBillingEntitlementsLocked(ctx context.Context, organiza
 		return BillingEntitlements{
 			Plan:                    "starter",
 			ModelSelectionLimit:     3,
-			MonthlyModelChangeLimit: 3,
+			MonthlyModelChangeLimit: 0,
 		}, nil
 	}
 
@@ -180,39 +240,7 @@ func (s *Service) resolveBillingEntitlementsLocked(ctx context.Context, organiza
 	if strings.TrimSpace(entitlements.Plan) == "" {
 		entitlements.Plan = "starter"
 	}
-	if entitlements.MonthlyModelChangeLimit <= 0 {
-		entitlements.MonthlyModelChangeLimit = 3
-	}
 	return entitlements, nil
-}
-
-func (s *Service) currentModelSelectionChangeUsageLocked(projectID string) ProjectModelSelectionChangeUsage {
-	usage := s.modelSelectionChanges[projectID]
-	currentMonth := s.now().UTC().Format("2006-01")
-	if usage.Month != currentMonth {
-		return ProjectModelSelectionChangeUsage{Month: currentMonth}
-	}
-	return usage
-}
-
-func (s *Service) incrementModelSelectionChangeUsageLocked(projectID string) {
-	usage := s.currentModelSelectionChangeUsageLocked(projectID)
-	usage.Count++
-	s.modelSelectionChanges[projectID] = usage
-}
-
-func sameNormalizedModelIDs(left, right []string) bool {
-	normalizedLeft := normalizeModelIDs(left)
-	normalizedRight := normalizeModelIDs(right)
-	if len(normalizedLeft) != len(normalizedRight) {
-		return false
-	}
-	for index, value := range normalizedLeft {
-		if normalizedRight[index] != value {
-			return false
-		}
-	}
-	return true
 }
 
 func (s *Service) SeedDefaultModels(ctx context.Context) ([]AIModel, error) {
@@ -234,6 +262,66 @@ func (s *Service) SeedDefaultModels(ctx context.Context) ([]AIModel, error) {
 	}
 	sort.Slice(models, func(i, j int) bool { return models[i].Label < models[j].Label })
 	return models, nil
+}
+
+func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouterModelsInput) (SyncOpenRouterModelsResult, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, openRouterModelsURL, nil)
+	if err != nil {
+		return SyncOpenRouterModelsResult{}, fmt.Errorf("create openrouter models request: %w", err)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	res, err := openRouterClient.Do(req)
+	if err != nil {
+		return SyncOpenRouterModelsResult{}, fmt.Errorf("%w: openrouter models unavailable", ErrDependencyUnavailable)
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode < 200 || res.StatusCode >= 300 {
+		return SyncOpenRouterModelsResult{}, fmt.Errorf("%w: openrouter models returned %d", ErrDependencyUnavailable, res.StatusCode)
+	}
+
+	var payload openRouterModelsResponse
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		return SyncOpenRouterModelsResult{}, fmt.Errorf("decode openrouter models: %w", err)
+	}
+
+	candidates := filterOpenRouterModels(payload.Data, input)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return SyncOpenRouterModelsResult{}, err
+	}
+
+	result := SyncOpenRouterModelsResult{
+		Models: make([]AIModel, 0, len(candidates)),
+	}
+	for _, candidate := range candidates {
+		model, created, err := s.openRouterModelToCatalogModelLocked(candidate, input.ActivateImported)
+		if err != nil {
+			return SyncOpenRouterModelsResult{}, err
+		}
+		if created {
+			result.Created++
+		} else {
+			result.Updated++
+		}
+		s.models[model.ID] = model
+		result.Models = append(result.Models, model)
+	}
+	if input.PurgeUnsupportedProviders {
+		result.Purged = s.purgeUnsupportedOpenRouterModelsLocked()
+	}
+	result.Imported = len(result.Models)
+
+	if err := s.persistLocked(ctx); err != nil {
+		return SyncOpenRouterModelsResult{}, err
+	}
+
+	sort.Slice(result.Models, func(i, j int) bool { return result.Models[i].Label < result.Models[j].Label })
+	return result, nil
 }
 
 func (s *Service) CreateModel(ctx context.Context, input CreateAIModelInput) (AIModel, error) {
@@ -318,6 +406,9 @@ func (s *Service) UpdateModel(ctx context.Context, modelID string, input UpdateA
 		if input.SupportsLiveSearch != nil {
 			candidate.SupportsLiveSearch = *input.SupportsLiveSearch
 		}
+		if strings.TrimSpace(candidate.IconKey) == "" {
+			candidate.IconKey = openRouterIconKey(candidate.Provider)
+		}
 	})
 	if err != nil {
 		return AIModel{}, err
@@ -393,4 +484,367 @@ func modelIconPath(iconKey string) string {
 		return ""
 	}
 	return "/models/" + iconKey + ".svg"
+}
+
+func filterOpenRouterModels(models []openRouterModelPayload, input SyncOpenRouterModelsInput) []openRouterModelPayload {
+	providers := openRouterProviderPrefixes(input.Providers)
+	variant := strings.ToLower(strings.TrimSpace(input.Variant))
+	query := strings.ToLower(strings.TrimSpace(input.SearchQuery))
+
+	filtered := make([]openRouterModelPayload, 0, len(models))
+	for _, model := range models {
+		model.ID = strings.TrimSpace(model.ID)
+		model.Name = strings.TrimSpace(model.Name)
+		if model.ID == "" {
+			continue
+		}
+		if input.OnlyFree && strings.TrimSpace(model.Pricing["prompt"]) != "0" {
+			continue
+		}
+		if input.MinContext > 0 && model.ContextLength < input.MinContext {
+			continue
+		}
+		if input.SupportsTools && !openRouterSupportsParameter(model.SupportedParameters, "tools") {
+			continue
+		}
+		if !openRouterVariantAllowed(model, variant) {
+			continue
+		}
+		if !openRouterProviderAllowed(model.ID, providers) {
+			continue
+		}
+		if query != "" {
+			haystack := strings.ToLower(model.ID + " " + model.Name)
+			if !strings.Contains(haystack, query) {
+				continue
+			}
+		}
+		filtered = append(filtered, model)
+	}
+	return filtered
+}
+
+func openRouterVariantAllowed(model openRouterModelPayload, variant string) bool {
+	switch variant {
+	case "", "all":
+		return true
+	case "instruct":
+		return openRouterLooksInstruct(model)
+	case "chat":
+		return !openRouterLooksInstruct(model)
+	default:
+		return true
+	}
+}
+
+func openRouterLooksInstruct(model openRouterModelPayload) bool {
+	haystack := strings.ToLower(model.ID + " " + model.Name)
+	if strings.Contains(haystack, "instruct") || strings.Contains(haystack, "instruction") {
+		return true
+	}
+	instructType := strings.ToLower(strings.TrimSpace(model.Architecture.InstructType))
+	return strings.Contains(instructType, "instruct")
+}
+
+func (s *Service) purgeUnsupportedOpenRouterModelsLocked() int {
+	purgedModelIDs := make([]string, 0)
+	for modelID, model := range s.models {
+		if !isUnsupportedOpenRouterCatalogModel(model) {
+			continue
+		}
+		purgedModelIDs = append(purgedModelIDs, modelID)
+		delete(s.models, modelID)
+	}
+	if len(purgedModelIDs) == 0 {
+		return 0
+	}
+
+	purged := make(map[string]bool, len(purgedModelIDs))
+	for _, modelID := range purgedModelIDs {
+		purged[modelID] = true
+	}
+	for projectID, enabledByID := range s.projectModels {
+		for modelID := range purged {
+			delete(enabledByID, modelID)
+		}
+		if len(enabledByID) == 0 {
+			delete(s.projectModels, projectID)
+		}
+	}
+	for _, prompt := range s.prompts {
+		if prompt == nil {
+			continue
+		}
+		filteredModelIDs := prompt.ModelIDs[:0]
+		for _, modelID := range prompt.ModelIDs {
+			if !purged[modelID] {
+				filteredModelIDs = append(filteredModelIDs, modelID)
+			}
+		}
+		prompt.ModelIDs = append([]string(nil), filteredModelIDs...)
+		schedule, err := normalizePromptSchedule(
+			prompt.Schedule,
+			effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, prompt.ProjectID)),
+		)
+		if err == nil {
+			prompt.Schedule = schedule
+		}
+	}
+
+	return len(purgedModelIDs)
+}
+
+func isUnsupportedOpenRouterCatalogModel(model AIModel) bool {
+	providerID := strings.TrimSpace(openRouterProviderFromID(model.ModelID))
+	if providerID == "" {
+		return false
+	}
+	if _, ok := canonicalOpenRouterProvider(providerID); ok {
+		return false
+	}
+	return model.ID == safeOpenRouterCatalogID(model.ModelID)
+}
+
+func openRouterProviderPrefixes(providers []string) []string {
+	canonicalProviders := defaultOpenRouterProviderIDs
+	if len(providers) > 0 {
+		canonicalProviders = make([]string, 0, len(providers))
+		seen := make(map[string]bool, len(providers))
+		for _, provider := range providers {
+			canonical, ok := canonicalOpenRouterProvider(provider)
+			if !ok || seen[canonical] {
+				continue
+			}
+			seen[canonical] = true
+			canonicalProviders = append(canonicalProviders, canonical)
+		}
+	}
+
+	prefixes := make([]string, 0, len(canonicalProviders))
+	seen := make(map[string]bool)
+	for _, provider := range canonicalProviders {
+		for _, prefix := range openRouterProviderPrefixesByID[provider] {
+			prefix = strings.Trim(strings.ToLower(prefix), "/ ")
+			if prefix == "" || seen[prefix] {
+				continue
+			}
+			seen[prefix] = true
+			prefixes = append(prefixes, prefix)
+		}
+	}
+	return prefixes
+}
+
+func canonicalOpenRouterProvider(provider string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(provider))
+	compact := strings.NewReplacer(" ", "", "_", "", "-", "", ".", "").Replace(normalized)
+	switch compact {
+	case "openai":
+		return "openai", true
+	case "anthropic", "antropic":
+		return "anthropic", true
+	case "google", "gemini":
+		return "google", true
+	case "perplexity":
+		return "perplexity", true
+	case "qwen":
+		return "qwen", true
+	case "deepseek":
+		return "deepseek", true
+	case "mistral", "mistralai":
+		return "mistral", true
+	case "z", "zai":
+		return "zai", true
+	case "x", "xai", "grok":
+		return "xai", true
+	case "groq":
+		return "groq", true
+	case "copilot":
+		return "copilot", true
+	case "meta", "metallama":
+		return "meta", true
+	default:
+		return "", false
+	}
+}
+
+func openRouterSupportsParameter(parameters []string, target string) bool {
+	target = strings.ToLower(strings.TrimSpace(target))
+	for _, parameter := range parameters {
+		if strings.ToLower(strings.TrimSpace(parameter)) == target {
+			return true
+		}
+	}
+	return false
+}
+
+func openRouterProviderAllowed(modelID string, providers []string) bool {
+	modelID = strings.ToLower(strings.TrimSpace(modelID))
+	for _, provider := range providers {
+		if modelID == provider || strings.HasPrefix(modelID, provider+"/") {
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPayload, activateImported bool) (AIModel, bool, error) {
+	provider := normalizeOpenRouterProvider(openRouterProviderFromID(payload.ID))
+	if provider == "" {
+		return AIModel{}, false, fmt.Errorf("%w: openrouter provider is required", ErrValidation)
+	}
+
+	modelID := strings.TrimSpace(payload.ID)
+	catalogID := safeOpenRouterCatalogID(modelID)
+	if catalogID == "" {
+		return AIModel{}, false, fmt.Errorf("%w: openrouter model id is required", ErrValidation)
+	}
+
+	existingID := catalogID
+	created := true
+	if existing, ok := s.models[catalogID]; ok {
+		created = false
+		existingID = existing.ID
+	} else if existing, ok := findModelByProviderModelID(s.models, provider, modelID); ok {
+		created = false
+		existingID = existing.ID
+	}
+
+	displayName := openRouterDisplayName(payload.Name, payload.ID)
+	groupName := openRouterGroupName(payload.Name, provider)
+	iconKey := openRouterIconKey(provider)
+	isActive := activateImported
+	if existing, ok := s.models[existingID]; ok {
+		isActive = existing.IsActive
+	}
+
+	model, err := s.buildModelLocked(existingID, func(candidate *AIModel) {
+		candidate.Label = displayName
+		candidate.Provider = provider
+		candidate.Group = groupName
+		candidate.IconKey = iconKey
+		candidate.ModelID = modelID
+		candidate.IsActive = isActive
+		candidate.SupportsLiveSearch = openRouterSupportsParameter(payload.SupportedParameters, "tools")
+	})
+	if err != nil {
+		return AIModel{}, false, err
+	}
+	return model, created, nil
+}
+
+func findModelByProviderModelID(models map[string]AIModel, provider, providerModelID string) (AIModel, bool) {
+	for _, model := range models {
+		if model.Provider == provider && model.ModelID == providerModelID {
+			return model, true
+		}
+	}
+	return AIModel{}, false
+}
+
+func openRouterProviderFromID(modelID string) string {
+	modelID = strings.TrimSpace(modelID)
+	if before, _, ok := strings.Cut(modelID, "/"); ok {
+		return before
+	}
+	return ""
+}
+
+func normalizeOpenRouterProvider(provider string) string {
+	if canonical, ok := canonicalOpenRouterProvider(provider); ok {
+		return canonical
+	}
+	return strings.ToLower(strings.TrimSpace(provider))
+}
+
+func openRouterDisplayName(name, modelID string) string {
+	name = strings.TrimSpace(name)
+	if _, after, ok := strings.Cut(name, ":"); ok && strings.TrimSpace(after) != "" {
+		return strings.TrimSpace(after)
+	}
+	if name != "" {
+		return name
+	}
+	_, after, ok := strings.Cut(strings.TrimSpace(modelID), "/")
+	if ok && strings.TrimSpace(after) != "" {
+		return strings.TrimSpace(after)
+	}
+	return strings.TrimSpace(modelID)
+}
+
+func openRouterGroupName(name, provider string) string {
+	if before, _, ok := strings.Cut(strings.TrimSpace(name), ":"); ok && strings.TrimSpace(before) != "" {
+		if canonical, ok := canonicalOpenRouterProvider(before); ok {
+			return openRouterProviderLabel(canonical)
+		}
+		return strings.TrimSpace(before)
+	}
+	return openRouterProviderLabel(provider)
+}
+
+func openRouterProviderLabel(provider string) string {
+	switch normalizeOpenRouterProvider(provider) {
+	case "openai":
+		return "OpenAI"
+	case "anthropic":
+		return "Anthropic"
+	case "google":
+		return "Google Gemini"
+	case "perplexity":
+		return "Perplexity"
+	case "qwen":
+		return "Qwen"
+	case "mistral":
+		return "Mistral AI"
+	case "deepseek":
+		return "DeepSeek"
+	case "zai":
+		return "Z.ai"
+	case "groq":
+		return "Groq"
+	case "xai":
+		return "Grok"
+	case "copilot":
+		return "Microsoft Copilot"
+	case "meta":
+		return "Meta"
+	default:
+		provider = normalizeOpenRouterProvider(provider)
+		if provider == "" {
+			return "OpenRouter"
+		}
+		return strings.ToUpper(provider[:1]) + provider[1:]
+	}
+}
+
+func openRouterIconKey(provider string) string {
+	switch provider {
+	case "anthropic", "deepseek", "google", "groq", "mistral", "openai", "openrouter", "perplexity", "xai", "zai":
+		return provider
+	case "qwen":
+		return "qwen"
+	case "x-ai":
+		return "xai"
+	case "meta":
+		return "meta"
+	default:
+		return "openrouter"
+	}
+}
+
+func safeOpenRouterCatalogID(modelID string) string {
+	var builder strings.Builder
+	lastDash := false
+	for _, char := range strings.ToLower(strings.TrimSpace(modelID)) {
+		if (char >= 'a' && char <= 'z') || (char >= '0' && char <= '9') {
+			builder.WriteRune(char)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			builder.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(builder.String(), "-")
 }

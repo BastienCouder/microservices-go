@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { MonitoringData } from "@/lib/monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-
 import { getAlertTypeLabel } from "../../_lib/activity/activity-detail-helpers";
 
 type MonitoringAlert = MonitoringData["alerts"][number];

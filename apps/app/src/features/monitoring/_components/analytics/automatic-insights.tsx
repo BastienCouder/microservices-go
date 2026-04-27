@@ -5,8 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
 
 type InsightItem = { model: string; text: string; delta: string; level: "high" | "medium" };
 
@@ -23,14 +23,14 @@ export const AutomaticInsights = memo(function AutomaticInsights({ autoInsights 
       <CardHeader>
         <div className="space-y-1">
           <CardTitle className="text-lg font-semibold">
-            <MonitoringSectionTitle>{content.autoInsightsTitle}</MonitoringSectionTitle>
+            <SectionTitle>{content.autoInsightsTitle}</SectionTitle>
           </CardTitle>
           <CardDescription className="text-xs leading-relaxed md:text-sm">{content.autoInsightsDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
         {!hasData ? (
-          <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[120px] text-sm" />
+          <EmptyStateCard label={content.noDataAvailable} className="h-[120px] text-sm" />
         ) : (
           <div className="flex flex-col">
           {autoInsights.map((insight, index) => (

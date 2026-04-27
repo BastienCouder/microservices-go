@@ -378,19 +378,20 @@ func (x *PromptSchedule) GetModelCrons() map[string]string {
 }
 
 type ScheduledAnalysisJob struct {
-	state          protoimpl.MessageState `protogen:"open.v1"`
-	ProjectId      string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
-	ProjectName    string                 `protobuf:"bytes,2,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
-	OrganizationId int64                  `protobuf:"varint,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
-	CreatedBy      int64                  `protobuf:"varint,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
-	BrandName      string                 `protobuf:"bytes,5,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
-	Competitors    []string               `protobuf:"bytes,6,rep,name=competitors,proto3" json:"competitors,omitempty"`
-	PromptId       string                 `protobuf:"bytes,7,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
-	PromptText     string                 `protobuf:"bytes,8,opt,name=prompt_text,json=promptText,proto3" json:"prompt_text,omitempty"`
-	ModelIds       []string               `protobuf:"bytes,9,rep,name=model_ids,json=modelIds,proto3" json:"model_ids,omitempty"`
-	Schedule       *PromptSchedule        `protobuf:"bytes,10,opt,name=schedule,proto3" json:"schedule,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	state               protoimpl.MessageState                       `protogen:"open.v1"`
+	ProjectId           string                                       `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	ProjectName         string                                       `protobuf:"bytes,2,opt,name=project_name,json=projectName,proto3" json:"project_name,omitempty"`
+	OrganizationId      int64                                        `protobuf:"varint,3,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	CreatedBy           int64                                        `protobuf:"varint,4,opt,name=created_by,json=createdBy,proto3" json:"created_by,omitempty"`
+	BrandName           string                                       `protobuf:"bytes,5,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
+	Competitors         []string                                     `protobuf:"bytes,6,rep,name=competitors,proto3" json:"competitors,omitempty"`
+	PromptId            string                                       `protobuf:"bytes,7,opt,name=prompt_id,json=promptId,proto3" json:"prompt_id,omitempty"`
+	PromptText          string                                       `protobuf:"bytes,8,opt,name=prompt_text,json=promptText,proto3" json:"prompt_text,omitempty"`
+	ModelIds            []string                                     `protobuf:"bytes,9,rep,name=model_ids,json=modelIds,proto3" json:"model_ids,omitempty"`
+	Schedule            *PromptSchedule                              `protobuf:"bytes,10,opt,name=schedule,proto3" json:"schedule,omitempty"`
+	ProviderCredentials map[string]*ScheduledModelProviderCredential `protobuf:"bytes,11,rep,name=provider_credentials,json=providerCredentials,proto3" json:"provider_credentials,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *ScheduledAnalysisJob) Reset() {
@@ -493,6 +494,73 @@ func (x *ScheduledAnalysisJob) GetSchedule() *PromptSchedule {
 	return nil
 }
 
+func (x *ScheduledAnalysisJob) GetProviderCredentials() map[string]*ScheduledModelProviderCredential {
+	if x != nil {
+		return x.ProviderCredentials
+	}
+	return nil
+}
+
+type ScheduledModelProviderCredential struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	ProviderId      string                 `protobuf:"bytes,1,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
+	ProviderModelId string                 `protobuf:"bytes,2,opt,name=provider_model_id,json=providerModelId,proto3" json:"provider_model_id,omitempty"`
+	ProviderApiKey  string                 `protobuf:"bytes,3,opt,name=provider_api_key,json=providerApiKey,proto3" json:"provider_api_key,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *ScheduledModelProviderCredential) Reset() {
+	*x = ScheduledModelProviderCredential{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScheduledModelProviderCredential) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScheduledModelProviderCredential) ProtoMessage() {}
+
+func (x *ScheduledModelProviderCredential) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScheduledModelProviderCredential.ProtoReflect.Descriptor instead.
+func (*ScheduledModelProviderCredential) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ScheduledModelProviderCredential) GetProviderId() string {
+	if x != nil {
+		return x.ProviderId
+	}
+	return ""
+}
+
+func (x *ScheduledModelProviderCredential) GetProviderModelId() string {
+	if x != nil {
+		return x.ProviderModelId
+	}
+	return ""
+}
+
+func (x *ScheduledModelProviderCredential) GetProviderApiKey() string {
+	if x != nil {
+		return x.ProviderApiKey
+	}
+	return ""
+}
+
 type ListScheduledAnalysisJobsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -501,7 +569,7 @@ type ListScheduledAnalysisJobsRequest struct {
 
 func (x *ListScheduledAnalysisJobsRequest) Reset() {
 	*x = ListScheduledAnalysisJobsRequest{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	mi := &file_proto_project_v1_project_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -513,7 +581,7 @@ func (x *ListScheduledAnalysisJobsRequest) String() string {
 func (*ListScheduledAnalysisJobsRequest) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	mi := &file_proto_project_v1_project_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -526,7 +594,7 @@ func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScheduledAnalysisJobsRequest.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{8}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{9}
 }
 
 type ListScheduledAnalysisJobsResponse struct {
@@ -538,7 +606,7 @@ type ListScheduledAnalysisJobsResponse struct {
 
 func (x *ListScheduledAnalysisJobsResponse) Reset() {
 	*x = ListScheduledAnalysisJobsResponse{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[9]
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -550,7 +618,7 @@ func (x *ListScheduledAnalysisJobsResponse) String() string {
 func (*ListScheduledAnalysisJobsResponse) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[9]
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -563,7 +631,7 @@ func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListScheduledAnalysisJobsResponse.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{9}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *ListScheduledAnalysisJobsResponse) GetJobs() []*ScheduledAnalysisJob {
@@ -605,7 +673,7 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"modelCrons\x1a=\n" +
 	"\x0fModelCronsEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf4\x02\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xd8\x04\n" +
 	"\x14ScheduledAnalysisJob\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12!\n" +
@@ -621,7 +689,16 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"promptText\x12\x1b\n" +
 	"\tmodel_ids\x18\t \x03(\tR\bmodelIds\x126\n" +
 	"\bschedule\x18\n" +
-	" \x01(\v2\x1a.project.v1.PromptScheduleR\bschedule\"\"\n" +
+	" \x01(\v2\x1a.project.v1.PromptScheduleR\bschedule\x12l\n" +
+	"\x14provider_credentials\x18\v \x03(\v29.project.v1.ScheduledAnalysisJob.ProviderCredentialsEntryR\x13providerCredentials\x1at\n" +
+	"\x18ProviderCredentialsEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12B\n" +
+	"\x05value\x18\x02 \x01(\v2,.project.v1.ScheduledModelProviderCredentialR\x05value:\x028\x01\"\x99\x01\n" +
+	" ScheduledModelProviderCredential\x12\x1f\n" +
+	"\vprovider_id\x18\x01 \x01(\tR\n" +
+	"providerId\x12*\n" +
+	"\x11provider_model_id\x18\x02 \x01(\tR\x0fproviderModelId\x12(\n" +
+	"\x10provider_api_key\x18\x03 \x01(\tR\x0eproviderApiKey\"\"\n" +
 	" ListScheduledAnalysisJobsRequest\"Y\n" +
 	"!ListScheduledAnalysisJobsResponse\x124\n" +
 	"\x04jobs\x18\x01 \x03(\v2 .project.v1.ScheduledAnalysisJobR\x04jobs2\xd7\x03\n" +
@@ -643,7 +720,7 @@ func file_proto_project_v1_project_proto_rawDescGZIP() []byte {
 	return file_proto_project_v1_project_proto_rawDescData
 }
 
-var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_proto_project_v1_project_proto_goTypes = []any{
 	(*CheckProjectAccessRequest)(nil),         // 0: project.v1.CheckProjectAccessRequest
 	(*CheckProjectAccessResponse)(nil),        // 1: project.v1.CheckProjectAccessResponse
@@ -653,27 +730,31 @@ var file_proto_project_v1_project_proto_goTypes = []any{
 	(*ListProjectEnabledModelsResponse)(nil),  // 5: project.v1.ListProjectEnabledModelsResponse
 	(*PromptSchedule)(nil),                    // 6: project.v1.PromptSchedule
 	(*ScheduledAnalysisJob)(nil),              // 7: project.v1.ScheduledAnalysisJob
-	(*ListScheduledAnalysisJobsRequest)(nil),  // 8: project.v1.ListScheduledAnalysisJobsRequest
-	(*ListScheduledAnalysisJobsResponse)(nil), // 9: project.v1.ListScheduledAnalysisJobsResponse
-	nil, // 10: project.v1.PromptSchedule.ModelCronsEntry
+	(*ScheduledModelProviderCredential)(nil),  // 8: project.v1.ScheduledModelProviderCredential
+	(*ListScheduledAnalysisJobsRequest)(nil),  // 9: project.v1.ListScheduledAnalysisJobsRequest
+	(*ListScheduledAnalysisJobsResponse)(nil), // 10: project.v1.ListScheduledAnalysisJobsResponse
+	nil, // 11: project.v1.PromptSchedule.ModelCronsEntry
+	nil, // 12: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
 }
 var file_proto_project_v1_project_proto_depIdxs = []int32{
-	10, // 0: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
+	11, // 0: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
 	6,  // 1: project.v1.ScheduledAnalysisJob.schedule:type_name -> project.v1.PromptSchedule
-	7,  // 2: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
-	0,  // 3: project.v1.ProjectService.CheckProjectAccess:input_type -> project.v1.CheckProjectAccessRequest
-	2,  // 4: project.v1.ProjectService.ListProjectCompetitors:input_type -> project.v1.ListProjectCompetitorsRequest
-	4,  // 5: project.v1.ProjectService.ListProjectEnabledModels:input_type -> project.v1.ListProjectEnabledModelsRequest
-	8,  // 6: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
-	1,  // 7: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
-	3,  // 8: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
-	5,  // 9: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
-	9,  // 10: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
-	7,  // [7:11] is the sub-list for method output_type
-	3,  // [3:7] is the sub-list for method input_type
-	3,  // [3:3] is the sub-list for extension type_name
-	3,  // [3:3] is the sub-list for extension extendee
-	0,  // [0:3] is the sub-list for field type_name
+	12, // 2: project.v1.ScheduledAnalysisJob.provider_credentials:type_name -> project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
+	7,  // 3: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
+	8,  // 4: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry.value:type_name -> project.v1.ScheduledModelProviderCredential
+	0,  // 5: project.v1.ProjectService.CheckProjectAccess:input_type -> project.v1.CheckProjectAccessRequest
+	2,  // 6: project.v1.ProjectService.ListProjectCompetitors:input_type -> project.v1.ListProjectCompetitorsRequest
+	4,  // 7: project.v1.ProjectService.ListProjectEnabledModels:input_type -> project.v1.ListProjectEnabledModelsRequest
+	9,  // 8: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
+	1,  // 9: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
+	3,  // 10: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
+	5,  // 11: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
+	10, // 12: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
+	9,  // [9:13] is the sub-list for method output_type
+	5,  // [5:9] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_project_v1_project_proto_init() }
@@ -687,7 +768,7 @@ func file_proto_project_v1_project_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_project_v1_project_proto_rawDesc), len(file_proto_project_v1_project_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

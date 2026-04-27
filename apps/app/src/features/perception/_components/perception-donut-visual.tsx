@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import type { PerceptionViewData } from "@/lib/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { SectionTitle } from "@/components/shared/section-title";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionAxisLabel, getPerceptionGradeLabel } from "../_lib";
@@ -45,7 +45,7 @@ export function PerceptionDonutVisual({
   if (rankedPoints.length === 0) {
     return (
       <div className="rounded-[28px] border border-border/60 bg-background px-5 py-6">
-        <MonitoringSectionTitle>{t("donutTitle")}</MonitoringSectionTitle>
+        <SectionTitle>{t("donutTitle")}</SectionTitle>
         <p className="mt-2 text-sm text-muted-foreground">{t("donutSubtitle")}</p>
       </div>
     );
@@ -55,7 +55,7 @@ export function PerceptionDonutVisual({
     <div className="px-5 py-3">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
-          <MonitoringSectionTitle>{t("donutTitle")}</MonitoringSectionTitle>
+          <SectionTitle>{t("donutTitle")}</SectionTitle>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
         </div>
         <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">

@@ -14,6 +14,8 @@ message ExecutePromptRequest {
   string model_id = 3;
   string brand_name = 4;
   repeated string competitors = 5;
+  string provider_id = 6;
+  string provider_api_key = 7;
 }
 
 message PromptExecutionAnalysis {

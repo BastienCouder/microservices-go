@@ -4,8 +4,8 @@ import { memo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
 
 type TopPageItem = { url: string; value: number };
 
@@ -29,14 +29,14 @@ export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, to
       <CardHeader className="pb-2">
         <div className="space-y-1">
           <CardTitle className="text-lg font-semibold">
-            <MonitoringSectionTitle>{content.topCitedPagesTitle}</MonitoringSectionTitle>
+            <SectionTitle>{content.topCitedPagesTitle}</SectionTitle>
           </CardTitle>
           <CardDescription className="text-xs leading-relaxed md:text-sm">{content.topCitedPagesDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
         {!hasData ? (
-          <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[180px] text-sm" />
+          <EmptyStateCard label={content.noDataAvailable} className="h-[180px] text-sm" />
         ) : (
           <div className="space-y-3">
           {topCitedPages.map((page, index) => (

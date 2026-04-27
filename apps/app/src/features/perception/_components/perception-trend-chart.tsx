@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
 import { APP_CHART_UI_COLORS, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
-import { MonitoringSectionTitle } from "@/features/monitoring/_components/shared/monitoring-section-title";
+import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionGradeLabel } from "../_lib";
 
@@ -38,7 +38,7 @@ export function PerceptionTrendChart({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <CardTitle className="text-base">
-              <MonitoringSectionTitle>{t("trendTitle")}</MonitoringSectionTitle>
+              <SectionTitle>{t("trendTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription>
               {t("trendDescription", { periodLabel })}

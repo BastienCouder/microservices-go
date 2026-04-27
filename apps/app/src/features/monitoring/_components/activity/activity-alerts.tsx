@@ -12,8 +12,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { MonitoringData } from "@/lib/monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
 import { getAlertTypeLabel } from "../../_lib/activity/activity-detail-helpers";
 
 type MonitoringAlert = MonitoringData["alerts"][number];
@@ -43,7 +43,7 @@ export const ActivityAlerts = memo(function ActivityAlerts({ filteredAlerts, pre
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <h4 className="min-w-0 text-sm font-semibold md:text-base">
-            <MonitoringSectionTitle>{content.criticalUpdates}</MonitoringSectionTitle>
+            <SectionTitle>{content.criticalUpdates}</SectionTitle>
           </h4>
           <CollapsibleTrigger asChild>
 
@@ -63,7 +63,7 @@ export const ActivityAlerts = memo(function ActivityAlerts({ filteredAlerts, pre
 
       <CollapsibleContent className="space-y-3 overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
         {!hasData ? (
-          <FiltersEmptyStateCard label={content.noDataAvailable} className="h-[120px] text-sm" />
+          <EmptyStateCard label={content.noDataAvailable} className="h-[120px] text-sm" />
         ) : (
           visibleAlerts.map((alert, index) => {
             const tone = getAlertTone(alert.type);

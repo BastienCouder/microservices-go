@@ -36,12 +36,14 @@ func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
 }
 
 type executePromptRequest struct {
-	PromptID     string   `json:"promptId"`
-	PromptText   string   `json:"promptText"`
-	ModelID      string   `json:"modelId"`
-	BrandName    string   `json:"brandName"`
-	Competitors  []string `json:"competitors"`
-	MockResponse string   `json:"mockResponse"`
+	PromptID       string   `json:"promptId"`
+	PromptText     string   `json:"promptText"`
+	ModelID        string   `json:"modelId"`
+	ProviderID     string   `json:"providerId"`
+	ProviderAPIKey string   `json:"providerApiKey"`
+	BrandName      string   `json:"brandName"`
+	Competitors    []string `json:"competitors"`
+	MockResponse   string   `json:"mockResponse"`
 }
 
 func (h *Handler) executePrompt(w http.ResponseWriter, r *http.Request) {
@@ -52,12 +54,14 @@ func (h *Handler) executePrompt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result, err := h.svc.ExecutePrompt(r.Context(), usecase.ExecutePromptInput{
-		PromptID:     req.PromptID,
-		PromptText:   req.PromptText,
-		ModelID:      req.ModelID,
-		BrandName:    req.BrandName,
-		Competitors:  req.Competitors,
-		MockResponse: req.MockResponse,
+		PromptID:       req.PromptID,
+		PromptText:     req.PromptText,
+		ModelID:        req.ModelID,
+		ProviderID:     req.ProviderID,
+		ProviderAPIKey: req.ProviderAPIKey,
+		BrandName:      req.BrandName,
+		Competitors:    req.Competitors,
+		MockResponse:   req.MockResponse,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)

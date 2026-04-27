@@ -56,6 +56,13 @@ message ScheduledAnalysisJob {
   string prompt_text = 8;
   repeated string model_ids = 9;
   PromptSchedule schedule = 10;
+  map<string, ScheduledModelProviderCredential> provider_credentials = 11;
+}
+
+message ScheduledModelProviderCredential {
+  string provider_id = 1;
+  string provider_model_id = 2;
+  string provider_api_key = 3;
 }
 
 message ListScheduledAnalysisJobsRequest {}

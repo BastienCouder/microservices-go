@@ -21,11 +21,13 @@ func NewServer(svc *usecase.Service) *Server {
 
 func (s *Server) ExecutePrompt(ctx context.Context, req *iav1.ExecutePromptRequest) (*iav1.ExecutePromptResponse, error) {
 	result, err := s.svc.ExecutePrompt(ctx, usecase.ExecutePromptInput{
-		PromptID:    req.GetPromptId(),
-		PromptText:  req.GetPromptText(),
-		ModelID:     req.GetModelId(),
-		BrandName:   req.GetBrandName(),
-		Competitors: req.GetCompetitors(),
+		PromptID:       req.GetPromptId(),
+		PromptText:     req.GetPromptText(),
+		ModelID:        req.GetModelId(),
+		ProviderID:     req.GetProviderId(),
+		ProviderAPIKey: req.GetProviderApiKey(),
+		BrandName:      req.GetBrandName(),
+		Competitors:    req.GetCompetitors(),
 	})
 	if err != nil {
 		return nil, toStatus(err)

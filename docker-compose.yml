@@ -183,6 +183,7 @@ services:
       ORG_DB_NAME: orgsvc
       ORG_DB_SSLMODE: disable
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+      PROJECT_SERVICE_URL: http://project-service:8088
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:

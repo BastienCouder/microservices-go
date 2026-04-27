@@ -11,6 +11,14 @@ type ProjectLister interface {
 	ListProjectsByOrganization(ctx context.Context, organizationID int64) ([]ProjectSummary, error)
 }
 
+type ProjectUserLister interface {
+	ListProjectsByOrganizationForUser(ctx context.Context, organizationID, userID int64) ([]ProjectSummary, error)
+}
+
+type ProjectMemberAssigner interface {
+	AssignProjectMember(ctx context.Context, projectID string, organizationID, userID int64, role string) error
+}
+
 type ProjectSummary struct {
 	ID                string    `json:"id"`
 	OrganizationID    int64     `json:"organizationId"`

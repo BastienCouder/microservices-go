@@ -13,7 +13,11 @@ type Repository interface {
 	ListTeams(ctx context.Context, organizationID int64) ([]Team, error)
 	UpsertMember(ctx context.Context, member *Member) error
 	ListMembers(ctx context.Context, organizationID int64) ([]Member, error)
+	UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*Member, error)
 	AssignRole(ctx context.Context, organizationID, userID int64, role string) (*Member, error)
+	UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*Member, error)
+	RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error
+	SetMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*Member, error)
 	CreateInvitation(ctx context.Context, invitation *Invitation) error
 	ListInvitations(ctx context.Context, organizationID int64) ([]Invitation, error)
 	GetInvitationByID(ctx context.Context, organizationID, invitationID int64) (*Invitation, error)

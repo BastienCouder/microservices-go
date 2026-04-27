@@ -2,10 +2,9 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-
-import { MonitoringSectionTitle } from "../shared/monitoring-section-title";
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
+import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
 import { ToggleMoreButton } from "./toggle-more-button";
+import { SectionTitle } from "@/components/shared/section-title";
 
 const COMPETITORS_COUNT = 3;
 
@@ -35,7 +34,7 @@ export function CompetitorFilterSection({
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-2">
         <h4 className="min-w-0 text-sm font-semibold leading-tight text-foreground md:text-base lg:text-sm">
-          <MonitoringSectionTitle>{content.topCompetitors}</MonitoringSectionTitle>
+          <SectionTitle>{content.topCompetitors}</SectionTitle>
         </h4>
         <Button
           variant="ghost"
@@ -80,7 +79,7 @@ export function CompetitorFilterSection({
       </div>
 
       {competitors.length === 0 ? (
-        <FiltersEmptyStateCard label={content.noDataAvailable} />
+        <EmptyStateCard label={content.noDataAvailable} />
       ) : null}
       {competitors.length > COMPETITORS_COUNT ? (
         <ToggleMoreButton

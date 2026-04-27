@@ -1,1 +1,0 @@
-export { PagesPage } from "./view";

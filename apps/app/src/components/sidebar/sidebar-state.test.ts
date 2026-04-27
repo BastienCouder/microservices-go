@@ -50,6 +50,7 @@ describe("sidebar state helpers", () => {
     expect(hierarchy).toEqual({
       organization: {
         id: "org_1",
+        slug: "acme",
         name: "Acme",
         ownerIdentityId: "",
         createdAt: "",
@@ -58,6 +59,7 @@ describe("sidebar state helpers", () => {
       projects: [
         {
           id: "proj_1",
+          slug: "website",
           organizationId: "org_1",
           name: "Website",
           status: "draft",

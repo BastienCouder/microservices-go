@@ -70,6 +70,14 @@ export function buildScopedHref(
   const params = new URLSearchParams(rawSearch);
 
   for (const [key, value] of Object.entries(updates)) {
+    if (key === "project") {
+      params.delete("projectId");
+      params.delete("project_id");
+    }
+    if (key === "org") {
+      params.delete("organizationId");
+      params.delete("organization_id");
+    }
     const normalized = value?.trim() ?? "";
     if (normalized === "") {
       params.delete(key);

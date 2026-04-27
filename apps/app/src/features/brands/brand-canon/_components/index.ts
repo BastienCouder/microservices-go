@@ -1,3 +1,4 @@
-export { BrandCanonHeroInsightCard } from "./brand-canon-hero-insight-card";
-export { CompetitorEditor } from "./competitor-editor";
-export { EditableListField } from "./editable-list-field";
+export { BrandCanonHeroInsightCard } from "./hero/brand-canon-hero-insight-card";
+export { BrandCanonEditorPanel } from "./editor";
+export { CompetitorEditor } from "./editor/competitor-editor";
+export { EditableListField } from "./editor/editable-list-field";

@@ -1,7 +1,9 @@
 export type SidebarProjectOption = {
   id: string;
+  slug: string;
   name: string;
   organizationId: string;
+  organizationSlug: string;
   organizationName: string;
   brandName: string;
   status: string;

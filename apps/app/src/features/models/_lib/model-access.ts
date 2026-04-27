@@ -6,6 +6,7 @@ import {
 
 export type ModelsProjectSummary = {
   id: string;
+  slug: string;
   name: string;
   brandName: string;
   status: string;

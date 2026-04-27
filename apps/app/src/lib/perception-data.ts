@@ -15,6 +15,7 @@ import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
 
 export type PerceptionAxisKey =
   | "positioning"
@@ -162,6 +163,11 @@ type PerceptionApiPayload = {
 };
 
 type JsonObject = Record<string, unknown>;
+type ProjectRouteCandidate = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 type ParsedResponse = {
   id: string;
@@ -255,6 +261,22 @@ function unwrapRequiredEnvelope<T>(
     throw new PerceptionRequestError(result.status, `${scope}: ${result.error}`);
   }
   return unwrapSuccessEnvelope(result.data);
+}
+
+function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
+  const payload = unwrapSuccessEnvelope(value);
+  if (!Array.isArray(payload)) return [];
+
+  return attachStableSlugs(
+    payload
+      .map(asObject)
+      .map((entry) => ({
+        id: asString(getField(entry, ["id", "ID"])).trim(),
+        name: asString(getField(entry, ["name", "Name"])).trim() || "Projet",
+      }))
+      .filter((project) => project.id !== ""),
+    "project",
+  );
 }
 
 function clampScore(value: number): number {
@@ -1239,13 +1261,41 @@ export async function loadPerceptionData(
     throw new PerceptionRequestError(404, "no project available");
   }
 
-  const encodedProjectId = encodeProjectPathSegment(projectId);
-
-  const [projectRes, modelsRes, competitorsRes, monitoringRes, perceptionRes] = await Promise.all([
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.get(encodedProjectId), {
+  let projectRes = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.projects.get(encodeProjectPathSegment(projectId)),
+    {
       method: "GET",
       signal: options?.signal,
-    }),
+    },
+  );
+
+  if (!projectRes.ok && projectId && projectRes.status === 404) {
+    const projectsPayload = unwrapRequiredEnvelope(
+      await gatewayJSON<unknown>(apiBaseURL, "/projects", {
+        method: "GET",
+        signal: options?.signal,
+      }),
+      "projects",
+    );
+    const projects = normalizeProjectCandidates(projectsPayload);
+    const resolvedProject = findBySlugOrId(projects, projectId);
+    if (resolvedProject) {
+      projectId = resolvedProject.id;
+      projectRes = await gatewayJSON<unknown>(
+        apiBaseURL,
+        apiRoutes.projects.get(encodeProjectPathSegment(projectId)),
+        {
+          method: "GET",
+          signal: options?.signal,
+        },
+      );
+    }
+  }
+
+  const encodedProjectId = encodeProjectPathSegment(projectId);
+
+  const [modelsRes, competitorsRes, monitoringRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(encodedProjectId), {
       method: "GET",
       signal: options?.signal,

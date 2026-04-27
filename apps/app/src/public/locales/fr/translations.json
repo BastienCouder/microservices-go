@@ -655,6 +655,8 @@
     "remove": "Supprimer",
     "websiteTitle": "Bienvenue",
     "websiteDescription": "Nous allons analyser votre site pour détecter automatiquement votre marque et votre secteur",
+    "organizationNameLabel": "Nom de l'organisation",
+    "organizationNamePlaceholder": "Votre organisation",
     "brandNameLabel": "Nom de la marque",
     "brandNamePlaceholder": "Le nom de votre marque",
     "websiteUrlLabel": "URL du site web",

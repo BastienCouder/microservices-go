@@ -3,12 +3,12 @@
 import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { ModelFilterModeTabs } from "@/components/monitoring/model-filter-mode-tabs";
-import { PeriodFilterPicker } from "@/components/monitoring/period-filter-picker";
+import { ModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
+import { PeriodFilterPicker } from "@/components/shared/period-filter-picker";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FiltersEmptyStateCard } from "@/features/monitoring/_components/shared/filters-empty-state-card";
-import { ModelCard } from "@/features/monitoring/_components/shared/model-card";
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
+import { ModelCard } from "@/components/shared/model-card";
 import type {
   BrandCanon,
   PerceptionModelOption,
@@ -227,7 +227,7 @@ function PerceptionFiltersPanel({
         />
 
         {modelOptions.length === 0 ? (
-          <FiltersEmptyStateCard label={t("filtersNoModels")} />
+          <EmptyStateCard label={t("filtersNoModels")} />
         ) : (
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
             {visibleModels.map((model) => (

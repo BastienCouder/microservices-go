@@ -64,6 +64,7 @@ export type AcceptInvitationResponse = {
 
 export type OrganizationHierarchyOrganization = {
   id: string;
+  slug: string;
   name: string;
   ownerIdentityId: string;
   createdAt: string;
@@ -72,6 +73,7 @@ export type OrganizationHierarchyOrganization = {
 
 export type OrganizationProjectSummary = {
   id: string;
+  slug: string;
   organizationId: string;
   name: string;
   status: string;

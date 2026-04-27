@@ -68,7 +68,7 @@ func Load() (Config, error) {
 		if providerBaseURL == "" {
 			providerBaseURL = "https://openrouter.ai/api/v1"
 		}
-		providerAPIKey, err = passwordFromEnv("IA_PROVIDER_API_KEY", "IA_PROVIDER_API_KEY_FILE")
+		providerAPIKey, err = optionalPasswordFromEnv("IA_PROVIDER_API_KEY", "IA_PROVIDER_API_KEY_FILE")
 		if err != nil {
 			return Config{}, err
 		}
@@ -113,6 +113,25 @@ func passwordFromEnv(passwordKey, fileKey string) (string, error) {
 	filePath := strings.TrimSpace(os.Getenv(fileKey))
 	if filePath == "" {
 		return "", fmt.Errorf("missing required environment variable %s or %s", passwordKey, fileKey)
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read password file %s: %w", filePath, err)
+	}
+	value := strings.TrimSpace(string(raw))
+	if value == "" {
+		return "", fmt.Errorf("password file %s is empty", filePath)
+	}
+	return value, nil
+}
+
+func optionalPasswordFromEnv(passwordKey, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(passwordKey)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", nil
 	}
 	raw, err := os.ReadFile(filePath)
 	if err != nil {

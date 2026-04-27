@@ -43,7 +43,7 @@ import type {
   ModelCatalogItem,
   OpenRouterModelSyncInput,
 } from "@/features/models/_lib/model-access";
-import { PageHeader } from "@/features/shared/view/page-header";
+import { PageHeader } from "@/components/shared/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,7 @@ export function AdminModelsTemplate({
 
   useEffect(() => {
     setOrganizationId(
-      readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
+      readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch),
     );
   }, [routeSearch]);
 

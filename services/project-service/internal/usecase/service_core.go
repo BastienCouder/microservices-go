@@ -19,8 +19,10 @@ type Service struct {
 	competitors           map[string]*Competitor
 	models                map[string]AIModel
 	projectModels         map[string]map[string]bool
+	projectMembers        map[string]map[int64]*ProjectMember
 	modelSelectionChanges map[string]ProjectModelSelectionChangeUsage
 	impactIntegrations    map[string]*ProjectImpactIntegrations
+	providerCredentials   map[string]map[string]*LLMProviderCredentialRecord
 	outbox                map[string]*OutboxEvent
 	outboxOrder           []string
 
@@ -39,8 +41,10 @@ func NewService() *Service {
 		competitors:           make(map[string]*Competitor),
 		models:                make(map[string]AIModel),
 		projectModels:         make(map[string]map[string]bool),
+		projectMembers:        make(map[string]map[int64]*ProjectMember),
 		modelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage),
 		impactIntegrations:    make(map[string]*ProjectImpactIntegrations),
+		providerCredentials:   make(map[string]map[string]*LLMProviderCredentialRecord),
 		outbox:                make(map[string]*OutboxEvent),
 		outboxOrder:           make([]string, 0),
 	}
@@ -92,8 +96,10 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
+	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
+	s.providerCredentials = nonNilProviderCredentialMap(state.ProviderCredentials)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 	if len(s.models) == 0 {
@@ -122,8 +128,10 @@ func (s *Service) snapshotLocked() *persistedState {
 		Competitors:           make(map[string]*Competitor, len(s.competitors)),
 		Models:                make(map[string]AIModel, len(s.models)),
 		ProjectModels:         make(map[string]map[string]bool, len(s.projectModels)),
+		ProjectMembers:        make(map[string]map[int64]*ProjectMember, len(s.projectMembers)),
 		ModelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage, len(s.modelSelectionChanges)),
 		ImpactIntegrations:    make(map[string]*ProjectImpactIntegrations, len(s.impactIntegrations)),
+		ProviderCredentials:   make(map[string]map[string]*LLMProviderCredentialRecord, len(s.providerCredentials)),
 		Outbox:                make(map[string]*OutboxEvent, len(s.outbox)),
 		OutboxOrder:           append([]string(nil), s.outboxOrder...),
 	}
@@ -149,12 +157,23 @@ func (s *Service) snapshotLocked() *persistedState {
 		}
 		state.ProjectModels[projectID] = copied
 	}
+	for projectID, members := range s.projectMembers {
+		copied := make(map[int64]*ProjectMember, len(members))
+		for userID, member := range members {
+			clone := copyProjectMember(member)
+			copied[userID] = &clone
+		}
+		state.ProjectMembers[projectID] = copied
+	}
 	for projectID, usage := range s.modelSelectionChanges {
 		state.ModelSelectionChanges[projectID] = usage
 	}
 	for key, value := range s.impactIntegrations {
 		clone := copyProjectImpactIntegrations(value)
 		state.ImpactIntegrations[key] = &clone
+	}
+	for projectID, credentials := range s.providerCredentials {
+		state.ProviderCredentials[projectID] = copyProviderCredentialMap(credentials)
 	}
 	for key, value := range s.outbox {
 		clone := copyOutboxEvent(value)
@@ -173,8 +192,10 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
+	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
+	s.providerCredentials = nonNilProviderCredentialMap(state.ProviderCredentials)
 	s.outbox = nonNilOutboxMap(state.Outbox)
 	s.outboxOrder = nonNilStringSlice(state.OutboxOrder)
 }
@@ -234,6 +255,13 @@ func copyProject(project *Project) Project {
 		return Project{}
 	}
 	return *project
+}
+
+func copyProjectMember(member *ProjectMember) ProjectMember {
+	if member == nil {
+		return ProjectMember{}
+	}
+	return *member
 }
 
 func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpactIntegrations {
@@ -307,6 +335,21 @@ func nonNilProjectModelMap(input map[string]map[string]bool) map[string]map[stri
 	return input
 }
 
+func nonNilProjectMemberMap(input map[string]map[int64]*ProjectMember) map[string]map[int64]*ProjectMember {
+	if input == nil {
+		return make(map[string]map[int64]*ProjectMember)
+	}
+	out := make(map[string]map[int64]*ProjectMember, len(input))
+	for projectID, members := range input {
+		out[projectID] = make(map[int64]*ProjectMember, len(members))
+		for userID, member := range members {
+			clone := copyProjectMember(member)
+			out[projectID][userID] = &clone
+		}
+	}
+	return out
+}
+
 func nonNilModelSelectionChangeUsageMap(input map[string]ProjectModelSelectionChangeUsage) map[string]ProjectModelSelectionChangeUsage {
 	if input == nil {
 		return make(map[string]ProjectModelSelectionChangeUsage)
@@ -326,6 +369,17 @@ func nonNilProjectImpactIntegrationMap(input map[string]*ProjectImpactIntegratio
 	for key, value := range input {
 		clone := copyProjectImpactIntegrations(value)
 		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilProviderCredentialMap(input map[string]map[string]*LLMProviderCredentialRecord) map[string]map[string]*LLMProviderCredentialRecord {
+	if input == nil {
+		return make(map[string]map[string]*LLMProviderCredentialRecord)
+	}
+	out := make(map[string]map[string]*LLMProviderCredentialRecord, len(input))
+	for projectID, credentials := range input {
+		out[projectID] = copyProviderCredentialMap(credentials)
 	}
 	return out
 }
@@ -358,6 +412,25 @@ func copyStringMap(input map[string]string) map[string]string {
 		out[key] = value
 	}
 	return out
+}
+
+func copyProviderCredentialMap(input map[string]*LLMProviderCredentialRecord) map[string]*LLMProviderCredentialRecord {
+	if input == nil {
+		return map[string]*LLMProviderCredentialRecord{}
+	}
+	out := make(map[string]*LLMProviderCredentialRecord, len(input))
+	for provider, record := range input {
+		out[provider] = copyLLMProviderCredentialRecord(record)
+	}
+	return out
+}
+
+func copyLLMProviderCredentialRecord(input *LLMProviderCredentialRecord) *LLMProviderCredentialRecord {
+	if input == nil {
+		return nil
+	}
+	clone := *input
+	return &clone
 }
 
 func copyPromptSchedule(input PromptSchedule) PromptSchedule {

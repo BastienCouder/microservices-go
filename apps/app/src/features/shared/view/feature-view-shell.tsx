@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
-import { PageHeader } from "./page-header";
+import { PageHeader } from "../../../components/shared/page-header";
 
 type FeatureViewShellProps = {
   title: string;

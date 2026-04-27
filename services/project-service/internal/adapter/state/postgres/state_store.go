@@ -18,16 +18,18 @@ import (
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq                   int64                                               `json:"seq"`
-	Projects              map[string]*usecase.Project                         `json:"projects"`
-	Prompts               map[string]*usecase.Prompt                          `json:"prompts"`
-	Competitors           map[string]*usecase.Competitor                      `json:"competitors"`
-	Models                map[string]usecase.AIModel                          `json:"models"`
-	ProjectModels         map[string]map[string]bool                          `json:"projectModels"`
-	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
-	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations       `json:"impactIntegrations"`
-	Outbox                map[string]*usecase.OutboxEvent                     `json:"outbox"`
-	OutboxOrder           []string                                            `json:"outboxOrder"`
+	Seq                   int64                                                      `json:"seq"`
+	Projects              map[string]*usecase.Project                                `json:"projects"`
+	Prompts               map[string]*usecase.Prompt                                 `json:"prompts"`
+	Competitors           map[string]*usecase.Competitor                             `json:"competitors"`
+	Models                map[string]usecase.AIModel                                 `json:"models"`
+	ProjectModels         map[string]map[string]bool                                 `json:"projectModels"`
+	ProjectMembers        map[string]map[int64]*usecase.ProjectMember                `json:"projectMembers"`
+	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage        `json:"modelSelectionChanges"`
+	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations              `json:"impactIntegrations"`
+	ProviderCredentials   map[string]map[string]*usecase.LLMProviderCredentialRecord `json:"providerCredentials"`
+	Outbox                map[string]*usecase.OutboxEvent                            `json:"outbox"`
+	OutboxOrder           []string                                                   `json:"outboxOrder"`
 }
 
 type StateStore struct {
@@ -50,8 +52,10 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		Competitors:           make(map[string]*usecase.Competitor),
 		Models:                make(map[string]usecase.AIModel),
 		ProjectModels:         make(map[string]map[string]bool),
+		ProjectMembers:        make(map[string]map[int64]*usecase.ProjectMember),
 		ModelSelectionChanges: make(map[string]usecase.ProjectModelSelectionChangeUsage),
 		ImpactIntegrations:    make(map[string]*usecase.ProjectImpactIntegrations),
+		ProviderCredentials:   make(map[string]map[string]*usecase.LLMProviderCredentialRecord),
 		Outbox:                make(map[string]*usecase.OutboxEvent),
 		OutboxOrder:           make([]string, 0),
 	}
@@ -69,6 +73,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	}
 
 	if err := s.loadProjects(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadProjectMembers(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadPrompts(ctx, &state); err != nil {
@@ -93,6 +100,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadImpactIntegrations(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadProviderCredentials(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadOutbox(ctx, &state); err != nil {
@@ -138,6 +148,8 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		`DELETE FROM project_models`,
 		`DELETE FROM project_model_selection_changes`,
 		`DELETE FROM project_impact_integrations`,
+		`DELETE FROM project_llm_provider_credentials`,
+		`DELETE FROM project_members`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
 		`DELETE FROM projects`,
@@ -152,6 +164,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertProjects(ctx, tx, state.Projects); err != nil {
+		return err
+	}
+	if err := insertProjectMembers(ctx, tx, state.ProjectMembers); err != nil {
 		return err
 	}
 	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
@@ -173,6 +188,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := s.insertImpactIntegrations(ctx, tx, state.ImpactIntegrations); err != nil {
+		return err
+	}
+	if err := s.insertProviderCredentials(ctx, tx, state.ProviderCredentials, state.Projects); err != nil {
 		return err
 	}
 	if err := insertOutboxEvents(ctx, tx, state.Outbox, state.OutboxOrder); err != nil {
@@ -230,6 +248,37 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		item.Industry = stringValue(industry)
 		project := item
 		state.Projects[item.ID] = &project
+	}
+	return rows.Err()
+}
+
+func (s *StateStore) loadProjectMembers(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, organization_id, user_id, role, added_at
+		FROM project_members
+		ORDER BY project_id ASC, user_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select project members: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item usecase.ProjectMember
+		if err := rows.Scan(
+			&item.ProjectID,
+			&item.OrganizationID,
+			&item.UserID,
+			&item.Role,
+			&item.AddedAt,
+		); err != nil {
+			return fmt.Errorf("scan project member: %w", err)
+		}
+		if state.ProjectMembers[item.ProjectID] == nil {
+			state.ProjectMembers[item.ProjectID] = make(map[int64]*usecase.ProjectMember)
+		}
+		member := item
+		state.ProjectMembers[item.ProjectID][item.UserID] = &member
 	}
 	return rows.Err()
 }
@@ -569,6 +618,47 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 	return rows.Err()
 }
 
+func (s *StateStore) loadProviderCredentials(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, provider, api_key_ciphertext, updated_at
+		FROM project_llm_provider_credentials
+		ORDER BY project_id ASC, provider ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select llm provider credentials: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			projectID        string
+			provider         string
+			apiKeyCiphertext string
+			updatedAt        time.Time
+		)
+		if err := rows.Scan(&projectID, &provider, &apiKeyCiphertext, &updatedAt); err != nil {
+			return fmt.Errorf("scan llm provider credential: %w", err)
+		}
+		apiKey, err := s.codec.Decrypt(apiKeyCiphertext)
+		if err != nil {
+			return fmt.Errorf("decrypt llm provider credential %s/%s: %w", projectID, provider, err)
+		}
+		if state.ProviderCredentials == nil {
+			state.ProviderCredentials = make(map[string]map[string]*usecase.LLMProviderCredentialRecord)
+		}
+		if state.ProviderCredentials[projectID] == nil {
+			state.ProviderCredentials[projectID] = make(map[string]*usecase.LLMProviderCredentialRecord)
+		}
+		record := usecase.LLMProviderCredentialRecord{
+			APIKey:    apiKey,
+			HasAPIKey: strings.TrimSpace(apiKey) != "",
+			UpdatedAt: updatedAt,
+		}
+		state.ProviderCredentials[projectID][provider] = &record
+	}
+	return rows.Err()
+}
+
 func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, event_type, status, payload, sort_order, created_at, updated_at
@@ -622,6 +712,29 @@ func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
+		}
+	}
+	return nil
+}
+
+func insertProjectMembers(ctx context.Context, tx pgx.Tx, projectMembers map[string]map[int64]*usecase.ProjectMember) error {
+	for _, projectID := range sortedProjectMemberProjectIDs(projectMembers) {
+		userIDs := make([]int64, 0, len(projectMembers[projectID]))
+		for userID := range projectMembers[projectID] {
+			userIDs = append(userIDs, userID)
+		}
+		sort.Slice(userIDs, func(i, j int) bool { return userIDs[i] < userIDs[j] })
+		for _, userID := range userIDs {
+			member := projectMembers[projectID][userID]
+			if member == nil {
+				continue
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO project_members (project_id, organization_id, user_id, role, added_at)
+				VALUES ($1, $2, $3, $4, $5)
+			`, member.ProjectID, member.OrganizationID, member.UserID, member.Role, member.AddedAt); err != nil {
+				return fmt.Errorf("insert project member %s/%d: %w", member.ProjectID, member.UserID, err)
+			}
 		}
 	}
 	return nil
@@ -706,6 +819,60 @@ func insertProjectSelections(ctx context.Context, tx pgx.Tx, selections map[stri
 				VALUES ($1, $2, $3, NOW(), NOW())
 			`, projectID, modelID, selections[projectID][modelID]); err != nil {
 				return fmt.Errorf("insert project model %s/%s: %w", projectID, modelID, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (s *StateStore) insertProviderCredentials(
+	ctx context.Context,
+	tx pgx.Tx,
+	items map[string]map[string]*usecase.LLMProviderCredentialRecord,
+	projects map[string]*usecase.Project,
+) error {
+	projectIDs := make([]string, 0, len(items))
+	for projectID := range items {
+		projectIDs = append(projectIDs, projectID)
+	}
+	sort.Strings(projectIDs)
+
+	for _, projectID := range projectIDs {
+		project, exists := projects[projectID]
+		if !exists || project == nil {
+			continue
+		}
+		providers := make([]string, 0, len(items[projectID]))
+		for provider := range items[projectID] {
+			providers = append(providers, provider)
+		}
+		sort.Strings(providers)
+
+		for _, provider := range providers {
+			record := items[projectID][provider]
+			apiKey := ""
+			if record != nil {
+				apiKey = strings.TrimSpace(record.APIKey)
+			}
+			if apiKey == "" {
+				continue
+			}
+			apiKeyCiphertext, err := s.codec.Encrypt(apiKey)
+			if err != nil {
+				return fmt.Errorf("encrypt llm provider credential %s/%s: %w", projectID, provider, err)
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO project_llm_provider_credentials (
+					project_id,
+					organization_id,
+					provider,
+					api_key_ciphertext,
+					updated_at,
+					created_at
+				)
+				VALUES ($1, $2, $3, $4, $5, NOW())
+			`, projectID, project.OrganizationID, provider, apiKeyCiphertext, record.UpdatedAt); err != nil {
+				return fmt.Errorf("insert llm provider credential %s/%s: %w", projectID, provider, err)
 			}
 		}
 	}
@@ -821,6 +988,15 @@ func insertOutboxEvents(ctx context.Context, tx pgx.Tx, outbox map[string]*useca
 }
 
 func sortedProjectIDs(items map[string]*usecase.Project) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedProjectMemberProjectIDs(items map[string]map[int64]*usecase.ProjectMember) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)

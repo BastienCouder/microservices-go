@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -107,6 +108,15 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 				"gpt-4o": true
 			}
 		},
+		"providerCredentials": {
+			"prj-1": {
+				"openai": {
+					"apiKey": "sk-project-openai",
+					"hasApiKey": true,
+					"updatedAt": "2026-03-01T11:40:00Z"
+				}
+			}
+		},
 		"outbox": {
 			"evt-1": {
 				"id": "evt-1",
@@ -149,7 +159,20 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	assertProjectTableCount(t, ctx, db, "competitors", 1)
 	assertProjectTableCount(t, ctx, db, "ai_models", 1)
 	assertProjectTableCount(t, ctx, db, "project_models", 1)
+	assertProjectTableCount(t, ctx, db, "project_llm_provider_credentials", 1)
 	assertProjectTableCount(t, ctx, db, "outbox_events", 1)
+
+	var storedCiphertext string
+	if err := db.QueryRow(ctx, `
+		SELECT api_key_ciphertext
+		FROM project_llm_provider_credentials
+		WHERE project_id = $1 AND provider = $2
+	`, "prj-1", "openai").Scan(&storedCiphertext); err != nil {
+		t.Fatalf("select encrypted provider credential: %v", err)
+	}
+	if storedCiphertext == "" || strings.Contains(storedCiphertext, "sk-project-openai") {
+		t.Fatalf("expected provider credential to be encrypted, got %q", storedCiphertext)
+	}
 
 	loaded, ok, err := store.Load(ctx)
 	if err != nil {
@@ -177,6 +200,15 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	if model["groupName"] != "chatgpt" {
 		t.Fatalf("expected model group chatgpt, got %#v", model["groupName"])
 	}
+	credentials := got["providerCredentials"].(map[string]any)
+	projectCredentials := credentials["prj-1"].(map[string]any)
+	openai := projectCredentials["openai"].(map[string]any)
+	if openai["hasApiKey"] != true {
+		t.Fatalf("expected openai credential to be configured, got %#v", openai["hasApiKey"])
+	}
+	if openai["apiKey"] != "sk-project-openai" {
+		t.Fatalf("expected decrypted openai credential to be loaded")
+	}
 	prompts := got["prompts"].(map[string]any)
 	prompt := prompts["prm-1"].(map[string]any)
 	modelIDs := prompt["modelIds"].([]any)
@@ -194,9 +226,137 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	if modelCrons["gpt-4o"] != "15 */2 * * *" {
 		t.Fatalf("expected gpt-4o override, got %#v", modelCrons["gpt-4o"])
 	}
+	storedProviderCredentials := got["providerCredentials"].(map[string]any)
+	storedProjectCredentials := storedProviderCredentials["prj-1"].(map[string]any)
+	storedOpenAICredential := storedProjectCredentials["openai"].(map[string]any)
+	if storedOpenAICredential["hasApiKey"] != true {
+		t.Fatalf("expected openai credential to be configured, got %#v", storedOpenAICredential["hasApiKey"])
+	}
 	outboxOrder := got["outboxOrder"].([]any)
 	if len(outboxOrder) != 1 || outboxOrder[0] != "evt-1" {
 		t.Fatalf("expected outbox order [evt-1], got %#v", outboxOrder)
+	}
+}
+
+func TestStateStoreSaveReplacesProviderCredentialRows(t *testing.T) {
+	dsn := os.Getenv("PROJECT_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("PROJECT_TEST_DATABASE_URL is required for integration tests")
+	}
+
+	ctx := context.Background()
+	testDSN, cleanup := createProjectTestSchema(t, ctx, dsn)
+	defer cleanup()
+
+	if err := RunMigrations(testDSN); err != nil {
+		t.Fatalf("run migrations: %v", err)
+	}
+
+	db, err := pgxpool.New(ctx, testDSN)
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	defer db.Close()
+
+	store, err := NewStateStore(db, testSecretEncryptionKey)
+	if err != nil {
+		t.Fatalf("init state store: %v", err)
+	}
+
+	payload := []byte(`{
+		"seq": 1,
+		"projects": {
+			"prj-1": {
+				"id": "prj-1",
+				"organizationId": 42,
+				"createdBy": 7,
+				"name": "Acme",
+				"domain": "acme.test",
+				"websiteUrl": "https://acme.test",
+				"status": "active",
+				"createdAt": "2026-04-21T13:00:00Z",
+				"updatedAt": "2026-04-21T13:00:00Z"
+			}
+		},
+		"prompts": {},
+		"competitors": {},
+		"models": {},
+		"projectModels": {},
+		"modelSelectionChanges": {},
+		"impactIntegrations": {},
+		"providerCredentials": {
+			"prj-1": {
+				"openai": {
+					"apiKey": "sk-first",
+					"hasApiKey": true,
+					"updatedAt": "2026-04-21T13:39:28.53912194Z"
+				}
+			}
+		},
+		"outbox": {},
+		"outboxOrder": []
+	}`)
+	if err := store.Save(ctx, payload); err != nil {
+		t.Fatalf("first save: %v", err)
+	}
+
+	updatedPayload := []byte(`{
+		"seq": 2,
+		"projects": {
+			"prj-1": {
+				"id": "prj-1",
+				"organizationId": 42,
+				"createdBy": 7,
+				"name": "Acme",
+				"domain": "acme.test",
+				"websiteUrl": "https://acme.test",
+				"status": "active",
+				"createdAt": "2026-04-21T13:00:00Z",
+				"updatedAt": "2026-04-21T13:00:00Z"
+			}
+		},
+		"prompts": {},
+		"competitors": {},
+		"models": {},
+		"projectModels": {},
+		"modelSelectionChanges": {},
+		"impactIntegrations": {},
+		"providerCredentials": {
+			"prj-1": {
+				"openai": {
+					"apiKey": "sk-second",
+					"hasApiKey": true,
+					"updatedAt": "2026-04-21T14:10:00Z"
+				}
+			}
+		},
+		"outbox": {},
+		"outboxOrder": []
+	}`)
+	if err := store.Save(ctx, updatedPayload); err != nil {
+		t.Fatalf("second save: %v", err)
+	}
+
+	loaded, ok, err := store.Load(ctx)
+	if err != nil {
+		t.Fatalf("load state: %v", err)
+	}
+	if !ok {
+		t.Fatalf("expected state to exist")
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(loaded, &got); err != nil {
+		t.Fatalf("unmarshal loaded payload: %v", err)
+	}
+	providerCredentials := got["providerCredentials"].(map[string]any)
+	projectCredentials := providerCredentials["prj-1"].(map[string]any)
+	openaiCredential := projectCredentials["openai"].(map[string]any)
+	if openaiCredential["updatedAt"] != "2026-04-21T14:10:00Z" {
+		t.Fatalf("expected updated timestamp, got %#v", openaiCredential["updatedAt"])
+	}
+	if openaiCredential["apiKey"] != "sk-second" {
+		t.Fatalf("expected decrypted updated api key to be loaded")
 	}
 }
 

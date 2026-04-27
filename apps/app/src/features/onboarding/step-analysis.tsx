@@ -1,19 +1,26 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import { createOnboardingProject } from "@/features/onboarding/onboarding-api";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { buildScopedHref, readSelectedOrganizationID, storeSelectedProjectID } from "@/shared/selection";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
 type StepAnalysisProps = {
+  apiBaseURL: string;
   hideBack?: boolean;
 };
 
-export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
+export function StepAnalysis({ apiBaseURL, hideBack = false }: StepAnalysisProps) {
   const {
+    organizationName,
     websiteUrl,
     attributionSource,
     brandName,
+    brandDescription,
+    industry,
+    competitors,
     selectedPrompts,
     selectedModels,
     prevStep,
@@ -21,6 +28,9 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
   const { t } = useScopedI18n("onboarding");
   const navigate = useNavigate();
   const [progress, setProgress] = useState(10);
+  const [createdProjectId, setCreatedProjectId] = useState("");
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const creationStartedRef = useRef(false);
   const attributionLabel =
     attributionSource === "other"
       ? t("attributionOptionOther")
@@ -29,8 +39,9 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setProgress((currentProgress) => {
-        const nextProgress = Math.min(currentProgress + Math.random() * 7, 100);
-        if (nextProgress >= 100) {
+        const ceiling = createdProjectId ? 100 : 92;
+        const nextProgress = Math.min(currentProgress + Math.random() * 7, ceiling);
+        if (nextProgress >= ceiling) {
           window.clearInterval(timer);
         }
         return nextProgress;
@@ -38,7 +49,48 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
     }, 350);
 
     return () => window.clearInterval(timer);
-  }, []);
+  }, [createdProjectId]);
+
+  useEffect(() => {
+    if (creationStartedRef.current) return;
+    creationStartedRef.current = true;
+
+    const organizationId = readSelectedOrganizationID();
+    void createOnboardingProject(apiBaseURL, {
+      organizationId,
+      organizationName,
+      brandName,
+      websiteUrl,
+      attributionSource,
+      brandDescription,
+      industry,
+      competitors,
+      prompts: selectedPrompts,
+      modelIds: selectedModels,
+    })
+      .then(({ projectId, projectSlug }) => {
+        storeSelectedProjectID(projectId);
+        setCreatedProjectId(projectSlug);
+        setCreationError(null);
+        setProgress(100);
+      })
+      .catch((error) => {
+        setCreationError(
+          error instanceof Error ? error.message : "Impossible de creer le projet.",
+        );
+      });
+  }, [
+    apiBaseURL,
+    attributionSource,
+    brandDescription,
+    brandName,
+    competitors,
+    industry,
+    organizationName,
+    selectedModels,
+    selectedPrompts,
+    websiteUrl,
+  ]);
 
   return (
     <OnboardingStep
@@ -52,8 +104,10 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
         <OnboardingStepFooter
           hideBack={hideBack}
           onBack={prevStep}
-          onNext={() => navigate("/monitoring")}
-          // nextDisabled={progress < 95}
+          onNext={() =>
+            navigate(buildScopedHref("/monitoring", { project: createdProjectId }))
+          }
+          nextDisabled={createdProjectId === ""}
           nextLabel={t("goToMonitoring")}
         />
       }
@@ -65,6 +119,12 @@ export function StepAnalysis({ hideBack = false }: StepAnalysisProps) {
           <span>{Math.round(progress)}%</span>
         </div>
       </div>
+
+      {creationError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {creationError}
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-2 text-left text-sm text-zinc-700 sm:grid-cols-2">
         <div className="rounded-md border border-border/80 p-3">

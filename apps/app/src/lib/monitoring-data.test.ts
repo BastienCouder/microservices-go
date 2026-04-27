@@ -65,6 +65,29 @@ describe("loadMonitoringData", () => {
     expect(result.data.recent_prompts).toHaveLength(1);
     expect(result.data.recent_prompts[0]?.persona).toBe("");
   });
+
+  test("resolves a readable project slug from the route before loading monitoring", async () => {
+    mockFetchSequence([
+      jsonResponse(404, { error: "not found" }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          { id: "prj_1", name: "Site France" },
+          { id: "prj_2", name: "Site Europe" },
+        ],
+      }),
+      jsonResponse(200, { success: true, data: { id: "prj_1", brandName: "Acme", name: "Site France" } }),
+      jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
+      jsonResponse(200, { success: true, data: [] }),
+    ]);
+
+    const result = await loadMonitoringData("http://api.test", "?project=site-france");
+
+    expect(result.projectId).toBe("prj_1");
+    expect(result.data.project.name).toBe("Acme");
+  });
 });
 
 describe("filterMonitoringAlerts", () => {

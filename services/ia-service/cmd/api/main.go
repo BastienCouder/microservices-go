@@ -19,7 +19,9 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/http"
+	openai "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openai"
 	openrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openrouter"
+	providerrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/router"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
@@ -51,13 +53,24 @@ func main() {
 
 	var provider usecase.PromptProvider
 	if cfg.ExecutionMode == string(usecase.ExecutionModeProvider) {
-		provider = openrouter.NewClient(
+		openRouterClient := openrouter.NewClient(
 			cfg.ProviderBaseURL,
 			cfg.ProviderAPIKey,
 			cfg.ProviderHTTPReferer,
 			cfg.ProviderAppName,
 			httpClient,
 		)
+		provider = providerrouter.New(map[string]usecase.PromptProvider{
+			"openai":     openai.NewClient("https://api.openai.com/v1", "", httpClient),
+			"google":     openai.NewClient("https://generativelanguage.googleapis.com/v1beta/openai", "", httpClient),
+			"deepseek":   openai.NewClient("https://api.deepseek.com", "", httpClient),
+			"groq":       openai.NewClient("https://api.groq.com/openai/v1", "", httpClient),
+			"mistral":    openai.NewClient("https://api.mistral.ai/v1", "", httpClient),
+			"perplexity": openai.NewClient("https://api.perplexity.ai", "", httpClient),
+			"qwen":       openai.NewClient("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "", httpClient),
+			"xai":        openai.NewClient("https://api.x.ai/v1", "", httpClient),
+			"zai":        openai.NewClient("https://open.bigmodel.cn/api/paas/v4", "", httpClient),
+		}, openRouterClient)
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(usecase.Dependencies{

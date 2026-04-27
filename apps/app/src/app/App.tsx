@@ -1,10 +1,16 @@
 import { useEffect, useMemo } from "react";
-import { useLocation } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
+import { apiRoutes } from "@/lib/api-config";
+import { gatewayJSON } from "@/shared/api/gateway";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
-import { shouldRedirectUnauthenticated } from "./auth-guard";
+import {
+  shouldRedirectToOnboarding,
+  shouldRedirectUnauthenticated,
+} from "./auth-guard";
 import { AppLayout } from "./layout";
 import { AppRouter } from "./router";
 
@@ -15,6 +21,36 @@ function getAPIBaseURL(): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function unwrapData(value: unknown): unknown {
+  if (
+    value &&
+    typeof value === "object" &&
+    "success" in value &&
+    (value as { success?: unknown }).success === true &&
+    "data" in value
+  ) {
+    return (value as { data: unknown }).data;
+  }
+  return value;
+}
+
+async function loadProjectCount(
+  apiBaseURL: string,
+  signal?: AbortSignal,
+): Promise<number | null> {
+  const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.list(), {
+    method: "GET",
+    signal,
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = unwrapData(response.data);
+  return Array.isArray(payload) ? payload.length : 0;
+}
+
 export default function App() {
   const location = useLocation();
   const routeSearch = location.search;
@@ -22,7 +58,24 @@ export default function App() {
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
+  const shouldCheckProjectGuard =
+    apiBaseURL.trim() !== "" && !busy && user !== null && !isOnboardingRoute;
   const mustRedirectToAuth = shouldRedirectUnauthenticated({ apiBaseURL, busy, user });
+  const projectGuardQuery = useQuery({
+    queryKey: ["route-project-guard", apiBaseURL, user?.ID ?? null],
+    enabled: shouldCheckProjectGuard,
+    queryFn: ({ signal }) => loadProjectCount(apiBaseURL, signal),
+  });
+  const mustRedirectToOnboarding = shouldRedirectToOnboarding({
+    apiBaseURL,
+    busy,
+    user,
+    isOnboardingRoute,
+    projectCount:
+      projectGuardQuery.isLoading || projectGuardQuery.isFetching
+        ? null
+        : projectGuardQuery.data ?? null,
+  });
 
   useEffect(() => {
     if (!mustRedirectToAuth) {
@@ -46,6 +99,14 @@ export default function App() {
 
   if (mustRedirectToAuth) {
     return null;
+  }
+
+  if (shouldCheckProjectGuard && (projectGuardQuery.isLoading || projectGuardQuery.isFetching)) {
+    return null;
+  }
+
+  if (mustRedirectToOnboarding) {
+    return <Navigate replace to="/onboarding" />;
   }
 
   if (isOnboardingRoute) {

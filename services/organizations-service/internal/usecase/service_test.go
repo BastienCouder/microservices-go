@@ -20,6 +20,27 @@ type fakeRepo struct {
 	nextInviteID  int64
 }
 
+type fakeProjectMemberAssigner struct {
+	calls []fakeProjectMemberAssignment
+}
+
+type fakeProjectMemberAssignment struct {
+	projectID      string
+	organizationID int64
+	userID         int64
+	role           string
+}
+
+func (f *fakeProjectMemberAssigner) AssignProjectMember(_ context.Context, projectID string, organizationID, userID int64, role string) error {
+	f.calls = append(f.calls, fakeProjectMemberAssignment{
+		projectID:      projectID,
+		organizationID: organizationID,
+		userID:         userID,
+		role:           role,
+	})
+	return nil
+}
+
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
 		organizations: make(map[int64]*domain.Organization),
@@ -125,6 +146,34 @@ func (f *fakeRepo) ListMembers(_ context.Context, organizationID int64) ([]domai
 	return out, nil
 }
 
+func (f *fakeRepo) UpdateMemberTeam(_ context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	key := [2]int64{organizationID, userID}
+	member, ok := f.members[key]
+	if !ok {
+		return nil, domain.ErrMemberNotFound
+	}
+	if teamID > 0 {
+		found := false
+		for _, team := range f.teams[organizationID] {
+			if team.ID == teamID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return nil, domain.ErrTeamNotFound
+		}
+	}
+	member.TeamID = teamID
+	f.members[key] = member
+	clone := member
+	clone.Roles = append([]string(nil), member.Roles...)
+	return &clone, nil
+}
+
 func (f *fakeRepo) AssignRole(_ context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
 	if _, ok := f.organizations[organizationID]; !ok {
 		return nil, domain.ErrOrganizationNotFound
@@ -135,6 +184,64 @@ func (f *fakeRepo) AssignRole(_ context.Context, organizationID, userID int64, r
 		return nil, domain.ErrMemberNotFound
 	}
 	member.Roles = domain.AddRole(member.Roles, role)
+	f.members[key] = member
+	clone := member
+	clone.Roles = append([]string(nil), member.Roles...)
+	return &clone, nil
+}
+
+func (f *fakeRepo) UpdateMemberRoles(_ context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	key := [2]int64{organizationID, userID}
+	member, ok := f.members[key]
+	if !ok || member.DeletedAt != nil {
+		return nil, domain.ErrMemberNotFound
+	}
+	member.Roles = append([]string(nil), roles...)
+	f.members[key] = member
+	clone := member
+	clone.Roles = append([]string(nil), member.Roles...)
+	return &clone, nil
+}
+
+func (f *fakeRepo) RemoveMember(_ context.Context, organizationID, userID int64, removedAt time.Time) error {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return domain.ErrOrganizationNotFound
+	}
+	key := [2]int64{organizationID, userID}
+	member, ok := f.members[key]
+	if !ok || member.DeletedAt != nil {
+		return domain.ErrMemberNotFound
+	}
+	removedAt = removedAt.UTC()
+	member.DeletedAt = &removedAt
+	member.Roles = nil
+	f.members[key] = member
+	return nil
+}
+
+func (f *fakeRepo) SetMemberBanned(_ context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	key := [2]int64{organizationID, userID}
+	member, ok := f.members[key]
+	if !ok || member.DeletedAt != nil {
+		return nil, domain.ErrMemberNotFound
+	}
+	if banned {
+		member.Roles = domain.AddRole(member.Roles, domain.RoleBanned)
+	} else {
+		next := make([]string, 0, len(member.Roles))
+		for _, role := range member.Roles {
+			if role != domain.RoleBanned {
+				next = append(next, role)
+			}
+		}
+		member.Roles = next
+	}
 	f.members[key] = member
 	clone := member
 	clone.Roles = append([]string(nil), member.Roles...)
@@ -237,6 +344,9 @@ func (f *fakeRepo) AcceptInvitationByToken(_ context.Context, token string, user
 		TeamID:         0,
 		Roles:          []string{invitation.Role},
 		AddedAt:        actedAt,
+	}
+	if invitation.ProjectID != "" {
+		member.Roles = []string{"project_member"}
 	}
 	key := [2]int64{member.OrganizationID, member.UserID}
 	f.members[key] = member
@@ -354,4 +464,91 @@ func TestTeamsMembersRolesFlow(t *testing.T) {
 	if len(members) != 1 {
 		t.Fatalf("expected 1 member, got %d", len(members))
 	}
+}
+
+func TestMemberActionsFlow(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+	svc.now = func() time.Time {
+		return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
+	}
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	member, err := svc.AddMember(context.Background(), org.ID, 42, 0)
+	if err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+
+	updated, err := svc.UpdateMemberRoles(context.Background(), org.ID, member.UserID, []string{" Admin ", "editor", "admin"})
+	if err != nil {
+		t.Fatalf("update member roles: %v", err)
+	}
+	if got, want := updated.Roles, []string{"admin", "editor"}; !equalStrings(got, want) {
+		t.Fatalf("roles mismatch: got %v want %v", got, want)
+	}
+
+	banned, err := svc.BanMember(context.Background(), org.ID, member.UserID)
+	if err != nil {
+		t.Fatalf("ban member: %v", err)
+	}
+	if !containsString(banned.Roles, domain.RoleBanned) {
+		t.Fatalf("expected banned role, got %v", banned.Roles)
+	}
+
+	unbanned, err := svc.UnbanMember(context.Background(), org.ID, member.UserID)
+	if err != nil {
+		t.Fatalf("unban member: %v", err)
+	}
+	if containsString(unbanned.Roles, domain.RoleBanned) {
+		t.Fatalf("expected banned role removed, got %v", unbanned.Roles)
+	}
+
+	if err := svc.RemoveMember(context.Background(), org.ID, member.UserID); err != nil {
+		t.Fatalf("remove member: %v", err)
+	}
+	if _, err := svc.BanMember(context.Background(), org.ID, member.UserID); !errors.Is(err, domain.ErrMemberNotFound) {
+		t.Fatalf("expected ErrMemberNotFound after removal, got %v", err)
+	}
+}
+
+func TestUpdateMemberRolesRejectsEmptyRoleSet(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	if _, err := svc.AddMember(context.Background(), org.ID, 42, 0); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+
+	_, err = svc.UpdateMemberRoles(context.Background(), org.ID, 42, []string{" ", ""})
+	if !errors.Is(err, domain.ErrInvalidRole) {
+		t.Fatalf("expected ErrInvalidRole, got %v", err)
+	}
+}
+
+func equalStrings(left, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

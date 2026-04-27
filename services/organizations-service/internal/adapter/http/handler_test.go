@@ -51,6 +51,19 @@ func (stubRepo) ListMembers(_ context.Context, organizationID int64) ([]domain.M
 	}, nil
 }
 
+func (stubRepo) UpdateMemberTeam(_ context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, domain.ErrInvalidMember
+	}
+	return &domain.Member{
+		OrganizationID: organizationID,
+		UserID:         userID,
+		TeamID:         teamID,
+		Roles:          []string{"member"},
+		AddedAt:        time.Now().UTC(),
+	}, nil
+}
+
 func (stubRepo) AssignRole(_ context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
 	if organizationID <= 0 || userID <= 0 {
 		return nil, domain.ErrInvalidMember
@@ -59,6 +72,41 @@ func (stubRepo) AssignRole(_ context.Context, organizationID, userID int64, role
 		OrganizationID: organizationID,
 		UserID:         userID,
 		Roles:          []string{"member", role},
+		AddedAt:        time.Now().UTC(),
+	}, nil
+}
+
+func (stubRepo) UpdateMemberRoles(_ context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, domain.ErrInvalidMember
+	}
+	return &domain.Member{
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Roles:          append([]string(nil), roles...),
+		AddedAt:        time.Now().UTC(),
+	}, nil
+}
+
+func (stubRepo) RemoveMember(_ context.Context, organizationID, userID int64, _ time.Time) error {
+	if organizationID <= 0 || userID <= 0 {
+		return domain.ErrInvalidMember
+	}
+	return nil
+}
+
+func (stubRepo) SetMemberBanned(_ context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, domain.ErrInvalidMember
+	}
+	roles := []string{"member"}
+	if banned {
+		roles = append(roles, domain.RoleBanned)
+	}
+	return &domain.Member{
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Roles:          roles,
 		AddedAt:        time.Now().UTC(),
 	}, nil
 }
@@ -144,6 +192,64 @@ func TestAssignRoleAllowsTargetUserDifferentFromCaller(t *testing.T) {
 
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+}
+
+func TestMemberActionRoutes(t *testing.T) {
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   any
+		want   int
+	}{
+		{
+			name:   "update roles",
+			method: http.MethodPatch,
+			path:   "/organizations/1/members/42",
+			body:   map[string][]string{"roles": []string{"admin", "editor"}},
+			want:   http.StatusOK,
+		},
+		{
+			name:   "ban member",
+			method: http.MethodPost,
+			path:   "/organizations/1/members/42/ban",
+			want:   http.StatusOK,
+		},
+		{
+			name:   "unban member",
+			method: http.MethodPost,
+			path:   "/organizations/1/members/42/unban",
+			want:   http.StatusOK,
+		},
+		{
+			name:   "remove member",
+			method: http.MethodDelete,
+			path:   "/organizations/1/members/42",
+			want:   http.StatusNoContent,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newTestHandler()
+			var body bytes.Buffer
+			if tt.body != nil {
+				if err := json.NewEncoder(&body).Encode(tt.body); err != nil {
+					t.Fatalf("encode body: %v", err)
+				}
+			}
+			req := httptest.NewRequest(tt.method, tt.path, &body)
+			req.Header.Set("X-Authenticated-User-ID", "7")
+			req.Header.Set("X-Organization-ID", "1")
+			resp := httptest.NewRecorder()
+
+			h.organizationRoutes(resp, req)
+
+			if resp.Code != tt.want {
+				t.Fatalf("expected %d, got %d body=%s", tt.want, resp.Code, resp.Body.String())
+			}
+		})
 	}
 }
 

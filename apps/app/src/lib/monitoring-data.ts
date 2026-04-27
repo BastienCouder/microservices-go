@@ -9,6 +9,7 @@ import {
 import type { RuntimeMode } from "@/lib/runtime-mode";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
 
 export type MonitoringCompetitor = {
   name: string;
@@ -58,6 +59,7 @@ export type MonitoringData = {
   project: {
     id: string;
     name: string;
+    website?: string;
     tagline: string;
     personas: string[];
     competitors: MonitoringCompetitor[];
@@ -166,6 +168,12 @@ function asNumber(value: unknown): number {
 function asBool(value: unknown): boolean {
   return value === true;
 }
+
+type ProjectRouteCandidate = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 function normalizeFilterValue(value: string): string {
   return value.trim().toLowerCase();
@@ -279,6 +287,22 @@ function readProjectIdFromSearch(routeSearch: string): string | null {
   return trimmed === "" ? null : trimmed;
 }
 
+function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
+  const payload = unwrapSuccessEnvelope(value);
+  if (!Array.isArray(payload)) return [];
+
+  return attachStableSlugs(
+    payload
+      .map(asObject)
+      .map((entry) => ({
+        id: asString(getField(entry, ["id", "ID"])).trim(),
+        name: asString(getField(entry, ["name", "Name"])).trim() || "Projet",
+      }))
+      .filter((project) => project.id !== ""),
+    "project",
+  );
+}
+
 export function getMonitoringQueryContext(routeSearch: string): MonitoringQueryContext {
   return {
     projectId: readProjectIdFromSearch(routeSearch),
@@ -351,6 +375,13 @@ function pickProjectTagline(project: JsonObject): string {
   return "";
 }
 
+function pickProjectWebsite(project: JsonObject): string {
+  return (
+    asString(getField(project, ["websiteUrl", "WebsiteURL"])).trim() ||
+    asString(getField(project, ["domain", "Domain"])).trim()
+  );
+}
+
 function pickProjectPersonas(project: JsonObject): string[] {
   const directPersonas = asPersonaArray(
     getField(project, [
@@ -386,6 +417,7 @@ function fallbackMonitoringData(): MonitoringData {
     project: {
       id: "",
       name: "",
+      website: "",
       tagline: "",
       personas: [],
       competitors: [],
@@ -532,13 +564,41 @@ export async function loadMonitoringData(
     return { data: fallback, projectId: null, mode };
   }
 
-  const encodedProjectId = encodeProjectPathSegment(projectId);
-
-  const [projectRes, modelsRes, competitorsRes, monitoringRes, alertsRes] = await Promise.all([
-    gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}`, {
+  let projectRes = await gatewayJSON<unknown>(
+    apiBaseURL,
+    `/projects/${encodeProjectPathSegment(projectId)}`,
+    {
       method: "GET",
       signal: options?.signal,
-    }),
+    },
+  );
+
+  if (!projectRes.ok && routeProjectId && projectRes.status === 404) {
+    const projectsPayload = unwrapRequiredEnvelope(
+      await gatewayJSON<unknown>(apiBaseURL, "/projects", {
+        method: "GET",
+        signal: options?.signal,
+      }),
+      "projects",
+    );
+    const projects = normalizeProjectCandidates(projectsPayload);
+    const resolvedProject = findBySlugOrId(projects, routeProjectId);
+    if (resolvedProject) {
+      projectId = resolvedProject.id;
+      projectRes = await gatewayJSON<unknown>(
+        apiBaseURL,
+        `/projects/${encodeProjectPathSegment(projectId)}`,
+        {
+          method: "GET",
+          signal: options?.signal,
+        },
+      );
+    }
+  }
+
+  const encodedProjectId = encodeProjectPathSegment(projectId);
+
+  const [modelsRes, competitorsRes, monitoringRes, alertsRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/models`, {
       method: "GET",
       signal: options?.signal,
@@ -610,6 +670,7 @@ export async function loadMonitoringData(
     asString(getField(project, ["name", "Name"])) ||
     "";
   const projectTagline = pickProjectTagline(project);
+  const projectWebsite = pickProjectWebsite(project);
   const projectPersonas = pickProjectPersonas(project);
 
   const responses = asArray(getField(monitoringPayload, ["aiResponses", "responses", "Responses"]))
@@ -754,6 +815,7 @@ export async function loadMonitoringData(
     project: {
       id: projectId,
       name: projectName,
+      website: projectWebsite,
       tagline: projectTagline,
       personas: projectPersonas,
       competitors: normalizedCompetitors,

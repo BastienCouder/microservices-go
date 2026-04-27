@@ -147,11 +147,13 @@ func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromp
 	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
 		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
 		resp, callErr := c.client.ExecutePrompt(callCtx, &iav1.ExecutePromptRequest{
-			PromptId:    input.PromptID,
-			PromptText:  input.PromptText,
-			ModelId:     input.ModelID,
-			BrandName:   input.BrandName,
-			Competitors: input.Competitors,
+			PromptId:       input.PromptID,
+			PromptText:     input.PromptText,
+			ModelId:        input.ModelID,
+			BrandName:      input.BrandName,
+			Competitors:    input.Competitors,
+			ProviderId:     input.ProviderID,
+			ProviderApiKey: input.ProviderAPIKey,
 		})
 		if callErr != nil {
 			return isTransientGRPCError(callErr), callErr

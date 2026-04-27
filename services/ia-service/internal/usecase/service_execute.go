@@ -26,7 +26,12 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		switch s.mode {
 		case ExecutionModeProvider:
 			providerPrompt := buildProviderPrompt(promptText, strings.TrimSpace(input.BrandName), input.Competitors)
-			result, err := s.provider.Generate(ctx, modelID, providerPrompt)
+			result, err := s.provider.Generate(ctx, ProviderGenerateInput{
+				ProviderID: strings.TrimSpace(input.ProviderID),
+				ModelID:    modelID,
+				APIKey:     strings.TrimSpace(input.ProviderAPIKey),
+				Prompt:     providerPrompt,
+			})
 			if err != nil {
 				return ExecutePromptResult{}, fmt.Errorf("execute prompt with provider: %w", err)
 			}

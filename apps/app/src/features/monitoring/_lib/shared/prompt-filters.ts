@@ -20,44 +20,36 @@ export function normalizeFilterValue(value: string): string {
   return value.trim().toLowerCase();
 }
 
-export function matchesPromptAudienceFilters(
-  prompt: AudiencePrompt,
-  selectedModels: string[],
-  selectedPersonas: string[],
-  selectedCompetitors: string[],
-): boolean {
-  const matchesModel =
-    selectedModels.length === 0 || selectedModels.includes(prompt.modelId);
-  // Persona filtering is intentionally paused for now.
-  const matchesPersona = true;
-  const promptCompetitors = (prompt.competitorsMentioned || []).map(
-    normalizeFilterValue,
-  );
-  const matchesCompetitor =
-    selectedCompetitors.length === 0 ||
-    (prompt.mention &&
-      selectedCompetitors.some((competitor) =>
-        promptCompetitors.includes(normalizeFilterValue(competitor)),
-      ));
-
-  return matchesModel && matchesPersona && matchesCompetitor;
-}
-
 export function filterPromptsByAudience<T extends AudiencePrompt>(
   prompts: T[],
   filters: AudienceFilters,
 ): T[] {
-  return prompts.filter((prompt) =>
-    matchesPromptAudienceFilters(
-      prompt,
-      filters.selectedModels,
-      filters.selectedPersonas,
-      filters.selectedCompetitors,
-    ),
-  );
+  return prompts.filter((prompt) => {
+    if (
+      filters.selectedModels.length > 0 &&
+      !filters.selectedModels.includes(prompt.modelId)
+    ) {
+      return false;
+    }
+
+    if (filters.selectedCompetitors.length === 0) {
+      return true;
+    }
+
+    const promptCompetitors = (prompt.competitorsMentioned || []).map(
+      normalizeFilterValue,
+    );
+
+    return (
+      prompt.mention &&
+      filters.selectedCompetitors.some((competitor) =>
+        promptCompetitors.includes(normalizeFilterValue(competitor)),
+      )
+    );
+  });
 }
 
-export function promptIsInPeriod(promptTime: string, period: string): boolean {
+function promptIsInPeriod(promptTime: string, period: string): boolean {
   if (!promptTime) return true;
 
   const normalized = promptTime.trim().toLowerCase();

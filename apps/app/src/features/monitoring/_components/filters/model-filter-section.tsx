@@ -1,12 +1,12 @@
-import { ModelFilterModeTabs } from "@/components/monitoring/model-filter-mode-tabs";
+import { ModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 
-import { FiltersEmptyStateCard } from "../shared/filters-empty-state-card";
-import { ModelCard } from "../shared/model-card";
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { ToggleMoreButton } from "./toggle-more-button";
+import { ModelCard } from "@/components/shared/model-card";
 
 const MODELS_COUNT = 4;
 
@@ -89,7 +89,7 @@ export function ModelFilterSection({
       </div>
 
       {filteredModels.length === 0 ? (
-        <FiltersEmptyStateCard label={content.noDataAvailable} />
+        <EmptyStateCard label={content.noDataAvailable} />
       ) : null}
       {filteredModels.length > MODELS_COUNT ? (
         <ToggleMoreButton

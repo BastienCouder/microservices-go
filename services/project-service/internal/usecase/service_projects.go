@@ -83,9 +83,38 @@ func (s *Service) ListProjects(ctx context.Context, organizationID int64) ([]Pro
 		return nil, err
 	}
 
-	projects := make([]Project, 0)
-	for _, project := range s.projects {
-		if project.OrganizationID == organizationID {
+	return listProjectsFromMap(s.projects, organizationID), nil
+}
+
+func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userID int64) ([]Project, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, fmt.Errorf("%w: organizationId and userId must be positive", ErrValidation)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	assignedProjectIDs := make(map[string]struct{})
+	for projectID, members := range s.projectMembers {
+		member, ok := members[userID]
+		if !ok || member.OrganizationID != organizationID {
+			continue
+		}
+		if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err == nil {
+			assignedProjectIDs[projectID] = struct{}{}
+		}
+	}
+	if len(assignedProjectIDs) == 0 {
+		return listProjectsFromMap(s.projects, organizationID), nil
+	}
+
+	projects := make([]Project, 0, len(assignedProjectIDs))
+	for projectID := range assignedProjectIDs {
+		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID {
 			projects = append(projects, copyProject(project))
 		}
 	}
@@ -241,4 +270,17 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 	}
 
 	return FinalizeResult{Project: copyProject(project), PromptCount: len(prompts), ModelCount: len(models)}, nil
+}
+
+func listProjectsFromMap(projectsByID map[string]*Project, organizationID int64) []Project {
+	projects := make([]Project, 0)
+	for _, project := range projectsByID {
+		if project.OrganizationID == organizationID {
+			projects = append(projects, copyProject(project))
+		}
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
+	})
+	return projects
 }

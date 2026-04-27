@@ -184,7 +184,7 @@ func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
 	if !strings.Contains(body, `"model_selection_limit":6`) {
 		t.Fatalf("expected model selection limit in payload, got %s", body)
 	}
-	if !strings.Contains(body, `"monthly_model_change_limit":3`) {
+	if !strings.Contains(body, `"monthly_model_change_limit":0`) {
 		t.Fatalf("expected monthly model change limit in payload, got %s", body)
 	}
 }

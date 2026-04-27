@@ -1,17 +1,21 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { buildSelectedProjectModelFilterIds } from "@/lib/project-models";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { buildFilterHeroInsight, type FilterHeroInsight } from "./filter-hero-insight";
 import {
-  buildModelCards,
   buildPersonaOptions,
   buildProjectWithDynamicCompetitors,
-  buildSelectedModelFilterIds,
   buildVisibleModelFilterItems,
 } from "./filter-helpers";
-import { useMonitoringFilterActions, useMonitoringFilters, hasActiveMonitoringFilters } from "../shared/use-monitoring-filters";
+import type { FilterModelCard } from "./types";
+import {
+  hasActiveMonitoringFilters,
+  useMonitoringFilterActions,
+  useMonitoringFilters,
+} from "../shared/use-monitoring-filters";
 
 type FiltersPanelViewModel = {
   loading: boolean;
@@ -24,7 +28,7 @@ type FiltersPanelViewModel = {
   selectedPersonas: string[];
   togglePersona: (id: string) => void;
   clearPersonas: () => void;
-  models: ReturnType<typeof buildModelCards>;
+  models: FilterModelCard[];
   selectedModels: string[];
   toggleModel: (id: string) => void;
   clearModels: () => void;
@@ -65,7 +69,7 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
   );
   const selectedModelFilterIds = useMemo(
     () =>
-      buildSelectedModelFilterIds(
+      buildSelectedProjectModelFilterIds(
         filters.selectedModels,
         visibleModelFilterItems,
         filters.showUniqueModelFilters,
@@ -142,7 +146,14 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
     selectedPersonas: filters.selectedPersonas,
     togglePersona: actions.togglePersona,
     clearPersonas: actions.clearPersonas,
-    models: buildModelCards(visibleModelFilterItems, filters.showUniqueModelFilters),
+    models: visibleModelFilterItems.map((model) => ({
+      id: model.id,
+      name: filters.showUniqueModelFilters ? model.displayName : "",
+      description: model.description,
+      icon: model.iconPath,
+      live: model.live,
+      modelGroup: model.groupName,
+    })),
     selectedModels: selectedModelFilterIds,
     toggleModel: toggleModelFilter,
     clearModels,

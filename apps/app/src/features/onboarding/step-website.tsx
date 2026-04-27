@@ -8,13 +8,28 @@ import {
 } from "./step-shell";
 
 type StepWebsiteProps = {
+  askOrganizationName?: boolean;
   isDemo?: boolean;
 };
 
-export function StepWebsite({ isDemo = false }: StepWebsiteProps) {
-  const { websiteUrl, setWebsiteUrl, brandName, setBrandName, nextStep } =
-    useOnboarding();
+export function StepWebsite({
+  askOrganizationName = false,
+  isDemo = false,
+}: StepWebsiteProps) {
+  const {
+    organizationName,
+    setOrganizationName,
+    websiteUrl,
+    setWebsiteUrl,
+    brandName,
+    setBrandName,
+    nextStep,
+  } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
+  const canContinue =
+    brandName.trim() !== "" &&
+    websiteUrl.trim() !== "" &&
+    (!askOrganizationName || organizationName.trim() !== "");
 
   return (
     <OnboardingStep
@@ -22,10 +37,23 @@ export function StepWebsite({ isDemo = false }: StepWebsiteProps) {
       description={t("websiteDescription")}
       footer={
         <div className="flex w-full justify-end">
-          <Button onClick={nextStep}>{t("continue")}</Button>
+          <Button onClick={nextStep} disabled={!canContinue}>
+            {t("continue")}
+          </Button>
         </div>
       }
     >
+      {askOrganizationName ? (
+        <OnboardingField label={t("organizationNameLabel")} htmlFor="organizationName">
+          <Input
+            id="organizationName"
+            value={organizationName}
+            onChange={(event) => setOrganizationName(event.target.value)}
+            placeholder={t("organizationNamePlaceholder")}
+          />
+        </OnboardingField>
+      ) : null}
+
       <OnboardingField label={t("brandNameLabel")} htmlFor="brandName">
         <Input
           id="brandName"

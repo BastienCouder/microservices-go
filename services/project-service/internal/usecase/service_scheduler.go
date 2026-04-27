@@ -54,18 +54,31 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 			if len(modelIDs) == 0 {
 				continue
 			}
+			providerCredentials := make(map[string]ScheduledModelProviderCredential, len(modelIDs))
+			for _, modelID := range modelIDs {
+				credential, err := s.resolveProviderCredentialForModelLocked(projectID, modelID)
+				if err != nil {
+					continue
+				}
+				providerCredentials[modelID] = ScheduledModelProviderCredential{
+					ProviderID:      credential.ProviderID,
+					ProviderModelID: credential.ProviderModelID,
+					ProviderAPIKey:  credential.ProviderAPIKey,
+				}
+			}
 
 			jobs = append(jobs, ScheduledAnalysisJob{
-				ProjectID:      project.ID,
-				ProjectName:    project.Name,
-				OrganizationID: project.OrganizationID,
-				CreatedBy:      project.CreatedBy,
-				BrandName:      project.BrandName,
-				Competitors:    append([]string(nil), competitors...),
-				PromptID:       prompt.ID,
-				PromptText:     prompt.Text,
-				ModelIDs:       append([]string(nil), modelIDs...),
-				Schedule:       copyPromptSchedule(prompt.Schedule),
+				ProjectID:           project.ID,
+				ProjectName:         project.Name,
+				OrganizationID:      project.OrganizationID,
+				CreatedBy:           project.CreatedBy,
+				BrandName:           project.BrandName,
+				Competitors:         append([]string(nil), competitors...),
+				PromptID:            prompt.ID,
+				PromptText:          prompt.Text,
+				ModelIDs:            append([]string(nil), modelIDs...),
+				ProviderCredentials: providerCredentials,
+				Schedule:            copyPromptSchedule(prompt.Schedule),
 			})
 		}
 	}

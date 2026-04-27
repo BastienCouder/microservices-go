@@ -43,7 +43,14 @@ interface ProtoScheduledAnalysisJob {
   promptId: string;
   promptText: string;
   modelIds: string[];
+  providerCredentials?: Record<string, ProtoModelProviderCredential>;
   schedule?: ProtoPromptSchedule;
+}
+
+interface ProtoModelProviderCredential {
+  providerId: string;
+  providerModelId: string;
+  providerApiKey: string;
 }
 
 interface ListScheduledAnalysisJobsResponse {
@@ -88,6 +95,8 @@ interface ExecutePromptRequest {
   promptId: string;
   promptText: string;
   modelId: string;
+  providerId: string;
+  providerApiKey: string;
   brandName: string;
   competitors: string[];
 }
@@ -285,23 +294,31 @@ export function isQuotaExceededSchedulerError(error: unknown): boolean {
 function toScheduledAnalysisJobDefinitions(
   response: ListScheduledAnalysisJobsResponse,
 ): ScheduledAnalysisJobDefinition[] {
-  return response.jobs.map((job) => ({
-    projectId: job.projectId,
-    projectName: job.projectName,
-    organizationId: job.organizationId,
-    createdBy: job.createdBy,
-    brandName: job.brandName,
-    competitors: [...job.competitors],
-    promptId: job.promptId,
-    promptText: job.promptText,
-    modelIds: [...job.modelIds],
-    schedule: {
-      mode: job.schedule?.mode ?? "",
-      cron: job.schedule?.cron ?? "",
-      timezone: job.schedule?.timezone ?? "",
-      ...(job.schedule?.modelCrons !== undefined ? { modelCrons: job.schedule.modelCrons } : {}),
-    },
-  }));
+  return response.jobs.map((job) => {
+    const providerCredentials =
+      job.providerCredentials !== undefined
+        ? { ...job.providerCredentials }
+        : undefined;
+
+    return {
+      projectId: job.projectId,
+      projectName: job.projectName,
+      organizationId: job.organizationId,
+      createdBy: job.createdBy,
+      brandName: job.brandName,
+      competitors: [...job.competitors],
+      promptId: job.promptId,
+      promptText: job.promptText,
+      modelIds: [...job.modelIds],
+      ...(providerCredentials !== undefined ? { providerCredentials } : {}),
+      schedule: {
+        mode: job.schedule?.mode ?? "",
+        cron: job.schedule?.cron ?? "",
+        timezone: job.schedule?.timezone ?? "",
+        ...(job.schedule?.modelCrons !== undefined ? { modelCrons: job.schedule.modelCrons } : {}),
+      },
+    };
+  });
 }
 
 export function createClients(config: SchedulerConfig): SchedulerClients {
@@ -406,12 +423,15 @@ export function createClients(config: SchedulerConfig): SchedulerClients {
     ia: {
       async executePrompt(job: DueAnalysisJob): Promise<ExecutePromptResult> {
         const token = issueToken(config, { audience: "ia-service" });
+        const providerCredential = job.providerCredentials?.[job.modelId];
         const response = await unaryCall<ProtoExecutePromptResponse>((callback) =>
           iaClient.executePrompt(
             {
               promptId: job.promptId,
               promptText: job.promptText,
-              modelId: job.modelId,
+              modelId: providerCredential?.providerModelId || job.modelId,
+              providerId: providerCredential?.providerId || "",
+              providerApiKey: providerCredential?.providerApiKey || "",
               brandName: job.brandName || job.projectName,
               competitors: job.competitors,
             },

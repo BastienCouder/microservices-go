@@ -267,6 +267,54 @@ describe("loadPerceptionData", () => {
     expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT"]);
   });
 
+  test("resolves a readable project slug from the route before loading perception", async () => {
+    mockFetchSequence([
+      jsonResponse(404, { error: "not found" }),
+      jsonResponse(200, {
+        success: true,
+        data: [{ id: "prj_1", name: "Site France" }],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "prj_1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+        ],
+      }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          metadata: {
+            generatedAt: "2026-03-10T09:30:00Z",
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?project=site-france");
+
+    expect(result.projectId).toBe("prj_1");
+    expect(result.data.brandCanon.brandName).toBe("Acme");
+  });
+
   test("falls back to the latest run with active project model responses for score cards and trends", async () => {
     mockFetchSequence([
       jsonResponse(200, {
