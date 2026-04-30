@@ -115,3 +115,37 @@ export function selectPreferredID({ candidates, availableIds, fallback = "" }: S
 
   return "";
 }
+
+export function findOrganizationIdForProjectToken(
+  hierarchies: Array<OrganizationHierarchy | null | undefined>,
+  projectToken: string,
+): string {
+  const normalizedToken = normalizeString(projectToken);
+  if (normalizedToken === "") return "";
+
+  for (const hierarchy of hierarchies) {
+    if (!hierarchy) continue;
+
+    const project = hierarchy.projects.find(
+      ({ id, slug }) => id === normalizedToken || slug === normalizedToken,
+    );
+    if (project) {
+      return hierarchy.organization.id || project.organizationId;
+    }
+  }
+
+  return "";
+}
+
+export function findProjectIdForToken(
+  projects: Array<{ id: string; slug: string }>,
+  projectToken: string,
+): string {
+  const normalizedToken = normalizeString(projectToken);
+  if (normalizedToken === "") return "";
+
+  return (
+    projects.find(({ id, slug }) => id === normalizedToken || slug === normalizedToken)
+      ?.id ?? ""
+  );
+}

@@ -206,7 +206,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at
+		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, created_at, updated_at
 		FROM projects
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -236,7 +236,6 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			&industry,
 			&item.PrimaryLanguage,
 			&item.Country,
-			&item.Status,
 			&item.CreatedAt,
 			&item.UpdatedAt,
 		); err != nil {
@@ -535,6 +534,7 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 		SELECT project_id,
 		       ga4_property_id,
 		       ga4_service_account_ciphertext,
+		       ga4_oauth_refresh_token_ciphertext,
 		       ga4_connected_at,
 		       ga4_updated_at,
 		       stripe_webhook_secret_ciphertext,
@@ -556,6 +556,7 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 			projectID               string
 			ga4PropertyID           *string
 			ga4ServiceAccountCipher *string
+			ga4OAuthRefreshCipher   *string
 			ga4ConnectedAt          *time.Time
 			ga4UpdatedAt            *time.Time
 			stripeWebhookCipher     *string
@@ -569,6 +570,7 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 			&projectID,
 			&ga4PropertyID,
 			&ga4ServiceAccountCipher,
+			&ga4OAuthRefreshCipher,
 			&ga4ConnectedAt,
 			&ga4UpdatedAt,
 			&stripeWebhookCipher,
@@ -585,6 +587,10 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 		if err != nil {
 			return fmt.Errorf("decrypt ga4 service account for project %s: %w", projectID, err)
 		}
+		ga4OAuthRefreshToken, err := s.codec.Decrypt(stringValue(ga4OAuthRefreshCipher))
+		if err != nil {
+			return fmt.Errorf("decrypt ga4 oauth refresh token for project %s: %w", projectID, err)
+		}
 		stripeWebhookSecret, err := s.codec.Decrypt(stringValue(stripeWebhookCipher))
 		if err != nil {
 			return fmt.Errorf("decrypt stripe webhook secret for project %s: %w", projectID, err)
@@ -599,6 +605,7 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 			GA4: usecase.ProjectGA4Integration{
 				PropertyID:         stringValue(ga4PropertyID),
 				ServiceAccountJSON: ga4ServiceAccountJSON,
+				OAuthRefreshToken:  ga4OAuthRefreshToken,
 				ConnectedAt:        timeValue(ga4ConnectedAt),
 				UpdatedAt:          timeValue(ga4UpdatedAt),
 			},
@@ -708,9 +715,9 @@ func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, status, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.Status, project.CreatedAt, project.UpdatedAt); err != nil {
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
 		}
 	}
@@ -925,6 +932,10 @@ func (s *StateStore) insertImpactIntegrations(
 		if err != nil {
 			return fmt.Errorf("encrypt ga4 service account for project %s: %w", projectID, err)
 		}
+		ga4OAuthRefreshCipher, err := s.codec.Encrypt(item.GA4.OAuthRefreshToken)
+		if err != nil {
+			return fmt.Errorf("encrypt ga4 oauth refresh token for project %s: %w", projectID, err)
+		}
 		stripeWebhookCipher, err := s.codec.Encrypt(item.Stripe.WebhookSecret)
 		if err != nil {
 			return fmt.Errorf("encrypt stripe webhook secret for project %s: %w", projectID, err)
@@ -939,6 +950,7 @@ func (s *StateStore) insertImpactIntegrations(
 				project_id,
 				ga4_property_id,
 				ga4_service_account_ciphertext,
+				ga4_oauth_refresh_token_ciphertext,
 				ga4_connected_at,
 				ga4_updated_at,
 				stripe_webhook_secret_ciphertext,
@@ -950,11 +962,12 @@ func (s *StateStore) insertImpactIntegrations(
 				created_at,
 				updated_at
 			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
 		`,
 			projectID,
 			nullIfEmpty(item.GA4.PropertyID),
 			nullIfEmpty(ga4ServiceAccountCipher),
+			nullIfEmpty(ga4OAuthRefreshCipher),
 			nullIfZeroTime(item.GA4.ConnectedAt),
 			nullIfZeroTime(item.GA4.UpdatedAt),
 			nullIfEmpty(stripeWebhookCipher),

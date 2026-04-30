@@ -8,7 +8,11 @@ import (
 type Repository interface {
 	Create(ctx context.Context, organization *Organization) error
 	GetByID(ctx context.Context, id int64) (*Organization, error)
+	UpdateName(ctx context.Context, id int64, name string) (*Organization, error)
 	ListOrganizationsByUser(ctx context.Context, userID int64) ([]Membership, error)
+	CreateAPIKey(ctx context.Context, key *OrganizationAPIKey) error
+	ListAPIKeys(ctx context.Context, organizationID int64) ([]OrganizationAPIKey, error)
+	RevokeAPIKey(ctx context.Context, organizationID, keyID int64, revokedAt time.Time) error
 	CreateTeam(ctx context.Context, team *Team) error
 	ListTeams(ctx context.Context, organizationID int64) ([]Team, error)
 	UpsertMember(ctx context.Context, member *Member) error
@@ -17,10 +21,10 @@ type Repository interface {
 	AssignRole(ctx context.Context, organizationID, userID int64, role string) (*Member, error)
 	UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*Member, error)
 	RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error
-	SetMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*Member, error)
 	CreateInvitation(ctx context.Context, invitation *Invitation) error
 	ListInvitations(ctx context.Context, organizationID int64) ([]Invitation, error)
 	GetInvitationByID(ctx context.Context, organizationID, invitationID int64) (*Invitation, error)
+	GetInvitationByToken(ctx context.Context, token string) (*Invitation, error)
 	UpdateInvitation(ctx context.Context, invitation *Invitation) (*Invitation, error)
 	DeleteInvitation(ctx context.Context, organizationID, invitationID int64) error
 	AcceptInvitationByToken(ctx context.Context, token string, userID int64, acceptedAt time.Time) (*Invitation, *Member, error)

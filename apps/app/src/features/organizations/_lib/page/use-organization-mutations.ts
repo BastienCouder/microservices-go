@@ -2,12 +2,15 @@ import { useMutation } from "@tanstack/react-query";
 import { EMPTY_INVITATION_DRAFT } from "../shared/constants";
 import {
   assignOrganizationProjectMember,
-  banOrganizationMember,
+  createOrganizationAPIKey,
   createOrganizationInvitation,
+  deleteOrganizationProject,
   removeOrganizationMember,
   removeOrganizationProjectMember,
+  revokeOrganizationAPIKey,
   revokeOrganizationInvitation,
-  unbanOrganizationMember,
+  updateOrganizationProject,
+  updateOrganizationName,
   updateOrganizationMemberRoles,
 } from "../shared/organization-page-api";
 import {
@@ -20,7 +23,9 @@ import {
 } from "../shared/project-membership";
 import type {
   InvitationDraft,
+  OrganizationAPIKey,
   OrganizationResources,
+  ProjectSettingsInput,
   ProjectMemberDraft,
 } from "../shared/types";
 
@@ -34,6 +39,7 @@ type OrganizationMutationsInput = {
   invitationDraft: InvitationDraft;
   setProjectMemberDrafts: (updater: (current: Record<string, ProjectMemberDraft>) => Record<string, ProjectMemberDraft>) => void;
   setInvitationDraft: (draft: InvitationDraft) => void;
+  setCreatedAPIKey: (value: OrganizationAPIKey | null) => void;
   setNotice: (value: string | null) => void;
   setLocalError: (value: string | null) => void;
   invalidateOrganizationData: () => Promise<void>;
@@ -53,6 +59,7 @@ export function useOrganizationMutations({
   invitationDraft,
   setProjectMemberDrafts,
   setInvitationDraft,
+  setCreatedAPIKey,
   setNotice,
   setLocalError,
   invalidateOrganizationData,
@@ -65,6 +72,51 @@ export function useOrganizationMutations({
       targetRoles: getMemberRoles(userId),
       isCurrentUser: userId === currentUserId,
     });
+
+  const updateProjectSettingsMutation = useMutation({
+    mutationFn: async ({
+      projectId,
+      input,
+    }: {
+      projectId: string;
+      input: ProjectSettingsInput;
+    }) => {
+      const name = input.name.trim();
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!projectId) throw new Error("Selectionne un projet.");
+      if (!name) throw new Error("Le nom du projet est obligatoire.");
+      await updateOrganizationProject(apiBaseURL, selectedOrganizationId, projectId, {
+        name,
+      });
+    },
+    onSuccess: async () => {
+      setNotice("Projet mis a jour.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de mettre a jour le projet."));
+    },
+  });
+
+  const deleteProjectMutation = useMutation({
+    mutationFn: async (projectId: string) => {
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!projectId) throw new Error("Selectionne un projet.");
+      await deleteOrganizationProject(apiBaseURL, selectedOrganizationId, projectId);
+      return projectId;
+    },
+    onSuccess: async () => {
+      setNotice("Projet supprime.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de supprimer le projet."));
+    },
+  });
 
   const assignProjectMemberMutation = useMutation({
     mutationFn: async (projectId: string) => {
@@ -238,29 +290,6 @@ export function useOrganizationMutations({
     },
   });
 
-  const setMemberBannedMutation = useMutation({
-    mutationFn: async ({ userId, banned }: { userId: string; banned: boolean }) => {
-      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
-      if (!userId) throw new Error("Selectionne un membre.");
-      if (!getPolicyForUser(userId).canSetBanned) throw new Error("Action interdite pour ce membre.");
-      if (banned) {
-        await banOrganizationMember(apiBaseURL, selectedOrganizationId, userId);
-        return true;
-      }
-      await unbanOrganizationMember(apiBaseURL, selectedOrganizationId, userId);
-      return false;
-    },
-    onSuccess: async (banned) => {
-      setNotice(banned ? "Membre banni." : "Membre debanni.");
-      setLocalError(null);
-      await invalidateOrganizationData();
-    },
-    onError: (error) => {
-      setNotice(null);
-      setLocalError(buildOrganizationError(error, "Impossible de mettre a jour le statut du membre."));
-    },
-  });
-
   const createInvitationMutation = useMutation({
     mutationFn: async () => {
       const email = invitationDraft.email.trim();
@@ -286,6 +315,62 @@ export function useOrganizationMutations({
     },
   });
 
+  const updateOrganizationNameMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const nextName = name.trim();
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!nextName) throw new Error("Le nom de l'organisation est obligatoire.");
+      await updateOrganizationName(apiBaseURL, selectedOrganizationId, nextName);
+    },
+    onSuccess: async () => {
+      setNotice("Organisation mise a jour.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de mettre a jour l'organisation."));
+    },
+  });
+
+  const createAPIKeyMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const nextName = name.trim();
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!nextName) throw new Error("Le nom de l'API key est obligatoire.");
+      return createOrganizationAPIKey(apiBaseURL, selectedOrganizationId, nextName);
+    },
+    onSuccess: async (apiKey) => {
+      setCreatedAPIKey(apiKey);
+      setNotice("API key creee.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setCreatedAPIKey(null);
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de creer l'API key."));
+    },
+  });
+
+  const revokeAPIKeyMutation = useMutation({
+    mutationFn: async (keyId: string) => {
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!keyId) throw new Error("Selectionne une API key.");
+      await revokeOrganizationAPIKey(apiBaseURL, selectedOrganizationId, keyId);
+    },
+    onSuccess: async () => {
+      setCreatedAPIKey(null);
+      setNotice("API key supprimee.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de supprimer l'API key."));
+    },
+  });
+
   const revokeInvitationMutation = useMutation({
     mutationFn: async (invitationId: string) => {
       if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
@@ -304,13 +389,17 @@ export function useOrganizationMutations({
   });
 
   return {
+    updateProjectSettingsMutation,
+    deleteProjectMutation,
     assignProjectMemberMutation,
     removeProjectMemberMutation,
     updateMemberProjectsMutation,
     updateMemberRolesMutation,
     removeMemberMutation,
-    setMemberBannedMutation,
     createInvitationMutation,
+    updateOrganizationNameMutation,
+    createAPIKeyMutation,
+    revokeAPIKeyMutation,
     revokeInvitationMutation,
   };
 }

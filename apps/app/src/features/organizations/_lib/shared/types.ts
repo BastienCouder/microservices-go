@@ -2,7 +2,6 @@ export type OrganizationRole =
   | "owner"
   | "admin"
   | "member"
-  | "project_member"
   | "super_admin";
 
 export type OrganizationSummary = {
@@ -17,7 +16,6 @@ export type OrganizationProject = {
   slug: string;
   organizationId: string;
   name: string;
-  status: string;
   brandName: string;
   brandDescription: string;
   attributionSource: string;
@@ -36,6 +34,8 @@ export type OrganizationMember = {
   organizationId: string;
   userId: string;
   email: string;
+  firstName: string;
+  lastName: string;
   roles: string[];
   addedAt: string;
 };
@@ -56,15 +56,26 @@ export type OrganizationInvitation = {
   respondedAt: string;
 };
 
+export type OrganizationAPIKey = {
+  id: string;
+  organizationId: string;
+  name: string;
+  prefix: string;
+  key: string;
+  createdAt: string;
+  lastUsedAt: string;
+};
+
 export type OrganizationResources = {
   organization: OrganizationSummary | null;
   projects: OrganizationProject[];
   projectMembers: OrganizationProjectMember[];
   members: OrganizationMember[];
   invitations: OrganizationInvitation[];
+  apiKeys: OrganizationAPIKey[];
 };
 
-export type ViewTab = "projects" | "members" | "invitations";
+export type ViewTab = "projects" | "members" | "invitations" | "settings" | "apiKeys";
 
 export type InvitationDraft = {
   email: string;
@@ -76,4 +87,8 @@ export type InvitationDraft = {
 export type ProjectMemberDraft = {
   userId: string;
   role: string;
+};
+
+export type ProjectSettingsInput = {
+  name: string;
 };

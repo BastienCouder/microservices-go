@@ -171,18 +171,33 @@ func (q *Queries) SetUserBanned(ctx context.Context, arg SetUserBannedParams) (i
 
 const softDeleteUser = `-- name: SoftDeleteUser :execrows
 UPDATE users
-SET deleted_at = $2
+SET auth_identity_id = $2,
+    email = $3,
+    first_name = $4,
+    last_name = $5,
+    deleted_at = $6
 WHERE id = $1
   AND deleted_at IS NULL
 `
 
 type SoftDeleteUserParams struct {
-	ID        int64
-	DeletedAt pgtype.Timestamptz
+	ID             int64
+	AuthIdentityID string
+	Email          string
+	FirstName      string
+	LastName       string
+	DeletedAt      pgtype.Timestamptz
 }
 
 func (q *Queries) SoftDeleteUser(ctx context.Context, arg SoftDeleteUserParams) (int64, error) {
-	result, err := q.db.Exec(ctx, softDeleteUser, arg.ID, arg.DeletedAt)
+	result, err := q.db.Exec(ctx, softDeleteUser,
+		arg.ID,
+		arg.AuthIdentityID,
+		arg.Email,
+		arg.FirstName,
+		arg.LastName,
+		arg.DeletedAt,
+	)
 	if err != nil {
 		return 0, err
 	}

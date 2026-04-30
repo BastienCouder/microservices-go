@@ -82,12 +82,9 @@ func TestFinalizeProjectEnqueuesOutboxWithoutBlockingPipeline(t *testing.T) {
 		t.Fatalf("add prompts: %v", err)
 	}
 
-	result, err := svc.FinalizeProject(ctx, project.ID, 42)
+	_, err = svc.FinalizeProject(ctx, project.ID, 42)
 	if err != nil {
 		t.Fatalf("finalize: %v", err)
-	}
-	if result.Project.Status != "active" {
-		t.Fatalf("expected active status, got %s", result.Project.Status)
 	}
 	if analysisSpy.startCalls != 0 || analysisSpy.recordCalls != 0 || iaSpy.execCalls != 0 {
 		t.Fatalf("expected no sync pipeline calls during finalize, got start=%d record=%d ia=%d", analysisSpy.startCalls, analysisSpy.recordCalls, iaSpy.execCalls)
@@ -317,5 +314,124 @@ func TestOutboxEventProcessingPassesProjectProviderAPIKey(t *testing.T) {
 	}
 	if got.ModelID != "openai/gpt-oss-20b:free" {
 		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestRunManualAnalysisExecutesPromptAndRecordsResponse(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM recommander ?"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
+
+	result, err := svc.RunManualAnalysis(ctx, project.ID, 42, 7, RunManualAnalysisInput{
+		RequestID: "manual-request-1",
+		PromptTexts: []AnalysisPromptText{
+			{ID: prompts[0].ID, Text: prompts[0].Text},
+		},
+		ModelIDs: []string{"gpt-oss-20b-free"},
+	})
+	if err != nil {
+		t.Fatalf("run manual analysis: %v", err)
+	}
+
+	if result.RunID != "run-1" {
+		t.Fatalf("expected run id run-1, got %q", result.RunID)
+	}
+	if analysisSpy.startCalls != 1 {
+		t.Fatalf("expected one analysis start call, got %d", analysisSpy.startCalls)
+	}
+	if iaSpy.execCalls != 1 {
+		t.Fatalf("expected one ia execution, got %d", iaSpy.execCalls)
+	}
+	if analysisSpy.recordCalls != 1 {
+		t.Fatalf("expected one recorded response, got %d", analysisSpy.recordCalls)
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openrouter" {
+		t.Fatalf("expected openrouter provider, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "sk-openrouter" {
+		t.Fatalf("expected project provider api key to be passed, got %q", got.ProviderAPIKey)
+	}
+	if got.ModelID != "openai/gpt-oss-20b:free" {
+		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestRunManualAnalysisFallsBackToOpenRouterServiceCredential(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM recommander ?"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	_, err = svc.RunManualAnalysis(ctx, project.ID, 42, 7, RunManualAnalysisInput{
+		RequestID: "manual-request-1",
+		PromptTexts: []AnalysisPromptText{
+			{ID: prompts[0].ID, Text: prompts[0].Text},
+		},
+		ModelIDs: []string{"gpt-oss-20b-free"},
+	})
+	if err != nil {
+		t.Fatalf("run manual analysis: %v", err)
+	}
+
+	if iaSpy.execCalls != 1 {
+		t.Fatalf("expected one ia execution, got %d", iaSpy.execCalls)
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openrouter" {
+		t.Fatalf("expected openrouter fallback, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "" {
+		t.Fatalf("expected empty provider api key so ia-service can use its configured key, got %q", got.ProviderAPIKey)
 	}
 }

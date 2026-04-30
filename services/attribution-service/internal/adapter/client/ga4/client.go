@@ -30,17 +30,26 @@ var aiSourceAliases = map[string]string{
 	"chatgpt":               "chatgpt",
 	"chatgpt.com":           "chatgpt",
 	"chat.openai.com":       "chatgpt",
+	"openai":                "chatgpt",
 	"perplexity":            "perplexity",
 	"perplexity.ai":         "perplexity",
 	"claude":                "claude",
 	"claude.ai":             "claude",
+	"anthropic.com":         "claude",
 	"gemini":                "gemini",
 	"gemini.google.com":     "gemini",
 	"bard.google.com":       "gemini",
 	"mistral":               "mistral",
+	"chat.mistral.ai":       "mistral",
 	"mistral.ai":            "mistral",
 	"copilot":               "copilot",
 	"copilot.microsoft.com": "copilot",
+	"grok":                  "grok",
+	"grok.x.ai":             "grok",
+	"deepseek":              "deepseek",
+	"chat.deepseek.com":     "deepseek",
+	"you.com":               "you.com",
+	"phind.com":             "phind",
 }
 
 type serviceAccount struct {
@@ -50,11 +59,28 @@ type serviceAccount struct {
 }
 
 type Client struct {
-	httpClient *http.Client
+	httpClient         *http.Client
+	oauthClientID      string
+	oauthClientSecret  string
+	fakeTrafficEnabled bool
 }
 
 func NewClient() *Client {
-	return &Client{httpClient: &http.Client{Timeout: defaultHTTPTimeout}}
+	return &Client{
+		httpClient:         &http.Client{Timeout: defaultHTTPTimeout},
+		fakeTrafficEnabled: true,
+	}
+}
+
+func NewClientWithOAuth(clientID, clientSecret string) *Client {
+	client := NewClient()
+	client.oauthClientID = strings.TrimSpace(clientID)
+	client.oauthClientSecret = strings.TrimSpace(clientSecret)
+	return client
+}
+
+func (c *Client) SetFakeTrafficEnabled(enabled bool) {
+	c.fakeTrafficEnabled = enabled
 }
 
 func (c *Client) ListVisitsBySource(
@@ -67,18 +93,12 @@ func (c *Client) ListVisitsBySource(
 		return nil, fmt.Errorf("ga4 property id is required")
 	}
 
-	account, err := parseServiceAccount(project.GA4.ServiceAccountJSON)
+	accessToken, err := c.getProjectAccessToken(ctx, project)
 	if err != nil {
 		return nil, err
 	}
 
-	accessToken, err := c.getAccessToken(ctx, account)
-	if err != nil {
-		return nil, err
-	}
-
-	hostFilterValue := resolveProjectHost(project)
-	body, err := json.Marshal(buildRunReportRequest(from, to, hostFilterValue))
+	body, err := json.Marshal(buildRunReportRequest(from, to))
 	if err != nil {
 		return nil, fmt.Errorf("marshal ga4 runReport payload: %w", err)
 	}
@@ -146,7 +166,7 @@ func (c *Client) ListVisitsBySource(
 	return sources, nil
 }
 
-func buildRunReportRequest(from, to time.Time, hostFilter string) map[string]any {
+func buildRunReportRequest(from, to time.Time) map[string]any {
 	sources := make([]string, 0, len(aiSourceAliases))
 	seen := make(map[string]struct{}, len(aiSourceAliases))
 	for source := range aiSourceAliases {
@@ -168,19 +188,6 @@ func buildRunReportRequest(from, to time.Time, hostFilter string) map[string]any
 			},
 		},
 	}
-	if hostFilter != "" {
-		filters = append(filters, map[string]any{
-			"filter": map[string]any{
-				"fieldName": "hostName",
-				"stringFilter": map[string]any{
-					"matchType":     "CONTAINS",
-					"value":         hostFilter,
-					"caseSensitive": false,
-				},
-			},
-		})
-	}
-
 	return map[string]any{
 		"dateRanges": []map[string]string{
 			{
@@ -201,28 +208,6 @@ func buildRunReportRequest(from, to time.Time, hostFilter string) map[string]any
 		},
 		"limit": "100",
 	}
-}
-
-func resolveProjectHost(project usecase.ProjectMetadata) string {
-	domain := strings.TrimSpace(project.Domain)
-	if domain != "" {
-		domain = strings.TrimPrefix(domain, "https://")
-		domain = strings.TrimPrefix(domain, "http://")
-		domain = strings.TrimPrefix(domain, "www.")
-		return domain
-	}
-
-	website := strings.TrimSpace(project.WebsiteURL)
-	if website == "" {
-		return ""
-	}
-	parsed, err := url.Parse(website)
-	if err != nil {
-		return ""
-	}
-	host := strings.TrimSpace(parsed.Hostname())
-	host = strings.TrimPrefix(host, "www.")
-	return host
 }
 
 func normalizeSource(value string) string {
@@ -301,6 +286,65 @@ func (c *Client) getAccessToken(ctx context.Context, account serviceAccount) (st
 	}
 	if tokenResponse.ExpiresIn <= 0 {
 		tokenResponse.ExpiresIn = 3600
+	}
+	return strings.TrimSpace(tokenResponse.AccessToken), nil
+}
+
+func (c *Client) getProjectAccessToken(ctx context.Context, project usecase.ProjectMetadata) (string, error) {
+	if strings.TrimSpace(project.GA4.ServiceAccountJSON) != "" {
+		account, err := parseServiceAccount(project.GA4.ServiceAccountJSON)
+		if err != nil {
+			return "", err
+		}
+		return c.getAccessToken(ctx, account)
+	}
+	return c.getOAuthRefreshAccessToken(ctx, project.GA4.OAuthRefreshToken)
+}
+
+func (c *Client) getOAuthRefreshAccessToken(ctx context.Context, refreshToken string) (string, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return "", fmt.Errorf("ga4 oauth refresh token is required")
+	}
+	if strings.TrimSpace(c.oauthClientID) == "" || strings.TrimSpace(c.oauthClientSecret) == "" {
+		return "", fmt.Errorf("ga4 oauth client is not configured")
+	}
+
+	form := url.Values{}
+	form.Set("client_id", c.oauthClientID)
+	form.Set("client_secret", c.oauthClientSecret)
+	form.Set("refresh_token", refreshToken)
+	form.Set("grant_type", "refresh_token")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, defaultTokenURI, strings.NewReader(form.Encode()))
+	if err != nil {
+		return "", fmt.Errorf("create oauth refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("send oauth refresh request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(raw))
+		if message == "" {
+			message = http.StatusText(resp.StatusCode)
+		}
+		return "", fmt.Errorf("oauth refresh error (%d): %s", resp.StatusCode, message)
+	}
+
+	var tokenResponse struct {
+		AccessToken string `json:"access_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResponse); err != nil {
+		return "", fmt.Errorf("decode oauth refresh response: %w", err)
+	}
+	if strings.TrimSpace(tokenResponse.AccessToken) == "" {
+		return "", fmt.Errorf("oauth refresh response missing access_token")
 	}
 	return strings.TrimSpace(tokenResponse.AccessToken), nil
 }

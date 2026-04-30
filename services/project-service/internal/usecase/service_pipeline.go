@@ -184,8 +184,102 @@ func (s *Service) markOutboxProcessingFailed(ctx context.Context, eventID string
 }
 
 func (s *Service) runInitialAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string) error {
+	requestID := fmt.Sprintf("%s-%d", project.ID, time.Now().UTC().UnixNano())
+	_, err := s.runAnalysis(ctx, project, prompts, modelIDs, competitors, requestID, "manual")
+	return err
+}
+
+func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organizationID int64, createdBy int64, input RunManualAnalysisInput) (AnalysisStartResponse, error) {
+	projectID = strings.TrimSpace(projectID)
+	modelIDs := normalizeModelIDs(input.ModelIDs)
+	if projectID == "" {
+		return AnalysisStartResponse{}, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if len(input.PromptTexts) == 0 {
+		return AnalysisStartResponse{}, fmt.Errorf("%w: promptTexts cannot be empty", ErrValidation)
+	}
+	if len(modelIDs) == 0 {
+		return AnalysisStartResponse{}, fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return AnalysisStartResponse{}, err
+	}
+
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
+	if err != nil {
+		s.mu.Unlock()
+		return AnalysisStartResponse{}, err
+	}
+	projectCopy := copyProject(project)
+	if createdBy > 0 {
+		projectCopy.CreatedBy = createdBy
+	}
+
+	enabledModelIDs := filterEnabledModels(s.projectModels, s.models, projectID)
+	if _, err := validatePromptModelIDs(modelIDs, enabledModelIDs); err != nil {
+		s.mu.Unlock()
+		return AnalysisStartResponse{}, err
+	}
+
+	promptTexts := make([]AnalysisPromptText, 0, len(input.PromptTexts))
+	for _, item := range input.PromptTexts {
+		promptID := strings.TrimSpace(item.ID)
+		if promptID == "" {
+			s.mu.Unlock()
+			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt id is required", ErrValidation)
+		}
+
+		prompt, ok := s.prompts[promptID]
+		if !ok || prompt.ProjectID != projectID {
+			s.mu.Unlock()
+			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt %s", ErrNotFound, promptID)
+		}
+		if !prompt.IsActive {
+			s.mu.Unlock()
+			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt %s is not active", ErrValidation, promptID)
+		}
+
+		promptModelIDs := modelIDs
+		if len(item.ModelIDs) > 0 {
+			normalized, err := validatePromptModelIDs(item.ModelIDs, enabledModelIDs)
+			if err != nil {
+				s.mu.Unlock()
+				return AnalysisStartResponse{}, err
+			}
+			promptModelIDs = normalized
+		}
+
+		text := strings.TrimSpace(item.Text)
+		if text == "" {
+			text = prompt.Text
+		}
+		if text == "" {
+			s.mu.Unlock()
+			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt text is required", ErrValidation)
+		}
+
+		promptTexts = append(promptTexts, AnalysisPromptText{
+			ID:       promptID,
+			Text:     text,
+			ModelIDs: append([]string(nil), promptModelIDs...),
+		})
+	}
+	competitors := filterActiveCompetitorsByProject(s.competitors, projectID)
+	s.mu.Unlock()
+
+	runType := strings.TrimSpace(input.RunType)
+	if runType == "" {
+		runType = "manual"
+	}
+	return s.runAnalysis(ctx, projectCopy, promptTexts, modelIDs, competitors, input.RequestID, runType)
+}
+
+func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string, requestID string, runType string) (AnalysisStartResponse, error) {
 	if s.analysisClient == nil || s.iaClient == nil {
-		return fmt.Errorf("%w: analysis and ia clients are required", ErrValidation)
+		return AnalysisStartResponse{}, fmt.Errorf("%w: analysis and ia clients are required", ErrValidation)
 	}
 
 	effectiveModelIDs := normalizeModelIDs(modelIDs)
@@ -196,10 +290,13 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		effectiveModelIDs = normalizeModelIDs(effectiveModelIDs)
 	}
 	if len(effectiveModelIDs) == 0 {
-		return fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
+		return AnalysisStartResponse{}, fmt.Errorf("%w: modelIds cannot be empty", ErrValidation)
+	}
+	runType = strings.TrimSpace(runType)
+	if runType == "" {
+		runType = "manual"
 	}
 
-	requestID := fmt.Sprintf("%s-%d", project.ID, time.Now().UTC().UnixNano())
 	startResp, err := s.analysisClient.StartAnalysis(ctx, AnalysisStartRequest{
 		RequestID:      requestID,
 		OrganizationID: project.OrganizationID,
@@ -207,13 +304,13 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		ProjectID:      project.ID,
 		PromptTexts:    prompts,
 		ModelIDs:       effectiveModelIDs,
-		RunType:        "manual",
+		RunType:        runType,
 	})
 	if err != nil {
-		return fmt.Errorf("start analysis run: %w", err)
+		return AnalysisStartResponse{}, fmt.Errorf("start analysis run: %w", err)
 	}
 	if startResp.RunID == "" {
-		return fmt.Errorf("start analysis run: empty run id")
+		return AnalysisStartResponse{}, fmt.Errorf("start analysis run: empty run id")
 	}
 
 	if len(startResp.PromptRuns) == 0 {
@@ -237,7 +334,7 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 		for _, modelID := range promptModelIDs {
 			credential, err := s.resolveProviderCredentialForModel(ctx, project.ID, project.OrganizationID, modelID)
 			if err != nil {
-				return fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
+				return AnalysisStartResponse{}, fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
 			}
 
 			iaResult, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{
@@ -250,7 +347,7 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 				Competitors:    competitors,
 			})
 			if err != nil {
-				return fmt.Errorf("execute ia prompt %s on %s: %w", promptRun.PromptID, modelID, err)
+				return AnalysisStartResponse{}, fmt.Errorf("execute ia prompt %s on %s: %w", promptRun.PromptID, modelID, err)
 			}
 			err = s.analysisClient.RecordResponse(ctx, startResp.RunID, AnalysisRecordResponseInput{
 				PromptRunID:    promptRun.ID,
@@ -263,10 +360,10 @@ func (s *Service) runInitialAnalysis(ctx context.Context, project Project, promp
 				Sentiment:      iaResult.Analysis.Sentiment,
 			})
 			if err != nil {
-				return fmt.Errorf("record analysis response: %w", err)
+				return AnalysisStartResponse{}, fmt.Errorf("record analysis response: %w", err)
 			}
 		}
 	}
 
-	return nil
+	return startResp, nil
 }

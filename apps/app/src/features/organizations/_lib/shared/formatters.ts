@@ -37,10 +37,11 @@ export function getStatusBadgeVariant(status: string): "default" | "secondary" |
   return "outline";
 }
 
-export function memberLabel(member: Pick<OrganizationMember, "userId">): string {
+export function memberLabel(
+  member: Pick<OrganizationMember, "userId"> & Partial<Pick<OrganizationMember, "firstName" | "lastName" | "email">>,
+): string {
+  const fullName = [member.firstName, member.lastName].map((value) => value?.trim()).filter(Boolean).join(" ");
+  if (fullName) return fullName;
+  if (member.email?.trim()) return member.email.trim();
   return `User ${member.userId}`;
-}
-
-export function isMemberBanned(member: OrganizationMember): boolean {
-  return member.roles.includes("banned");
 }

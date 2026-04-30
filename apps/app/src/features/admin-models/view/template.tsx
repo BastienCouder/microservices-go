@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import {
   Select,
   SelectContent,
@@ -75,7 +76,6 @@ export function AdminModelsTemplate({
   const [purgeUnsupportedProviders, setPurgeUnsupportedProviders] =
     useState(false);
   const [minContext, setMinContext] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setOrganizationId(
@@ -94,6 +94,12 @@ export function AdminModelsTemplate({
   });
 
   const catalog = catalogQuery.data ?? EMPTY_MODEL_CATALOG;
+  useEffect(() => {
+    if (catalogQuery.error instanceof Error) {
+      pushErrorToast(catalogQuery.error, "Impossible de charger le catalogue.");
+    }
+  }, [catalogQuery.error]);
+
   const providerOptions = useMemo(
     () =>
       Array.from(
@@ -153,18 +159,14 @@ export function AdminModelsTemplate({
           queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
         }),
       ]);
-      setMessage(
+      pushSuccessToast(
         `${updatedModel.name} est maintenant ${
           updatedModel.isActive ? "actif" : "inactif"
         }.`,
       );
     },
     onError: (error) => {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Impossible de mettre a jour ce modele.",
-      );
+      pushErrorToast(error, "Impossible de mettre a jour ce modele.");
     },
   });
 
@@ -193,22 +195,17 @@ export function AdminModelsTemplate({
           ),
         }),
       ]);
-      setMessage(
+      pushSuccessToast(
         `OpenRouter synchronise : ${result.imported} modeles importes (${result.created} nouveaux, ${result.updated} mis a jour, ${result.purged} purges).`,
       );
     },
     onError: (error) => {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "Impossible de synchroniser les modeles OpenRouter.",
-      );
+      pushErrorToast(error, "Impossible de synchroniser les modeles OpenRouter.");
     },
   });
 
   const toggleModel = (model: ModelCatalogItem, isActive: boolean) => {
-    setMessage(null);
-    void toggleModelMutation.mutateAsync({ model, isActive });
+    toggleModelMutation.mutate({ model, isActive });
   };
 
   return (
@@ -238,8 +235,7 @@ export function AdminModelsTemplate({
             <Button
               type="button"
               onClick={() => {
-                setMessage(null);
-                void syncOpenRouterMutation.mutateAsync();
+                syncOpenRouterMutation.mutate();
               }}
               disabled={!organizationId || syncOpenRouterMutation.isPending}
             >
@@ -354,23 +350,6 @@ export function AdminModelsTemplate({
             n'est plus supporte.
           </p>
         </div>
-
-        {(message || catalogQuery.error instanceof Error) ? (
-          <div className="border-b px-4 py-3 md:px-6">
-            <div
-              className={cn(
-                "rounded-xl border px-4 py-3 text-sm",
-                catalogQuery.error instanceof Error
-                  ? "border-destructive/20 bg-destructive/5 text-destructive"
-                  : "border-border/70 bg-muted/30 text-foreground",
-              )}
-            >
-              {catalogQuery.error instanceof Error
-                ? catalogQuery.error.message
-                : message}
-            </div>
-          </div>
-        ) : null}
 
         <div className="px-4 py-4 md:px-6">
           {!organizationId ? (

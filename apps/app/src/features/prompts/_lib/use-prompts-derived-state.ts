@@ -336,6 +336,7 @@ export function usePromptsDerivedState({
   });
 
   return {
+    editorPrompts: basePrompts,
     prompts: filteredPromptRows,
     filteredPrompts,
     allResponses,

@@ -13,6 +13,7 @@ import { PERCEPTION_TEXT } from "@/lib/app-data";
 import {
   deriveShortDescription,
 } from "../../_lib/overview/brand-overview-helpers";
+import { buildBrandCanonLocation } from "../../brand-canon/_lib/brand-canon-utils";
 
 type BrandsOverviewPanelProps = {
   apiBaseURL: string;
@@ -40,7 +41,7 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
         actionsVariant="classic"
         actions={
           <Button asChild variant="default">
-            <Link to={`/brand-canon?${new URLSearchParams({ brand: routeSearch }).toString()}`}>
+            <Link to={buildBrandCanonLocation(routeSearch)}>
               Modifier le référentiel
             </Link>
           </Button>
@@ -316,7 +317,7 @@ function BrandPageUnavailableState({
               Réessayer
             </Button>
             <Button asChild>
-              <Link to={`/brand-canon?${new URLSearchParams({ brand: routeSearch, tab: "brand" }).toString()}`}>
+              <Link to={buildBrandCanonLocation(routeSearch)}>
                 Modifier le référentiel
               </Link>
             </Button>

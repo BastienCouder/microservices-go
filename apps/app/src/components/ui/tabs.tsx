@@ -59,31 +59,43 @@ function TabsList({
 }: React.ComponentProps<typeof TabsPrimitive.List> &
   VariantProps<typeof tabsListVariants>) {
   const listRef = React.useRef<React.ElementRef<typeof TabsPrimitive.List>>(null)
-  const [indicatorStyle, setIndicatorStyle] = React.useState<React.CSSProperties>({
-    opacity: 0,
-  })
+
+  const [indicatorStyle, setIndicatorStyle] =
+    React.useState<React.CSSProperties>({
+      opacity: 0,
+    })
+
+  const [isIndicatorReady, setIsIndicatorReady] = React.useState(false)
 
   React.useLayoutEffect(() => {
     const list = listRef.current
+    if (!list) return
 
-    if (!list) {
-      return
-    }
+    setIsIndicatorReady(false)
 
     const updateIndicator = () => {
-      const activeTrigger = list.querySelector<HTMLElement>('[data-slot="tabs-trigger"][data-state="active"]')
+      const activeTrigger = list.querySelector<HTMLElement>(
+        '[data-slot="tabs-trigger"][data-state="active"]'
+      )
+
       const tabsRoot = list.closest<HTMLElement>('[data-slot="tabs"]')
       const orientation = tabsRoot?.dataset.orientation ?? "horizontal"
+
       let nextStyle: React.CSSProperties
 
       if (!activeTrigger) {
         nextStyle = { opacity: 0 }
-        setIndicatorStyle((current) => (areStylesEqual(current, nextStyle) ? current : nextStyle))
+
+        setIndicatorStyle((current) =>
+          areStylesEqual(current, nextStyle) ? current : nextStyle
+        )
+
         return
       }
 
       const listRect = list.getBoundingClientRect()
       const triggerRect = activeTrigger.getBoundingClientRect()
+
       const x = triggerRect.left - listRect.left
       const y = triggerRect.top - listRect.top
 
@@ -95,9 +107,15 @@ function TabsList({
             opacity: 1,
             width: 2,
             height,
-            transform: `translate3d(${x + triggerRect.width - 2}px, ${y + 4}px, 0)`,
+            transform: `translate3d(${x + triggerRect.width - 2}px, ${
+              y + 4
+            }px, 0)`,
           }
-          setIndicatorStyle((current) => (areStylesEqual(current, nextStyle) ? current : nextStyle))
+
+          setIndicatorStyle((current) =>
+            areStylesEqual(current, nextStyle) ? current : nextStyle
+          )
+
           return
         }
 
@@ -107,9 +125,15 @@ function TabsList({
           opacity: 1,
           width,
           height: 2,
-          transform: `translate3d(${x + 4}px, ${y + triggerRect.height}px, 0)`,
+          transform: `translate3d(${x + 4}px, ${
+            y + triggerRect.height
+          }px, 0)`,
         }
-        setIndicatorStyle((current) => (areStylesEqual(current, nextStyle) ? current : nextStyle))
+
+        setIndicatorStyle((current) =>
+          areStylesEqual(current, nextStyle) ? current : nextStyle
+        )
+
         return
       }
 
@@ -119,18 +143,32 @@ function TabsList({
         height: triggerRect.height,
         transform: `translate3d(${x}px, ${y}px, 0)`,
       }
-      setIndicatorStyle((current) => (areStylesEqual(current, nextStyle) ? current : nextStyle))
+
+      setIndicatorStyle((current) =>
+        areStylesEqual(current, nextStyle) ? current : nextStyle
+      )
     }
 
     updateIndicator()
 
+    const frame = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setIsIndicatorReady(true)
+      })
+    })
+
     const resizeObserver = new ResizeObserver(updateIndicator)
+
     resizeObserver.observe(list)
-    Array.from(list.querySelectorAll('[data-slot="tabs-trigger"]')).forEach((trigger) => {
+
+    Array.from(
+      list.querySelectorAll('[data-slot="tabs-trigger"]')
+    ).forEach((trigger) => {
       resizeObserver.observe(trigger)
     })
 
     const mutationObserver = new MutationObserver(updateIndicator)
+
     mutationObserver.observe(list, {
       childList: true,
       subtree: true,
@@ -139,6 +177,7 @@ function TabsList({
     })
 
     return () => {
+      cancelAnimationFrame(frame)
       resizeObserver.disconnect()
       mutationObserver.disconnect()
     }
@@ -155,12 +194,16 @@ function TabsList({
       <span
         aria-hidden="true"
         className={cn(
-          "pointer-events-none absolute left-0 top-0 z-0 transition-[transform,width,height,opacity] duration-300 ease-out",
-          variant === "default" && "rounded-[calc(var(--radius)+5px)] bg-linear-to-br from-primary/95 via-primary to-primary/80 shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)]",
+          "pointer-events-none absolute left-0 top-0 z-0",
+          isIndicatorReady &&
+            "transition-[transform,width,height,opacity] duration-300 ease-out",
+          variant === "default" &&
+            "rounded-[calc(var(--radius)+5px)] bg-linear-to-br from-primary/95 via-primary to-primary/80 shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)]",
           variant === "line" && "rounded-full bg-primary"
         )}
         style={indicatorStyle}
       />
+
       {children}
     </TabsPrimitive.List>
   )
@@ -174,7 +217,7 @@ function TabsTrigger({
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
       className={cn(
-        "z-10 cursor-pointer gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none [&_svg:not([class*='size-'])]:size-4 relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center whitespace-nowrap text-foreground/60 transition-[color,background-color,box-shadow,transform,opacity] duration-300 ease-out group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 motion-safe:hover:-translate-y-px motion-safe:data-[state=active]:translate-y-0 [&_svg]:pointer-events-none [&_svg]:shrink-0",
+        "z-10 cursor-pointer gap-1.5 rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium group-data-[variant=line]/tabs-list:data-[state=active]:shadow-none [&_svg:not([class*='size-'])]:size-4 relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center whitespace-nowrap text-foreground/60 transition-[color,background-color,box-shadow] duration-300 group-data-vertical/tabs:w-full group-data-vertical/tabs:justify-start hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0",
         "group-data-[variant=line]/tabs-list:bg-transparent group-data-[variant=line]/tabs-list:data-[state=active]:bg-transparent",
         "group-data-[variant=default]/tabs-list:data-[state=active]:text-primary-foreground group-data-[variant=line]/tabs-list:data-[state=active]:text-primary",
         className
@@ -190,9 +233,10 @@ function TabsContent({
 }: React.ComponentProps<typeof TabsPrimitive.Content>) {
   return (
     <TabsPrimitive.Content
+      forceMount
       data-slot="tabs-content"
       className={cn(
-        "text-sm flex-1 outline-none data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-300",
+        "text-sm flex-1 outline-none data-[state=inactive]:hidden",
         className
       )}
       {...props}

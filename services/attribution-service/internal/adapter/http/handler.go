@@ -93,6 +93,8 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.listEvents(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "funnel" && r.Method == http.MethodGet:
 		h.getFunnel(w, r, projectID)
+	case len(parts) == 2 && (parts[1] == "traffic" || parts[1] == "geo") && r.Method == http.MethodGet:
+		h.getGeoTrafficReport(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -285,6 +287,43 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 	writeSuccess(w, http.StatusOK, funnel)
 }
 
+func (h *Handler) getGeoTrafficReport(w http.ResponseWriter, r *http.Request, projectID string) {
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	from, to, err := parseWindow(r)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	report, err := h.svc.GetGeoTrafficReport(
+		r.Context(),
+		projectID,
+		userID,
+		organizationID,
+		from,
+		to,
+		usecase.GeoTrafficFilters{
+			Search: strings.TrimSpace(r.URL.Query().Get("search")),
+			Engine: strings.TrimSpace(r.URL.Query().Get("engine")),
+		},
+	)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, report)
+}
+
 func parseWindow(r *http.Request) (time.Time, time.Time, error) {
 	fromRaw := strings.TrimSpace(r.URL.Query().Get("from"))
 	toRaw := strings.TrimSpace(r.URL.Query().Get("to"))
@@ -319,9 +358,25 @@ func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+	case errors.Is(err, usecase.ErrDependencyUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": userFacingDependencyError(err)})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}
+}
+
+func userFacingDependencyError(err error) string {
+	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "service_disabled") ||
+		strings.Contains(message, "analyticsdata.googleapis.com") ||
+		strings.Contains(message, "google analytics data api has not been used") ||
+		(strings.Contains(message, "google analytics data api") && strings.Contains(message, "disabled")) {
+		return "Active Google Analytics Data API dans le projet Google Cloud du client OAuth, puis réessaie dans quelques minutes."
+	}
+	if strings.Contains(message, "ga4") || strings.Contains(message, "google analytics") {
+		return "Google Analytics est momentanément indisponible pour ce projet. Vérifie l'accès à la propriété GA4, puis réessaie."
+	}
+	return "Service momentanément indisponible. Réessaie dans quelques instants."
 }
 
 func splitPathAfter(path, prefix string) []string {

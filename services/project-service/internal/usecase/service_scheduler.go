@@ -15,7 +15,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 
 	projectIDs := make([]string, 0, len(s.projects))
 	for projectID, project := range s.projects {
-		if project == nil || project.Status != "active" {
+		if project == nil {
 			continue
 		}
 		projectIDs = append(projectIDs, projectID)

@@ -14,6 +14,9 @@ type WorkspaceTableProps<T> = {
   rows: T[];
   getRowKey: (row: T) => string;
   renderRow: (row: T) => ReactNode;
+  loading?: boolean;
+  loadingRowCount?: number;
+  renderLoadingRow?: (index: number) => ReactNode;
   emptyLabel?: string;
   tableClassName?: string;
 };
@@ -23,6 +26,9 @@ export function WorkspaceTable<T>({
   rows,
   getRowKey,
   renderRow,
+  loading = false,
+  loadingRowCount = 6,
+  renderLoadingRow,
   emptyLabel = "No data found.",
   tableClassName,
 }: WorkspaceTableProps<T>) {
@@ -41,7 +47,11 @@ export function WorkspaceTable<T>({
         </TableRow>
       </TableHeader>
       <TableBody className="[&_td]:px-3 [&_td]:py-3">
-        {rows.length === 0 ? (
+        {loading && renderLoadingRow ? (
+          Array.from({ length: loadingRowCount }).map((_, index) => (
+            <Fragment key={index}>{renderLoadingRow(index)}</Fragment>
+          ))
+        ) : rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={columns.length} className="py-4">
               <EmptyStateCard label={emptyLabel} className="h-20" />

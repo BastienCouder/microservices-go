@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { ModelCard } from "@/components/shared/model-card";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import {
   createProviderCredentialLookup,
   getCatalogDefaultSelection,
@@ -56,9 +57,6 @@ export function StepModels({
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<
     Record<string, string>
   >({});
-  const [providerKeyMessage, setProviderKeyMessage] = useState<string | null>(
-    null,
-  );
   const normalizedApiBaseURL = apiBaseURL.trim();
 
   const billingQuery = useQuery({
@@ -114,32 +112,46 @@ export function StepModels({
         ...current,
         [credential.provider]: "",
       }));
-      setProviderKeyMessage(t("modelsDeveloperKeysSaved"));
+      const nextMessage = t("modelsDeveloperKeysSaved");
+      pushSuccessToast(nextMessage);
     },
     onDeleteSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({
         ...current,
         [credential.provider]: "",
       }));
-      setProviderKeyMessage(t("modelsDeveloperKeysDeleted"));
+      const nextMessage = t("modelsDeveloperKeysDeleted");
+      pushSuccessToast(nextMessage);
     },
     onSaveError: (mutationError) => {
-      setProviderKeyMessage(
+      const nextMessage =
         mutationError instanceof Error
           ? mutationError.message
-          : t("modelsDeveloperKeysSaveError"),
-      );
+          : t("modelsDeveloperKeysSaveError");
+      pushErrorToast(new Error(nextMessage), nextMessage);
     },
     onDeleteError: (mutationError) => {
-      setProviderKeyMessage(
+      const nextMessage =
         mutationError instanceof Error
           ? mutationError.message
-          : t("modelsDeveloperKeysDeleteError"),
-      );
+          : t("modelsDeveloperKeysDeleteError");
+      pushErrorToast(new Error(nextMessage), nextMessage);
     },
   });
 
   const catalog = catalogQuery.data ?? EMPTY_MODEL_CATALOG;
+  useEffect(() => {
+    if (catalogQuery.error instanceof Error) {
+      pushErrorToast(catalogQuery.error, t("modelsEmpty"));
+    }
+  }, [catalogQuery.error, t]);
+
+  useEffect(() => {
+    if (providerCredentialsQuery.error instanceof Error) {
+      pushErrorToast(providerCredentialsQuery.error, t("modelsDeveloperKeysSaveError"));
+    }
+  }, [providerCredentialsQuery.error, t]);
+
   const providerCredentials =
     providerCredentialsQuery.data ?? EMPTY_PROVIDER_CREDENTIALS;
   const providerCredentialLookup = useMemo(
@@ -274,7 +286,7 @@ export function StepModels({
       }
 
       if (requiresProjectProviderCredentials && !providerCredentialsReady) {
-        setProviderKeyMessage(t("modelsDeveloperKeysLoading"));
+        pushSuccessToast(t("modelsDeveloperKeysLoading"));
         return;
       }
 
@@ -286,11 +298,10 @@ export function StepModels({
           providerCredentialLookup,
         )
       ) {
-        setProviderKeyMessage(
-          t("modelsDeveloperKeysRequired", {
-            providers: `${model.provider} / OpenRouter`,
-          }),
-        );
+        const nextMessage = t("modelsDeveloperKeysRequired", {
+          providers: `${model.provider} / OpenRouter`,
+        });
+        pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
 
@@ -384,7 +395,6 @@ export function StepModels({
       ...current,
       [provider]: value,
     }));
-    setProviderKeyMessage(null);
   }, []);
 
   const saveProviderKey = useCallback(
@@ -452,8 +462,8 @@ export function StepModels({
     );
   } else if (catalogQuery.error instanceof Error) {
     content = (
-      <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-destructive">
-        {catalogQuery.error.message}
+      <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
+        {t("modelsEmpty")}
       </div>
     );
   } else if (selectableModels.length === 0) {
@@ -524,16 +534,6 @@ export function StepModels({
             onDelete={deleteProviderKey}
             texts={providerApiKeyTexts}
           />
-          {providerCredentialsQuery.error instanceof Error ? (
-            <p className="text-sm text-destructive">
-              {providerCredentialsQuery.error.message}
-            </p>
-          ) : null}
-          {providerKeyMessage ? (
-            <p className="text-sm text-muted-foreground">
-              {providerKeyMessage}
-            </p>
-          ) : null}
           {developerPlanMissingKeys ? (
             <p className="text-sm text-destructive">
               {t("modelsDeveloperKeysRequired", {

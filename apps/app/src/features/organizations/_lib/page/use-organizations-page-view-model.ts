@@ -7,10 +7,18 @@ import { findBySlugOrId } from "@/shared/public-slugs";
 import {
   buildScopedHref,
   readOrganizationIdFromSearch,
+  readRouteQueryParam,
   readSelectedOrganizationID,
   storeSelectedOrganizationID,
 } from "@/shared/selection";
-import { EMPTY_INVITATION_DRAFT, EMPTY_ORGANIZATIONS, EMPTY_RESOURCES } from "../shared/constants";
+import {
+  canManageOrganizationPages,
+  DEFAULT_ORGANIZATION_VIEW_TAB,
+  EMPTY_INVITATION_DRAFT,
+  EMPTY_ORGANIZATIONS,
+  EMPTY_RESOURCES,
+  isOrganizationViewTabAvailable,
+} from "../shared/constants";
 import {
   loadOrganizationResources,
   loadOrganizationSummaries,
@@ -19,8 +27,10 @@ import { buildCreateProjectOnboardingHref } from "../shared/organization-page-li
 import { useOrganizationMutations } from "./use-organization-mutations";
 import type {
   InvitationDraft,
+  OrganizationAPIKey,
   OrganizationResources,
   OrganizationSummary,
+  ProjectSettingsInput,
   ProjectMemberDraft,
   ViewTab,
 } from "../shared/types";
@@ -45,23 +55,36 @@ export type OrganizationsPageViewModel = {
   projectMemberDrafts: Record<string, ProjectMemberDraft>;
   invitationDraft: InvitationDraft;
   createProjectOnboardingHref: string;
+  canManageProjects: boolean;
+  canDeleteProjects: boolean;
+  deletingProjectId: string;
+  projectSettingsBusy: boolean;
   projectMemberBusy: boolean;
   removeProjectMemberBusy: boolean;
   memberActionBusy: boolean;
   createInvitationBusy: boolean;
   revokeInvitationBusy: boolean;
+  updateOrganizationBusy: boolean;
+  createAPIKeyBusy: boolean;
+  revokeAPIKeyBusy: boolean;
+  createdAPIKey: OrganizationAPIKey | null;
   setActiveTab: (value: ViewTab) => void;
   setProjectSearch: (value: string) => void;
   setInvitationDraft: (draft: InvitationDraft) => void;
   onMemberDraftChange: (projectId: string, draft: ProjectMemberDraft) => void;
+  onUpdateProjectSettings: (projectId: string, input: ProjectSettingsInput) => void;
+  onDeleteProject: (projectId: string) => void;
   onAssignProjectMember: (projectId: string) => void;
   onRemoveProjectMember: (projectId: string, userId: string) => void;
   onUpdateMemberProjects: (userId: string, projectIds: string[]) => void;
   onUpdateRoles: (userId: string, roles: string[]) => void;
   onRemoveMember: (userId: string) => void;
-  onSetMemberBanned: (userId: string, banned: boolean) => void;
   onCreateInvitation: () => void;
   onRevokeInvitation: (invitationId: string) => void;
+  onUpdateOrganizationName: (name: string) => void;
+  onCreateAPIKey: (name: string) => void;
+  onRevokeAPIKey: (keyId: string) => void;
+  onClearCreatedAPIKey: () => void;
   onRefetchOrganizations: () => void;
 };
 
@@ -82,6 +105,19 @@ function findPreferredOrganizationId(
   return candidates.find((candidate) => candidate && availableIds.has(candidate)) ?? "";
 }
 
+function normalizeViewTab(value: string): ViewTab {
+  if (
+    value === "projects" ||
+    value === "members" ||
+    value === "invitations" ||
+    value === "settings" ||
+    value === "apiKeys"
+  ) {
+    return value;
+  }
+  return DEFAULT_ORGANIZATION_VIEW_TAB;
+}
+
 export function useOrganizationsPageViewModel({
   apiBaseURL,
   busy,
@@ -90,11 +126,12 @@ export function useOrganizationsPageViewModel({
 }: UseOrganizationsPageViewModelInput): OrganizationsPageViewModel {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<ViewTab>("projects");
+  const [activeTab, setActiveTab] = useState<ViewTab>(DEFAULT_ORGANIZATION_VIEW_TAB);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(readSelectedOrganizationID);
   const [projectSearch, setProjectSearch] = useState("");
   const [projectMemberDrafts, setProjectMemberDrafts] = useState<Record<string, ProjectMemberDraft>>({});
   const [invitationDraft, setInvitationDraft] = useState<InvitationDraft>(EMPTY_INVITATION_DRAFT);
+  const [createdAPIKey, setCreatedAPIKey] = useState<OrganizationAPIKey | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
 
@@ -105,6 +142,16 @@ export function useOrganizationsPageViewModel({
   });
   const organizations = organizationsQuery.data ?? EMPTY_ORGANIZATIONS;
   const routeOrganizationToken = readOrganizationIdFromSearch(routeSearch);
+  const routeSection = normalizeViewTab(readRouteQueryParam(routeSearch, "section"));
+  const selectedOrganizationFromList = organizations.find(
+    (organization) => organization.id === selectedOrganizationId,
+  );
+  const selectedOrganizationRole = selectedOrganizationFromList?.role ?? "member";
+  const canManageOrganizationFromSummary = canManageOrganizationPages([selectedOrganizationRole]);
+
+  useEffect(() => {
+    setActiveTab(routeSection);
+  }, [routeSection]);
 
   useEffect(() => {
     if (organizations.length === 0) return;
@@ -113,24 +160,57 @@ export function useOrganizationsPageViewModel({
       setSelectedOrganizationId(nextId);
       storeSelectedOrganizationID(nextId);
       const organization = organizations.find((item) => item.id === nextId);
-      navigate(buildScopedHref("/organizations", { org: organization?.slug }), { replace: true });
+      navigate(buildScopedHref(`/organizations${routeSearch}`, { org: organization?.slug }), { replace: true });
     }
   }, [navigate, organizations, routeSearch, selectedOrganizationId]);
 
   const resourcesQuery = useQuery({
-    queryKey: appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
+    queryKey: [
+      ...appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
+      canManageOrganizationFromSummary ? "manager" : "member",
+    ] as const,
     enabled: apiBaseURL.trim() !== "" && selectedOrganizationId !== "",
-    queryFn: ({ signal }) => loadOrganizationResources(apiBaseURL, selectedOrganizationId, signal),
+    queryFn: ({ signal }) =>
+      loadOrganizationResources(apiBaseURL, selectedOrganizationId, {
+        canManageOrganization: canManageOrganizationFromSummary,
+        currentUserEmail: user?.Email ?? "",
+        currentUserId: user ? String(user.ID) : "",
+        organizationRole: selectedOrganizationRole,
+        signal,
+      }),
   });
   const resources = resourcesQuery.data ?? EMPTY_RESOURCES;
   const selectedOrganization =
-    organizations.find((organization) => organization.id === selectedOrganizationId) ??
+    selectedOrganizationFromList ??
     resources.organization;
   const currentUserId = user ? String(user.ID) : "";
   const currentUserRoles = useMemo(
     () => resources.members.find((member) => member.userId === currentUserId)?.roles ?? [],
     [currentUserId, resources.members],
   );
+  const effectiveCurrentUserRoles = useMemo(
+    () => (currentUserRoles.length > 0 ? currentUserRoles : [selectedOrganizationRole]),
+    [currentUserRoles, selectedOrganizationRole],
+  );
+  const canManageProjects = canManageOrganizationPages(effectiveCurrentUserRoles);
+  const canDeleteProjects = effectiveCurrentUserRoles.some((role) =>
+    ["owner", "admin"].includes(role),
+  );
+  const effectiveActiveTab = isOrganizationViewTabAvailable(activeTab, effectiveCurrentUserRoles)
+    ? activeTab
+    : DEFAULT_ORGANIZATION_VIEW_TAB;
+
+  useEffect(() => {
+    if (isOrganizationViewTabAvailable(routeSection, effectiveCurrentUserRoles)) return;
+    if (!selectedOrganization) return;
+    navigate(
+      buildScopedHref(`/organizations${routeSearch}`, {
+        org: selectedOrganization.slug,
+        section: null,
+      }),
+      { replace: true },
+    );
+  }, [effectiveCurrentUserRoles, navigate, routeSearch, routeSection, selectedOrganization]);
   useEffect(() => {
     if (!selectedOrganizationId) return;
     console.info("[organizations] client resources", {
@@ -154,8 +234,8 @@ export function useOrganizationsPageViewModel({
   useEffect(() => {
     if (!selectedOrganization) return;
     if (routeOrganizationToken === selectedOrganization.slug) return;
-    navigate(buildScopedHref("/organizations", { org: selectedOrganization.slug }), { replace: true });
-  }, [navigate, routeOrganizationToken, selectedOrganization]);
+    navigate(buildScopedHref(`/organizations${routeSearch}`, { org: selectedOrganization.slug }), { replace: true });
+  }, [navigate, routeOrganizationToken, routeSearch, selectedOrganization]);
 
   const activeError =
     localError ??
@@ -170,6 +250,9 @@ export function useOrganizationsPageViewModel({
       queryClient.invalidateQueries({
         queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrganizationId),
       }),
+      queryClient.invalidateQueries({
+        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+      }),
     ]);
   };
 
@@ -183,13 +266,14 @@ export function useOrganizationsPageViewModel({
     invitationDraft,
     setProjectMemberDrafts,
     setInvitationDraft,
+    setCreatedAPIKey,
     setNotice,
     setLocalError,
     invalidateOrganizationData,
   });
 
   return {
-    activeTab,
+    activeTab: effectiveActiveTab,
     activeError,
     notice,
     isInitialLoading:
@@ -203,20 +287,40 @@ export function useOrganizationsPageViewModel({
     projectMemberDrafts,
     invitationDraft,
     createProjectOnboardingHref: buildCreateProjectOnboardingHref(selectedOrganizationId),
+    canManageProjects,
+    canDeleteProjects,
+    deletingProjectId: mutations.deleteProjectMutation.isPending
+      ? mutations.deleteProjectMutation.variables ?? ""
+      : "",
+    projectSettingsBusy: mutations.updateProjectSettingsMutation.isPending,
     projectMemberBusy: mutations.assignProjectMemberMutation.isPending,
     removeProjectMemberBusy: mutations.removeProjectMemberMutation.isPending,
     memberActionBusy:
       mutations.updateMemberProjectsMutation.isPending ||
       mutations.updateMemberRolesMutation.isPending ||
-      mutations.removeMemberMutation.isPending ||
-      mutations.setMemberBannedMutation.isPending,
+      mutations.removeMemberMutation.isPending,
     createInvitationBusy: mutations.createInvitationMutation.isPending,
     revokeInvitationBusy: mutations.revokeInvitationMutation.isPending,
-    setActiveTab,
+    updateOrganizationBusy: mutations.updateOrganizationNameMutation.isPending,
+    createAPIKeyBusy: mutations.createAPIKeyMutation.isPending,
+    revokeAPIKeyBusy: mutations.revokeAPIKeyMutation.isPending,
+    createdAPIKey,
+    setActiveTab: (value) => {
+      setActiveTab(value);
+      navigate(
+        buildScopedHref(`/organizations${routeSearch}`, {
+          org: selectedOrganization?.slug,
+          section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
+        }),
+      );
+    },
     setProjectSearch,
     setInvitationDraft,
     onMemberDraftChange: (projectId, draft) =>
       setProjectMemberDrafts((current) => ({ ...current, [projectId]: draft })),
+    onUpdateProjectSettings: (projectId, input) =>
+      mutations.updateProjectSettingsMutation.mutate({ projectId, input }),
+    onDeleteProject: (projectId) => mutations.deleteProjectMutation.mutate(projectId),
     onAssignProjectMember: (projectId) => mutations.assignProjectMemberMutation.mutate(projectId),
     onRemoveProjectMember: (projectId, userId) =>
       mutations.removeProjectMemberMutation.mutate({ projectId, userId }),
@@ -224,9 +328,12 @@ export function useOrganizationsPageViewModel({
       mutations.updateMemberProjectsMutation.mutate({ userId, projectIds }),
     onUpdateRoles: (userId, roles) => mutations.updateMemberRolesMutation.mutate({ userId, roles }),
     onRemoveMember: (userId) => mutations.removeMemberMutation.mutate(userId),
-    onSetMemberBanned: (userId, banned) => mutations.setMemberBannedMutation.mutate({ userId, banned }),
     onCreateInvitation: () => mutations.createInvitationMutation.mutate(),
     onRevokeInvitation: (invitationId) => mutations.revokeInvitationMutation.mutate(invitationId),
+    onUpdateOrganizationName: (name) => mutations.updateOrganizationNameMutation.mutate(name),
+    onCreateAPIKey: (name) => mutations.createAPIKeyMutation.mutate(name),
+    onRevokeAPIKey: (keyId) => mutations.revokeAPIKeyMutation.mutate(keyId),
+    onClearCreatedAPIKey: () => setCreatedAPIKey(null),
     onRefetchOrganizations: () => void organizationsQuery.refetch(),
   };
 }

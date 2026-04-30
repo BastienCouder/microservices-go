@@ -80,8 +80,12 @@ func TestProjectFlowCreateFinalize(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get project: %v", err)
 	}
-	if got.Status != "active" {
-		t.Fatalf("expected active status, got %q", got.Status)
+	encoded, err := json.Marshal(got)
+	if err != nil {
+		t.Fatalf("marshal project: %v", err)
+	}
+	if strings.Contains(string(encoded), "status") {
+		t.Fatalf("expected project json to omit status, got %s", string(encoded))
 	}
 }
 
@@ -103,6 +107,81 @@ func TestProjectUnauthorizedAccess(t *testing.T) {
 	_, err = svc.GetProject(ctx, project.ID, 11)
 	if !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("expected unauthorized error, got %v", err)
+	}
+}
+
+func TestUpdateProjectCanRenameProject(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Old name",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	name := " New name "
+	updated, err := svc.UpdateProject(ctx, project.ID, 42, UpdateProjectInput{
+		Name: &name,
+	})
+	if err != nil {
+		t.Fatalf("update project: %v", err)
+	}
+	if updated.Name != "New name" {
+		t.Fatalf("expected trimmed project name, got %q", updated.Name)
+	}
+}
+
+func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM pour PME ?"}); err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.AddCompetitors(ctx, project.ID, 42, []AddCompetitorInput{{Name: "Rival"}}); err != nil {
+		t.Fatalf("add competitors: %v", err)
+	}
+	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 99, "viewer"); err != nil {
+		t.Fatalf("assign member: %v", err)
+	}
+
+	if err := svc.DeleteProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("delete project: %v", err)
+	}
+	if _, err := svc.GetProject(ctx, project.ID, 42); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected project not found, got %v", err)
+	}
+	if _, ok := svc.projectModels[project.ID]; ok {
+		t.Fatalf("expected project models to be removed")
+	}
+	if _, ok := svc.projectMembers[project.ID]; ok {
+		t.Fatalf("expected project members to be removed")
+	}
+	for _, prompt := range svc.prompts {
+		if prompt.ProjectID == project.ID {
+			t.Fatalf("expected project prompts to be removed")
+		}
+	}
+	for _, competitor := range svc.competitors {
+		if competitor.ProjectID == project.ID {
+			t.Fatalf("expected project competitors to be removed")
+		}
 	}
 }
 
@@ -291,6 +370,83 @@ func TestUpdateModelInfersMissingIconKeyFromProvider(t *testing.T) {
 	}
 	if !updated.IsActive {
 		t.Fatalf("expected model to be activated")
+	}
+}
+
+type fakeGA4OAuthProvider struct {
+	exchangeToken GA4OAuthToken
+	properties    []GA4OAuthProperty
+	listCalls     int
+}
+
+func (p *fakeGA4OAuthProvider) AuthorizationURL(state, redirectURI string) (string, error) {
+	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state + "&redirect_uri=" + redirectURI, nil
+}
+
+func (p *fakeGA4OAuthProvider) ExchangeCode(_ context.Context, code, redirectURI string) (GA4OAuthToken, error) {
+	if code == "" || redirectURI == "" {
+		return GA4OAuthToken{}, errors.New("missing code or redirect uri")
+	}
+	return p.exchangeToken, nil
+}
+
+func (p *fakeGA4OAuthProvider) ListProperties(_ context.Context, refreshToken string) ([]GA4OAuthProperty, error) {
+	p.listCalls++
+	if refreshToken == "" {
+		return nil, errors.New("missing refresh token")
+	}
+	return p.properties, nil
+}
+
+func TestGA4OAuthConnectsDirectlyWithProvidedProjectProperty(t *testing.T) {
+	svc := NewService()
+	provider := &fakeGA4OAuthProvider{
+		exchangeToken: GA4OAuthToken{RefreshToken: "refresh_token_123"},
+		properties: []GA4OAuthProperty{
+			{PropertyID: "123456789", DisplayName: "Site France"},
+			{PropertyID: "987654321", DisplayName: "Site Europe"},
+		},
+	}
+	svc.ConfigureGA4OAuth(provider, "state-secret")
+	ctx := context.Background()
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "GA4 OAuth Project",
+		Domain:         "oauth.test",
+		WebsiteURL:     "https://oauth.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	start, err := svc.StartProjectGA4OAuth(ctx, project.ID, 42, StartProjectGA4OAuthInput{
+		RedirectURI: "http://localhost:30006/traffic",
+	})
+	if err != nil {
+		t.Fatalf("start ga4 oauth: %v", err)
+	}
+	if start.AuthorizationURL == "" || start.State == "" {
+		t.Fatalf("expected authorization url and state, got %+v", start)
+	}
+
+	callback, err := svc.CompleteProjectGA4OAuth(ctx, project.ID, 42, CompleteProjectGA4OAuthInput{
+		Code:        "auth-code",
+		State:       start.State,
+		RedirectURI: "http://localhost:30006/traffic",
+		PropertyID:  "123456789",
+	})
+	if err != nil {
+		t.Fatalf("complete ga4 oauth: %v", err)
+	}
+	if provider.listCalls != 0 {
+		t.Fatalf("expected direct property callback to skip property listing, got %d calls", provider.listCalls)
+	}
+	if callback.Integration.GA4.AuthMode != "oauth" || !callback.Integration.GA4.HasOAuthToken {
+		t.Fatalf("expected oauth integration after callback, got %+v", callback.Integration.GA4)
+	}
+	if callback.Integration.GA4.PropertyID != "123456789" || !callback.Integration.GA4.IsConnected {
+		t.Fatalf("expected oauth integration to connect selected property, got %+v", callback.Integration.GA4)
 	}
 }
 
@@ -886,7 +1042,6 @@ func TestListProjectsReloadsStateFromStore(t *testing.T) {
 				WebsiteURL:      "https://seed-demo.local",
 				PrimaryLanguage: "fr",
 				Country:         "FR",
-				Status:          "active",
 				CreatedAt:       now,
 				UpdatedAt:       now,
 			},

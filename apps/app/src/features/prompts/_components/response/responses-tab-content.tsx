@@ -11,6 +11,7 @@ type ResponsesTabContentProps = {
   toggleCompetitor: (value: string) => void;
   clearCompetitors: () => void;
   availableCompetitors: string[];
+  loading?: boolean;
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;
   filteredResponses: PromptRunRow[];

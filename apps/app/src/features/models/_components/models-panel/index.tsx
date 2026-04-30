@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { Navigate } from "react-router-dom";
 
 import { Badge } from "@/components/ui/badge";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/shared/page-header";
+import { pushErrorToast } from "@/components/ui/toast-actions";
 
 import { ProviderApiKeysPanel } from "../provider-keys/provider-api-keys-panel";
 import {
@@ -12,7 +14,6 @@ import {
 } from "../../_lib/models-panel/use-models-panel-view-model";
 import { DeveloperPlanHeroBanner } from "./developer-plan-hero-banner";
 import { ModelCatalogGrid } from "./model-catalog-grid";
-import { ModelsStatusMessage } from "./models-status-message";
 import { ModelsToolbar } from "./models-toolbar";
 import {
   CatalogTemplate,
@@ -27,6 +28,12 @@ type ModelsPanelProps = {
 
 export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
   const viewModel = useModelsPanelViewModel({ apiBaseURL, routeSearch });
+
+  useEffect(() => {
+    if (viewModel.displayError) {
+      pushErrorToast(new Error(viewModel.displayError), viewModel.displayError);
+    }
+  }, [viewModel.displayError]);
 
   if (viewModel.redirectHref) {
     return <Navigate to={viewModel.redirectHref} replace />;
@@ -62,20 +69,15 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
       />
 
       <div className="flex flex-1 flex-col rounded-md bg-background">
-        <ModelsStatusMessage
-          error={viewModel.displayError}
-          message={viewModel.message}
-        />
-
-        {viewModel.loadingPlan ? (
+      {/*   {viewModel.loadingPlan ? (
           <div className="border-b px-4 py-4 md:px-4">
             <DeveloperPlanHeroBannerTemplate />
           </div>
         ) : viewModel.showDeveloperUpgradeBanner ? (
-          <div className="border-b px-4 py-4 md:px-4">
+         /*  <div className="border-b px-4 py-4 md:px-4">
             <DeveloperPlanHeroBanner currentPlanLabel={viewModel.planLabel} />
           </div>
-        ) : null}
+        ) : null} */}
 
         {viewModel.isDeveloperPlan ? (
           <div className="border-b px-4 py-4 md:px-6">

@@ -10,6 +10,7 @@ import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PROMPT_MAX_LENGTH,
   buildEditorCadenceSummary,
+  getModelOverrideCron,
   getPromptStatusLabel,
   normalizeEditorSchedule,
 } from "../../_lib/prompt-editor";
@@ -69,10 +70,6 @@ export function PromptEditorPage({
     });
   }, [availableModels]);
 
-  useEffect(() => {
-    setSchedule((current) => normalizeEditorSchedule(current, selectedModels));
-  }, [selectedModels]);
-
   const normalizedSchedule = normalizeEditorSchedule(
     {
       ...schedule,
@@ -113,7 +110,7 @@ export function PromptEditorPage({
         className="hidden md:flex pr-4"
       />
 
-      <ScrollArea className="min-h-0 flex-1 pr-4 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+      <ScrollArea className="min-h-0 flex-1 pr-4 pt-0">
         <div className="space-y-5 overflow-x-hidden pb-6">
           <PromptTextSection
             promptText={promptText}
@@ -156,7 +153,8 @@ export function PromptEditorPage({
               setSchedule((current) => {
                 const nextModelCrons = { ...current.modelCrons };
                 if (enabled) {
-                  nextModelCrons[model] = nextModelCrons[model] || current.cron;
+                  nextModelCrons[model] =
+                    getModelOverrideCron(current.cron, nextModelCrons[model]);
                 } else {
                   delete nextModelCrons[model];
                 }

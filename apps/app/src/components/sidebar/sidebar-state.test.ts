@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  findOrganizationIdForProjectToken,
+  findProjectIdForToken,
   normalizeOrganizationHierarchy,
   selectPreferredID,
 } from "./sidebar-state";
@@ -70,5 +72,40 @@ describe("sidebar state helpers", () => {
         },
       ],
     });
+  });
+
+  test("findOrganizationIdForProjectToken finds the organization that owns a stored project id", () => {
+    const first = normalizeOrganizationHierarchy(
+      {
+        organization: { id: "org-1", name: "First" },
+        projects: [{ id: "project-a", name: "Project A" }],
+      },
+      "org-1",
+    );
+    const second = normalizeOrganizationHierarchy(
+      {
+        organization: { id: "org-2", name: "Second" },
+        projects: [{ id: "project-b", name: "Project B" }],
+      },
+      "org-2",
+    );
+
+    expect(findOrganizationIdForProjectToken([first, second], "project-b")).toBe(
+      "org-2",
+    );
+  });
+
+  test("findProjectIdForToken resolves a stored project slug to its id", () => {
+    const hierarchy = normalizeOrganizationHierarchy(
+      {
+        organization: { id: "org-1", name: "First" },
+        projects: [{ id: "project-fe", name: "FE" }],
+      },
+      "org-1",
+    );
+
+    expect(findProjectIdForToken(hierarchy?.projects ?? [], "fe")).toBe(
+      "project-fe",
+    );
   });
 });

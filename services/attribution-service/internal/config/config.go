@@ -25,8 +25,11 @@ type Config struct {
 
 type GA4Config struct {
 	Enabled            bool
+	FakeTrafficEnabled bool
 	PropertyID         string
 	ServiceAccountJSON string
+	OAuthClientID      string
+	OAuthClientSecret  string
 }
 
 func Load() (Config, error) {
@@ -145,14 +148,29 @@ func loadGA4Config() (GA4Config, error) {
 	if err != nil {
 		return GA4Config{}, err
 	}
+	fakeTrafficEnabled, err := optionalBoolEnv("ATTRIBUTION_ENABLE_FAKE_TRAFFIC", true)
+	if err != nil {
+		return GA4Config{}, err
+	}
 	serviceAccountJSON, err := optionalEnvOrFile("GA4_SERVICE_ACCOUNT_JSON", "GA4_SERVICE_ACCOUNT_JSON_FILE")
+	if err != nil {
+		return GA4Config{}, err
+	}
+	oAuthClientID, err := passwordFromEnv("GA4_OAUTH_CLIENT_ID", "GA4_OAUTH_CLIENT_ID_FILE")
+	if err != nil {
+		return GA4Config{}, err
+	}
+	oAuthClientSecret, err := passwordFromEnv("GA4_OAUTH_CLIENT_SECRET", "GA4_OAUTH_CLIENT_SECRET_FILE")
 	if err != nil {
 		return GA4Config{}, err
 	}
 	cfg := GA4Config{
 		Enabled:            enabled,
+		FakeTrafficEnabled: fakeTrafficEnabled,
 		PropertyID:         optionalEnv("GA4_PROPERTY_ID"),
 		ServiceAccountJSON: serviceAccountJSON,
+		OAuthClientID:      oAuthClientID,
+		OAuthClientSecret:  oAuthClientSecret,
 	}
 	if !enabled {
 		return cfg, nil

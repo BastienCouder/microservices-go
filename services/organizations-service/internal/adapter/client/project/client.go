@@ -103,7 +103,6 @@ func (c *Client) listProjects(ctx context.Context, organizationID, userID int64)
 		ID                string `json:"id"`
 		OrganizationID    int64  `json:"organizationId"`
 		Name              string `json:"name"`
-		Status            string `json:"status"`
 		BrandName         string `json:"brandName"`
 		BrandDescription  string `json:"brandDescription"`
 		AttributionSource string `json:"attributionSource"`
@@ -126,7 +125,6 @@ func (c *Client) listProjects(ctx context.Context, organizationID, userID int64)
 			ID:                strings.TrimSpace(item.ID),
 			OrganizationID:    item.OrganizationID,
 			Name:              strings.TrimSpace(item.Name),
-			Status:            strings.TrimSpace(item.Status),
 			BrandName:         strings.TrimSpace(item.BrandName),
 			BrandDescription:  strings.TrimSpace(item.BrandDescription),
 			AttributionSource: strings.TrimSpace(item.AttributionSource),

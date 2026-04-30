@@ -20,6 +20,30 @@ export const PROMPT_STATUS_OPTIONS: Array<{
 
 export const PROMPT_MAX_LENGTH = 500;
 
+export function getInitialModelOverrideCron(
+  globalCron: string,
+  presets: Array<{ cron: string }> = GLOBAL_CADENCE_PRESETS,
+) {
+  const normalizedGlobalCron = globalCron.trim();
+  return (
+    presets.find((preset) => preset.cron !== normalizedGlobalCron)?.cron ??
+    normalizedGlobalCron
+  );
+}
+
+export function getModelOverrideCron(
+  globalCron: string,
+  existingCron = "",
+  presets: Array<{ cron: string }> = GLOBAL_CADENCE_PRESETS,
+) {
+  const normalizedGlobalCron = globalCron.trim();
+  const normalizedExistingCron = existingCron.trim();
+  if (normalizedExistingCron !== "" && normalizedExistingCron !== normalizedGlobalCron) {
+    return normalizedExistingCron;
+  }
+  return getInitialModelOverrideCron(normalizedGlobalCron, presets);
+}
+
 export function getPromptStatusLabel(status: PromptItem["status"], locale = "en") {
   if (status === "active") return translateI18nText("prompts-workspace", "statusActive", locale);
   if (status === "disabled") return translateI18nText("prompts-workspace", "statusDisabled", locale);
@@ -31,15 +55,17 @@ export function normalizeEditorSchedule(
   selectedModels: AIModel[],
 ): PromptSchedule {
   const allowed = new Set(selectedModels);
+  const cron = schedule.cron.trim() || defaultPromptSchedule().cron;
   const modelCrons = Object.fromEntries(
     Object.entries(schedule.modelCrons ?? {}).filter(
-      ([modelId, cron]) => allowed.has(modelId) && cron.trim() !== "",
+      ([modelId, modelCron]) =>
+        allowed.has(modelId) && modelCron.trim() !== "" && modelCron.trim() !== cron,
     ),
   );
 
   return {
     mode: schedule.mode === "per_model" ? "per_model" : "global",
-    cron: schedule.cron.trim() || defaultPromptSchedule().cron,
+    cron,
     timezone: schedule.timezone.trim() || defaultPromptSchedule().timezone,
     modelCrons: schedule.mode === "per_model" ? modelCrons : {},
   };

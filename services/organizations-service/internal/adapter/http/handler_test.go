@@ -28,8 +28,39 @@ func (stubRepo) GetByID(_ context.Context, id int64) (*domain.Organization, erro
 	return &domain.Organization{ID: id, Name: "Acme", OwnerIdentityID: 7, CreatedAt: time.Now().UTC()}, nil
 }
 
+func (stubRepo) UpdateName(_ context.Context, id int64, name string) (*domain.Organization, error) {
+	if id <= 0 {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	return &domain.Organization{ID: id, Name: name, OwnerIdentityID: 7, CreatedAt: time.Now().UTC()}, nil
+}
+
 func (stubRepo) ListOrganizationsByUser(_ context.Context, _ int64) ([]domain.Membership, error) {
 	return nil, nil
+}
+
+func (stubRepo) CreateAPIKey(_ context.Context, key *domain.OrganizationAPIKey) error {
+	key.ID = 1
+	return nil
+}
+
+func (stubRepo) ListAPIKeys(_ context.Context, organizationID int64) ([]domain.OrganizationAPIKey, error) {
+	return []domain.OrganizationAPIKey{
+		{
+			ID:             1,
+			OrganizationID: organizationID,
+			Name:           "Production",
+			Prefix:         "org_12345678",
+			CreatedAt:      time.Now().UTC(),
+		},
+	}, nil
+}
+
+func (stubRepo) RevokeAPIKey(_ context.Context, organizationID, keyID int64, _ time.Time) error {
+	if organizationID <= 0 || keyID <= 0 {
+		return domain.ErrOrganizationNotFound
+	}
+	return nil
 }
 
 func (stubRepo) CreateTeam(_ context.Context, team *domain.Team) error {
@@ -95,22 +126,6 @@ func (stubRepo) RemoveMember(_ context.Context, organizationID, userID int64, _ 
 	return nil
 }
 
-func (stubRepo) SetMemberBanned(_ context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
-	if organizationID <= 0 || userID <= 0 {
-		return nil, domain.ErrInvalidMember
-	}
-	roles := []string{"member"}
-	if banned {
-		roles = append(roles, domain.RoleBanned)
-	}
-	return &domain.Member{
-		OrganizationID: organizationID,
-		UserID:         userID,
-		Roles:          roles,
-		AddedAt:        time.Now().UTC(),
-	}, nil
-}
-
 func (stubRepo) CreateInvitation(_ context.Context, invitation *domain.Invitation) error {
 	invitation.ID = 1
 	return nil
@@ -121,6 +136,10 @@ func (stubRepo) ListInvitations(_ context.Context, _ int64) ([]domain.Invitation
 }
 
 func (stubRepo) GetInvitationByID(_ context.Context, _, _ int64) (*domain.Invitation, error) {
+	return nil, domain.ErrInvitationNotFound
+}
+
+func (stubRepo) GetInvitationByToken(_ context.Context, _ string) (*domain.Invitation, error) {
 	return nil, domain.ErrInvitationNotFound
 }
 
@@ -214,13 +233,13 @@ func TestMemberActionRoutes(t *testing.T) {
 			name:   "ban member",
 			method: http.MethodPost,
 			path:   "/organizations/1/members/42/ban",
-			want:   http.StatusOK,
+			want:   http.StatusNotFound,
 		},
 		{
 			name:   "unban member",
 			method: http.MethodPost,
 			path:   "/organizations/1/members/42/unban",
-			want:   http.StatusOK,
+			want:   http.StatusNotFound,
 		},
 		{
 			name:   "remove member",
@@ -261,7 +280,6 @@ func TestGetOrganizationHierarchyReturnsProjects(t *testing.T) {
 				ID:               "prj-1",
 				OrganizationID:   1,
 				Name:             "Acme Core",
-				Status:           "active",
 				BrandName:        "Acme",
 				BrandDescription: "Acme brand",
 			},

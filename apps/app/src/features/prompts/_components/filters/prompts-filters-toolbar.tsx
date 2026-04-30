@@ -39,6 +39,7 @@ type PromptsFiltersToolbarProps = {
   allModelsSelected: boolean;
   selectedModels: string[];
   availableModels: string[];
+  modelsLoading?: boolean;
   getModelVisual: (model: string) => ModelVisual;
   toggleModel: (model: string) => void;
 };
@@ -60,6 +61,7 @@ export function PromptsFiltersToolbar({
   allModelsSelected,
   selectedModels,
   availableModels,
+  modelsLoading = false,
   getModelVisual,
   toggleModel,
 }: PromptsFiltersToolbarProps) {
@@ -96,6 +98,7 @@ export function PromptsFiltersToolbar({
         allModelsSelected={allModelsSelected}
         selectedModels={selectedModels}
         availableModels={availableModels}
+        loading={modelsLoading}
         getModelVisual={getModelVisual}
         toggleModel={toggleModel}
       />

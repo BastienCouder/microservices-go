@@ -5,7 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
+	"time"
 )
 
 type Client struct {
@@ -18,7 +21,7 @@ func NewClient(apiKey, fromEmail string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		fromEmail:  fromEmail,
-		httpClient: &http.Client{},
+		httpClient: &http.Client{Timeout: 20 * time.Second},
 	}
 }
 
@@ -49,7 +52,12 @@ func (c *Client) Send(ctx context.Context, toEmail, subject, htmlBody, textBody 
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("resend returned status %d", resp.StatusCode)
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(raw))
+		if message == "" {
+			message = http.StatusText(resp.StatusCode)
+		}
+		return fmt.Errorf("resend returned status %d: %s", resp.StatusCode, message)
 	}
 
 	return nil

@@ -3,6 +3,10 @@ export const API_CONFIG = {
 } as const;
 
 export const apiRoutes = {
+  users: {
+    me: () => "/users/me",
+    deleteMe: () => "/users/me",
+  },
   organizations: {
     me: () => "/organizations/me",
     create: () => "/organizations",
@@ -10,6 +14,8 @@ export const apiRoutes = {
     get: (id: string) => `/organizations/${id}`,
     hierarchy: (id: string) => `/organizations/${id}/hierarchy`,
     members: (id: string) => `/organizations/${id}/members`,
+    apiKeys: (id: string) => `/organizations/${id}/api-keys`,
+    apiKey: (orgId: string, keyId: string) => `/organizations/${orgId}/api-keys/${keyId}`,
     invitations: (id: string) => `/organizations/${id}/invitations`,
     invitation: (orgId: string, invitationId: string) => `/organizations/${orgId}/invitations/${invitationId}`,
     update: (id: string) => `/organizations/${id}`,
@@ -17,17 +23,25 @@ export const apiRoutes = {
     assignMemberRole: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}/roles`,
     removeMember: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}`,
     updateMemberRole: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}`,
-    banMember: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}/ban`,
-    unbanMember: (orgId: string, userId: string) => `/organizations/${orgId}/members/${userId}/unban`,
-    acceptInvitation: (token: string) => `/organizations/invitations/${token}/accept`,
+    acceptInvitation: (token: string) => `/invitations/${encodeURIComponent(token)}/accept`,
   },
   projects: {
     create: () => "/projects",
     list: () => "/projects",
     get: (projectId: string) => `/projects/${projectId}`,
+    update: (projectId: string) => `/projects/${projectId}`,
+    remove: (projectId: string) => `/projects/${projectId}`,
     members: (projectId: string) => `/projects/${projectId}/members`,
     member: (projectId: string, userId: string) => `/projects/${projectId}/members/${userId}`,
     impactIntegrations: (projectId: string) => `/projects/${projectId}/impact-integrations`,
+    ga4OAuthStart: (projectId: string) =>
+      `/projects/${projectId}/impact-integrations/ga4/oauth/start`,
+    ga4OAuthCallback: (projectId: string) =>
+      `/projects/${projectId}/impact-integrations/ga4/oauth/callback`,
+    ga4OAuthProperties: (projectId: string) =>
+      `/projects/${projectId}/impact-integrations/ga4/oauth/properties`,
+    ga4OAuthProperty: (projectId: string) =>
+      `/projects/${projectId}/impact-integrations/ga4/oauth/property`,
     competitors: (projectId: string) => `/projects/${projectId}/competitors`,
     promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
@@ -68,7 +82,7 @@ export const apiRoutes = {
     quota: (organizationId: string) => `/billing/quotas/${organizationId}`,
   },
   analysis: {
-    analyze: (projectId: string) => `/analysis/projects/${projectId}/analyze`,
+    analyze: (projectId: string) => `/projects/${projectId}/analysis/run`,
     quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
@@ -77,6 +91,25 @@ export const apiRoutes = {
   },
   attribution: {
     funnel: (projectId: string) => `/attribution/projects/${projectId}/funnel`,
+    traffic: (
+      projectId: string,
+      options?: { from?: string; to?: string; search?: string; engine?: string },
+    ) => {
+      const params = new URLSearchParams();
+      if (options?.from) params.set("from", options.from);
+      if (options?.to) params.set("to", options.to);
+      if (options?.search) params.set("search", options.search);
+      if (options?.engine && options.engine !== "all") params.set("engine", options.engine);
+      const query = params.toString();
+      return `/attribution/projects/${projectId}/traffic${query ? `?${query}` : ""}`;
+    },
+    geo: (projectId: string, options?: { from?: string; to?: string }) => {
+      const params = new URLSearchParams();
+      if (options?.from) params.set("from", options.from);
+      if (options?.to) params.set("to", options.to);
+      const query = params.toString();
+      return `/attribution/projects/${projectId}/traffic${query ? `?${query}` : ""}`;
+    },
     ingest: (projectId: string) => `/attribution/ingest/${projectId}`,
     stripeWebhook: (projectId: string) => `/attribution/stripe/webhook/${projectId}`,
     events: (projectId: string, options?: { limit?: number }) => {

@@ -8,6 +8,7 @@ import {
   isRecord,
   normalizeHierarchyProjects,
   normalizeInvitation,
+  normalizeAPIKey,
   normalizeMembership,
   normalizeOrganization,
   normalizeProjectMember,
@@ -16,13 +17,17 @@ import {
 } from "./api-normalizers";
 import type {
   OrganizationInvitation,
+  OrganizationAPIKey,
   OrganizationProjectMember,
+  OrganizationRole,
+  ProjectSettingsInput,
   OrganizationResources,
   OrganizationSummary,
 } from "./types";
 
 export type {
   OrganizationInvitation,
+  OrganizationAPIKey,
   OrganizationMember,
   OrganizationProject,
   OrganizationProjectMember,
@@ -31,11 +36,28 @@ export type {
   OrganizationSummary,
 } from "./types";
 
+type LoadOrganizationResourcesOptions = {
+  canManageOrganization?: boolean;
+  organizationRole?: OrganizationRole;
+  currentUserEmail?: string;
+  currentUserId?: string;
+  signal?: AbortSignal;
+};
+
 async function requireGatewayData<T>(promise: Promise<GatewayResult<T>>, message: string): Promise<T> {
   const response = await promise;
   if (!response.ok) {
     throw new Error(response.error || message);
   }
+  return response.data;
+}
+
+async function optionalGatewayData<T>(
+  promise: Promise<GatewayResult<T>>,
+  fallback: T,
+): Promise<T> {
+  const response = await promise;
+  if (!response.ok) return fallback;
   return response.data;
 }
 
@@ -82,43 +104,45 @@ export async function loadOrganizationSummaries(
 export async function loadOrganizationResources(
   apiBaseURL: string,
   organizationId: string,
-  signal?: AbortSignal,
+  options: LoadOrganizationResourcesOptions = {},
 ): Promise<OrganizationResources> {
-  const [organizationPayload, hierarchyPayload, membersPayload, invitationsPayload] =
-    await Promise.all([
-      requireGatewayData(
-        gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.get(organizationId), {
-          method: "GET",
-          organizationId,
-          signal,
-        }),
-        "Impossible de charger l'organisation.",
-      ),
-      requireGatewayData(
-        gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.hierarchy(organizationId), {
-          method: "GET",
-          organizationId,
-          signal,
-        }),
-        "Impossible de charger les projets.",
-      ),
-      requireGatewayData(
-        gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.members(organizationId), {
-          method: "GET",
-          organizationId,
-          signal,
-        }),
-        "Impossible de charger les membres.",
-      ),
-      requireGatewayData(
-        gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.invitations(organizationId), {
-          method: "GET",
-          organizationId,
-          signal,
-        }),
-        "Impossible de charger les invitations.",
-      ),
-    ]);
+  const signal = options.signal;
+  const canManageOrganization = options.canManageOrganization ?? false;
+  const [organizationPayload, hierarchyPayload, membersPayload] = await Promise.all([
+    requireGatewayData(
+      gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.get(organizationId), {
+        method: "GET",
+        organizationId,
+        signal,
+      }),
+      "Impossible de charger l'organisation.",
+    ),
+    requireGatewayData(
+      gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.hierarchy(organizationId), {
+        method: "GET",
+        organizationId,
+        signal,
+      }),
+      "Impossible de charger les projets.",
+    ),
+    canManageOrganization
+      ? requireGatewayData(
+          gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.members(organizationId), {
+            method: "GET",
+            organizationId,
+            signal,
+          }),
+          "Impossible de charger les membres.",
+        )
+      : optionalGatewayData(
+          gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.members(organizationId), {
+            method: "GET",
+            organizationId,
+            signal,
+          }),
+          [],
+        ),
+  ]);
 
   const projects = normalizeHierarchyProjects(hierarchyPayload);
   console.info("[organizations] hierarchy payload", {
@@ -131,32 +155,78 @@ export async function loadOrganizationResources(
     })),
   });
 
-  const projectMembers = (
-    await Promise.all(
-      projects.map(async (project) => {
-        const payload = await requireGatewayData(
-          gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.members(project.id), {
+  const projectMembersPromise = Promise.all(
+    projects.map(async (project) => {
+      const payload = canManageOrganization
+        ? await requireGatewayData(
+            gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.members(project.id), {
+              method: "GET",
+              organizationId,
+              signal,
+            }),
+            "Impossible de charger les membres du projet.",
+          )
+        : await optionalGatewayData(
+            gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.members(project.id), {
+              method: "GET",
+              organizationId,
+              signal,
+            }),
+            [],
+          );
+      return getArray(unwrapData(payload))
+        .map(normalizeProjectMember)
+        .filter((member): member is OrganizationProjectMember => member !== null);
+    }),
+  ).then((items) => items.flat());
+
+  const [projectMembers, invitationsPayload, apiKeysPayload] = canManageOrganization
+    ? await Promise.all([
+        projectMembersPromise,
+        requireGatewayData(
+          gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.invitations(organizationId), {
             method: "GET",
             organizationId,
             signal,
           }),
-          "Impossible de charger les membres du projet.",
-        );
-        return getArray(unwrapData(payload))
-          .map(normalizeProjectMember)
-          .filter((member): member is OrganizationProjectMember => member !== null);
-      }),
-    )
-  ).flat();
+          "Impossible de charger les invitations.",
+        ),
+        requireGatewayData(
+          gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.apiKeys(organizationId), {
+            method: "GET",
+            organizationId,
+            signal,
+          }),
+          "Impossible de charger les API keys.",
+        ),
+      ])
+    : [await projectMembersPromise, [], []];
 
   const organization = normalizeOrganization(organizationPayload, {
     organizationId,
-    role: "member",
+    role: options.organizationRole ?? "member",
   });
-  const members = normalizeResourcesMembers(membersPayload);
+  let members = normalizeResourcesMembers(membersPayload);
+  const currentUserId = options.currentUserId?.trim() ?? "";
+  if (!canManageOrganization && currentUserId && !members.some((member) => member.userId === currentUserId)) {
+    members = [
+      {
+        organizationId,
+        userId: currentUserId,
+        email: options.currentUserEmail?.trim() ?? "",
+        firstName: "",
+        lastName: "",
+        roles: [options.organizationRole ?? "member"],
+        addedAt: "",
+      },
+    ];
+  }
   const invitations = getArray(invitationsPayload)
     .map(normalizeInvitation)
     .filter((invitation): invitation is OrganizationInvitation => invitation !== null);
+  const apiKeys = getArray(apiKeysPayload)
+    .map(normalizeAPIKey)
+    .filter((apiKey): apiKey is OrganizationAPIKey => apiKey !== null);
 
   console.info("[organizations] resources normalized", {
     organizationId,
@@ -178,7 +248,91 @@ export async function loadOrganizationResources(
     projectMembers,
     members,
     invitations,
+    apiKeys,
   };
+}
+
+export async function updateOrganizationName(
+  apiBaseURL: string,
+  organizationId: string,
+  name: string,
+): Promise<OrganizationSummary> {
+  const payload = await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.update(organizationId), {
+      method: "PATCH",
+      organizationId,
+      body: JSON.stringify({ name }),
+    }),
+    "Impossible de mettre a jour l'organisation.",
+  );
+  return normalizeOrganization(payload, {
+    organizationId,
+    role: "member",
+  });
+}
+
+export async function updateOrganizationProject(
+  apiBaseURL: string,
+  organizationId: string,
+  projectId: string,
+  input: ProjectSettingsInput,
+): Promise<void> {
+  await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.update(projectId), {
+      method: "PATCH",
+      organizationId,
+      body: JSON.stringify(input),
+    }),
+    "Impossible de mettre a jour le projet.",
+  );
+}
+
+export async function deleteOrganizationProject(
+  apiBaseURL: string,
+  organizationId: string,
+  projectId: string,
+): Promise<void> {
+  await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.remove(projectId), {
+      method: "DELETE",
+      organizationId,
+    }),
+    "Impossible de supprimer le projet.",
+  );
+}
+
+export async function createOrganizationAPIKey(
+  apiBaseURL: string,
+  organizationId: string,
+  name: string,
+): Promise<OrganizationAPIKey> {
+  const payload = await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.apiKeys(organizationId), {
+      method: "POST",
+      organizationId,
+      body: JSON.stringify({ name }),
+    }),
+    "Impossible de creer l'API key.",
+  );
+  const key = normalizeAPIKey(payload);
+  if (!key) {
+    throw new Error("Reponse API key invalide.");
+  }
+  return key;
+}
+
+export async function revokeOrganizationAPIKey(
+  apiBaseURL: string,
+  organizationId: string,
+  keyId: string,
+): Promise<void> {
+  await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.apiKey(organizationId, keyId), {
+      method: "DELETE",
+      organizationId,
+    }),
+    "Impossible de supprimer l'API key.",
+  );
 }
 
 export async function createOrganizationProject(
@@ -306,33 +460,5 @@ export async function removeOrganizationMember(
       organizationId,
     }),
     "Impossible de retirer le membre de l'organisation.",
-  );
-}
-
-export async function banOrganizationMember(
-  apiBaseURL: string,
-  organizationId: string,
-  userId: string,
-): Promise<void> {
-  await requireGatewayData(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.banMember(organizationId, userId), {
-      method: "POST",
-      organizationId,
-    }),
-    "Impossible de bannir le membre.",
-  );
-}
-
-export async function unbanOrganizationMember(
-  apiBaseURL: string,
-  organizationId: string,
-  userId: string,
-): Promise<void> {
-  await requireGatewayData(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.unbanMember(organizationId, userId), {
-      method: "POST",
-      organizationId,
-    }),
-    "Impossible de debannir le membre.",
   );
 }

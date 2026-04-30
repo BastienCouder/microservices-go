@@ -203,7 +203,10 @@ func (s *Service) resolveProviderCredentialForModelLocked(projectID, modelID str
 		}
 	}
 
-	return resolvedModelProviderCredential{}, fmt.Errorf("%w: API key is required for provider %s on project %s", ErrValidation, providerID, projectID)
+	return resolvedModelProviderCredential{
+		ProviderID:      "openrouter",
+		ProviderModelID: providerModelID,
+	}, nil
 }
 
 func hasProviderAPIKey(record *LLMProviderCredentialRecord) bool {

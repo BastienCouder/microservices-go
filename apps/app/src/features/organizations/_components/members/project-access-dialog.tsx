@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { formatLabel, memberLabel } from "../../_lib/shared/formatters";
+import { memberLabel } from "../../_lib/shared/formatters";
 import {
   buildCurrentUserProjectAccessGuardMessage,
   getOrphanedProjectsAfterMemberProjectsChange,
@@ -105,7 +105,7 @@ export function ProjectAccessDialog({
                   <span className="min-w-0">
                     <span className="block truncate font-medium text-foreground">{project.name}</span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      {project.brandName || formatLabel(project.status)}
+                      {project.brandName || project.attributionSource || project.name}
                     </span>
                   </span>
                 </label>

@@ -15,6 +15,9 @@ import { StepPrompts } from "./step-prompts";
 import { StepWebsite } from "./step-website";
 import { AnimatedWave } from "./animated-wave";
 import { OnboardingLanguageSwitcher } from "./language-switcher";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 
 type OnboardingPageProps = {
   apiBaseURL: string;
@@ -42,6 +45,9 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [step]);
 
+    const navigate = useNavigate();
+
+
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.08),_transparent_34%),linear-gradient(180deg,_#f8f9fc_0%,_#f1f3f8_100%)] lg:h-screen">
       <div className="pointer-events-none absolute inset-0 opacity-20">
@@ -51,6 +57,14 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
       <OnboardingLeftPanel />
 
       <section className="relative z-10 min-w-0 flex-1">
+        
+        <div className="absolute left-4 top-4 z-30 sm:right-6 lg:right-10">
+          <Button variant="outline" onClick={() => navigate(-1)} className="flex items-center text-xs font-medium text-muted-foreground gap-1 rounded-full border-none bg-white/50 hover:bg-white/80 p-1.5 outline-none backdrop-blur">
+           <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
+        </div>
+        
         <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center px-4">
           <StepProgress step={step} total={steps.length} />
         </div>

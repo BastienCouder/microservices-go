@@ -44,7 +44,6 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 		Industry:          strings.TrimSpace(input.Industry),
 		PrimaryLanguage:   primaryLanguage,
 		Country:           country,
-		Status:            "draft",
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	}
@@ -196,26 +195,40 @@ func (s *Service) UpdateProject(ctx context.Context, projectID string, organizat
 	return copyProject(project), nil
 }
 
-func (s *Service) ActivateProject(ctx context.Context, projectID string, organizationID int64) (Project, error) {
+func (s *Service) DeleteProject(ctx context.Context, projectID string, organizationID int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if err := s.reloadLocked(ctx); err != nil {
-		return Project{}, err
+		return err
+	}
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return err
 	}
 
-	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
-	if err != nil {
-		return Project{}, err
+	backup := s.snapshotLocked()
+	delete(s.projects, projectID)
+	delete(s.projectModels, projectID)
+	delete(s.projectMembers, projectID)
+	delete(s.modelSelectionChanges, projectID)
+	delete(s.impactIntegrations, projectID)
+	delete(s.providerCredentials, projectID)
+	for promptID, prompt := range s.prompts {
+		if prompt.ProjectID == projectID {
+			delete(s.prompts, promptID)
+		}
 	}
-	backup := *project
-	project.Status = "active"
-	project.UpdatedAt = s.now().UTC()
+	for competitorID, competitor := range s.competitors {
+		if competitor.ProjectID == projectID {
+			delete(s.competitors, competitorID)
+		}
+	}
+
 	if err := s.persistLocked(ctx); err != nil {
-		*project = backup
-		return Project{}, err
+		s.restoreLocked(backup)
+		return err
 	}
-	return copyProject(project), nil
+	return nil
 }
 
 func (s *Service) FinalizeProject(ctx context.Context, projectID string, organizationID int64) (FinalizeResult, error) {
@@ -244,7 +257,6 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 	backup := s.snapshotLocked()
 	now := s.now().UTC()
 
-	project.Status = "active"
 	project.UpdatedAt = now
 
 	payload := FinalizePipelinePayload{

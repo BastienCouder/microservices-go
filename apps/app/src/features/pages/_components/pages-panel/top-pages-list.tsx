@@ -1,9 +1,12 @@
 import { Search } from "lucide-react";
 
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
+import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import type { PageInsight } from "../../_lib/pages-panel/types";
@@ -14,6 +17,7 @@ type TopPagesListProps = {
   onSearchChange: (value: string) => void;
   selectedPageUrl: string | null;
   onSelectPage: (url: string) => void;
+  loading?: boolean;
 };
 
 export function TopPagesList({
@@ -22,26 +26,66 @@ export function TopPagesList({
   onSearchChange,
   selectedPageUrl,
   onSelectPage,
+  loading = false,
 }: TopPagesListProps) {
   return (
     <Card className="flex min-h-0 overflow-hidden rounded-md border-border/60 bg-card/95">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <SectionTitle>Pages citées</SectionTitle>
+          <p className="text-xs text-muted-foreground">
+            URLs de votre site détectées dans les réponses IA.
+          </p>
+        </div>
+
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             placeholder="Rechercher"
+            disabled={loading}
             className="h-10 rounded-md border-border/70 bg-background pl-9 text-sm"
           />
         </div>
 
         <ScrollArea className="min-h-0 flex-1 pr-2">
           <div className="space-y-3 pb-1">
-            {pages.length === 0 ? (
-              <div className="rounded-md border border-dashed border-border/70 bg-muted/15 px-4 py-10 text-sm text-muted-foreground">
-                Aucune page ne correspond à la recherche.
-              </div>
+            {loading ? (
+              Array.from({ length: 4 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="w-full rounded-md border border-border/50 bg-background p-4"
+                >
+                  <div className="mb-4 flex min-w-0 items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-2">
+                      <Skeleton className="h-8 w-8 shrink-0 rounded-md" />
+                      <Skeleton className="h-4 w-full max-w-[220px]" />
+                    </div>
+                    <Skeleton className="h-8 w-14 shrink-0 rounded-sm" />
+                  </div>
+
+                  <Skeleton className="mb-3 h-5 w-full rounded-full" />
+
+                  <div className="flex items-center justify-between border-t border-border/40 pt-3">
+                    <div className="flex items-center gap-2">
+                      <Skeleton className="h-6 w-6 rounded-md" />
+                      <Skeleton className="h-6 w-6 rounded-md" />
+                      <Skeleton className="h-6 w-6 rounded-md" />
+                    </div>
+                    <Skeleton className="h-4 w-32" />
+                  </div>
+                </div>
+              ))
+            ) : pages.length === 0 ? (
+              <EmptyStateCard
+                label={
+                  search.trim()
+                    ? "Aucune page ne correspond à la recherche."
+                    : "Aucune page citée pour le moment."
+                }
+                className="h-40"
+              />
             ) : (
               pages.map((page, index) => (
                 <button

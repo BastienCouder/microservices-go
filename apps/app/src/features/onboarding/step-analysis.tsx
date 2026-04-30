@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Progress } from "@/components/ui/progress";
+import { pushErrorToast } from "@/components/ui/toast-actions";
 import { createOnboardingProject } from "@/features/onboarding/onboarding-api";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { buildScopedHref, readSelectedOrganizationID, storeSelectedProjectID } from "@/shared/selection";
@@ -29,7 +30,6 @@ export function StepAnalysis({ apiBaseURL, hideBack = false }: StepAnalysisProps
   const navigate = useNavigate();
   const [progress, setProgress] = useState(10);
   const [createdProjectId, setCreatedProjectId] = useState("");
-  const [creationError, setCreationError] = useState<string | null>(null);
   const creationStartedRef = useRef(false);
   const attributionLabel =
     attributionSource === "other"
@@ -71,13 +71,10 @@ export function StepAnalysis({ apiBaseURL, hideBack = false }: StepAnalysisProps
       .then(({ projectId, projectSlug }) => {
         storeSelectedProjectID(projectId);
         setCreatedProjectId(projectSlug);
-        setCreationError(null);
         setProgress(100);
       })
       .catch((error) => {
-        setCreationError(
-          error instanceof Error ? error.message : "Impossible de creer le projet.",
-        );
+        pushErrorToast(error, "Impossible de creer le projet.");
       });
   }, [
     apiBaseURL,
@@ -119,12 +116,6 @@ export function StepAnalysis({ apiBaseURL, hideBack = false }: StepAnalysisProps
           <span>{Math.round(progress)}%</span>
         </div>
       </div>
-
-      {creationError ? (
-        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
-          {creationError}
-        </div>
-      ) : null}
 
       <div className="grid grid-cols-1 gap-2 text-left text-sm text-zinc-700 sm:grid-cols-2">
         <div className="rounded-md border border-border/80 p-3">

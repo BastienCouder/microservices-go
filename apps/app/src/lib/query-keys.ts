@@ -10,6 +10,25 @@ export const appQueryKeys = {
     ["prompt-quota", apiBaseURL, organizationId, projectId ?? "__default__"] as const,
   perception: (apiBaseURL: string, projectId: string | null, mode: string) =>
     ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
+  traffic: (
+    apiBaseURL: string,
+    projectId: string | null,
+    organizationId: string | null,
+    period: string,
+    search = "",
+    engine = "all",
+  ) =>
+    [
+      "traffic",
+      apiBaseURL,
+      organizationId ?? "__default_org__",
+      projectId ?? "__default__",
+      period,
+      search,
+      engine,
+    ] as const,
+  geo: (apiBaseURL: string, projectId: string | null, period: string) =>
+    ["traffic", apiBaseURL, projectId ?? "__default__", period] as const,
   optimizeActions: (apiBaseURL: string, projectId: string | null) =>
     ["optimize-actions", apiBaseURL, projectId ?? "__default__"] as const,
   modelsCatalog: (
@@ -55,6 +74,8 @@ export const appQueryKeys = {
     ["organizations", "hierarchy", apiBaseURL, organizationId] as const,
   organizationResources: (apiBaseURL: string, organizationId: string) =>
     ["organizations", "resources", apiBaseURL, organizationId] as const,
+  organizationAPIKeys: (apiBaseURL: string, organizationId: string) =>
+    ["organizations", "api-keys", apiBaseURL, organizationId] as const,
   projectDetails: (apiBaseURL: string, organizationId: string, projectId: string) =>
     ["projects", "details", apiBaseURL, organizationId, projectId] as const,
 };

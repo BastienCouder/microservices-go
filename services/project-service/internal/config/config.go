@@ -30,6 +30,8 @@ type Config struct {
 	GRPCTLSServerName        string
 	GRPCTLSClientCAFile      string
 	GRPCTLSRequireClientCert bool
+	GA4OAuthClientID         string
+	GA4OAuthClientSecret     string
 }
 
 func Load() (Config, error) {
@@ -85,7 +87,20 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	grpcTLSCAFile := optionalEnv("GRPC_TLS_CA_FILE")
+	grpcTLSCertFile := optionalEnv("GRPC_TLS_CERT_FILE")
+	grpcTLSKeyFile := optionalEnv("GRPC_TLS_KEY_FILE")
+	grpcTLSServerName := optionalEnv("GRPC_TLS_SERVER_NAME")
+	grpcTLSClientCAFile := optionalEnv("GRPC_TLS_CLIENT_CA_FILE")
 	grpcTLSRequireClientCert, err := optionalBoolEnv("GRPC_TLS_REQUIRE_CLIENT_CERT", false)
+	if err != nil {
+		return Config{}, err
+	}
+	ga4OAuthClientID, err := passwordFromEnv("GA4_OAUTH_CLIENT_ID", "GA4_OAUTH_CLIENT_ID_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	ga4OAuthClientSecret, err := passwordFromEnv("GA4_OAUTH_CLIENT_SECRET", "GA4_OAUTH_CLIENT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -107,12 +122,14 @@ func Load() (Config, error) {
 		InternalJWTSecret:        internalJWTSecret,
 		InternalJWTIssuer:        internalJWTIssuer,
 		GRPCAllowInsecure:        grpcAllowInsecure,
-		GRPCTLSCAFile:            optionalEnv("GRPC_TLS_CA_FILE"),
-		GRPCTLSCertFile:          optionalEnv("GRPC_TLS_CERT_FILE"),
-		GRPCTLSKeyFile:           optionalEnv("GRPC_TLS_KEY_FILE"),
-		GRPCTLSServerName:        optionalEnv("GRPC_TLS_SERVER_NAME"),
-		GRPCTLSClientCAFile:      optionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
+		GRPCTLSCAFile:            grpcTLSCAFile,
+		GRPCTLSCertFile:          grpcTLSCertFile,
+		GRPCTLSKeyFile:           grpcTLSKeyFile,
+		GRPCTLSServerName:        grpcTLSServerName,
+		GRPCTLSClientCAFile:      grpcTLSClientCAFile,
 		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
+		GA4OAuthClientID:         ga4OAuthClientID,
+		GA4OAuthClientSecret:     ga4OAuthClientSecret,
 	}, nil
 }
 

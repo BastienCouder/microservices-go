@@ -6,6 +6,12 @@ import type { DateRange } from "react-day-picker";
 import { useMonitoringData } from "@/hooks/use-monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
 import {
+  readOrganizationIdFromSearch,
+  readRouteQueryParam,
+  readSelectedOrganizationID,
+  SELECTED_CONTEXT_CHANGE_EVENT,
+} from "@/shared/selection";
+import {
   buildPromptPlanUsageSummary,
   buildSimulatedPromptPlanUsageSummary,
   readPromptPlan,
@@ -13,7 +19,6 @@ import {
 import { loadPromptQuotaUsage } from "./prompt-quota";
 import {
   getPromptSelectionKey,
-  readSelectedOrganizationId,
   RESPONSES_BATCH_SIZE,
 } from "./prompt-normalizers";
 import { DEFAULT_PROMPT_PERIOD, rankTone, statusBadgeClassName, truncate } from "./utils";
@@ -31,10 +36,46 @@ import type {
   ResponseView,
 } from "./types";
 
-export function usePromptsResponsesState(apiBaseURL: string) {
+function readOrganizationId(routeSearch: string): string {
+  const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
+  if (/^\d+$/.test(routeOrganizationId)) {
+    return routeOrganizationId;
+  }
+
+  return readSelectedOrganizationID();
+}
+
+type PromptsWorkspaceLoadingStateInput = {
+  monitoringLoading: boolean;
+  promptsCatalogInitialLoading: boolean;
+  promptMutationPending: boolean;
+};
+
+export function getPromptsWorkspaceLoadingState({
+  monitoringLoading,
+  promptsCatalogInitialLoading,
+  promptMutationPending,
+}: PromptsWorkspaceLoadingStateInput) {
+  const promptsDataLoading = monitoringLoading || promptsCatalogInitialLoading;
+
+  return {
+    promptsDataLoading,
+    responsesDataLoading: monitoringLoading,
+    promptsBusy: promptsDataLoading || promptMutationPending,
+  };
+}
+
+export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const queryClient = useQueryClient();
-  const { data: monitoringData, mode, projectId } = useMonitoringData();
-  const [organizationId, setOrganizationId] = useState("");
+  const {
+    data: monitoringData,
+    loading: monitoringLoading,
+    mode,
+    projectId,
+  } = useMonitoringData();
+  const [organizationId, setOrganizationId] = useState(() =>
+    readOrganizationId(routeSearch),
+  );
   const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PROMPT_PERIOD);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [tab, setTab] = useState<"prompts" | "responses">("prompts");
@@ -69,8 +110,30 @@ export function usePromptsResponsesState(apiBaseURL: string) {
   const [runningPromptRowIds, setRunningPromptRowIds] = useState<string[]>([]);
 
   useEffect(() => {
-    setOrganizationId(readSelectedOrganizationId());
-  }, []);
+    setOrganizationId(readOrganizationId(routeSearch));
+  }, [routeSearch]);
+
+  useEffect(() => {
+    const tabFromUrl = readRouteQueryParam(routeSearch, "tab");
+    if (tabFromUrl === "responses" || tabFromUrl === "prompts") {
+      setTab(tabFromUrl);
+    } else {
+      setTab("prompts");
+    }
+  }, [routeSearch]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncOrganizationId = () => {
+      setOrganizationId(readOrganizationId(routeSearch));
+    };
+
+    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncOrganizationId);
+    return () => {
+      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncOrganizationId);
+    };
+  }, [routeSearch]);
 
   const source = usePromptsSourceData({
     apiBaseURL,
@@ -196,6 +259,20 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     setSelectedPromptId,
     setRunningPromptRowIds,
   });
+  const promptsCatalogInitialLoading =
+    source.promptsCatalogQuery.isLoading ||
+    (source.promptsCatalogQuery.isFetching && !source.promptsCatalogQuery.data);
+  const promptMutationPending =
+    mutations.bulkPromptStatusMutation.isPending ||
+    mutations.savePromptEditorMutation.isPending ||
+    mutations.deletePromptMutation.isPending ||
+    mutations.updatePromptModelsMutation.isPending ||
+    mutations.updatePromptScheduleMutation.isPending;
+  const loadingState = getPromptsWorkspaceLoadingState({
+    monitoringLoading,
+    promptsCatalogInitialLoading,
+    promptMutationPending,
+  });
 
   const runnableSelectedPrompts = derived.selectedPromptRows.filter((item) =>
     mutations.canRunPrompt(item),
@@ -227,6 +304,7 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     tab,
     setTab,
     prompts: derived.prompts,
+    editorPrompts: derived.editorPrompts,
     filteredPrompts: derived.filteredPrompts,
     filteredResponses: derived.visibleResponses,
     filteredResponsesTotal: derived.filteredResponses.length,
@@ -323,14 +401,9 @@ export function usePromptsResponsesState(apiBaseURL: string) {
     promptTotalPages: derived.promptTotalPages,
     canPreviousPromptPage: promptPage > 1,
     canNextPromptPage: promptPage < derived.promptTotalPages,
-    promptsLoading:
-      source.promptsCatalogQuery.isLoading ||
-      (source.promptsCatalogQuery.isFetching && !source.promptsCatalogQuery.data) ||
-      mutations.bulkPromptStatusMutation.isPending ||
-      mutations.savePromptEditorMutation.isPending ||
-      mutations.deletePromptMutation.isPending ||
-      mutations.updatePromptModelsMutation.isPending ||
-      mutations.updatePromptScheduleMutation.isPending,
+    promptsDataLoading: loadingState.promptsDataLoading,
+    responsesDataLoading: loadingState.responsesDataLoading,
+    promptsLoading: loadingState.promptsBusy,
     rankTone,
     statusBadgeClassName,
     truncate,

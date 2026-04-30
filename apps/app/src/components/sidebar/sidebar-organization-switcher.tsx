@@ -1,13 +1,13 @@
 "use client";
 
-import { Check, ChevronsUpDown, FolderPlus } from "lucide-react";
+import { Check, ChevronsUpDown } from "lucide-react";
 import { Link } from "react-router-dom";
-import { Separator } from "@/components/ui/separator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 import type { SidebarProjectOption } from "./sidebar-constants";
+import { Button } from "../ui/button";
 
 type SidebarOrganizationSwitcherProps = {
   collapsed: boolean;
@@ -15,6 +15,7 @@ type SidebarOrganizationSwitcherProps = {
   activeProjectId: string;
   onSelectProject: (projectId: string) => void;
   addProjectHref: string;
+  canAddProject?: boolean;
   orgOpen: boolean;
   setOrgOpen: (open: boolean) => void;
 };
@@ -38,6 +39,7 @@ export function SidebarOrganizationSwitcher({
   activeProjectId,
   onSelectProject,
   addProjectHref,
+  canAddProject = true,
   orgOpen,
   setOrgOpen,
 }: SidebarOrganizationSwitcherProps) {
@@ -49,7 +51,7 @@ export function SidebarOrganizationSwitcher({
   return (
     <div className={cn("py-3", collapsed ? "px-2" : "px-3")}>
       <Popover open={orgOpen} onOpenChange={setOrgOpen}>
-        <PopoverTrigger asChild>
+        <PopoverTrigger asChild className="border">
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -76,6 +78,11 @@ export function SidebarOrganizationSwitcher({
         </PopoverTrigger>
 
         <PopoverContent side="right" align="start" className="w-64 p-1.5">
+          {canAddProject ? (
+            <Button asChild>
+              <Link to={addProjectHref}>{content.addProject}</Link>
+            </Button>
+          ) : null}
           {projects.length > 0 ? (
             <div className="space-y-0.5">
               {projects.map((project) => {
@@ -110,14 +117,6 @@ export function SidebarOrganizationSwitcher({
               {content.noProjectsInOrganization}
             </p>
           )}
-          <Separator className="my-1.5" />
-          <Link
-            to={addProjectHref}
-            className="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <FolderPlus className="h-4 w-4" />
-            {content.addProject}
-          </Link>
         </PopoverContent>
       </Popover>
     </div>

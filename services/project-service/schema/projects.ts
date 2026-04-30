@@ -23,9 +23,6 @@ export const projects = pgTable("projects", {
     primaryLanguage: text("primary_language").default("fr"),
     country: text("country").default("FR"),
 
-    // Status
-    status: text("status").default("draft").notNull(), // draft | active | paused
-
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({

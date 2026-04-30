@@ -11,6 +11,7 @@ type SidebarNavItemProps = {
   active: boolean;
   indent?: boolean;
   collapsed?: boolean;
+  onClick?: () => void;
 };
 
 export function SidebarSectionHeader({
@@ -29,7 +30,15 @@ export function SidebarSectionHeader({
   );
 }
 
-export function SidebarNavItem({ href, label, active, indent, collapsed, className }: SidebarNavItemProps & { className?: string }) {
+export function SidebarNavItem({
+  href,
+  label,
+  active,
+  indent,
+  collapsed,
+  className,
+  onClick,
+}: SidebarNavItemProps & { className?: string }) {
   if (collapsed) {
     return (
       <Tooltip>
@@ -41,9 +50,10 @@ export function SidebarNavItem({ href, label, active, indent, collapsed, classNa
               active ? "bg-primary/8 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
               className,
             )}
+            onClick={onClick}
           >
             {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-            <span className="text-sm font-semibold uppercase tracking-[0.18em]">{label.slice(0, 1)}</span>
+            <span className="text-sm">{label.slice(0, 1)}</span>
           </Link>
         </TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
@@ -63,6 +73,7 @@ export function SidebarNavItem({ href, label, active, indent, collapsed, classNa
             active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
             className,
           )}
+          onClick={onClick}
         >
           {label}
         </Link>
@@ -78,6 +89,7 @@ export function SidebarNavItem({ href, label, active, indent, collapsed, classNa
         active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
         className,
         )}
+      onClick={onClick}
     >
       {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
       {label}

@@ -113,6 +113,16 @@ export function promptScheduleLabel(
   });
 }
 
+export function promptCadenceLabel(item: PromptItem, locale = "en") {
+  const overridesCount = Object.keys(item.schedule.modelCrons).length;
+  if (item.rowMode === "global" && item.schedule.mode === "per_model" && overridesCount > 0) {
+    return translateI18nText("prompts-workspace", "customCadenceCount", locale, {
+      count: overridesCount,
+    });
+  }
+  return promptScheduleLabel(item.schedule, item.effectiveCron, locale);
+}
+
 export function promptStatusLabel(status: PromptItem["status"], locale = "en") {
   if (status === "active") return translateI18nText("prompts-workspace", "statusActive", locale);
   if (status === "disabled") return translateI18nText("prompts-workspace", "statusDisabled", locale);

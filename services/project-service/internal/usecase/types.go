@@ -44,7 +44,6 @@ type Project struct {
 	Industry          string    `json:"industry,omitempty"`
 	PrimaryLanguage   string    `json:"primaryLanguage"`
 	Country           string    `json:"country"`
-	Status            string    `json:"status"`
 	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt         time.Time `json:"updatedAt"`
 }
@@ -67,6 +66,7 @@ type ProjectImpactIntegrations struct {
 type ProjectGA4Integration struct {
 	PropertyID         string    `json:"propertyId,omitempty"`
 	ServiceAccountJSON string    `json:"serviceAccountJSON,omitempty"`
+	OAuthRefreshToken  string    `json:"oauthRefreshToken,omitempty"`
 	ConnectedAt        time.Time `json:"connectedAt,omitempty"`
 	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
 }
@@ -92,7 +92,9 @@ type ProjectImpactIntegrationsView struct {
 
 type ProjectGA4IntegrationView struct {
 	PropertyID        string    `json:"propertyId,omitempty"`
+	AuthMode          string    `json:"authMode,omitempty"`
 	HasServiceAccount bool      `json:"hasServiceAccount"`
+	HasOAuthToken     bool      `json:"hasOAuthToken"`
 	IsConnected       bool      `json:"isConnected"`
 	ConnectedAt       time.Time `json:"connectedAt,omitempty"`
 	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
@@ -261,6 +263,47 @@ type UpdateProjectGA4IntegrationInput struct {
 	Disconnect         bool
 }
 
+type GA4OAuthProperty struct {
+	PropertyID  string `json:"propertyId"`
+	DisplayName string `json:"displayName"`
+	AccountName string `json:"accountName,omitempty"`
+}
+
+type GA4OAuthToken struct {
+	RefreshToken string
+}
+
+type GA4OAuthProvider interface {
+	AuthorizationURL(state, redirectURI string) (string, error)
+	ExchangeCode(ctx context.Context, code, redirectURI string) (GA4OAuthToken, error)
+	ListProperties(ctx context.Context, refreshToken string) ([]GA4OAuthProperty, error)
+}
+
+type StartProjectGA4OAuthInput struct {
+	RedirectURI string
+}
+
+type StartProjectGA4OAuthResult struct {
+	AuthorizationURL string `json:"authorizationUrl"`
+	State            string `json:"state"`
+}
+
+type CompleteProjectGA4OAuthInput struct {
+	Code        string
+	State       string
+	RedirectURI string
+	PropertyID  string
+}
+
+type CompleteProjectGA4OAuthResult struct {
+	Integration ProjectImpactIntegrationsView `json:"integration"`
+	Properties  []GA4OAuthProperty            `json:"properties"`
+}
+
+type SelectProjectGA4OAuthPropertyInput struct {
+	PropertyID string
+}
+
 type UpdateProjectStripeIntegrationInput struct {
 	WebhookSecret *string
 	Disconnect    bool
@@ -362,6 +405,13 @@ type AnalysisStartRequest struct {
 type AnalysisStartResponse struct {
 	RunID      string
 	PromptRuns []AnalysisPromptRun
+}
+
+type RunManualAnalysisInput struct {
+	RequestID   string
+	PromptTexts []AnalysisPromptText
+	ModelIDs    []string
+	RunType     string
 }
 
 type AnalysisRecordResponseInput struct {

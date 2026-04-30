@@ -1,4 +1,4 @@
-import { Ban, CheckCircle2, FolderKanban, Trash2 } from "lucide-react";
+import { FolderKanban, Trash2 } from "lucide-react";
 import { ActionsPopover, type ActionsPopoverItem } from "@/components/shared/actions-popover";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -11,10 +11,8 @@ import {
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import {
-  formatDateTime,
   formatLabel,
   getRoleBadgeVariant,
-  isMemberBanned,
   memberLabel,
 } from "../../_lib/shared/formatters";
 import {
@@ -34,7 +32,6 @@ type MemberRowProps = {
   onUpdateRoles: (userId: string, roles: string[]) => void;
   onEditProjects: (member: OrganizationMember) => void;
   onRemoveMember: (member: OrganizationMember) => void;
-  onSetMemberBanned: (userId: string, banned: boolean) => void;
 };
 
 export function MemberRow({
@@ -48,16 +45,11 @@ export function MemberRow({
   onUpdateRoles,
   onEditProjects,
   onRemoveMember,
-  onSetMemberBanned,
 }: MemberRowProps) {
-  const banned = isMemberBanned(member);
   const selectedAssignableRole = ASSIGNABLE_ORGANIZATION_ROLES.find((role) =>
     member.roles.includes(role),
   );
-  const roleOptions = ASSIGNABLE_ORGANIZATION_ROLES.filter((role) => {
-    if (role !== "owner") return true;
-    return actionPolicy.canAssignOwnerRole;
-  });
+  const roleOptions = ASSIGNABLE_ORGANIZATION_ROLES;
   const actions: ActionsPopoverItem[] = [];
   if (actionPolicy.canEditProjects) {
     actions.push({
@@ -66,17 +58,6 @@ export function MemberRow({
       description: "Ajouter ou retirer ses acces projet.",
       disabled: false,
       onSelect: () => onEditProjects(member),
-    });
-  }
-  if (actionPolicy.canSetBanned) {
-    actions.push({
-      icon: banned ? CheckCircle2 : Ban,
-      title: banned ? "Debannir" : "Bannir",
-      description: banned
-        ? "Retirer le statut banni pour restaurer l'acces organisation."
-        : "Marquer ce membre comme banni dans cette organisation.",
-      disabled: false,
-      onSelect: () => onSetMemberBanned(member.userId, !banned),
     });
   }
   if (actionPolicy.canRemoveMember) {
@@ -117,7 +98,7 @@ export function MemberRow({
           <Select
             value={selectedAssignableRole}
             onValueChange={(role) => onUpdateRoles(member.userId, [role])}
-            disabled={memberActionBusy || roleOptions.length === 0}
+            disabled={memberActionBusy}
           >
             <SelectTrigger className="h-8 min-w-[132px] bg-background">
               <SelectValue placeholder={formatLabel(member.roles[0] ?? "member")} />
@@ -144,16 +125,6 @@ export function MemberRow({
           </div>
         )}
       </TableCell>
-      <TableCell>
-        {banned ? (
-          <Badge variant="outline" className="border-destructive/40 text-destructive">
-            Banni
-          </Badge>
-        ) : (
-          <Badge variant="secondary">Actif</Badge>
-        )}
-      </TableCell>
-      <TableCell>{formatDateTime(member.addedAt)}</TableCell>
       {showActions ? (
         <TableCell className="text-right">
           {actionPolicy.showActions && actions.length > 0 ? (

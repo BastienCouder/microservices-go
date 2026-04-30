@@ -24,6 +24,13 @@ type User struct {
 	DeletedAt      *time.Time
 }
 
+type AnonymizedUser struct {
+	AuthIdentityID string
+	Email          string
+	FirstName      string
+	LastName       string
+}
+
 func (u *User) Validate() error {
 	if strings.TrimSpace(u.AuthIdentityID) == "" {
 		return fmt.Errorf("%w: auth identity id is required", ErrInvalidUser)

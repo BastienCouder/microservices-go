@@ -92,6 +92,7 @@ export function AuthPageClient({ config }: AuthPageClientProps) {
         throw new Error(payload.error ?? "failed password auth flow");
       }
       setResult(payload.message ?? "opération réussie");
+      window.location.href = getReturnTo();
     } catch (error) {
       setResult(`${mode === "login" ? "connexion" : "inscription"} error: ${parseError(error)}`);
     } finally {
@@ -163,6 +164,7 @@ export function AuthPageClient({ config }: AuthPageClientProps) {
         throw new Error(payload.error ?? "failed to verify otp");
       }
       setResult(payload.message ?? "otp validé");
+      window.location.href = getReturnTo();
     } catch (error) {
       setResult(`verify otp error: ${parseError(error)}`);
     } finally {

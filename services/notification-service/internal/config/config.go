@@ -8,14 +8,18 @@ import (
 )
 
 type Config struct {
-	HTTPAddr          string
-	MetricsAddr       string
-	DatabaseURL       string
-	EmailRendererURL  string
-	ResendAPIKey      string
-	ResendFromEmail   string
-	InternalJWTSecret string
-	InternalJWTIssuer string
+	HTTPAddr           string
+	MetricsAddr        string
+	DatabaseURL        string
+	EmailRendererURL   string
+	ResendAPIKey       string
+	ResendFromEmail    string
+	RabbitMQURL        string
+	RabbitMQExchange   string
+	RabbitMQEmailQueue string
+	RabbitMQEmailRoute string
+	InternalJWTSecret  string
+	InternalJWTIssuer  string
 }
 
 func Load() (Config, error) {
@@ -39,6 +43,22 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	rabbitMQURL, err := requiredEnvOrFile("RABBITMQ_URL", "RABBITMQ_URL_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	rabbitMQExchange, err := requiredEnv("RABBITMQ_EXCHANGE")
+	if err != nil {
+		return Config{}, err
+	}
+	rabbitMQEmailQueue, err := requiredEnv("RABBITMQ_NOTIFICATION_EMAIL_QUEUE")
+	if err != nil {
+		return Config{}, err
+	}
+	rabbitMQEmailRoute, err := requiredEnv("RABBITMQ_NOTIFICATION_EMAIL_ROUTING_KEY")
+	if err != nil {
+		return Config{}, err
+	}
 	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
@@ -48,14 +68,18 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		HTTPAddr:          httpAddr,
-		MetricsAddr:       optionalEnv("METRICS_ADDR"),
-		DatabaseURL:       databaseURL,
-		EmailRendererURL:  emailRendererURL,
-		ResendAPIKey:      resendAPIKey,
-		ResendFromEmail:   resendFromEmail,
-		InternalJWTSecret: internalJWTSecret,
-		InternalJWTIssuer: internalJWTIssuer,
+		HTTPAddr:           httpAddr,
+		MetricsAddr:        optionalEnv("METRICS_ADDR"),
+		DatabaseURL:        databaseURL,
+		EmailRendererURL:   emailRendererURL,
+		ResendAPIKey:       resendAPIKey,
+		ResendFromEmail:    resendFromEmail,
+		RabbitMQURL:        rabbitMQURL,
+		RabbitMQExchange:   rabbitMQExchange,
+		RabbitMQEmailQueue: rabbitMQEmailQueue,
+		RabbitMQEmailRoute: rabbitMQEmailRoute,
+		InternalJWTSecret:  internalJWTSecret,
+		InternalJWTIssuer:  internalJWTIssuer,
 	}, nil
 }
 
@@ -111,6 +135,25 @@ func passwordFromEnv(passwordKey, fileKey string) (string, error) {
 	value := strings.TrimSpace(string(raw))
 	if value == "" {
 		return "", fmt.Errorf("password file %s is empty", filePath)
+	}
+	return value, nil
+}
+
+func requiredEnvOrFile(valueKey, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(valueKey)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", fmt.Errorf("missing required environment variable %s or %s", valueKey, fileKey)
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read %s: %w", fileKey, err)
+	}
+	value := strings.TrimSpace(string(raw))
+	if value == "" {
+		return "", fmt.Errorf("%s is empty", fileKey)
 	}
 	return value, nil
 }

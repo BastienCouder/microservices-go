@@ -38,15 +38,17 @@ export const MODEL_PRESETS = [
 
 export function normalizeSchedule(schedule: PromptSchedule, selectedModels: string[]): PromptSchedule {
   const allowed = new Set(selectedModels);
+  const cron = schedule.cron.trim();
   const modelCrons = Object.fromEntries(
     Object.entries(schedule.modelCrons ?? {}).filter(
-      ([modelId, cron]) => allowed.has(modelId) && cron.trim() !== "",
+      ([modelId, modelCron]) =>
+        allowed.has(modelId) && modelCron.trim() !== "" && modelCron.trim() !== cron,
     ),
   );
 
   return {
     mode: schedule.mode === "per_model" ? "per_model" : "global",
-    cron: schedule.cron.trim(),
+    cron,
     timezone: schedule.timezone.trim() || "UTC",
     modelCrons: schedule.mode === "per_model" ? modelCrons : {},
   };

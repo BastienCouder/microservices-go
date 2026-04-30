@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { getModelOverrideCron } from "../../_lib/prompt-editor";
 import {
   buildScheduleHeaderSummary,
   buildScheduleValidation,
@@ -103,7 +104,11 @@ export function PromptScheduleDialog({
                 setDraft((current) => {
                   const nextOverrides = { ...current.modelCrons };
                   if (enabled) {
-                    nextOverrides[modelId] = nextOverrides[modelId] || current.cron;
+                    nextOverrides[modelId] = getModelOverrideCron(
+                      current.cron,
+                      nextOverrides[modelId],
+                      MODEL_PRESETS,
+                    );
                   } else {
                     delete nextOverrides[modelId];
                   }

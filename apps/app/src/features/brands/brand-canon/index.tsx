@@ -5,6 +5,7 @@ import {
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 
 import { BrandCanonEditorPanel } from "./_components";
+import { normalizeBrandCanonSearch } from "./_lib/brand-canon-utils";
 
 type BrandCanonPageProps = {
   apiBaseURL: string;
@@ -12,9 +13,10 @@ type BrandCanonPageProps = {
 };
 
 export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps) {
+  const normalizedRouteSearch = normalizeBrandCanonSearch(routeSearch);
   const { data, error, loading, reload } = usePerceptionData(
     apiBaseURL,
-    routeSearch,
+    normalizedRouteSearch,
   );
 
   if (loading && !data) {
@@ -29,7 +31,7 @@ export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps)
     <BrandCanonEditorPanel
       initialData={data}
       apiBaseURL={apiBaseURL}
-      routeSearch={routeSearch}
+      routeSearch={normalizedRouteSearch}
     />
   );
 }

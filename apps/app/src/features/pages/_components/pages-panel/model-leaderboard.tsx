@@ -1,12 +1,19 @@
 import { Bot } from "lucide-react";
 
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 
 import type { ModelLeader } from "../../_lib/pages-panel/types";
 
-export function ModelLeaderboard({ models }: { models: ModelLeader[] }) {
+type ModelLeaderboardProps = {
+  models: ModelLeader[];
+  loading?: boolean;
+};
+
+export function ModelLeaderboard({ models, loading = false }: ModelLeaderboardProps) {
   return (
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
@@ -18,8 +25,29 @@ export function ModelLeaderboard({ models }: { models: ModelLeader[] }) {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {models.length === 0 ? (
-          <EmptyPanelState label="Aucun LLM ne cite encore une page du site." />
+        {loading ? (
+          <div className="space-y-3">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="h-9 w-9 shrink-0 rounded-md" />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-3">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-4 w-10" />
+                    </div>
+                    <Skeleton className="mt-2 h-3 w-36" />
+                  </div>
+                </div>
+                <Skeleton className="h-2 w-full rounded-full" />
+              </div>
+            ))}
+          </div>
+        ) : models.length === 0 ? (
+          <EmptyStateCard
+            label="Aucun LLM ne cite encore une page du site."
+            className="h-[150px]"
+          />
         ) : (
           <div className="space-y-3">
             {models.map((model) => (
@@ -64,13 +92,5 @@ export function ModelLeaderboard({ models }: { models: ModelLeader[] }) {
         )}
       </CardContent>
     </Card>
-  );
-}
-
-function EmptyPanelState({ label }: { label: string }) {
-  return (
-    <div className="flex min-h-[150px] items-center justify-center rounded-md border border-dashed border-border/70 bg-muted/15 px-4 text-center text-sm text-muted-foreground">
-      {label}
-    </div>
   );
 }

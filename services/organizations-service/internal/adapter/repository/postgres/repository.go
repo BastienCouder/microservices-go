@@ -53,14 +53,14 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 		TeamID:  pgtype.Int8{},
 		AddedAt: toPgTimestamptz(organization.CreatedAt),
 	}); err != nil {
-		return fmt.Errorf("insert owner membership: %w", err)
+		return fmt.Errorf("insert organization creator membership: %w", err)
 	}
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
 		OrganizationID: created.ID,
 		UserID:         organization.OwnerIdentityID,
-		Role:           "owner",
+		Role:           "admin",
 	}); err != nil {
-		return fmt.Errorf("insert owner role: %w", err)
+		return fmt.Errorf("insert organization creator role: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
@@ -87,6 +87,33 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Organizatio
 		CreatedAt:       fromPgTimestamptz(org.CreatedAt),
 		DeletedAt:       fromPgNullableTimestamptz(org.DeletedAt),
 	}, nil
+}
+
+func (r *Repository) UpdateName(ctx context.Context, id int64, name string) (*domain.Organization, error) {
+	var org domain.Organization
+	var createdAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		UPDATE organizations
+		SET name = $2
+		WHERE id = $1
+		  AND deleted_at IS NULL
+		RETURNING id, name, owner_user_id, created_at, deleted_at
+	`, id, name).Scan(
+		&org.ID,
+		&org.Name,
+		&org.OwnerIdentityID,
+		&createdAt,
+		&deletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrOrganizationNotFound
+		}
+		return nil, fmt.Errorf("update organization name: %w", err)
+	}
+	org.CreatedAt = fromPgTimestamptz(createdAt)
+	org.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &org, nil
 }
 
 func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
@@ -129,6 +156,94 @@ func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) 
 		return nil, fmt.Errorf("iterate organization memberships: %w", err)
 	}
 	return memberships, nil
+}
+
+func (r *Repository) CreateAPIKey(ctx context.Context, key *domain.OrganizationAPIKey) error {
+	var createdAt pgtype.Timestamptz
+	var lastUsedAt pgtype.Timestamptz
+	var revokedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		INSERT INTO organization_api_keys (
+			organization_id,
+			name,
+			prefix,
+			key_hash,
+			created_at,
+			last_used_at,
+			revoked_at
+		)
+		SELECT o.id, $2, $3, $4, $5, NULL, NULL
+		FROM organizations o
+		WHERE o.id = $1
+		  AND o.deleted_at IS NULL
+		RETURNING id, organization_id, name, prefix, key_hash, created_at, last_used_at, revoked_at
+	`, key.OrganizationID, key.Name, key.Prefix, key.KeyHash, toPgTimestamptz(key.CreatedAt)).Scan(
+		&key.ID,
+		&key.OrganizationID,
+		&key.Name,
+		&key.Prefix,
+		&key.KeyHash,
+		&createdAt,
+		&lastUsedAt,
+		&revokedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) || isFKViolation(err) {
+			return domain.ErrOrganizationNotFound
+		}
+		return fmt.Errorf("insert organization api key: %w", err)
+	}
+	key.CreatedAt = fromPgTimestamptz(createdAt)
+	key.LastUsedAt = fromPgNullableTimestamptz(lastUsedAt)
+	key.RevokedAt = fromPgNullableTimestamptz(revokedAt)
+	return nil
+}
+
+func (r *Repository) ListAPIKeys(ctx context.Context, organizationID int64) ([]domain.OrganizationAPIKey, error) {
+	if _, err := r.GetByID(ctx, organizationID); err != nil {
+		return nil, err
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT id, organization_id, name, prefix, key_hash, created_at, last_used_at, revoked_at
+		FROM organization_api_keys
+		WHERE organization_id = $1
+		  AND revoked_at IS NULL
+		ORDER BY created_at DESC, id DESC
+	`, organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list organization api keys: %w", err)
+	}
+	defer rows.Close()
+
+	keys := make([]domain.OrganizationAPIKey, 0)
+	for rows.Next() {
+		key, err := scanOrganizationAPIKey(rows)
+		if err != nil {
+			return nil, err
+		}
+		keys = append(keys, key)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate organization api keys: %w", err)
+	}
+	return keys, nil
+}
+
+func (r *Repository) RevokeAPIKey(ctx context.Context, organizationID, keyID int64, revokedAt time.Time) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE organization_api_keys
+		SET revoked_at = $3
+		WHERE organization_id = $1
+		  AND id = $2
+		  AND revoked_at IS NULL
+	`, organizationID, keyID, toPgTimestamptz(revokedAt))
+	if err != nil {
+		return fmt.Errorf("revoke organization api key: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrOrganizationNotFound
+	}
+	return nil
 }
 
 func (r *Repository) CreateTeam(ctx context.Context, team *domain.Team) error {
@@ -457,53 +572,6 @@ func (r *Repository) RemoveMember(ctx context.Context, organizationID, userID in
 	return nil
 }
 
-func (r *Repository) SetMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
-	if _, err := r.GetByID(ctx, organizationID); err != nil {
-		return nil, err
-	}
-
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("begin set member banned transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	member, err := getActiveMember(ctx, tx, organizationID, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	if banned {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO member_roles (organization_id, user_id, role)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (organization_id, user_id, role) DO NOTHING
-		`, organizationID, userID, domain.RoleBanned); err != nil {
-			return nil, fmt.Errorf("insert banned role: %w", err)
-		}
-	} else {
-		if _, err := tx.Exec(ctx, `
-			DELETE FROM member_roles
-			WHERE organization_id = $1
-			  AND user_id = $2
-			  AND role = $3
-		`, organizationID, userID, domain.RoleBanned); err != nil {
-			return nil, fmt.Errorf("delete banned role: %w", err)
-		}
-	}
-
-	roles, err := listActiveMemberRoles(ctx, tx, organizationID, userID)
-	if err != nil {
-		return nil, err
-	}
-	member.Roles = roles
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit set member banned transaction: %w", err)
-	}
-	return member, nil
-}
-
 func (r *Repository) CreateInvitation(ctx context.Context, invitation *domain.Invitation) error {
 	created, err := r.queries.CreateInvitation(ctx, sqlc.CreateInvitationParams{
 		OrganizationID:  invitation.OrganizationID,
@@ -554,6 +622,18 @@ func (r *Repository) GetInvitationByID(ctx context.Context, organizationID, invi
 			return nil, domain.ErrInvitationNotFound
 		}
 		return nil, fmt.Errorf("get invitation: %w", err)
+	}
+	invitation := mapInvitation(row)
+	return &invitation, nil
+}
+
+func (r *Repository) GetInvitationByToken(ctx context.Context, token string) (*domain.Invitation, error) {
+	row, err := r.queries.GetInvitationByTokenForUpdate(ctx, token)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrInvitationNotFound
+		}
+		return nil, fmt.Errorf("get invitation by token: %w", err)
 	}
 	invitation := mapInvitation(row)
 	return &invitation, nil
@@ -653,7 +733,7 @@ func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, 
 	}
 	memberRole := invitation.Role
 	if invitation.ProjectID != "" {
-		memberRole = "project_member"
+		memberRole = "member"
 	}
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
 		OrganizationID: invitation.OrganizationID,
@@ -817,6 +897,29 @@ func fromPgNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
 	}
 	t := value.Time
 	return &t
+}
+
+func scanOrganizationAPIKey(row pgx.Row) (domain.OrganizationAPIKey, error) {
+	var key domain.OrganizationAPIKey
+	var createdAt pgtype.Timestamptz
+	var lastUsedAt pgtype.Timestamptz
+	var revokedAt pgtype.Timestamptz
+	if err := row.Scan(
+		&key.ID,
+		&key.OrganizationID,
+		&key.Name,
+		&key.Prefix,
+		&key.KeyHash,
+		&createdAt,
+		&lastUsedAt,
+		&revokedAt,
+	); err != nil {
+		return domain.OrganizationAPIKey{}, fmt.Errorf("scan organization api key: %w", err)
+	}
+	key.CreatedAt = fromPgTimestamptz(createdAt)
+	key.LastUsedAt = fromPgNullableTimestamptz(lastUsedAt)
+	key.RevokedAt = fromPgNullableTimestamptz(revokedAt)
+	return key, nil
 }
 
 func mapInvitation(row sqlc.OrganizationInvitation) domain.Invitation {

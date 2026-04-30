@@ -16,11 +16,52 @@ export function readEditorTab(search: string): EditorTab {
   return "brand";
 }
 
-export function buildBackSearch(search: string): string {
-  const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+function toSearchParams(search: string): URLSearchParams {
+  return new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+}
+
+function hasProjectScope(params: URLSearchParams): boolean {
+  return Boolean(
+    params.get("projectId")?.trim() ||
+      params.get("project_id")?.trim() ||
+      params.get("project")?.trim(),
+  );
+}
+
+function cleanBrandCanonSearch(params: URLSearchParams): string {
+  params.delete("brand");
   params.delete("tab");
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+export function normalizeBrandCanonSearch(search: string): string {
+  const params = toSearchParams(search);
+
+  if (hasProjectScope(params)) {
+    return cleanBrandCanonSearch(params);
+  }
+
+  const legacyBrandSearch = params.get("brand")?.trim() ?? "";
+  if (legacyBrandSearch) {
+    const legacyParams = toSearchParams(legacyBrandSearch);
+    if (hasProjectScope(legacyParams)) {
+      return cleanBrandCanonSearch(legacyParams);
+    }
+  }
+
+  return cleanBrandCanonSearch(params);
+}
+
+export function buildBrandCanonLocation(search: string) {
+  return {
+    pathname: "/brand-canon" as const,
+    search: normalizeBrandCanonSearch(search),
+  };
+}
+
+export function buildBackSearch(search: string): string {
+  return normalizeBrandCanonSearch(search);
 }
 
 export function buildBrandsLocation(search: string) {

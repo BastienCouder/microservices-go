@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -7,6 +7,12 @@ import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
+import {
+  readProjectIdFromSearch,
+  resolveSelectedContextSearch,
+  SELECTED_CONTEXT_CHANGE_EVENT,
+  storeLastSelectedProjectToken,
+} from "@/shared/selection";
 import {
   shouldRedirectToOnboarding,
   shouldRedirectUnauthenticated,
@@ -53,13 +59,21 @@ async function loadProjectCount(
 
 export default function App() {
   const location = useLocation();
-  const routeSearch = location.search;
+  const [selectionVersion, setSelectionVersion] = useState(0);
   const isOnboardingRoute = location.pathname === "/onboarding" || location.pathname.startsWith("/onboarding/");
+  const isInvitationRoute = location.pathname === "/invitations" || location.pathname.startsWith("/invitations/");
+  const routeSearch = useMemo(
+    () =>
+      isOnboardingRoute || isInvitationRoute
+        ? location.search
+        : resolveSelectedContextSearch(location.search),
+    [isInvitationRoute, isOnboardingRoute, location.search, selectionVersion],
+  );
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
   const shouldCheckProjectGuard =
-    apiBaseURL.trim() !== "" && !busy && user !== null && !isOnboardingRoute;
+    apiBaseURL.trim() !== "" && !busy && user !== null && !isOnboardingRoute && !isInvitationRoute;
   const mustRedirectToAuth = shouldRedirectUnauthenticated({ apiBaseURL, busy, user });
   const projectGuardQuery = useQuery({
     queryKey: ["route-project-guard", apiBaseURL, user?.ID ?? null],
@@ -83,6 +97,26 @@ export default function App() {
     }
     redirectToWebAuth(window.location.href);
   }, [mustRedirectToAuth]);
+
+  useEffect(() => {
+    const refreshSelection = () => setSelectionVersion((current) => current + 1);
+    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, refreshSelection);
+    window.addEventListener("storage", refreshSelection);
+    return () => {
+      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, refreshSelection);
+      window.removeEventListener("storage", refreshSelection);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isOnboardingRoute || isInvitationRoute) return;
+
+    const routeProjectToken = readProjectIdFromSearch(location.search);
+
+    if (routeProjectToken) {
+      storeLastSelectedProjectToken(routeProjectToken);
+    }
+  }, [isInvitationRoute, isOnboardingRoute, location.search]);
 
   if (!apiBaseURL) {
     return (
@@ -109,13 +143,15 @@ export default function App() {
     return <Navigate replace to="/onboarding" />;
   }
 
-  if (isOnboardingRoute) {
+  if (isOnboardingRoute || isInvitationRoute) {
     return (
       <AppRouter
         apiBaseURL={apiBaseURL}
         routeSearch={routeSearch}
         user={user}
         busy={busy}
+        onLogout={logout}
+        onRefresh={refresh}
       />
     );
   }
@@ -127,6 +163,8 @@ export default function App() {
         routeSearch={routeSearch}
         user={user}
         busy={busy}
+        onLogout={logout}
+        onRefresh={refresh}
       />
     </AppLayout>
   );
@@ -137,4 +175,6 @@ export type AppRouterProps = {
   busy: boolean;
   routeSearch: string;
   user: UserProfile | null;
+  onLogout?: () => Promise<void>;
+  onRefresh?: () => Promise<void>;
 };

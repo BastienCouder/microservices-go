@@ -17,6 +17,11 @@ const PagesPage = lazy(() =>
     default: module.PagesPage,
   })),
 );
+const TrafficPage = lazy(() =>
+  import("@/features/traffic/index").then((module) => ({
+    default: module.TrafficPage,
+  })),
+);
 const AdminModelsPage = lazy(() =>
   import("@/features/admin-models").then((module) => ({
     default: module.AdminModelsPage,
@@ -32,6 +37,16 @@ const OrganizationsPage = lazy(() =>
     default: module.OrganizationsPage,
   })),
 );
+const InvitationAcceptPage = lazy(() =>
+  import("@/features/invitations/index").then((module) => ({
+    default: module.InvitationAcceptPage,
+  })),
+);
+const AccountPage = lazy(() =>
+  import("@/features/account/index").then((module) => ({
+    default: module.AccountPage,
+  })),
+);
 
 const PerceptionBrandCanonPage = lazy(() =>
   import("@/features/brands/brand-canon/index").then((module) => ({
@@ -39,7 +54,14 @@ const PerceptionBrandCanonPage = lazy(() =>
   })),
 );
 
-export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProps) {
+export function AppRouter({
+  apiBaseURL,
+  busy,
+  routeSearch,
+  user,
+  onLogout,
+  onRefresh,
+}: AppRouterProps) {
   return (
     <Routes>
       <Route
@@ -73,6 +95,18 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
             <PagesPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
+      />
+      <Route
+        path="/traffic"
+        element={
+          <Suspense fallback={null}>
+            <TrafficPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/geo"
+        element={<Navigate replace to={{ pathname: "/traffic", search: routeSearch }} />}
       />
       <Route
         path="/models"
@@ -126,6 +160,28 @@ export function AppRouter({ apiBaseURL, busy, routeSearch, user }: AppRouterProp
               busy={busy}
               routeSearch={routeSearch}
               user={user}
+            />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/invitations/:token"
+        element={
+          <Suspense fallback={null}>
+            <InvitationAcceptPage apiBaseURL={apiBaseURL} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/account"
+        element={
+          <Suspense fallback={null}>
+            <AccountPage
+              apiBaseURL={apiBaseURL}
+              busy={busy}
+              user={user}
+              onLogout={onLogout}
+              onRefresh={onRefresh}
             />
           </Suspense>
         }

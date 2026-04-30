@@ -21,9 +21,6 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create active project: %v", err)
 	}
-	if _, err := svc.ActivateProject(ctx, activeProject.ID, 42); err != nil {
-		t.Fatalf("activate project: %v", err)
-	}
 	if _, err := svc.ReplaceProjectModels(ctx, activeProject.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace models: %v", err)
 	}
@@ -60,26 +57,26 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 		t.Fatalf("add competitors: %v", err)
 	}
 
-	draftProject, err := svc.CreateProject(ctx, CreateProjectInput{
+	secondProject, err := svc.CreateProject(ctx, CreateProjectInput{
 		OrganizationID: 42,
 		CreatedBy:      7,
-		Name:           "Draft",
-		Domain:         "draft.example",
-		WebsiteURL:     "https://draft.example",
+		Name:           "Second",
+		Domain:         "second.example",
+		WebsiteURL:     "https://second.example",
 	})
 	if err != nil {
-		t.Fatalf("create draft project: %v", err)
+		t.Fatalf("create second project: %v", err)
 	}
-	if _, err := svc.AddPrompts(ctx, draftProject.ID, 42, []string{"Should not run"}); err != nil {
-		t.Fatalf("add draft prompts: %v", err)
+	if _, err := svc.AddPrompts(ctx, secondProject.ID, 42, []string{"Should run"}); err != nil {
+		t.Fatalf("add second project prompts: %v", err)
 	}
 
 	jobs, err := svc.ListScheduledAnalysisJobs(ctx)
 	if err != nil {
 		t.Fatalf("list scheduled jobs: %v", err)
 	}
-	if len(jobs) != 1 {
-		t.Fatalf("expected one scheduled job, got %d", len(jobs))
+	if len(jobs) != 2 {
+		t.Fatalf("expected two scheduled jobs, got %d", len(jobs))
 	}
 
 	job := jobs[0]

@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
 
-import type { SavePromptEditorInput } from "../types";
+import type { PromptItem, SavePromptEditorInput } from "../types";
 import { usePromptsResponsesState } from "../use-prompts-responses-state";
 
 type UsePromptsWorkspacePanelViewModelInput = {
@@ -8,11 +8,21 @@ type UsePromptsWorkspacePanelViewModelInput = {
   routeSearch: string;
 };
 
+export function findPromptEditorSource(
+  promptId: string | undefined,
+  canonicalPrompts: PromptItem[],
+  visiblePrompts: PromptItem[],
+) {
+  if (!promptId) return null;
+  const matchesPromptId = (item: PromptItem) => (item.sourcePromptId || item.id) === promptId;
+  return canonicalPrompts.find(matchesPromptId) ?? visiblePrompts.find(matchesPromptId) ?? null;
+}
+
 export function usePromptsWorkspacePanelViewModel({
   apiBaseURL,
   routeSearch,
 }: UsePromptsWorkspacePanelViewModelInput) {
-  const state = usePromptsResponsesState(apiBaseURL);
+  const state = usePromptsResponsesState(apiBaseURL, routeSearch);
   const { setFocusPromptId, setSelectedResponseId, setTab } = state;
 
   const responseDeepLink = useMemo(() => {
@@ -29,9 +39,11 @@ export function usePromptsWorkspacePanelViewModel({
 
   const editorPrompt =
     state.promptEditorState?.mode === "edit"
-      ? state.prompts.find(
-          (item) => (item.sourcePromptId || item.id) === state.promptEditorState?.promptId,
-        ) ?? null
+      ? findPromptEditorSource(
+          state.promptEditorState.promptId,
+          state.editorPrompts,
+          state.prompts,
+        )
       : null;
   const activePromptCount = useMemo(
     () => state.prompts.filter((item) => item.status === "active").length,

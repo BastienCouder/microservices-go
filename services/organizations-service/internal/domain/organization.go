@@ -21,6 +21,7 @@ var (
 	ErrInvalidInvitation        = errors.New("invalid invitation")
 	ErrInvitationExpired        = errors.New("invitation expired")
 	ErrInvitationAlreadyHandled = errors.New("invitation already handled")
+	ErrInvitationEmailMismatch  = errors.New("invitation email does not match authenticated user")
 )
 
 type Organization struct {
@@ -37,6 +38,34 @@ func (o *Organization) Validate() error {
 	}
 	if o.OwnerIdentityID <= 0 {
 		return fmt.Errorf("%w: owner identity id must be positive", ErrInvalidOrganization)
+	}
+	return nil
+}
+
+type OrganizationAPIKey struct {
+	ID             int64      `json:"id"`
+	OrganizationID int64      `json:"organizationId"`
+	Name           string     `json:"name"`
+	Prefix         string     `json:"prefix"`
+	KeyHash        string     `json:"-"`
+	Key            string     `json:"key,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	LastUsedAt     *time.Time `json:"lastUsedAt,omitempty"`
+	RevokedAt      *time.Time `json:"revokedAt,omitempty"`
+}
+
+func (k *OrganizationAPIKey) ValidateForCreate() error {
+	if k.OrganizationID <= 0 {
+		return fmt.Errorf("%w: organization id must be positive", ErrInvalidOrganization)
+	}
+	if strings.TrimSpace(k.Name) == "" {
+		return fmt.Errorf("%w: api key name is required", ErrInvalidOrganization)
+	}
+	if strings.TrimSpace(k.Prefix) == "" {
+		return fmt.Errorf("%w: api key prefix is required", ErrInvalidOrganization)
+	}
+	if strings.TrimSpace(k.KeyHash) == "" {
+		return fmt.Errorf("%w: api key hash is required", ErrInvalidOrganization)
 	}
 	return nil
 }
@@ -63,6 +92,9 @@ type Member struct {
 	OrganizationID int64
 	UserID         int64
 	TeamID         int64
+	Email          string
+	FirstName      string
+	LastName       string
 	Roles          []string
 	AddedAt        time.Time
 	DeletedAt      *time.Time

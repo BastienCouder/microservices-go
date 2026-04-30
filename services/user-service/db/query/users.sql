@@ -17,7 +17,11 @@ WHERE auth_identity_id = $1
 
 -- name: SoftDeleteUser :execrows
 UPDATE users
-SET deleted_at = $2
+SET auth_identity_id = $2,
+    email = $3,
+    first_name = $4,
+    last_name = $5,
+    deleted_at = $6
 WHERE id = $1
   AND deleted_at IS NULL;
 

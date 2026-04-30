@@ -31,6 +31,8 @@ type Service struct {
 	iaClient          IAClient
 	attributionClient AttributionClient
 	billingClient     BillingClient
+	ga4OAuthProvider  GA4OAuthProvider
+	ga4OAuthStateKey  string
 }
 
 func NewService() *Service {

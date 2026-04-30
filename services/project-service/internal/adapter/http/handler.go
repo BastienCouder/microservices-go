@@ -186,10 +186,12 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.getProject(w, r, projectID)
 	case len(parts) == 1 && r.Method == http.MethodPatch:
 		h.updateProject(w, r, projectID)
-	case len(parts) == 2 && parts[1] == "activate" && r.Method == http.MethodPost:
-		h.activateProject(w, r, projectID)
+	case len(parts) == 1 && r.Method == http.MethodDelete:
+		h.deleteProject(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "finalize" && r.Method == http.MethodPost:
 		h.finalizeProject(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "analysis" && parts[2] == "run" && r.Method == http.MethodPost:
+		h.runManualAnalysis(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodPost:
 		h.addPrompts(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodGet:
@@ -220,6 +222,14 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.getProjectImpactIntegrations(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodPatch:
 		h.updateProjectImpactIntegrations(w, r, projectID)
+	case len(parts) == 5 && parts[1] == "impact-integrations" && parts[2] == "ga4" && parts[3] == "oauth" && parts[4] == "start" && r.Method == http.MethodPost:
+		h.startProjectGA4OAuth(w, r, projectID)
+	case len(parts) == 5 && parts[1] == "impact-integrations" && parts[2] == "ga4" && parts[3] == "oauth" && parts[4] == "callback" && r.Method == http.MethodPost:
+		h.completeProjectGA4OAuth(w, r, projectID)
+	case len(parts) == 5 && parts[1] == "impact-integrations" && parts[2] == "ga4" && parts[3] == "oauth" && parts[4] == "properties" && r.Method == http.MethodGet:
+		h.listProjectGA4OAuthProperties(w, r, projectID)
+	case len(parts) == 5 && parts[1] == "impact-integrations" && parts[2] == "ga4" && parts[3] == "oauth" && parts[4] == "property" && r.Method == http.MethodPatch:
+		h.selectProjectGA4OAuthProperty(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -414,18 +424,17 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 	writeSuccess(w, http.StatusOK, project)
 }
 
-func (h *Handler) activateProject(w http.ResponseWriter, r *http.Request, projectID string) {
+func (h *Handler) deleteProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
 		return
 	}
-	project, err := h.svc.ActivateProject(r.Context(), projectID, organizationID)
-	if err != nil {
+	if err := h.svc.DeleteProject(r.Context(), projectID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
-	writeSuccess(w, http.StatusOK, project)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) getProjectImpactContext(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -470,6 +479,21 @@ type updateProjectGA4IntegrationRequest struct {
 	PropertyID         *string `json:"propertyId"`
 	ServiceAccountJSON *string `json:"serviceAccountJSON"`
 	Disconnect         bool    `json:"disconnect"`
+}
+
+type startProjectGA4OAuthRequest struct {
+	RedirectURI string `json:"redirectUri"`
+}
+
+type completeProjectGA4OAuthRequest struct {
+	Code        string `json:"code"`
+	State       string `json:"state"`
+	RedirectURI string `json:"redirectUri"`
+	PropertyID  string `json:"propertyId"`
+}
+
+type selectProjectGA4OAuthPropertyRequest struct {
+	PropertyID string `json:"propertyId"`
 }
 
 type updateProjectStripeIntegrationRequest struct {
@@ -524,6 +548,89 @@ func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http
 	writeSuccess(w, http.StatusOK, value)
 }
 
+func (h *Handler) startProjectGA4OAuth(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req startProjectGA4OAuthRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	value, err := h.svc.StartProjectGA4OAuth(r.Context(), projectID, organizationID, usecase.StartProjectGA4OAuthInput{
+		RedirectURI: req.RedirectURI,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, value)
+}
+
+func (h *Handler) completeProjectGA4OAuth(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req completeProjectGA4OAuthRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	value, err := h.svc.CompleteProjectGA4OAuth(r.Context(), projectID, organizationID, usecase.CompleteProjectGA4OAuthInput{
+		Code:        req.Code,
+		State:       req.State,
+		RedirectURI: req.RedirectURI,
+		PropertyID:  req.PropertyID,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, value)
+}
+
+func (h *Handler) listProjectGA4OAuthProperties(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+	properties, err := h.svc.ListProjectGA4OAuthProperties(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, properties)
+}
+
+func (h *Handler) selectProjectGA4OAuthProperty(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req selectProjectGA4OAuthPropertyRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	value, err := h.svc.SelectProjectGA4OAuthProperty(r.Context(), projectID, organizationID, usecase.SelectProjectGA4OAuthPropertyInput{
+		PropertyID: req.PropertyID,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, value)
+}
+
 func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -536,6 +643,44 @@ func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projec
 		return
 	}
 	writeSuccess(w, http.StatusOK, result)
+}
+
+type runManualAnalysisRequest struct {
+	RequestID   string                       `json:"requestId"`
+	PromptTexts []usecase.AnalysisPromptText `json:"promptTexts"`
+	ModelIDs    []string                     `json:"modelIds"`
+	RunType     string                       `json:"runType"`
+}
+
+func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
+	createdBy, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req runManualAnalysisRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := h.svc.RunManualAnalysis(r.Context(), projectID, organizationID, createdBy, usecase.RunManualAnalysisInput{
+		RequestID:   req.RequestID,
+		PromptTexts: req.PromptTexts,
+		ModelIDs:    req.ModelIDs,
+		RunType:     req.RunType,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, result)
 }
 
 type addPromptsRequest struct {
@@ -1029,10 +1174,19 @@ func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	case errors.Is(err, usecase.ErrNotFound):
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": userFacingDependencyError(err)})
 	default:
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
 	}
+}
+
+func userFacingDependencyError(err error) string {
+	message := err.Error()
+	normalized := strings.ToLower(message)
+	if strings.Contains(normalized, "ga4 oauth") || strings.Contains(normalized, "google oauth") {
+		return "Connexion Google Analytics momentanément indisponible. Réessaie dans quelques instants."
+	}
+	return message
 }
 
 func splitPathAfter(path, prefix string) []string {

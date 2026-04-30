@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TableCell, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { promptScheduleLabel, promptStatusLabel, relativeRunLabel } from "../../_lib/utils";
+import { promptCadenceLabel, promptStatusLabel, relativeRunLabel } from "../../_lib/utils";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptItem, PromptRowMode } from "../../_lib/types";
 import { PromptActions, PromptModelBadges } from "./prompt-list-parts";
@@ -65,7 +65,7 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
       </TableCell>
       <TableCell>
         <div className="max-w-[140px] truncate text-sm font-medium xl:max-w-[180px]">
-          {promptScheduleLabel(item.schedule, item.effectiveCron, props.locale)}
+          {promptCadenceLabel(item, props.locale)}
         </div>
       </TableCell>
       <TableCell>
@@ -180,7 +180,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
             <Metric label={content.rank} value={hasResults ? item.rank.toFixed(1) : null} />
             <Metric
               label={content.columnCadence}
-              value={promptScheduleLabel(item.schedule, item.effectiveCron, props.locale)}
+              value={promptCadenceLabel(item, props.locale)}
             />
             <Metric label={content.overviewSov} value={hasResults ? `${item.sov}%` : null} />
             <Metric

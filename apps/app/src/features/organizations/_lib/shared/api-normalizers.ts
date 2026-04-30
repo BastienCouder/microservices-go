@@ -1,5 +1,6 @@
 import { attachStableSlugs } from "@/shared/public-slugs";
 import type {
+  OrganizationAPIKey,
   OrganizationInvitation,
   OrganizationMember,
   OrganizationProject,
@@ -52,7 +53,6 @@ function getRole(value: unknown): OrganizationRole {
   if (
     normalized === "owner" ||
     normalized === "admin" ||
-    normalized === "project_member" ||
     normalized === "super_admin"
   ) {
     return normalized;
@@ -93,7 +93,6 @@ export function normalizeProject(value: unknown): OrganizationProject | null {
     slug: "",
     organizationId: getIDString(getField(value, ["organizationId", "OrganizationID"])),
     name: getString(getField(value, ["name", "Name"])) || "Project",
-    status: getString(getField(value, ["status", "Status"])) || "draft",
     brandName: getString(getField(value, ["brandName", "BrandName"])),
     brandDescription: getString(getField(value, ["brandDescription", "BrandDescription"])),
     attributionSource: getString(getField(value, ["attributionSource", "AttributionSource"])),
@@ -111,6 +110,8 @@ export function normalizeMember(value: unknown): OrganizationMember | null {
     organizationId,
     userId,
     email: getString(getField(value, ["email", "Email"])),
+    firstName: getString(getField(value, ["firstName", "FirstName", "first_name"])),
+    lastName: getString(getField(value, ["lastName", "LastName", "last_name"])),
     roles: getArray(getField(value, ["roles", "Roles"])).map(getString).filter(Boolean),
     addedAt: getString(getField(value, ["addedAt", "AddedAt"])),
   };
@@ -158,6 +159,22 @@ export function normalizeInvitation(value: unknown): OrganizationInvitation | nu
     createdAt: getString(getField(value, ["createdAt", "CreatedAt"])),
     expiresAt: getString(getField(value, ["expiresAt", "ExpiresAt"])),
     respondedAt: getString(getField(value, ["respondedAt", "RespondedAt"])),
+  };
+}
+
+export function normalizeAPIKey(value: unknown): OrganizationAPIKey | null {
+  if (!isRecord(value)) return null;
+  const id = getIDString(getField(value, ["id", "ID"]));
+  if (!id) return null;
+
+  return {
+    id,
+    organizationId: getIDString(getField(value, ["organizationId", "OrganizationID"])),
+    name: getString(getField(value, ["name", "Name"])) || "API key",
+    prefix: getString(getField(value, ["prefix", "Prefix"])),
+    key: getString(getField(value, ["key", "Key"])),
+    createdAt: getString(getField(value, ["createdAt", "CreatedAt"])),
+    lastUsedAt: getString(getField(value, ["lastUsedAt", "LastUsedAt"])),
   };
 }
 

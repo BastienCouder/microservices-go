@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableHead } from "@/components/ui/table";
 import { PanelToolbar } from "../shared/panel-toolbar";
 import type { ModelVisual, PromptRunRow, ResponseView } from "../../_lib/types";
@@ -40,6 +41,55 @@ function competitorBadgeClassName() {
   return "bg-secondary text-background";
 }
 
+function ResponseTableLoadingRows() {
+  return (
+    <div className="space-y-3 py-4">
+      {Array.from({ length: 7 }).map((_, index) => (
+        <div
+          key={index}
+          className="grid gap-3 rounded-md border bg-background p-3 lg:grid-cols-[110px_160px_minmax(220px,1fr)_90px_70px_150px_80px]"
+        >
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-12 rounded-full" />
+          <Skeleton className="h-6 w-full rounded-full" />
+          <Skeleton className="h-5 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ResponseTimelineLoadingRows() {
+  return (
+    <div className="space-y-3 py-3">
+      {Array.from({ length: 6 }).map((_, index) => (
+        <div key={index} className="rounded-md border bg-background p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <Skeleton className="h-5 w-20 rounded-full" />
+              <Skeleton className="h-6 w-28 rounded-full" />
+            </div>
+            <Skeleton className="h-6 w-16 rounded-full" />
+          </div>
+          <Skeleton className="mt-3 h-4 w-full" />
+          <Skeleton className="mt-2 h-4 w-2/3" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-14 rounded-full" />
+            <Skeleton className="h-6 w-28 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 type ResponsesViewProps = {
   noMentionOnly: boolean;
   setNoMentionOnly: (value: boolean) => void;
@@ -49,6 +99,7 @@ type ResponsesViewProps = {
   toggleCompetitor: (value: string) => void;
   clearCompetitors: () => void;
   availableCompetitors: string[];
+  loading?: boolean;
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;
   filteredResponses: PromptRunRow[];
@@ -85,9 +136,13 @@ export function ResponsesContent(props: ResponsesViewProps) {
     <>
       <PanelToolbar
         summary={
-          <Badge variant="outline" className="h-9 justify-center px-3 text-sm">
-            {props.filteredResponses.length} / {props.filteredResponsesTotal} {content.responsesCount}
-          </Badge>
+          props.loading ? (
+            <Skeleton className="h-9 w-36 rounded-full" />
+          ) : (
+            <Badge variant="outline" className="h-9 justify-center px-3 text-sm">
+              {props.filteredResponses.length} / {props.filteredResponsesTotal} {content.responsesCount}
+            </Badge>
+          )
         }
       >
           <div className="flex flex-wrap items-center gap-2">
@@ -111,15 +166,19 @@ export function ResponsesContent(props: ResponsesViewProps) {
                   className="h-9 w-full justify-between rounded-full border-border/80 bg-background px-4 text-sm sm:w-auto sm:min-w-[240px] sm:max-w-[360px]"
                   title={selectedCompetitorLabel}
                 >
-                  <span className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
+                  <div className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
                     <span className="shrink-0 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
                       {content.competitors}
                     </span>
                     <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {selectedCompetitorLabel}
-                    </span>
-                  </span>
+                    {props.loading ? (
+                      <Skeleton className="h-4 w-24 rounded-full" />
+                    ) : (
+                      <span className="truncate text-sm font-medium text-foreground">
+                        {selectedCompetitorLabel}
+                      </span>
+                    )}
+                  </div>
                   <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
                 </Button>
               </PopoverTrigger>
@@ -158,35 +217,49 @@ export function ResponsesContent(props: ResponsesViewProps) {
                       )}
                     />
                   </button>
-                  {props.availableCompetitors.map((item) => {
-                    const highlighted = props.selectedCompetitors.includes(item);
-
-                    return (
-                      <button
-                        key={item}
-                        type="button"
-                        onClick={() => {
-                          props.toggleCompetitor(item);
-                        }}
-                        className={cn(
-                          "cursor-pointer relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
-                          highlighted
-                            ? "border-primary/30 bg-primary/10"
-                            : "border-border/70 bg-background hover:bg-muted/30",
-                        )}
+                  {props.loading ? (
+                    Array.from({ length: 4 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="relative flex items-start gap-2 rounded-2xl border border-border/70 p-3"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className={cn("truncate text-sm font-semibold leading-tight", highlighted ? "text-primary" : "text-foreground")}>{item}</div>
+                          <Skeleton className="h-4 w-32" />
                         </div>
-                        <div
+                        <Skeleton className="ml-auto mt-1 h-2.5 w-2.5 rounded-full" />
+                      </div>
+                    ))
+                  ) : (
+                    props.availableCompetitors.map((item) => {
+                      const highlighted = props.selectedCompetitors.includes(item);
+
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => {
+                            props.toggleCompetitor(item);
+                          }}
                           className={cn(
-                            "ml-auto mt-1 h-2.5 w-2.5 rounded-full",
-                            highlighted ? "bg-primary" : "bg-muted-foreground/30",
+                            "cursor-pointer relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
+                            highlighted
+                              ? "border-primary/30 bg-primary/10"
+                              : "border-border/70 bg-background hover:bg-muted/30",
                           )}
-                        />
-                      </button>
-                    );
-                  })}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className={cn("truncate text-sm font-semibold leading-tight", highlighted ? "text-primary" : "text-foreground")}>{item}</div>
+                          </div>
+                          <div
+                            className={cn(
+                              "ml-auto mt-1 h-2.5 w-2.5 rounded-full",
+                              highlighted ? "bg-primary" : "bg-muted-foreground/30",
+                            )}
+                          />
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
               </PopoverContent>
             </Popover>
@@ -205,7 +278,13 @@ export function ResponsesContent(props: ResponsesViewProps) {
       </PanelToolbar>
 
       <div className="min-h-0 flex-1 px-4">
-        {props.viewMode === "table" ? (
+        {props.loading ? (
+          props.viewMode === "table" ? (
+            <ResponseTableLoadingRows />
+          ) : (
+            <ResponseTimelineLoadingRows />
+          )
+        ) : props.viewMode === "table" ? (
           props.filteredResponses.length === 0 ? (
             <EmptyResponsesState />
           ) : (

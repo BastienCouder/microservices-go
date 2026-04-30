@@ -12,11 +12,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	emailrenderer "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/client/emailrenderer"
 	resendemail "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/email/resend"
 	httpadapter "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/http"
+	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/messaging/rabbitmq"
 	notificationrepo "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/notification-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/notification-service/internal/security"
@@ -37,11 +39,17 @@ func main() {
 		log.Fatalf("wait for notification database: %v", err)
 	}
 	defer db.Close()
+	if err := waitForRabbitMQ(context.Background(), cfg.RabbitMQURL, "notification-service"); err != nil {
+		log.Fatalf("wait for rabbitmq: %v", err)
+	}
 
 	repo := notificationrepo.NewRepository(db)
 	templateClient := emailrenderer.NewClient(cfg.EmailRendererURL)
 	emailClient := resendemail.NewClient(cfg.ResendAPIKey, cfg.ResendFromEmail)
 	svc := usecase.NewService(repo, emailClient, templateClient)
+	appCtx, cancelApp := context.WithCancel(context.Background())
+	defer cancelApp()
+	go runEmailNotificationConsumerLoop(appCtx, cfg, svc)
 	h := httpadapter.NewHandler(svc, readinessCheck(db))
 
 	mux := http.NewServeMux()
@@ -71,6 +79,7 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	<-stop
+	cancelApp()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -107,6 +116,87 @@ func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
 		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 		defer cancel()
 		return db.Ping(pingCtx)
+	}
+}
+
+func waitForRabbitMQ(ctx context.Context, amqpURL, serviceName string) error {
+	backoff := time.Second
+	const maxBackoff = 30 * time.Second
+
+	for {
+		conn, err := amqp.Dial(amqpURL)
+		if err == nil {
+			_ = conn.Close()
+			return nil
+		}
+
+		log.Printf("%s rabbitmq unavailable: %v; retrying in %s", serviceName, err, backoff)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff):
+		}
+
+		if backoff < maxBackoff {
+			backoff *= 2
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+		}
+	}
+}
+
+func runEmailNotificationConsumerLoop(ctx context.Context, cfg config.Config, svc *usecase.Service) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+
+		client, err := rabbitmqadapter.NewClient(
+			cfg.RabbitMQURL,
+			cfg.RabbitMQExchange,
+			cfg.RabbitMQEmailQueue,
+			cfg.RabbitMQEmailRoute,
+			"notification-service-email",
+		)
+		if err != nil {
+			log.Printf("email notification consumer dial failed: %v", err)
+			if sleepErr := sleepWithContext(ctx, time.Second); sleepErr != nil {
+				return
+			}
+			continue
+		}
+
+		err = client.ConsumeNotifications(ctx, func(loopCtx context.Context, message rabbitmqadapter.NotificationMessage) error {
+			processCtx, cancel := context.WithTimeout(loopCtx, 30*time.Second)
+			defer cancel()
+			_, err := svc.Send(processCtx, message.Channel, message.Recipient, message.Subject, message.Message)
+			if err != nil {
+				log.Printf("email notification delivery failed: recipient=%s subject=%q error=%v", message.Recipient, message.Subject, err)
+				_ = sleepWithContext(loopCtx, 10*time.Second)
+			} else {
+				log.Printf("email notification delivered: recipient=%s subject=%q", message.Recipient, message.Subject)
+			}
+			return err
+		})
+		_ = client.Close()
+		if err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("email notification consumer loop restart: %v", err)
+		}
+		if sleepErr := sleepWithContext(ctx, time.Second); sleepErr != nil {
+			return
+		}
+	}
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

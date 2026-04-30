@@ -5,10 +5,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { pushToast } from "@/components/ui/toast-store";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
@@ -41,7 +41,6 @@ export function BrandCanonEditorPanel({
   const [canonDraft, setCanonDraft] = useState<BrandCanon>(initialData.brandCanon);
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
   const brandsLocation = buildBrandsLocation(location.search);
 
   const update = <K extends keyof BrandCanon>(key: K, value: BrandCanon[K]) => {
@@ -49,15 +48,14 @@ export function BrandCanonEditorPanel({
   };
 
   const handleSave = async () => {
-    setMessage(null);
     if (!initialData.metadata.projectId) {
-      setMessage(t("demoSaveMessage"));
+      pushErrorToast(new Error(t("demoSaveMessage")), t("demoSaveMessage"));
       return;
     }
 
     const competitorError = validateCompetitors(competitorsDraft, locale);
     if (competitorError) {
-      setMessage(competitorError);
+      pushErrorToast(new Error(competitorError), competitorError);
       return;
     }
 
@@ -85,13 +83,10 @@ export function BrandCanonEditorPanel({
           resolveRuntimeMode(routeSearch),
         ),
       });
-      pushToast({
-        title: t("savedMessage"),
-        variant: "success",
-      });
+      pushSuccessToast(t("savedMessage"));
       navigate(brandsLocation);
     } catch (err) {
-      setMessage(err instanceof Error ? err.message : t("saveError"));
+      pushErrorToast(err, t("saveError"));
     } finally {
       setIsSaving(false);
     }
@@ -164,12 +159,7 @@ export function BrandCanonEditorPanel({
       </ScrollArea>
 
       <div className="border-t px-2 pt-4">
-        <div
-          className={`flex flex-col gap-2 sm:flex-row sm:items-center ${
-            message ? "sm:justify-between" : "sm:justify-end"
-          }`}
-        >
-          {message ? <div className="text-xs text-muted-foreground">{message}</div> : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
             <Button
               type="button"

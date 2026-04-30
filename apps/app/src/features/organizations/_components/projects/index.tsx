@@ -10,6 +10,7 @@ import type {
   OrganizationMember,
   OrganizationProject,
   OrganizationProjectMember,
+  ProjectSettingsInput,
   ProjectMemberDraft,
 } from "../../_lib/shared/types";
 
@@ -21,8 +22,14 @@ type ProjectsPanelProps = {
   memberDrafts: Record<string, ProjectMemberDraft>;
   onboardingHref: string;
   search: string;
+  canManageProjects: boolean;
+  canDeleteProjects: boolean;
+  deletingProjectId: string;
+  projectSettingsBusy: boolean;
   onMemberDraftChange: (projectId: string, draft: ProjectMemberDraft) => void;
   onSearchChange: (value: string) => void;
+  onUpdateProjectSettings: (projectId: string, input: ProjectSettingsInput) => void;
+  onDeleteProject: (projectId: string) => void;
   onAssignProjectMember: (projectId: string) => void;
   onRemoveProjectMember: (projectId: string, userId: string) => void;
   memberBusy: boolean;
@@ -37,8 +44,14 @@ export function ProjectsPanel({
   memberDrafts,
   onboardingHref,
   search,
+  canManageProjects,
+  canDeleteProjects,
+  deletingProjectId,
+  projectSettingsBusy,
   onMemberDraftChange,
   onSearchChange,
+  onUpdateProjectSettings,
+  onDeleteProject,
   onAssignProjectMember,
   onRemoveProjectMember,
   memberBusy,
@@ -48,7 +61,7 @@ export function ProjectsPanel({
     const needle = search.trim().toLowerCase();
     if (!needle) return projects;
     return projects.filter((project) =>
-      [project.name, project.brandName, project.status, project.attributionSource]
+      [project.name, project.brandName, project.attributionSource]
         .join(" ")
         .toLowerCase()
         .includes(needle),
@@ -58,14 +71,9 @@ export function ProjectsPanel({
   return (
     <div className="grid gap-4">
       <section className="rounded-lg border border-border/60 bg-card">
-        <div className="flex flex-col gap-3 border-b border-border/60 p-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2>
-              <SectionTitle>Projets</SectionTitle>
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {members.length} membre{members.length > 1 ? "s" : ""} orga ont acces a ces projets.
-            </p>
+            <SectionTitle showIndicator={false}>Projets</SectionTitle>
           </div>
           <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
             <div className="relative w-full sm:w-72">
@@ -77,12 +85,14 @@ export function ProjectsPanel({
                 className="pl-9"
               />
             </div>
-            <Button asChild className="w-full sm:w-auto">
-              <Link to={onboardingHref}>
-                <FolderPlus data-icon="inline-start" />
-                Creer un nouveau projet
-              </Link>
-            </Button>
+            {canManageProjects ? (
+              <Button asChild className="w-full sm:w-auto">
+                <Link to={onboardingHref}>
+                  <FolderPlus data-icon="inline-start" />
+                  Creer un nouveau projet
+                </Link>
+              </Button>
+            ) : null}
           </div>
         </div>
 
@@ -90,10 +100,14 @@ export function ProjectsPanel({
           {filteredProjects.length === 0 ? (
             <EmptyBlock
               title="Aucun projet"
-              description="Cree un premier projet pour alimenter cette organisation."
+              description={
+                canManageProjects
+                  ? "Cree un premier projet pour alimenter cette organisation."
+                  : "Aucun projet n'est disponible pour votre compte."
+              }
             />
           ) : (
-            <div className="grid gap-3 lg:grid-cols-2">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredProjects.map((project) => {
                 const assignedMembers = projectMembers.filter(
                   (member) => member.projectId === project.id,
@@ -109,12 +123,20 @@ export function ProjectsPanel({
                     key={project.id}
                     project={project}
                     assignedMembers={assignedMembers}
+                    organizationMembers={members}
                     availableMembers={availableMembers}
                     projectMembers={projectMembers}
                     currentUserId={currentUserId}
                     memberDraft={memberDraft}
                     memberBusy={memberBusy}
                     removeMemberBusy={removeMemberBusy}
+                    canUpdateProject={canManageProjects}
+                    canDeleteProject={canDeleteProjects}
+                    canManageProjectMembers={canManageProjects}
+                    updateProjectBusy={projectSettingsBusy}
+                    deleteProjectBusy={deletingProjectId === project.id}
+                    onUpdateProjectSettings={onUpdateProjectSettings}
+                    onDeleteProject={onDeleteProject}
                     onRemoveProjectMember={onRemoveProjectMember}
                     onMemberDraftChange={onMemberDraftChange}
                     onAssignProjectMember={onAssignProjectMember}

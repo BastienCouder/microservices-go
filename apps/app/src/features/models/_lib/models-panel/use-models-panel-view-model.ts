@@ -1,6 +1,12 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { buildScopedHref } from "@/shared/selection";
+import {
+  buildScopedHref,
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationID,
+  SELECTED_CONTEXT_CHANGE_EVENT,
+} from "@/shared/selection";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 
 import {
   getProviderCredentialOptions,
@@ -8,7 +14,6 @@ import {
   isProviderUsableWithCredentials,
   sortCatalogItemsByProvider,
 } from "../catalog-client";
-import { readSelectedOrganizationId } from "../model-access";
 import { readProjectIdFromSearch } from "./models-panel-route";
 import { useModelsPanelData } from "./use-models-panel-data";
 import { useProviderCredentialMutations } from "./use-provider-credential-mutations";
@@ -37,19 +42,46 @@ export const PROVIDER_API_KEY_TEXTS = {
   saving: "Enregistrement...",
 };
 
+function readOrganizationId(routeSearch: string): string {
+  const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
+  if (/^\d+$/.test(routeOrganizationId)) {
+    return routeOrganizationId;
+  }
+
+  return readSelectedOrganizationID();
+}
+
 export function useModelsPanelViewModel({
   apiBaseURL,
   routeSearch,
 }: UseModelsPanelViewModelOptions) {
-  const [organizationId] = useState(readSelectedOrganizationId);
+  const [organizationId, setOrganizationId] = useState(() =>
+    readOrganizationId(routeSearch),
+  );
   const [search, setSearch] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<Record<string, string>>({});
   const hintedProjectToken = useMemo(
     () => readProjectIdFromSearch(routeSearch),
     [routeSearch],
   );
+
+  useEffect(() => {
+    setOrganizationId(readOrganizationId(routeSearch));
+  }, [routeSearch]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const syncOrganizationId = () => {
+      setOrganizationId(readOrganizationId(routeSearch));
+    };
+
+    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncOrganizationId);
+    return () => {
+      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncOrganizationId);
+    };
+  }, [routeSearch]);
+
   const data = useModelsPanelData({
     apiBaseURL,
     organizationId,
@@ -61,10 +93,11 @@ export function useModelsPanelViewModel({
     organizationId,
     selectedProjectId: data.selectedProjectId,
     onSuccessMessage: (nextMessage) => {
-      setError(null);
-      setMessage(nextMessage);
+      pushSuccessToast(nextMessage);
     },
-    onErrorMessage: setError,
+    onErrorMessage: (nextMessage) => {
+      pushErrorToast(new Error(nextMessage), nextMessage);
+    },
   });
   const providerMutations = useProviderCredentialMutations({
     apiBaseURL,
@@ -72,27 +105,17 @@ export function useModelsPanelViewModel({
     projectId: data.selectedProjectId,
     onSaveSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({ ...current, [credential.provider]: "" }));
-      setError(null);
-      setMessage(`Cle API ${credential.label} enregistree.`);
+      pushSuccessToast(`Cle API ${credential.label} enregistree.`);
     },
     onDeleteSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({ ...current, [credential.provider]: "" }));
-      setError(null);
-      setMessage(`Cle API ${credential.label} supprimee.`);
+      pushSuccessToast(`Cle API ${credential.label} supprimee.`);
     },
     onSaveError: (mutationError) => {
-      setError(
-        mutationError instanceof Error
-          ? mutationError.message
-          : "Impossible d'enregistrer la cle API LLM.",
-      );
+      pushErrorToast(mutationError, "Impossible d'enregistrer la cle API LLM.");
     },
     onDeleteError: (mutationError) => {
-      setError(
-        mutationError instanceof Error
-          ? mutationError.message
-          : "Impossible de supprimer la cle API LLM.",
-      );
+      pushErrorToast(mutationError, "Impossible de supprimer la cle API LLM.");
     },
   });
 
@@ -178,7 +201,10 @@ export function useModelsPanelViewModel({
   const saveProviderKey = useCallback(
     (provider: string) => {
       if (!data.selectedProjectId) {
-        setError(API_KEY_PROJECT_REQUIRED_SAVE);
+        pushErrorToast(
+          new Error(API_KEY_PROJECT_REQUIRED_SAVE),
+          API_KEY_PROJECT_REQUIRED_SAVE,
+        );
         return;
       }
 
@@ -190,7 +216,10 @@ export function useModelsPanelViewModel({
   const deleteProviderKey = useCallback(
     (provider: string) => {
       if (!data.selectedProjectId) {
-        setError(API_KEY_PROJECT_REQUIRED_DELETE);
+        pushErrorToast(
+          new Error(API_KEY_PROJECT_REQUIRED_DELETE),
+          API_KEY_PROJECT_REQUIRED_DELETE,
+        );
         return;
       }
 
@@ -206,14 +235,13 @@ export function useModelsPanelViewModel({
         data.setSelectedModelIds((current) =>
           current.filter((value) => value !== modelId),
         );
-        setMessage(null);
         return;
       }
 
       const model = data.catalogById.get(modelId);
       if (!model) return;
       if (data.isDeveloperPlan && !data.providerCredentialsReady) {
-        setMessage("Chargement des cles API fournisseur...");
+        pushSuccessToast("Chargement des cles API fournisseur...");
         return;
       }
       if (
@@ -224,24 +252,25 @@ export function useModelsPanelViewModel({
           data.providerCredentialLookup,
         )
       ) {
-        setMessage(
-          `Ajoutez une cle API pour ${model.provider} ou OpenRouter avant d'utiliser ce modele.`,
+        const nextMessage = `Ajoutez une cle API pour ${model.provider} ou OpenRouter avant d'utiliser ce modele.`;
+        pushErrorToast(
+          new Error(nextMessage),
+          nextMessage,
         );
         return;
       }
       if (data.selectedModelIdSet.size >= data.selectionLimit) {
-        setMessage(
+        const nextMessage =
           data.planLabel
             ? `${data.planLabel} permet jusqu'a ${data.selectionLimit} modele${
                 data.selectionLimit > 1 ? "s" : ""
               }.`
-            : "La limite de votre plan a ete atteinte.",
-        );
+            : "La limite de votre plan a ete atteinte.";
+        pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
 
       data.setSelectedModelIds((current) => [...current, modelId]);
-      setMessage(null);
     },
     [data],
   );
@@ -255,8 +284,7 @@ export function useModelsPanelViewModel({
     setSearch,
     loading: data.loading,
     redirectHref,
-    displayError: error ?? data.queryError,
-    message,
+    displayError: data.queryError,
     selectedModelIds: data.selectedModelIds,
     selectedModelIdSet: data.selectedModelIdSet,
     selectedProject: data.selectedProject,

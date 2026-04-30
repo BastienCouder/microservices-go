@@ -22,6 +22,7 @@ import (
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
 	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
 	billingclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/billing"
+	googleanalyticsclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/googleanalytics"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/http"
@@ -101,6 +102,13 @@ func main() {
 	})
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)
+	}
+	if cfg.GA4OAuthClientID != "" || cfg.GA4OAuthClientSecret != "" {
+		ga4OAuthClient, err := googleanalyticsclient.NewClient(cfg.GA4OAuthClientID, cfg.GA4OAuthClientSecret)
+		if err != nil {
+			log.Fatalf("init ga4 oauth client: %v", err)
+		}
+		svc.ConfigureGA4OAuth(ga4OAuthClient, cfg.InternalJWTSecret)
 	}
 
 	backgroundCtx, stopBackground := context.WithCancel(context.Background())

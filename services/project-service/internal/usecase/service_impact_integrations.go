@@ -54,7 +54,7 @@ func (s *Service) UpdateProjectImpactIntegrations(
 		return ProjectImpactIntegrationsView{}, err
 	}
 
-	if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" &&
+	if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" && updated.GA4.OAuthRefreshToken == "" &&
 		updated.Stripe.WebhookSecret == "" &&
 		updated.Ingestion.SigningToken == "" {
 		delete(s.impactIntegrations, projectID)
@@ -113,10 +113,18 @@ func applyProjectImpactIntegrationUpdate(
 			}
 			if input.GA4.ServiceAccountJSON != nil {
 				updated.GA4.ServiceAccountJSON = strings.TrimSpace(*input.GA4.ServiceAccountJSON)
+				if updated.GA4.ServiceAccountJSON != "" {
+					updated.GA4.OAuthRefreshToken = ""
+				}
 			}
-			if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" {
+			hasProperty := updated.GA4.PropertyID != ""
+			hasServiceAccount := updated.GA4.ServiceAccountJSON != ""
+			hasOAuthToken := updated.GA4.OAuthRefreshToken != ""
+			if !hasProperty && !hasServiceAccount && !hasOAuthToken {
 				updated.GA4 = ProjectGA4Integration{}
-			} else if updated.GA4.PropertyID == "" || updated.GA4.ServiceAccountJSON == "" {
+			} else if hasServiceAccount && !hasProperty {
+				return ProjectImpactIntegrations{}, "", fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
+			} else if !hasServiceAccount && !hasOAuthToken {
 				return ProjectImpactIntegrations{}, "", fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
 			} else {
 				if updated.GA4.ConnectedAt.IsZero() {
@@ -176,6 +184,7 @@ func normalizeProjectImpactIntegrations(
 	out.ProjectID = strings.TrimSpace(projectID)
 	out.GA4.PropertyID = strings.TrimSpace(out.GA4.PropertyID)
 	out.GA4.ServiceAccountJSON = strings.TrimSpace(out.GA4.ServiceAccountJSON)
+	out.GA4.OAuthRefreshToken = strings.TrimSpace(out.GA4.OAuthRefreshToken)
 	out.Stripe.WebhookSecret = strings.TrimSpace(out.Stripe.WebhookSecret)
 	out.Ingestion.SigningToken = strings.TrimSpace(out.Ingestion.SigningToken)
 	return out
@@ -186,12 +195,21 @@ func buildProjectImpactIntegrationsView(
 	generatedIngestionToken string,
 ) ProjectImpactIntegrationsView {
 	projectID := strings.TrimSpace(input.ProjectID)
+	authMode := ""
+	if input.GA4.OAuthRefreshToken != "" {
+		authMode = "oauth"
+	} else if input.GA4.ServiceAccountJSON != "" {
+		authMode = "service_account"
+	}
+	isGA4Connected := input.GA4.PropertyID != "" && (input.GA4.ServiceAccountJSON != "" || input.GA4.OAuthRefreshToken != "")
 	return ProjectImpactIntegrationsView{
 		ProjectID: projectID,
 		GA4: ProjectGA4IntegrationView{
 			PropertyID:        input.GA4.PropertyID,
+			AuthMode:          authMode,
 			HasServiceAccount: input.GA4.ServiceAccountJSON != "",
-			IsConnected:       input.GA4.PropertyID != "" && input.GA4.ServiceAccountJSON != "",
+			HasOAuthToken:     input.GA4.OAuthRefreshToken != "",
+			IsConnected:       isGA4Connected,
 			ConnectedAt:       input.GA4.ConnectedAt,
 			UpdatedAt:         input.GA4.UpdatedAt,
 		},

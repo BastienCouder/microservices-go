@@ -3,8 +3,10 @@ package usecase
 import (
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"net/url"
 	"slices"
 	"strings"
 	"time"
@@ -16,6 +18,11 @@ type Service struct {
 	repo                  domain.Repository
 	projectLister         ProjectLister
 	projectMemberAssigner ProjectMemberAssigner
+	invitationNotifier    InvitationNotifier
+	userEmailResolver     UserEmailResolver
+	userProfileResolver   UserProfileResolver
+	invitationAppBaseURL  string
+	invitationLoginURL    string
 	now                   func() time.Time
 }
 
@@ -29,6 +36,19 @@ func (s *Service) EnableProjectHierarchy(projectLister ProjectLister) {
 
 func (s *Service) EnableProjectMemberAssignments(assigner ProjectMemberAssigner) {
 	s.projectMemberAssigner = assigner
+}
+
+func (s *Service) EnableInvitationNotifications(notifier InvitationNotifier, appBaseURL, loginURL string) {
+	s.invitationNotifier = notifier
+	s.invitationAppBaseURL = strings.TrimRight(strings.TrimSpace(appBaseURL), "/")
+	s.invitationLoginURL = strings.TrimSpace(loginURL)
+}
+
+func (s *Service) EnableInvitationUserEmailValidation(resolver UserEmailResolver) {
+	s.userEmailResolver = resolver
+	if profileResolver, ok := resolver.(UserProfileResolver); ok {
+		s.userProfileResolver = profileResolver
+	}
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIdentityID int64) (*domain.Organization, error) {
@@ -54,6 +74,71 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 		return nil, fmt.Errorf("get organization %d: %w", id, err)
 	}
 	return org, nil
+}
+
+func (s *Service) UpdateOrganizationName(ctx context.Context, id int64, name string) (*domain.Organization, error) {
+	name = strings.TrimSpace(name)
+	if id <= 0 {
+		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidOrganization)
+	}
+	if name == "" {
+		return nil, fmt.Errorf("%w: name is required", domain.ErrInvalidOrganization)
+	}
+
+	org, err := s.repo.UpdateName(ctx, id, name)
+	if err != nil {
+		return nil, fmt.Errorf("update organization %d: %w", id, err)
+	}
+	return org, nil
+}
+
+func (s *Service) CreateOrganizationAPIKey(ctx context.Context, organizationID int64, name string) (*domain.OrganizationAPIKey, error) {
+	name = strings.TrimSpace(name)
+	rawKey, err := generateOrganizationAPIKey()
+	if err != nil {
+		return nil, err
+	}
+	keyHash := hashOrganizationAPIKey(rawKey)
+	key := &domain.OrganizationAPIKey{
+		OrganizationID: organizationID,
+		Name:           name,
+		Prefix:         apiKeyPrefix(rawKey),
+		KeyHash:        keyHash,
+		Key:            rawKey,
+		CreatedAt:      s.now().UTC(),
+	}
+	if err := key.ValidateForCreate(); err != nil {
+		return nil, err
+	}
+	if err := s.repo.CreateAPIKey(ctx, key); err != nil {
+		return nil, fmt.Errorf("create organization api key: %w", err)
+	}
+	return key, nil
+}
+
+func (s *Service) ListOrganizationAPIKeys(ctx context.Context, organizationID int64) ([]domain.OrganizationAPIKey, error) {
+	if organizationID <= 0 {
+		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidOrganization)
+	}
+	keys, err := s.repo.ListAPIKeys(ctx, organizationID)
+	if err != nil {
+		return nil, fmt.Errorf("list organization api keys: %w", err)
+	}
+	for index := range keys {
+		keys[index].Key = ""
+		keys[index].KeyHash = ""
+	}
+	return keys, nil
+}
+
+func (s *Service) RevokeOrganizationAPIKey(ctx context.Context, organizationID, keyID int64) error {
+	if organizationID <= 0 || keyID <= 0 {
+		return fmt.Errorf("%w: invalid organization or api key id", domain.ErrInvalidOrganization)
+	}
+	if err := s.repo.RevokeAPIKey(ctx, organizationID, keyID, s.now().UTC()); err != nil {
+		return fmt.Errorf("revoke organization api key: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) GetOrganizationHierarchy(ctx context.Context, organizationID int64) (OrganizationHierarchy, error) {
@@ -120,7 +205,7 @@ func (s *Service) userCanManageAllProjects(ctx context.Context, organization *do
 		}
 		for _, role := range membership.Roles {
 			switch strings.TrimSpace(strings.ToLower(role)) {
-			case "owner", "admin", "super_admin":
+			case "admin", "super_admin":
 				return true, nil
 			}
 		}
@@ -194,6 +279,17 @@ func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]doma
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
 	}
+	if s.userProfileResolver != nil {
+		for i := range members {
+			profile, profileErr := s.userProfileResolver.UserProfile(ctx, members[i].UserID)
+			if profileErr != nil {
+				continue
+			}
+			members[i].Email = profile.Email
+			members[i].FirstName = profile.FirstName
+			members[i].LastName = profile.LastName
+		}
+	}
 	return members, nil
 }
 
@@ -254,25 +350,6 @@ func (s *Service) RemoveMember(ctx context.Context, organizationID, userID int64
 	return nil
 }
 
-func (s *Service) BanMember(ctx context.Context, organizationID, userID int64) (*domain.Member, error) {
-	return s.setMemberBanned(ctx, organizationID, userID, true)
-}
-
-func (s *Service) UnbanMember(ctx context.Context, organizationID, userID int64) (*domain.Member, error) {
-	return s.setMemberBanned(ctx, organizationID, userID, false)
-}
-
-func (s *Service) setMemberBanned(ctx context.Context, organizationID, userID int64, banned bool) (*domain.Member, error) {
-	if organizationID <= 0 || userID <= 0 {
-		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
-	}
-	member, err := s.repo.SetMemberBanned(ctx, organizationID, userID, banned)
-	if err != nil {
-		return nil, fmt.Errorf("set member banned: %w", err)
-	}
-	return member, nil
-}
-
 func normalizeMemberRoles(roles []string) ([]string, error) {
 	normalized := make([]string, 0, len(roles))
 	seen := make(map[string]struct{}, len(roles))
@@ -283,6 +360,9 @@ func normalizeMemberRoles(roles []string) ([]string, error) {
 		}
 		if _, exists := seen[next]; exists {
 			continue
+		}
+		if next == "owner" {
+			return nil, fmt.Errorf("%w: owner role is no longer assignable", domain.ErrInvalidRole)
 		}
 		seen[next] = struct{}{}
 		normalized = append(normalized, next)
@@ -362,7 +442,54 @@ func (s *Service) createInvitation(
 	if err := s.repo.CreateInvitation(ctx, invitation); err != nil {
 		return nil, fmt.Errorf("create invitation: %w", err)
 	}
+	if err := s.sendInvitationNotification(ctx, invitation); err != nil {
+		return nil, err
+	}
 	return invitation, nil
+}
+
+func (s *Service) sendInvitationNotification(ctx context.Context, invitation *domain.Invitation) error {
+	if s.invitationNotifier == nil || invitation == nil {
+		return nil
+	}
+
+	organizationName := fmt.Sprintf("organisation #%d", invitation.OrganizationID)
+	if org, err := s.repo.GetByID(ctx, invitation.OrganizationID); err == nil && strings.TrimSpace(org.Name) != "" {
+		organizationName = strings.TrimSpace(org.Name)
+	}
+
+	if err := s.invitationNotifier.SendInvitation(ctx, InvitationNotification{
+		Email:            invitation.Email,
+		OrganizationID:   invitation.OrganizationID,
+		OrganizationName: organizationName,
+		Role:             invitation.Role,
+		Message:          invitation.Message,
+		ProjectID:        invitation.ProjectID,
+		AcceptURL:        s.buildInvitationAcceptURL(invitation.Token),
+		ExpiresAt:        copyTimePtrUTC(invitation.ExpiresAt),
+	}); err != nil {
+		return fmt.Errorf("send invitation notification: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) buildInvitationAcceptURL(token string) string {
+	token = strings.TrimSpace(token)
+	if s.invitationAppBaseURL == "" || token == "" {
+		return ""
+	}
+	appInvitationURL := s.invitationAppBaseURL + "/invitations/" + url.PathEscape(token)
+	if s.invitationLoginURL == "" {
+		return appInvitationURL
+	}
+	loginURL, err := url.Parse(s.invitationLoginURL)
+	if err != nil {
+		return appInvitationURL
+	}
+	query := loginURL.Query()
+	query.Set("return_to", appInvitationURL)
+	loginURL.RawQuery = query.Encode()
+	return loginURL.String()
 }
 
 func (s *Service) ListInvitations(ctx context.Context, organizationID int64) ([]domain.Invitation, error) {
@@ -438,6 +565,11 @@ func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int
 	if trimmedToken == "" || userID <= 0 {
 		return nil, nil, fmt.Errorf("%w: token and user id are required", domain.ErrInvalidInvitation)
 	}
+	if s.userEmailResolver != nil {
+		if err := s.validateInvitationUserEmail(ctx, trimmedToken, userID); err != nil {
+			return nil, nil, err
+		}
+	}
 	invitation, member, err := s.repo.AcceptInvitationByToken(ctx, trimmedToken, userID, s.now().UTC())
 	if err != nil {
 		return nil, nil, fmt.Errorf("accept invitation: %w", err)
@@ -457,6 +589,29 @@ func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int
 		}
 	}
 	return invitation, member, nil
+}
+
+func (s *Service) validateInvitationUserEmail(ctx context.Context, token string, userID int64) error {
+	invitation, err := s.repo.GetInvitationByToken(ctx, token)
+	if err != nil {
+		return fmt.Errorf("get invitation before accept: %w", err)
+	}
+	userEmail, err := s.userEmailResolver.UserEmail(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("resolve invitation user email: %w", err)
+	}
+	invitationEmail, err := domain.NormalizeInvitationEmail(invitation.Email)
+	if err != nil {
+		return fmt.Errorf("%w: stored invitation email is invalid", domain.ErrInvalidInvitation)
+	}
+	normalizedUserEmail, err := domain.NormalizeInvitationEmail(userEmail)
+	if err != nil {
+		return fmt.Errorf("%w: authenticated user email is invalid", domain.ErrInvalidInvitation)
+	}
+	if normalizedUserEmail != invitationEmail {
+		return domain.ErrInvitationEmailMismatch
+	}
+	return nil
 }
 
 func (s *Service) RefuseInvitation(ctx context.Context, token string, userID int64) (*domain.Invitation, error) {
@@ -488,4 +643,25 @@ func generateSecureTokenHex(size int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(buf), nil
+}
+
+func generateOrganizationAPIKey() (string, error) {
+	token, err := generateSecureTokenHex(32)
+	if err != nil {
+		return "", fmt.Errorf("generate organization api key: %w", err)
+	}
+	return "org_" + token, nil
+}
+
+func hashOrganizationAPIKey(value string) string {
+	sum := sha256.Sum256([]byte(strings.TrimSpace(value)))
+	return hex.EncodeToString(sum[:])
+}
+
+func apiKeyPrefix(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) <= 12 {
+		return value
+	}
+	return value[:12]
 }

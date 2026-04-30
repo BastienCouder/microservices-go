@@ -8,19 +8,17 @@ export type MemberActionPolicy = {
   showActions: boolean;
   canEditRoles: boolean;
   canEditProjects: boolean;
-  canSetBanned: boolean;
   canRemoveMember: boolean;
   canAssignOwnerRole: boolean;
 };
 
-export const ASSIGNABLE_ORGANIZATION_ROLES = ["owner", "admin", "member"] as const;
+export const ASSIGNABLE_ORGANIZATION_ROLES = ["admin", "member"] as const;
 export const INVITABLE_ORGANIZATION_ROLES = ["admin", "member"] as const;
 
 const EMPTY_MEMBER_ACTION_POLICY: MemberActionPolicy = {
   showActions: false,
   canEditRoles: false,
   canEditProjects: false,
-  canSetBanned: false,
   canRemoveMember: false,
   canAssignOwnerRole: false,
 };
@@ -36,7 +34,7 @@ function hasRole(roles: string[], role: string): boolean {
 }
 
 export function memberHasOrganizationWideProjectAccess(roles: string[]): boolean {
-  return hasRole(roles, "owner") || hasRole(roles, "admin") || hasRole(roles, "super_admin");
+  return hasRole(roles, "owner");
 }
 
 export function getMemberActionPolicy({
@@ -52,15 +50,15 @@ export function getMemberActionPolicy({
   const actorIsAdminLike = hasRole(actorRoles, "admin") || hasRole(actorRoles, "super_admin");
   const actorCanManageMembers = actorIsOwner || actorIsAdminLike;
   if (!actorCanManageMembers) return EMPTY_MEMBER_ACTION_POLICY;
+  if (isCurrentUser) return EMPTY_MEMBER_ACTION_POLICY;
 
   const targetIsOwner = hasRole(targetRoles, "owner");
   if (targetIsOwner && !actorIsOwner) return EMPTY_MEMBER_ACTION_POLICY;
 
   return {
     showActions: true,
-    canEditRoles: !isCurrentUser,
+    canEditRoles: true,
     canEditProjects: !targetIsOwner,
-    canSetBanned: !targetIsOwner,
     canRemoveMember: actorIsAdminLike && !targetIsOwner,
     canAssignOwnerRole: actorIsOwner,
   };
@@ -88,6 +86,9 @@ export function getProjectNamesForMember(
   userId: string,
   roles: string[] = [],
 ): string[] {
+  if (memberHasOrganizationWideProjectAccess(roles)) {
+    return ["Tous les projets"];
+  }
   const projectNameById = new Map(projects.map((project) => [project.id, project.name]));
   return getProjectIdsForMember(projectMembers, userId, { projects, roles })
     .map((projectId) => projectNameById.get(projectId) ?? `Projet ${projectId}`)

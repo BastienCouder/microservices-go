@@ -10,6 +10,8 @@ import {
   buildScopedHref,
   readOrganizationIdFromSearch,
   readProjectIdFromSearch,
+  readSelectedOrganizationID,
+  readSelectedProjectToken,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import { MONITORING_ITEMS, ORGANIZATION_ITEMS, SIDEBAR_LABELS } from "./sidebar-constants";
@@ -41,8 +43,10 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
   const content = useI18nScope("sidebar");
   const location = useLocation();
   const [open, setOpen] = useState(false);
-  const activeProjectToken = readProjectIdFromSearch(location.search);
-  const activeOrganizationToken = readOrganizationIdFromSearch(location.search);
+  const activeProjectToken =
+    readProjectIdFromSearch(location.search) || readSelectedProjectToken();
+  const activeOrganizationToken =
+    readOrganizationIdFromSearch(location.search) || readSelectedOrganizationID();
 
   const navigationItems = useMemo(
     () => [
@@ -62,6 +66,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
         }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
+      { href: "/account", label: formatMobileLabel(content.account || SIDEBAR_LABELS.account) },
     ],
     [activeOrganizationToken, activeProjectToken, content],
   );

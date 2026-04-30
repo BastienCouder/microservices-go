@@ -60,6 +60,40 @@ func (r *Repository) GetByAuthIdentityID(ctx context.Context, authIdentityID str
 	return toDomainUserFromGetByAuthIdentityIDRow(user), nil
 }
 
+func (r *Repository) UpdateProfile(ctx context.Context, id int64, firstName, lastName string) (*domain.User, error) {
+	var user domain.User
+	var bannedAt pgtype.Timestamptz
+	var createdAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		UPDATE users
+		SET first_name = $2,
+		    last_name = $3
+		WHERE id = $1
+		  AND deleted_at IS NULL
+		RETURNING id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
+	`, id, firstName, lastName).Scan(
+		&user.ID,
+		&user.AuthIdentityID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Banned,
+		&bannedAt,
+		&createdAt,
+		&deletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrUserNotFound
+		}
+		return nil, fmt.Errorf("update user profile: %w", err)
+	}
+	user.BannedAt = fromPgNullableTimestamptz(bannedAt)
+	user.CreatedAt = fromPgTimestamptz(createdAt)
+	user.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &user, nil
+}
+
 func (r *Repository) SetBanned(ctx context.Context, id int64, banned bool, at time.Time) error {
 	rows, err := r.queries.SetUserBanned(ctx, sqlc.SetUserBannedParams{
 		ID:       id,
@@ -75,10 +109,14 @@ func (r *Repository) SetBanned(ctx context.Context, id int64, banned bool, at ti
 	return nil
 }
 
-func (r *Repository) SoftDelete(ctx context.Context, id int64, at time.Time) error {
+func (r *Repository) SoftDelete(ctx context.Context, id int64, at time.Time, anonymized domain.AnonymizedUser) error {
 	rows, err := r.queries.SoftDeleteUser(ctx, sqlc.SoftDeleteUserParams{
-		ID:        id,
-		DeletedAt: toPgTimestamptz(at),
+		ID:             id,
+		AuthIdentityID: anonymized.AuthIdentityID,
+		Email:          anonymized.Email,
+		FirstName:      anonymized.FirstName,
+		LastName:       anonymized.LastName,
+		DeletedAt:      toPgTimestamptz(at),
 	})
 	if err != nil {
 		return fmt.Errorf("soft delete user: %w", err)

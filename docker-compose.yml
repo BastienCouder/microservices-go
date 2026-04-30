@@ -41,7 +41,7 @@ services:
       - "30001:3000"
 
   email:
-    profiles: ["email"]
+    profiles: ["backend", "email"]
     build:
       dockerfile: apps/email/Dockerfile
     image: microservices-go/email:prod
@@ -174,6 +174,8 @@ services:
         SERVICE_PATH: ./services/organizations-service/cmd/api
     image: microservices-go/organizations-service:prod
     restart: unless-stopped
+    depends_on:
+      - rabbitmq
     environment:
       HTTP_ADDR: :8084
       METRICS_ADDR: :9090
@@ -183,12 +185,20 @@ services:
       ORG_DB_NAME: orgsvc
       ORG_DB_SSLMODE: disable
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+      USER_SERVICE_URL: http://user-service:8081
       PROJECT_SERVICE_URL: http://project-service:8088
+      APP_BASE_URL: http://localhost:30004
+      INVITATION_LOGIN_URL: http://localhost:30000/auth
+      RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
+      RABBITMQ_EXCHANGE: microservices.events
+      RABBITMQ_NOTIFICATION_EMAIL_QUEUE: notification.email.send
+      RABBITMQ_NOTIFICATION_EMAIL_ROUTING_KEY: notification.email.requested
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - orgsvc_db_password
       - internal_jwt_secret
+      - rabbitmq_url
     ports:
       - "50004:8084"
     healthcheck:
@@ -348,6 +358,9 @@ services:
         SERVICE_PATH: ./services/notification-service/cmd/api
     image: microservices-go/notification-service:prod
     restart: unless-stopped
+    depends_on:
+      - email
+      - rabbitmq
     environment:
       HTTP_ADDR: :8087
       METRICS_ADDR: :9090
@@ -359,13 +372,18 @@ services:
       NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
       EMAIL_RENDERER_URL: http://email:3002
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
-      RESEND_FROM_EMAIL: noreply@example.com
+      RESEND_FROM_EMAIL: Acme <hello@bastiencouder.com>
+      RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
+      RABBITMQ_EXCHANGE: microservices.events
+      RABBITMQ_NOTIFICATION_EMAIL_QUEUE: notification.email.send
+      RABBITMQ_NOTIFICATION_EMAIL_ROUTING_KEY: notification.email.requested
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - notifsvc_db_password
       - resend_api_key
       - internal_jwt_secret
+      - rabbitmq_url
     ports:
       - "50007:8087"
     healthcheck:
@@ -383,6 +401,9 @@ services:
         SERVICE_PATH: ./services/project-service/cmd/api
     image: microservices-go/project-service:prod
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       HTTP_ADDR: :8088
       METRICS_ADDR: :9090
@@ -404,10 +425,14 @@ services:
       INTERNAL_JWT_ISSUER: api-gateway
       PROJECT_SECRET_ENCRYPTION_KEY_FILE: /run/secrets/internal_jwt_secret
       GRPC_ALLOW_INSECURE: "true"
+      GA4_OAUTH_CLIENT_ID_FILE: /run/secrets/ga4_oauth_client_id
+      GA4_OAUTH_CLIENT_SECRET_FILE: /run/secrets/ga4_oauth_client_secret
     secrets:
       - projectsvc_db_password
       - internal_jwt_secret
       - rabbitmq_url
+      - ga4_oauth_client_id
+      - ga4_oauth_client_secret
     ports:
       - "50008:8088"
       - "9088:9088"
@@ -468,7 +493,7 @@ services:
       HTTP_ADDR: :8091
       METRICS_ADDR: :9090
       GRPC_ADDR: :9091
-      IA_EXECUTION_MODE: "${IA_EXECUTION_MODE:-mock}"
+      IA_EXECUTION_MODE: "${IA_EXECUTION_MODE:-provider}"
       IA_PROVIDER_BASE_URL: "${IA_PROVIDER_BASE_URL:-https://openrouter.ai/api/v1}"
       IA_PROVIDER_API_KEY_FILE: /run/secrets/openrouter_api_key
       IA_PROVIDER_HTTP_REFERER: "${IA_PROVIDER_HTTP_REFERER:-http://localhost:30004}"
@@ -521,6 +546,9 @@ services:
         SERVICE_PATH: ./services/attribution-service/cmd/api
     image: microservices-go/attribution-service:prod
     restart: unless-stopped
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     environment:
       HTTP_ADDR: :8092
       METRICS_ADDR: :9090
@@ -531,12 +559,18 @@ services:
       ATTRIBUTION_DB_SSLMODE: disable
       ATTRIBUTION_DB_PASSWORD_FILE: /run/secrets/attrsvc_db_password
       PROJECT_SERVICE_GRPC_ADDR: project-service:9088
+      PROJECT_SERVICE_URL: http://project-service:8088
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
+      GA4_OAUTH_CLIENT_ID_FILE: /run/secrets/ga4_oauth_client_id
+      GA4_OAUTH_CLIENT_SECRET_FILE: /run/secrets/ga4_oauth_client_secret
+      ATTRIBUTION_ENABLE_FAKE_TRAFFIC: "false"
     secrets:
       - attrsvc_db_password
       - internal_jwt_secret
+      - ga4_oauth_client_id
+      - ga4_oauth_client_secret
     ports:
       - "50012:8092"
     healthcheck:
@@ -877,3 +911,7 @@ secrets:
     file: ./deployments/secrets/r2_access_key_id.txt
   r2_secret_access_key:
     file: ./deployments/secrets/r2_secret_access_key.txt
+  ga4_oauth_client_id:
+    file: ./deployments/secrets/ga4_oauth_client_id.txt
+  ga4_oauth_client_secret:
+    file: ./deployments/secrets/ga4_oauth_client_secret.txt

@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { TableCell, TableRow } from "@/components/ui/table";
 import { WorkspaceTable, type WorkspaceTableColumn } from "../shared/workspace-table";
 import { PanelToolbar } from "../shared/panel-toolbar";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -26,6 +28,7 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 
 type PromptsTabContentProps = {
   filteredPrompts: PromptItem[];
+  promptsDataLoading: boolean;
   promptsLoading: boolean;
   hasPersonas: boolean;
   selectedPromptIds: string[];
@@ -64,6 +67,69 @@ type PromptsTabContentProps = {
   canNextPromptPage: boolean;
   setPromptPage: (page: number) => void;
 };
+
+function renderPromptLoadingRow(index: number) {
+  return (
+    <TableRow key={index}>
+      <TableCell>
+        <Skeleton className="h-4 w-4 rounded-sm" />
+      </TableCell>
+      <TableCell>
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full max-w-[360px]" />
+          <Skeleton className="h-3 w-2/3 max-w-[260px]" />
+        </div>
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-7 w-28 rounded-full" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-5 w-20" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-6 w-16 rounded-full" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-6 w-12 rounded-full" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-5 w-14" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="h-5 w-20" />
+      </TableCell>
+      <TableCell className="hidden xl:table-cell">
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </TableCell>
+      <TableCell>
+        <Skeleton className="ml-auto h-8 w-8 rounded-full" />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function PromptMobileLoadingCards() {
+  return (
+    <>
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className="rounded-md border bg-card p-4">
+          <div className="mb-3 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1 space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
+            <Skeleton className="h-8 w-8 rounded-full" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Skeleton className="h-6 w-20 rounded-full" />
+            <Skeleton className="h-6 w-16 rounded-full" />
+            <Skeleton className="h-6 w-24 rounded-full" />
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
 
 export function PromptsTabContent(props: PromptsTabContentProps) {
   const content = useI18nScope("prompts-workspace");
@@ -126,9 +192,13 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <PanelToolbar
             summary={
-              <Badge variant="outline" className="h-9 w-fit shrink-0 justify-center px-3 text-sm">
-                {t("promptsCount", { count: props.promptTotalItems })}
-              </Badge>
+              props.promptsDataLoading ? (
+                <Skeleton className="h-9 w-32 rounded-full" />
+              ) : (
+                <Badge variant="outline" className="h-9 w-fit shrink-0 justify-center px-3 text-sm">
+                  {t("promptsCount", { count: props.promptTotalItems })}
+                </Badge>
+              )
             }
           >
               <div className="flex flex-wrap items-center gap-2">
@@ -205,6 +275,9 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                   columns={promptsColumns}
                   rows={props.filteredPrompts}
                   getRowKey={(item) => item.id}
+                  loading={props.promptsDataLoading}
+                  loadingRowCount={6}
+                  renderLoadingRow={renderPromptLoadingRow}
                   emptyLabel={props.promptsLoading ? content.loadingPrompts : content.noPromptsForFilters}
                   renderRow={(item) =>
                     renderPromptDesktopRow(item, {
@@ -235,7 +308,9 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
             </div>
 
             <div className="space-y-3 py-4 lg:hidden">
-              {props.filteredPrompts.length === 0 ? (
+              {props.promptsDataLoading ? (
+                <PromptMobileLoadingCards />
+              ) : props.filteredPrompts.length === 0 ? (
                 <EmptyStateCard
                   label={props.promptsLoading ? content.loadingPrompts : content.noPromptsForFilters}
                 />
@@ -272,7 +347,11 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
 
           <div className="flex items-center justify-between gap-3 border-t px-4 py-3 md:px-6">
             <div className="min-w-0 text-sm text-muted-foreground">
-              {t("pageSummary", { page: props.promptPage, total: props.promptTotalPages })}
+              {props.promptsDataLoading ? (
+                <Skeleton className="h-4 w-28" />
+              ) : (
+                t("pageSummary", { page: props.promptPage, total: props.promptTotalPages })
+              )}
             </div>
             <div className="flex shrink-0 items-center gap-2">
               <Button

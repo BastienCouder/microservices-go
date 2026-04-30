@@ -30,7 +30,6 @@ type MembersPanelProps = {
   onUpdateMemberProjects: (userId: string, projectIds: string[]) => void;
   onUpdateRoles: (userId: string, roles: string[]) => void;
   onRemoveMember: (userId: string) => void;
-  onSetMemberBanned: (userId: string, banned: boolean) => void;
   memberActionBusy: boolean;
 };
 
@@ -44,7 +43,6 @@ export function MembersPanel({
   onUpdateMemberProjects,
   onUpdateRoles,
   onRemoveMember,
-  onSetMemberBanned,
   memberActionBusy,
 }: MembersPanelProps) {
   const [editingProjectsMember, setEditingProjectsMember] = useState<OrganizationMember | null>(null);
@@ -131,7 +129,7 @@ export function MembersPanel({
         <div className="border-b border-border/60 px-4 py-2">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <h2>
-              <SectionTitle>Membres & roles</SectionTitle>
+              <SectionTitle showIndicator={false}>Membres & roles</SectionTitle>
             </h2>
             <div className="flex flex-wrap gap-2">
               <Badge variant="outline">{members.length} membres</Badge>
@@ -153,8 +151,6 @@ export function MembersPanel({
                   <TableHead>Email</TableHead>
                   <TableHead>Projets</TableHead>
                   <TableHead>Roles actuels</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Ajoute le</TableHead>
                   {canShowAnyActions ? <TableHead className="text-right">Actions</TableHead> : null}
                 </TableRow>
               </TableHeader>
@@ -183,7 +179,6 @@ export function MembersPanel({
                       onUpdateRoles={onUpdateRoles}
                       onEditProjects={openProjectsDialog}
                       onRemoveMember={setRemoveTarget}
-                      onSetMemberBanned={onSetMemberBanned}
                     />
                   );
                 })}

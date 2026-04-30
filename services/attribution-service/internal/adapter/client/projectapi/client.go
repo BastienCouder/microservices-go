@@ -91,6 +91,7 @@ func (c *Client) GetProject(ctx context.Context, projectID string, organizationI
 			GA4 struct {
 				PropertyID         string `json:"propertyId"`
 				ServiceAccountJSON string `json:"serviceAccountJSON"`
+				OAuthRefreshToken  string `json:"oauthRefreshToken"`
 			} `json:"ga4"`
 			Stripe struct {
 				WebhookSecret string `json:"webhookSecret"`
@@ -112,6 +113,7 @@ func (c *Client) GetProject(ctx context.Context, projectID string, organizationI
 		GA4: usecase.ProjectGA4Integration{
 			PropertyID:         strings.TrimSpace(project.Integrations.GA4.PropertyID),
 			ServiceAccountJSON: strings.TrimSpace(project.Integrations.GA4.ServiceAccountJSON),
+			OAuthRefreshToken:  strings.TrimSpace(project.Integrations.GA4.OAuthRefreshToken),
 		},
 		Stripe: usecase.ProjectStripeIntegration{
 			WebhookSecret: strings.TrimSpace(project.Integrations.Stripe.WebhookSecret),

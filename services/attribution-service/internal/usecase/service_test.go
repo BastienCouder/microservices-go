@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -107,6 +108,21 @@ func (r staticProjectResolver) GetProject(_ context.Context, projectID string, _
 	return r.project, nil
 }
 
+type staticGeoTrafficProvider struct {
+	report GeoTrafficReport
+}
+
+func (p staticGeoTrafficProvider) GetGeoTrafficReport(_ context.Context, project ProjectMetadata, from, to time.Time, _ GeoTrafficFilters) (GeoTrafficReport, error) {
+	report := p.report
+	report.ProjectID = project.ID
+	report.PropertyID = project.GA4.PropertyID
+	report.DateRange = GeoTrafficDateRange{
+		StartDate: from.UTC().Format("2006-01-02"),
+		EndDate:   to.UTC().Format("2006-01-02"),
+	}
+	return report, nil
+}
+
 type allowVerifier struct{}
 
 func (allowVerifier) EnsureProjectOwnedByUser(_ context.Context, projectID, userID string) error {
@@ -127,6 +143,16 @@ func (allowVerifier) EnsureProjectInOrganization(_ context.Context, projectID st
 		return fmt.Errorf("%w: organizationId is required", ErrValidation)
 	}
 	return nil
+}
+
+type failingVerifier struct{}
+
+func (failingVerifier) EnsureProjectOwnedByUser(_ context.Context, _, _ string) error {
+	return errors.New("project grpc unavailable")
+}
+
+func (failingVerifier) EnsureProjectInOrganization(_ context.Context, _ string, _ int64) error {
+	return errors.New("project grpc unavailable")
 }
 
 func TestRecordEventAndGetFunnel(t *testing.T) {
@@ -209,5 +235,135 @@ func TestRecordIngestionEvent(t *testing.T) {
 	}
 	if event.Stage != StageSignup {
 		t.Fatalf("expected signup stage, got %s", event.Stage)
+	}
+}
+
+func TestGetGeoTrafficReportUsesConfiguredProjectGA4(t *testing.T) {
+	svc := NewService(&testRepo{}, allowVerifier{})
+	svc.projectResolver = staticProjectResolver{
+		project: ProjectMetadata{
+			ID:             "project-1",
+			OrganizationID: 42,
+			GA4: ProjectGA4Integration{
+				PropertyID:         "123456789",
+				ServiceAccountJSON: `{"client_email":"geo@example.iam.gserviceaccount.com","private_key":"key"}`,
+			},
+		},
+	}
+	svc.geoTrafficProvider = staticGeoTrafficProvider{
+		report: GeoTrafficReport{
+			Summary: GeoTrafficSummary{
+				TotalGeoSessions:     28,
+				TotalSessions:        400,
+				GeoShareOfTotal:      7,
+				GeoEngagedSessions:   21,
+				GeoEngagementRate:    75,
+				GeoConversions:       3,
+				GeoConversionRate:    10.71,
+				GeoAvgSessionSeconds: 94,
+				GeoBounceRate:        25,
+				GeoPageViews:         81,
+				TopEngine:            "ChatGPT",
+			},
+			BySource: []GeoTrafficSource{
+				{Source: "chatgpt.com", Medium: "referral", Engine: "ChatGPT", Sessions: 20},
+				{Source: "gemini.google.com", Medium: "referral", Engine: "Gemini", Sessions: 8},
+			},
+		},
+	}
+
+	from := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 3, 31, 23, 59, 59, 0, time.UTC)
+	report, err := svc.GetGeoTrafficReport(context.Background(), "project-1", "user-1", 42, from, to, GeoTrafficFilters{})
+	if err != nil {
+		t.Fatalf("get geo traffic report: %v", err)
+	}
+
+	if report.ProjectID != "project-1" || report.PropertyID != "123456789" {
+		t.Fatalf("unexpected report identity: %+v", report)
+	}
+	if report.DateRange.StartDate != "2026-03-01" || report.DateRange.EndDate != "2026-03-31" {
+		t.Fatalf("unexpected date range: %+v", report.DateRange)
+	}
+	if report.Summary.TotalGeoSessions != 28 || report.Summary.TopEngine != "ChatGPT" {
+		t.Fatalf("unexpected summary: %+v", report.Summary)
+	}
+	if len(report.BySource) != 2 || report.BySource[0].Engine != "ChatGPT" {
+		t.Fatalf("unexpected sources: %+v", report.BySource)
+	}
+}
+
+func TestGetGeoTrafficReportUsesOAuthGA4Integration(t *testing.T) {
+	svc := NewService(&testRepo{}, allowVerifier{})
+	svc.projectResolver = staticProjectResolver{
+		project: ProjectMetadata{
+			ID:             "project-1",
+			OrganizationID: 42,
+			GA4: ProjectGA4Integration{
+				PropertyID:        "123456789",
+				OAuthRefreshToken: "refresh_token_123",
+			},
+		},
+	}
+	svc.geoTrafficProvider = staticGeoTrafficProvider{
+		report: GeoTrafficReport{
+			Summary: GeoTrafficSummary{TotalGeoSessions: 9},
+		},
+	}
+
+	report, err := svc.GetGeoTrafficReport(
+		context.Background(),
+		"project-1",
+		"user-1",
+		42,
+		time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 3, 31, 0, 0, 0, 0, time.UTC),
+		GeoTrafficFilters{},
+	)
+	if err != nil {
+		t.Fatalf("get oauth ga4 traffic report: %v", err)
+	}
+	if report.Summary.TotalGeoSessions != 9 {
+		t.Fatalf("unexpected report: %+v", report)
+	}
+}
+
+func TestGetGeoTrafficReportRequiresGA4Integration(t *testing.T) {
+	svc := NewService(&testRepo{}, allowVerifier{})
+	svc.projectResolver = staticProjectResolver{
+		project: ProjectMetadata{ID: "project-1", OrganizationID: 42},
+	}
+	svc.geoTrafficProvider = staticGeoTrafficProvider{}
+
+	_, err := svc.GetGeoTrafficReport(context.Background(), "project-1", "user-1", 42, time.Time{}, time.Time{}, GeoTrafficFilters{})
+	if err == nil {
+		t.Fatalf("expected validation error")
+	}
+}
+
+func TestGetGeoTrafficReportUsesProjectResolverWhenProjectVerifierIsUnavailable(t *testing.T) {
+	svc := NewService(&testRepo{}, failingVerifier{})
+	svc.projectResolver = staticProjectResolver{
+		project: ProjectMetadata{
+			ID:             "project-1",
+			OrganizationID: 42,
+			GA4: ProjectGA4Integration{
+				PropertyID:        "123456789",
+				OAuthRefreshToken: "refresh-token",
+			},
+		},
+	}
+	svc.geoTrafficProvider = staticGeoTrafficProvider{
+		report: GeoTrafficReport{
+			Summary: GeoTrafficSummary{TotalGeoSessions: 7},
+		},
+	}
+
+	report, err := svc.GetGeoTrafficReport(context.Background(), "project-1", "user-1", 42, time.Time{}, time.Time{}, GeoTrafficFilters{})
+	if err != nil {
+		t.Fatalf("expected geo report to use project resolver, got %v", err)
+	}
+	if report.Summary.TotalGeoSessions != 7 {
+		t.Fatalf("unexpected report: %+v", report)
 	}
 }

@@ -1,9 +1,20 @@
 import { useMemo } from "react";
-import { Mail, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionTitle } from "@/components/shared/section-title";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -68,9 +79,9 @@ export function InvitationsPanel({
 
   return (
     <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-      <section className="rounded-lg border border-border/60 bg-card p-4">
+      <section className="rounded-lg border border-border/60 bg-card px-4 py-2">
         <h2>
-          <SectionTitle>Nouvelle invitation</SectionTitle>
+          <SectionTitle showIndicator={false}>Nouvelle invitation</SectionTitle>
         </h2>
         <div className="mt-4 space-y-3">
           <Input
@@ -95,7 +106,7 @@ export function InvitationsPanel({
               });
             }}
           >
-            <SelectTrigger className="bg-background">
+            <SelectTrigger className="bg-background w-full">
               <SelectValue placeholder="Portee de l'invitation" />
             </SelectTrigger>
             <SelectContent>
@@ -108,7 +119,7 @@ export function InvitationsPanel({
             </SelectContent>
           </Select>
           <Select value={draft.role} onValueChange={(role) => onDraftChange({ ...draft, role })}>
-            <SelectTrigger className="bg-background">
+            <SelectTrigger className="bg-background w-full">
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
@@ -125,16 +136,15 @@ export function InvitationsPanel({
             placeholder="Message optionnel"
           />
           <Button className="w-full" onClick={onSubmit} disabled={busy}>
-            <Mail data-icon="inline-start" />
             {busy ? "Envoi..." : "Inviter"}
           </Button>
         </div>
       </section>
 
       <section className="rounded-lg border border-border/60 bg-card">
-        <div className="border-b border-border/60 p-4">
+        <div className="border-b border-border/60 px-4 py-2">
           <h2>
-            <SectionTitle>Invitations en cours</SectionTitle>
+            <SectionTitle showIndicator={false}>Invitations en cours</SectionTitle>
           </h2>
         </div>
         <div className="p-4">
@@ -172,17 +182,39 @@ export function InvitationsPanel({
                     </TableCell>
                     <TableCell>{formatDateTime(invitation.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        title="Desactiver l'invitation"
-                        disabled={revokeBusy}
-                        onClick={() => onRevokeInvitation(invitation.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Desactiver l'invitation</span>
-                      </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                            title="Desactiver l'invitation"
+                            disabled={revokeBusy}
+                          >
+                            <Trash2 />
+                            <span className="sr-only">Desactiver l'invitation</span>
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Desactiver cette invitation ?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              L'invitation envoyee a {invitation.email} ne pourra plus etre acceptee.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel disabled={revokeBusy}>Annuler</AlertDialogCancel>
+                            <AlertDialogAction
+                              variant="destructive"
+                              disabled={revokeBusy}
+                              onClick={() => onRevokeInvitation(invitation.id)}
+                            >
+                              Desactiver
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </TableCell>
                   </TableRow>
                 ))}

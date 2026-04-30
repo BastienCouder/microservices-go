@@ -118,7 +118,7 @@ const COMPOSE_FILES = parseComposeFiles(process.env.SEED_COMPOSE_FILES);
 const COMPOSE_ARGS = ["compose", "-p", COMPOSE_PROJECT_NAME, ...COMPOSE_FILES.flatMap((file) => ["-f", file])];
 const POSTGRES_EXEC = [...COMPOSE_ARGS, "exec", "-T", "postgres"];
 
-const ORGANIZATION_NAME = process.env.SEED_ORG_NAME ?? "Nike Brand Team";
+const ORGANIZATION_NAME = process.env.SEED_ORG_NAME ?? "Nike";
 const TEAM_NAME = process.env.SEED_TEAM_NAME ?? "Global Digital Marketing";
 const PROJECT_ID = process.env.SEED_PROJECT_ID ?? "nike";
 const PROJECT_NAME = process.env.SEED_PROJECT_NAME ?? "Nike";

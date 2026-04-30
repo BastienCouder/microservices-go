@@ -1,15 +1,17 @@
+import { useEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { InvitationsPanel } from "./_components/invitations";
+import { ApiKeysPanel } from "./_components/api-keys";
 import { MembersPanel } from "./_components/members";
 import { ProjectsPanel } from "./_components/projects";
+import { SettingsPanel } from "./_components/settings";
 import { LoadingState } from "./_components/shared/template";
 import { EmptyBlock } from "./_components/shared/empty-block";
 import { OrganizationSummaryPanel } from "./_components/summary";
 import type { OrganizationsPageViewModel } from "./_lib/page/use-organizations-page-view-model";
-import type { ViewTab } from "./_lib/shared/types";
 
 export function OrganizationsLayout({
   activeTab,
@@ -24,25 +26,50 @@ export function OrganizationsLayout({
   projectMemberDrafts,
   invitationDraft,
   createProjectOnboardingHref,
+  canManageProjects,
+  canDeleteProjects,
+  deletingProjectId,
+  projectSettingsBusy,
   projectMemberBusy,
   removeProjectMemberBusy,
   memberActionBusy,
   createInvitationBusy,
   revokeInvitationBusy,
+  updateOrganizationBusy,
+  createAPIKeyBusy,
+  revokeAPIKeyBusy,
+  createdAPIKey,
   setActiveTab,
   setProjectSearch,
   setInvitationDraft,
   onMemberDraftChange,
+  onUpdateProjectSettings,
+  onDeleteProject,
   onAssignProjectMember,
   onRemoveProjectMember,
   onUpdateMemberProjects,
   onUpdateRoles,
   onRemoveMember,
-  onSetMemberBanned,
   onCreateInvitation,
   onRevokeInvitation,
+  onUpdateOrganizationName,
+  onCreateAPIKey,
+  onRevokeAPIKey,
+  onClearCreatedAPIKey,
   onRefetchOrganizations,
 }: OrganizationsPageViewModel) {
+  useEffect(() => {
+    if (activeError) {
+      pushErrorToast(new Error(activeError), activeError);
+    }
+  }, [activeError]);
+
+  useEffect(() => {
+    if (notice) {
+      pushSuccessToast(notice);
+    }
+  }, [notice]);
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
@@ -51,43 +78,13 @@ export function OrganizationsLayout({
         actionsVariant="classic"
       />
 
-      {activeError ? (
-        <div className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {activeError}
-        </div>
-      ) : null}
-      {notice ? (
-        <div className="mb-3 rounded-lg border border-primary/20 bg-primary/8 px-4 py-3 text-sm text-foreground">
-          {notice}
-        </div>
-      ) : null}
-
       {isInitialLoading ? (
         <LoadingState />
       ) : selectedOrganization ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
           <OrganizationSummaryPanel organization={selectedOrganization} resources={resources} />
-          <Tabs
-            value={activeTab}
-            onValueChange={(value) => setActiveTab(value as ViewTab)}
-            className="mt-4 flex-col rounded-lg border border-border/60 bg-card"
-          >
-            <div className="border-b border-border/60 px-4 py-3">
-              <TabsList className="h-10 max-w-full overflow-x-auto p-1.5">
-                <TabsTrigger value="projects" className="px-3 text-xs md:text-sm">
-                  Projets
-                </TabsTrigger>
-                <TabsTrigger value="members" className="px-3 text-xs md:text-sm">
-                  Membres & roles
-                </TabsTrigger>
-                <TabsTrigger value="invitations" className="px-3 text-xs md:text-sm">
-                  Invitations
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <div className="p-4">
-              <TabsContent value="projects" className="m-0">
+          <div className="mt-4">
+            {activeTab === "projects" ? (
                 <ProjectsPanel
                   projects={resources.projects}
                   members={resources.members}
@@ -96,16 +93,22 @@ export function OrganizationsLayout({
                   memberDrafts={projectMemberDrafts}
                   onboardingHref={createProjectOnboardingHref}
                   search={projectSearch}
+                  canManageProjects={canManageProjects}
+                  canDeleteProjects={canDeleteProjects}
+                  deletingProjectId={deletingProjectId}
+                  projectSettingsBusy={projectSettingsBusy}
                   onMemberDraftChange={onMemberDraftChange}
                   onSearchChange={setProjectSearch}
+                  onUpdateProjectSettings={onUpdateProjectSettings}
+                  onDeleteProject={onDeleteProject}
                   onAssignProjectMember={onAssignProjectMember}
                   onRemoveProjectMember={onRemoveProjectMember}
                   memberBusy={projectMemberBusy}
                   removeMemberBusy={removeProjectMemberBusy}
                 />
-              </TabsContent>
+              ) : null}
 
-              <TabsContent value="members" className="m-0">
+            {activeTab === "members" ? (
                 <MembersPanel
                   members={resources.members}
                   projects={resources.projects}
@@ -116,12 +119,11 @@ export function OrganizationsLayout({
                   onUpdateMemberProjects={onUpdateMemberProjects}
                   onUpdateRoles={onUpdateRoles}
                   onRemoveMember={onRemoveMember}
-                  onSetMemberBanned={onSetMemberBanned}
                   memberActionBusy={memberActionBusy}
                 />
-              </TabsContent>
+              ) : null}
 
-              <TabsContent value="invitations" className="m-0">
+            {activeTab === "invitations" ? (
                 <InvitationsPanel
                   invitations={resources.invitations}
                   projects={resources.projects}
@@ -132,9 +134,28 @@ export function OrganizationsLayout({
                   busy={createInvitationBusy}
                   revokeBusy={revokeInvitationBusy}
                 />
-              </TabsContent>
-            </div>
-          </Tabs>
+              ) : null}
+
+            {activeTab === "settings" ? (
+                <SettingsPanel
+                  organization={selectedOrganization}
+                  busy={updateOrganizationBusy}
+                  onSubmit={onUpdateOrganizationName}
+                />
+              ) : null}
+
+            {activeTab === "apiKeys" ? (
+                <ApiKeysPanel
+                  apiKeys={resources.apiKeys}
+                  createdAPIKey={createdAPIKey}
+                  createBusy={createAPIKeyBusy}
+                  revokeBusy={revokeAPIKeyBusy}
+                  onCreateAPIKey={onCreateAPIKey}
+                  onRevokeAPIKey={onRevokeAPIKey}
+                  onClearCreatedAPIKey={onClearCreatedAPIKey}
+                />
+              ) : null}
+          </div>
         </div>
       ) : (
         <EmptyBlock

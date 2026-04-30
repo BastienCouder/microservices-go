@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,64 @@ import (
 
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
+
+type handlerTestGA4OAuthProvider struct {
+	exchangeErr error
+}
+
+type handlerAnalysisClientSpy struct {
+	startCalls  int
+	recordCalls int
+}
+
+func (s *handlerAnalysisClientSpy) StartAnalysis(_ context.Context, req usecase.AnalysisStartRequest) (usecase.AnalysisStartResponse, error) {
+	s.startCalls++
+	promptRuns := make([]usecase.AnalysisPromptRun, 0, len(req.PromptTexts))
+	for _, prompt := range req.PromptTexts {
+		promptRuns = append(promptRuns, usecase.AnalysisPromptRun{
+			ID:         prompt.ID + "-run",
+			PromptID:   prompt.ID,
+			PromptText: prompt.Text,
+		})
+	}
+	return usecase.AnalysisStartResponse{RunID: "run-1", PromptRuns: promptRuns}, nil
+}
+
+func (s *handlerAnalysisClientSpy) RecordResponse(_ context.Context, _ string, _ usecase.AnalysisRecordResponseInput) error {
+	s.recordCalls++
+	return nil
+}
+
+type handlerIAClientSpy struct {
+	execCalls int
+}
+
+func (s *handlerIAClientSpy) ExecutePrompt(_ context.Context, _ usecase.IAExecutePromptInput) (usecase.IAExecutePromptResult, error) {
+	s.execCalls++
+	var result usecase.IAExecutePromptResult
+	result.RawResponse = "Acme est recommande https://acme.test"
+	result.Analysis.BrandMentioned = true
+	result.Analysis.BrandPosition = "top"
+	result.Analysis.CitationFound = true
+	result.Analysis.CitedURLs = []string{"https://acme.test"}
+	result.Analysis.Sentiment = "positive"
+	return result, nil
+}
+
+func (p handlerTestGA4OAuthProvider) AuthorizationURL(state, redirectURI string) (string, error) {
+	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state + "&redirect_uri=" + redirectURI, nil
+}
+
+func (p handlerTestGA4OAuthProvider) ExchangeCode(_ context.Context, _, _ string) (usecase.GA4OAuthToken, error) {
+	if p.exchangeErr != nil {
+		return usecase.GA4OAuthToken{}, p.exchangeErr
+	}
+	return usecase.GA4OAuthToken{RefreshToken: "refresh-token"}, nil
+}
+
+func (p handlerTestGA4OAuthProvider) ListProperties(_ context.Context, _ string) ([]usecase.GA4OAuthProperty, error) {
+	return []usecase.GA4OAuthProperty{{PropertyID: "123456789", DisplayName: "Site France"}}, nil
+}
 
 func TestLLMProviderCredentialsRoutes(t *testing.T) {
 	svc := usecase.NewService()
@@ -108,6 +167,106 @@ func TestLLMProviderCredentialsRoutes(t *testing.T) {
 	}
 }
 
+func TestManualAnalysisRunRouteExecutesPrompt(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &handlerAnalysisClientSpy{}
+	iaSpy := &handlerIAClientSpy{}
+	svc, err := usecase.NewServiceWithDependencies(ctx, usecase.Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	project, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Manual Analysis",
+		Domain:         "manual.test",
+		WebsiteURL:     "https://manual.test",
+		BrandName:      "Manual",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM recommander ?"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
+
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/projects/"+project.ID+"/analysis/run",
+		strings.NewReader(`{"requestId":"manual-route-1","promptTexts":[{"id":"`+prompts[0].ID+`","text":"`+prompts[0].Text+`"}],"modelIds":["gpt-oss-20b-free"],"runType":"manual"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "42")
+	req.Header.Set("X-Authenticated-User-ID", "7")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected POST 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if analysisSpy.startCalls != 1 || iaSpy.execCalls != 1 || analysisSpy.recordCalls != 1 {
+		t.Fatalf("expected full manual pipeline, got start=%d ia=%d record=%d", analysisSpy.startCalls, iaSpy.execCalls, analysisSpy.recordCalls)
+	}
+}
+
+func TestGA4OAuthCallbackReturnsUserFriendlyDependencyError(t *testing.T) {
+	svc := usecase.NewService()
+	svc.ConfigureGA4OAuth(
+		handlerTestGA4OAuthProvider{exchangeErr: errors.New("google oauth error (400): invalid_grant")},
+		"state-secret",
+	)
+	ctx := context.Background()
+	project, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "GA4 OAuth Callback",
+		Domain:         "oauth-callback.test",
+		WebsiteURL:     "https://oauth-callback.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	start, err := svc.StartProjectGA4OAuth(ctx, project.ID, 42, usecase.StartProjectGA4OAuthInput{
+		RedirectURI: "http://localhost:30004/traffic",
+	})
+	if err != nil {
+		t.Fatalf("start ga4 oauth: %v", err)
+	}
+
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/projects/"+project.ID+"/impact-integrations/ga4/oauth/callback",
+		strings.NewReader(`{"code":"one-use-code","state":"`+start.State+`","redirectUri":"http://localhost:30004/traffic"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "42")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected callback 503, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Connexion Google Analytics momentanément indisponible") {
+		t.Fatalf("expected user friendly GA4 error, got %s", rec.Body.String())
+	}
+	if strings.Contains(rec.Body.String(), "exchange ga4 oauth code") || strings.Contains(rec.Body.String(), "invalid_grant") {
+		t.Fatalf("expected response to hide dependency details, got %s", rec.Body.String())
+	}
+}
+
 func TestProjectMembersRoutes(t *testing.T) {
 	svc := usecase.NewService()
 	project, err := svc.CreateProject(context.Background(), usecase.CreateProjectInput{
@@ -168,6 +327,32 @@ func TestProjectMembersRoutes(t *testing.T) {
 	mux.ServeHTTP(deleteRec, deleteReq)
 	if deleteRec.Code != http.StatusNoContent {
 		t.Fatalf("expected DELETE 204, got %d: %s", deleteRec.Code, deleteRec.Body.String())
+	}
+}
+
+func TestActivateProjectRouteIsRemoved(t *testing.T) {
+	svc := usecase.NewService()
+	project, err := svc.CreateProject(context.Background(), usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Removed Activation",
+		Domain:         "activation.test",
+		WebsiteURL:     "https://activation.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+project.ID+"/activate", nil)
+	req.Header.Set("X-Organization-ID", "42")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected activate route 404, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

@@ -64,8 +64,10 @@ func main() {
 		if err != nil {
 			log.Fatalf("init project api client: %v", err)
 		}
-		visitProvider := ga4client.NewClient()
+		visitProvider := ga4client.NewClientWithOAuth(cfg.GA4.OAuthClientID, cfg.GA4.OAuthClientSecret)
+		visitProvider.SetFakeTrafficEnabled(cfg.GA4.FakeTrafficEnabled)
 		svc.EnableVisitProvider(projectResolver, visitProvider)
+		svc.EnableGeoTrafficProvider(projectResolver, visitProvider)
 	}
 	h := httpadapter.NewHandler(svc)
 

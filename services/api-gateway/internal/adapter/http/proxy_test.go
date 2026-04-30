@@ -434,6 +434,68 @@ func TestGatewayUsersReadForbidsOtherUserID(t *testing.T) {
 	}
 }
 
+func TestGatewayDeleteMeProxiesAuthenticatedUser(t *testing.T) {
+	var deleteCalls int32
+	var forwardedClaims internalTokenClaims
+
+	userUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/users/by-auth/"):
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":42}`))
+		case r.URL.Path == "/users/me" && r.Method == http.MethodDelete:
+			atomic.AddInt32(&deleteCalls, 1)
+			token := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "))
+			claims, err := verifyInternalJWT(token, "test-secret", "api-gateway", "user-service")
+			if err != nil {
+				t.Fatalf("verify internal jwt: %v", err)
+			}
+			forwardedClaims = claims
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer userUpstream.Close()
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/validate" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"identity_id":"kratos-id-42"}`))
+	}))
+	defer authUpstream.Close()
+
+	h, err := NewHandler(userUpstream.URL, authUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, 100, "test-secret", "api-gateway")
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/users/me", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := atomic.LoadInt32(&deleteCalls); got != 1 {
+		t.Fatalf("expected delete upstream to be called once, got %d", got)
+	}
+	if forwardedClaims.IdentityID != "kratos-id-42" {
+		t.Fatalf("unexpected forwarded identity: %q", forwardedClaims.IdentityID)
+	}
+	if forwardedClaims.UserID != 42 {
+		t.Fatalf("unexpected forwarded user id: %d", forwardedClaims.UserID)
+	}
+}
+
 func TestGatewayUsersByAuthForbidsDifferentIdentity(t *testing.T) {
 	var byAuthCalls int32
 

@@ -85,20 +85,20 @@ func TestRepositoryIntegration_TeamsMembersRoles(t *testing.T) {
 		t.Fatalf("list members: %v", err)
 	}
 	if len(members) != 2 {
-		t.Fatalf("expected 2 members (owner + added), got %d", len(members))
+		t.Fatalf("expected 2 members (creator + added), got %d", len(members))
 	}
 
-	var ownerFound bool
+	var creatorFound bool
 	for _, m := range members {
 		if m.UserID == org.OwnerIdentityID {
-			ownerFound = true
-			if len(m.Roles) != 1 || m.Roles[0] != "owner" {
-				t.Fatalf("expected owner to have role owner, got %v", m.Roles)
+			creatorFound = true
+			if len(m.Roles) != 1 || m.Roles[0] != "admin" {
+				t.Fatalf("expected organization creator to have role admin, got %v", m.Roles)
 			}
 		}
 	}
-	if !ownerFound {
-		t.Fatalf("expected owner membership for user_id=%d", org.OwnerIdentityID)
+	if !creatorFound {
+		t.Fatalf("expected creator membership for user_id=%d", org.OwnerIdentityID)
 	}
 
 	storedOrg, err := repo.GetByID(ctx, org.ID)

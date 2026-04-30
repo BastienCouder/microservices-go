@@ -41,7 +41,6 @@ func TestGetOrganizationHierarchyIncludesProjects(t *testing.T) {
 				ID:                "prj-1",
 				OrganizationID:    1,
 				Name:              "Acme Core",
-				Status:            "active",
 				BrandName:         "Acme",
 				BrandDescription:  "Acme brand",
 				AttributionSource: "google",
@@ -75,8 +74,8 @@ func TestGetOrganizationHierarchyForUserUsesProjectScopedListing(t *testing.T) {
 	svc := NewService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
-			{ID: "prj-user", OrganizationID: 1, Name: "Visible", Status: "active"},
-			{ID: "prj-other", OrganizationID: 1, Name: "Hidden", Status: "active"},
+			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
+			{ID: "prj-other", OrganizationID: 1, Name: "Hidden"},
 		},
 	})
 
@@ -102,8 +101,8 @@ func TestGetOrganizationHierarchyForAdminUserIncludesAllProjects(t *testing.T) {
 	svc := NewService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
-			{ID: "prj-user", OrganizationID: 1, Name: "Visible", Status: "active"},
-			{ID: "prj-other", OrganizationID: 1, Name: "Also visible", Status: "active"},
+			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
+			{ID: "prj-other", OrganizationID: 1, Name: "Also visible"},
 		},
 	})
 
@@ -127,13 +126,13 @@ func TestGetOrganizationHierarchyForAdminUserIncludesAllProjects(t *testing.T) {
 	}
 }
 
-func TestGetOrganizationHierarchyForOwnerUserIncludesAllProjectsEvenWithoutMemberRole(t *testing.T) {
+func TestGetOrganizationHierarchyForOrganizationCreatorIncludesAllProjectsEvenWithoutMemberRole(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
-			{ID: "prj-user", OrganizationID: 1, Name: "Visible", Status: "active"},
-			{ID: "prj-other", OrganizationID: 1, Name: "Also visible", Status: "active"},
+			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
+			{ID: "prj-other", OrganizationID: 1, Name: "Also visible"},
 		},
 	})
 
@@ -144,9 +143,9 @@ func TestGetOrganizationHierarchyForOwnerUserIncludesAllProjectsEvenWithoutMembe
 
 	hierarchy, err := svc.GetOrganizationHierarchyForUser(context.Background(), org.ID, 42)
 	if err != nil {
-		t.Fatalf("get owner hierarchy: %v", err)
+		t.Fatalf("get creator hierarchy: %v", err)
 	}
 	if len(hierarchy.Projects) != 2 {
-		t.Fatalf("expected all projects for owner, got %d", len(hierarchy.Projects))
+		t.Fatalf("expected all projects for creator, got %d", len(hierarchy.Projects))
 	}
 }
