@@ -80,6 +80,7 @@ export const apiRoutes = {
   },
   billing: {
     quota: (organizationId: string) => `/billing/quotas/${organizationId}`,
+    stripeCheckoutSession: () => "/billing/stripe/checkout-session",
   },
   analysis: {
     analyze: (projectId: string) => `/projects/${projectId}/analysis/run`,

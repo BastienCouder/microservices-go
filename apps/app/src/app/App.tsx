@@ -5,8 +5,11 @@ import { useQuery } from "@tanstack/react-query";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
+import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
+import { loadBillingEntitlements } from "@/shared/billing";
+import { loadUserOrganizationSummaries } from "@/shared/organizations";
 import {
   readProjectIdFromSearch,
   resolveSelectedContextSearch,
@@ -14,6 +17,8 @@ import {
   storeLastSelectedProjectToken,
 } from "@/shared/selection";
 import {
+  type BillingAccessState,
+  shouldRedirectToBillingGate,
   shouldRedirectToOnboarding,
   shouldRedirectUnauthenticated,
 } from "./auth-guard";
@@ -62,18 +67,53 @@ export default function App() {
   const [selectionVersion, setSelectionVersion] = useState(0);
   const isOnboardingRoute = location.pathname === "/onboarding" || location.pathname.startsWith("/onboarding/");
   const isInvitationRoute = location.pathname === "/invitations" || location.pathname.startsWith("/invitations/");
+  const isBillingRoute = location.pathname === "/billing" || location.pathname.startsWith("/billing/");
   const routeSearch = useMemo(
     () =>
-      isOnboardingRoute || isInvitationRoute
+      isOnboardingRoute || isInvitationRoute || isBillingRoute
         ? location.search
         : resolveSelectedContextSearch(location.search),
-    [isInvitationRoute, isOnboardingRoute, location.search, selectionVersion],
+    [isBillingRoute, isInvitationRoute, isOnboardingRoute, location.search, selectionVersion],
   );
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
+  const shouldCheckBillingGuard =
+    apiBaseURL.trim() !== "" && !busy && user !== null && !isInvitationRoute;
+  const organizationsQuery = useQuery({
+    queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
+    enabled: shouldCheckBillingGuard,
+    queryFn: ({ signal }) => loadUserOrganizationSummaries(apiBaseURL, signal),
+  });
+  const organizations = organizationsQuery.data ?? [];
+  const billingOrganizationId = organizations[0]?.id ?? "";
+  const billingQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganizationId),
+    enabled: shouldCheckBillingGuard && billingOrganizationId !== "",
+    queryFn: ({ signal }) =>
+      loadBillingEntitlements(apiBaseURL, billingOrganizationId, { signal }),
+  });
+  const billingAccess: BillingAccessState = !shouldCheckBillingGuard
+    ? "loading"
+    : organizationsQuery.isError || billingQuery.isError
+      ? "unknown"
+      : organizationsQuery.isLoading || organizationsQuery.isFetching
+        ? "loading"
+        : organizations.length === 0
+          ? "missing_organization"
+          : billingQuery.isLoading || billingQuery.isFetching
+            ? "loading"
+            : billingQuery.data?.isPaid === true
+              ? "paid"
+              : "unpaid";
   const shouldCheckProjectGuard =
-    apiBaseURL.trim() !== "" && !busy && user !== null && !isOnboardingRoute && !isInvitationRoute;
+    apiBaseURL.trim() !== "" &&
+    !busy &&
+    user !== null &&
+    billingAccess === "paid" &&
+    !isOnboardingRoute &&
+    !isInvitationRoute &&
+    !isBillingRoute;
   const mustRedirectToAuth = shouldRedirectUnauthenticated({ apiBaseURL, busy, user });
   const projectGuardQuery = useQuery({
     queryKey: ["route-project-guard", apiBaseURL, user?.ID ?? null],
@@ -89,6 +129,14 @@ export default function App() {
       projectGuardQuery.isLoading || projectGuardQuery.isFetching
         ? null
         : projectGuardQuery.data ?? null,
+  });
+  const mustRedirectToBillingGate = shouldRedirectToBillingGate({
+    apiBaseURL,
+    busy,
+    user,
+    isBillingRoute,
+    isInvitationRoute,
+    billingAccess,
   });
 
   useEffect(() => {
@@ -135,6 +183,18 @@ export default function App() {
     return null;
   }
 
+  if (shouldCheckBillingGuard && billingAccess === "loading") {
+    return null;
+  }
+
+  if (mustRedirectToBillingGate) {
+    return <Navigate replace to="/billing" />;
+  }
+
+  if (isBillingRoute && billingAccess === "paid") {
+    return <Navigate replace to="/monitoring" />;
+  }
+
   if (shouldCheckProjectGuard && (projectGuardQuery.isLoading || projectGuardQuery.isFetching)) {
     return null;
   }
@@ -143,7 +203,7 @@ export default function App() {
     return <Navigate replace to="/onboarding" />;
   }
 
-  if (isOnboardingRoute || isInvitationRoute) {
+  if (isOnboardingRoute || isInvitationRoute || isBillingRoute) {
     return (
       <AppRouter
         apiBaseURL={apiBaseURL}

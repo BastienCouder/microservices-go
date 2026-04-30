@@ -5,6 +5,8 @@ import "github.com/bastiencouder/microservices-go/services/billing-service/inter
 type OrganizationEntitlements struct {
 	OrganizationID          int64  `json:"organization_id"`
 	Plan                    string `json:"plan"`
+	SubscriptionStatus      string `json:"subscription_status"`
+	IsPaid                  bool   `json:"is_paid"`
 	MonthlyQuota            int    `json:"monthly_quota"`
 	Seats                   int    `json:"seats"`
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
@@ -16,6 +18,8 @@ func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitleme
 	return OrganizationEntitlements{
 		OrganizationID:          organizationID,
 		Plan:                    plan,
+		SubscriptionStatus:      "",
+		IsPaid:                  false,
 		MonthlyQuota:            defaultMonthlyQuotaForPlan(plan),
 		Seats:                   1,
 		ModelSelectionLimit:     ModelSelectionLimitForPlan(plan),
@@ -30,11 +34,17 @@ func EntitlementsFromSubscription(sub *domain.Subscription) OrganizationEntitlem
 	return OrganizationEntitlements{
 		OrganizationID:          sub.OrganizationID,
 		Plan:                    domain.NormalizePlan(sub.Plan),
+		SubscriptionStatus:      domain.NormalizeSubscriptionStatus(sub.Status),
+		IsPaid:                  isPaidSubscriptionStatus(sub.Status),
 		MonthlyQuota:            sub.MonthlyQuota,
 		Seats:                   sub.Seats,
 		ModelSelectionLimit:     ModelSelectionLimitForPlan(sub.Plan),
 		MonthlyModelChangeLimit: MonthlyModelChangeLimitForPlan(sub.Plan),
 	}
+}
+
+func isPaidSubscriptionStatus(status string) bool {
+	return domain.NormalizeSubscriptionStatus(status) == domain.SubscriptionStatusActive
 }
 
 func ModelSelectionLimitForPlan(plan string) int {

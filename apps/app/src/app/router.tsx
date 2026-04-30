@@ -42,6 +42,11 @@ const InvitationAcceptPage = lazy(() =>
     default: module.InvitationAcceptPage,
   })),
 );
+const BillingGatePage = lazy(() =>
+  import("@/features/billing-gate/index").then((module) => ({
+    default: module.BillingGatePage,
+  })),
+);
 const AccountPage = lazy(() =>
   import("@/features/account/index").then((module) => ({
     default: module.AccountPage,
@@ -158,6 +163,18 @@ export function AppRouter({
             <OrganizationsPage
               apiBaseURL={apiBaseURL}
               busy={busy}
+              routeSearch={routeSearch}
+              user={user}
+            />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/billing"
+        element={
+          <Suspense fallback={null}>
+            <BillingGatePage
+              apiBaseURL={apiBaseURL}
               routeSearch={routeSearch}
               user={user}
             />

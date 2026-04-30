@@ -7,6 +7,8 @@ type JsonObject = Record<string, unknown>;
 export type BillingEntitlements = {
   organizationId: string;
   plan: SimulatedPlan | null;
+  subscriptionStatus: string;
+  isPaid: boolean;
   monthlyQuota: number;
   seats: number;
   modelSelectionLimit: number;
@@ -34,6 +36,8 @@ export function normalizeBillingEntitlements(value: unknown): BillingEntitlement
   return {
     organizationId: asString(payload.organization_id),
     plan: normalizeBillingPlan(asString(payload.plan) || null),
+    subscriptionStatus: asString(payload.subscription_status),
+    isPaid: payload.is_paid === true,
     monthlyQuota: asNumber(payload.monthly_quota),
     seats: asNumber(payload.seats),
     modelSelectionLimit: asNumber(payload.model_selection_limit),

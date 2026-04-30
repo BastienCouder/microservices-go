@@ -14,7 +14,7 @@ type AppLayoutProps = {
 
 export function AppLayout({ apiBaseURL, busy, children, feedback, onLogout, onRefresh }: AppLayoutProps) {
   return (
-        <div className="flex h-screen w-full bg-muted/10">
+        <div className="flex h-screen w-full">
             {/* Desktop Sidebar */}
             <Sidebar apiBaseURL={apiBaseURL} busy={busy} className="hidden lg:flex" onLogout={onLogout} />
 

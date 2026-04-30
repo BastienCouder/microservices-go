@@ -187,4 +187,10 @@ func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
 	if !strings.Contains(body, `"monthly_model_change_limit":0`) {
 		t.Fatalf("expected monthly model change limit in payload, got %s", body)
 	}
+	if !strings.Contains(body, `"subscription_status":"active"`) {
+		t.Fatalf("expected subscription status in payload, got %s", body)
+	}
+	if !strings.Contains(body, `"is_paid":true`) {
+		t.Fatalf("expected paid flag in payload, got %s", body)
+	}
 }
