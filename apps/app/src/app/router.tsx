@@ -4,7 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { AppRouterProps } from "./App";
 import { MonitoringPage } from "@/features/monitoring/index";
 import { ModelsPage } from "@/features/models/index";
-import { PerceptionPage } from "@/features/perception";
+import { PerceptionOptimizeActionsPage, PerceptionPage } from "@/features/perception";
 import { PromptsPage } from "@/features/prompts/index";
 
 const OnboardingPage = lazy(() =>
@@ -137,6 +137,14 @@ export function AppRouter({
         element={
           <Suspense fallback={null}>
             <PerceptionPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/optimize/actions"
+        element={
+          <Suspense fallback={null}>
+            <PerceptionOptimizeActionsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

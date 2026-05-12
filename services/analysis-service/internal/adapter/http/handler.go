@@ -83,6 +83,8 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getDashboard(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "perception" && r.Method == http.MethodGet:
 		h.getPerception(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "optimization-errors" && r.Method == http.MethodGet:
+		h.getOptimizationErrors(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
 		h.getBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
@@ -294,6 +296,21 @@ func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectI
 		return
 	}
 	writeSuccess(w, http.StatusOK, perception)
+}
+
+func (h *Handler) getOptimizationErrors(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	board, err := h.svc.GetOptimizationErrors(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, board)
 }
 
 func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {

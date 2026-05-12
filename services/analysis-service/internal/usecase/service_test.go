@@ -870,6 +870,98 @@ func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
 	}
 }
 
+func TestGetOptimizationErrorsGroupsMonitoringAlertsAndPerceptionErrors(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	_, err := svc.CreateAlert(ctx, "project-1", 42, CreateAlertInput{
+		AlertType:   "pricing_hallucination",
+		Severity:    "high",
+		Title:       "Pricing incoherent",
+		Description: "Des reponses surestiment les prix",
+	})
+	if err != nil {
+		t.Fatalf("create alert: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est parfois cite mais sans preuve claire.",
+		BrandMentioned: true,
+		BrandPosition:  "bottom",
+		CitationFound:  false,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	board, err := svc.GetOptimizationErrors(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get optimization errors: %v", err)
+	}
+
+	if len(board.Columns) != 3 {
+		t.Fatalf("expected 3 severity columns, got %d", len(board.Columns))
+	}
+	if board.Columns[0].Severity != "high" || board.Columns[1].Severity != "medium" || board.Columns[2].Severity != "low" {
+		t.Fatalf("expected high, medium, low column order, got %#v", board.Columns)
+	}
+
+	var hasMonitoringError, hasPerceptionError bool
+	for _, item := range board.Errors {
+		switch item.Source {
+		case "monitoring":
+			hasMonitoringError = true
+		case "perception":
+			hasPerceptionError = true
+		}
+		if item.FixType == "" || item.OptimizePriority == "" {
+			t.Fatalf("expected optimization item to carry card-compatible fields, got %#v", item)
+		}
+	}
+	if !hasMonitoringError || !hasPerceptionError {
+		t.Fatalf("expected monitoring and perception errors, got %#v", board.Errors)
+	}
+	if board.Metadata["totalErrors"] != len(board.Errors) {
+		t.Fatalf("expected metadata totalErrors to match errors length, got %#v for %d errors", board.Metadata["totalErrors"], len(board.Errors))
+	}
+	if board.Metadata["monitoringErrors"] != 1 {
+		t.Fatalf("expected 1 monitoring error, got %#v", board.Metadata["monitoringErrors"])
+	}
+}
+
 func TestAlertsReadAll(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()

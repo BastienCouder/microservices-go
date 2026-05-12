@@ -135,6 +135,34 @@ type PerceptionData struct {
 	Metadata   map[string]any         `json:"metadata"`
 }
 
+type OptimizationError struct {
+	ID               string   `json:"id"`
+	Source           string   `json:"source"`
+	Severity         string   `json:"severity"`
+	Title            string   `json:"title"`
+	Issue            string   `json:"issue"`
+	Impact           string   `json:"impact"`
+	Type             string   `json:"type"`
+	FixType          string   `json:"fixType"`
+	OptimizePriority string   `json:"optimizePriority"`
+	DetectedInModels []string `json:"detectedInModels"`
+	GeneratedContent string   `json:"generatedContent"`
+	CreatedAt        string   `json:"createdAt,omitempty"`
+}
+
+type OptimizationErrorColumn struct {
+	Severity string              `json:"severity"`
+	Title    string              `json:"title"`
+	Count    int                 `json:"count"`
+	Errors   []OptimizationError `json:"errors"`
+}
+
+type OptimizationErrorBoard struct {
+	Errors   []OptimizationError       `json:"errors"`
+	Columns  []OptimizationErrorColumn `json:"columns"`
+	Metadata map[string]any            `json:"metadata"`
+}
+
 type BrandCanon struct {
 	ProjectID   string         `json:"projectId,omitempty"`
 	BrandName   string         `json:"brandName,omitempty"`

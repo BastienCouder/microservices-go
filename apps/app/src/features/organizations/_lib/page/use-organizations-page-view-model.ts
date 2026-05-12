@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { appQueryKeys } from "@/lib/query-keys";
 import type { UserProfile } from "@/shared/models";
 import { findBySlugOrId } from "@/shared/public-slugs";
@@ -125,6 +125,7 @@ export function useOrganizationsPageViewModel({
   user,
 }: UseOrganizationsPageViewModelInput): OrganizationsPageViewModel {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<ViewTab>(DEFAULT_ORGANIZATION_VIEW_TAB);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(readSelectedOrganizationID);
@@ -134,6 +135,14 @@ export function useOrganizationsPageViewModel({
   const [createdAPIKey, setCreatedAPIKey] = useState<OrganizationAPIKey | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
+  const currentRouteHref = `${location.pathname}${location.search}`;
+  const navigateIfChanged = useCallback(
+    (href: string, options?: { replace?: boolean }) => {
+      if (href === currentRouteHref) return;
+      navigate(href, options);
+    },
+    [currentRouteHref, navigate],
+  );
 
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
@@ -160,9 +169,12 @@ export function useOrganizationsPageViewModel({
       setSelectedOrganizationId(nextId);
       storeSelectedOrganizationID(nextId);
       const organization = organizations.find((item) => item.id === nextId);
-      navigate(buildScopedHref(`/organizations${routeSearch}`, { org: organization?.slug }), { replace: true });
+      navigateIfChanged(
+        buildScopedHref(`/organizations${routeSearch}`, { org: organization?.slug }),
+        { replace: true },
+      );
     }
-  }, [navigate, organizations, routeSearch, selectedOrganizationId]);
+  }, [navigateIfChanged, organizations, routeSearch, selectedOrganizationId]);
 
   const resourcesQuery = useQuery({
     queryKey: [
@@ -203,39 +215,23 @@ export function useOrganizationsPageViewModel({
   useEffect(() => {
     if (isOrganizationViewTabAvailable(routeSection, effectiveCurrentUserRoles)) return;
     if (!selectedOrganization) return;
-    navigate(
+    navigateIfChanged(
       buildScopedHref(`/organizations${routeSearch}`, {
         org: selectedOrganization.slug,
         section: null,
       }),
       { replace: true },
     );
-  }, [effectiveCurrentUserRoles, navigate, routeSearch, routeSection, selectedOrganization]);
-  useEffect(() => {
-    if (!selectedOrganizationId) return;
-    console.info("[organizations] client resources", {
-      selectedOrganizationId,
-      currentUserId,
-      currentUserRoles,
-      projects: resources.projects.map((project) => ({
-        id: project.id,
-        name: project.name,
-        organizationId: project.organizationId,
-      })),
-      members: resources.members.map((member) => ({ userId: member.userId, roles: member.roles })),
-      projectMembers: resources.projectMembers.map((projectMember) => ({
-        projectId: projectMember.projectId,
-        userId: projectMember.userId,
-        role: projectMember.role,
-      })),
-    });
-  }, [currentUserId, currentUserRoles, resources, selectedOrganizationId]);
+  }, [effectiveCurrentUserRoles, navigateIfChanged, routeSearch, routeSection, selectedOrganization]);
 
   useEffect(() => {
     if (!selectedOrganization) return;
     if (routeOrganizationToken === selectedOrganization.slug) return;
-    navigate(buildScopedHref(`/organizations${routeSearch}`, { org: selectedOrganization.slug }), { replace: true });
-  }, [navigate, routeOrganizationToken, routeSearch, selectedOrganization]);
+    navigateIfChanged(
+      buildScopedHref(`/organizations${routeSearch}`, { org: selectedOrganization.slug }),
+      { replace: true },
+    );
+  }, [navigateIfChanged, routeOrganizationToken, routeSearch, selectedOrganization]);
 
   const activeError =
     localError ??
@@ -307,7 +303,7 @@ export function useOrganizationsPageViewModel({
     createdAPIKey,
     setActiveTab: (value) => {
       setActiveTab(value);
-      navigate(
+      navigateIfChanged(
         buildScopedHref(`/organizations${routeSearch}`, {
           org: selectedOrganization?.slug,
           section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,

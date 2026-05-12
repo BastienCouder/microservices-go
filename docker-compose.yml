@@ -1,3 +1,9 @@
+etworks:
+  frontend-net:
+  backend-net:
+  infra-net:
+  monitoring-net:
+ 
 services:
   web:
     profiles: ["frontend"]
@@ -9,12 +15,19 @@ services:
         NEXT_PUBLIC_APP_URL: http://localhost:30004
     image: microservices-go/web:prod
     restart: unless-stopped
+    networks:
+      - frontend-net
     environment:
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
       NEXT_PUBLIC_APP_URL: http://localhost:30004
     ports:
-      - "30000:3000"
-
+      - "127.0.0.1:30000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+ 
   app:
     profiles: ["frontend"]
     build:
@@ -25,32 +38,65 @@ services:
         VITE_WEB_AUTH_URL: http://localhost:30000/auth
     image: microservices-go/app:prod
     restart: unless-stopped
+    networks:
+      - frontend-net
+      - backend-net
     environment:
       API_GATEWAY_INTERNAL_URL: http://api-gateway:8080
       WEB_AUTH_URL: http://localhost:30000/auth
     ports:
-      - "30004:8080"
-
+      - "127.0.0.1:30004:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+ 
   doc:
     profiles: ["doc"]
     build:
       dockerfile: apps/doc/Dockerfile
     image: microservices-go/doc:prod
     restart: unless-stopped
+    networks:
+      - frontend-net
     ports:
-      - "30001:3000"
-
+      - "127.0.0.1:30001:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+ 
   email:
     profiles: ["backend", "email"]
     build:
       dockerfile: apps/email/Dockerfile
     image: microservices-go/email:prod
     restart: unless-stopped
+    networks:
+      - backend-net
     environment:
       EMAIL_API_PORT: "3002"
     ports:
-      - "30002:3002"
-
+      - "127.0.0.1:30002:3002"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3002/health || exit 1"]
+      interval: 20s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   mcp-server:
     profiles: ["mcp"]
     build:
@@ -59,10 +105,22 @@ services:
         SERVICE_PATH: ./services/mcp-server/cmd/server
     image: microservices-go/mcp-server:prod
     restart: unless-stopped
+    networks:
+      - backend-net
     command: ["--transport", "http", "--http-addr", ":8090", "--metrics-addr", ":9090"]
     ports:
-      - "50010:8090"
-
+      - "127.0.0.1:50010:8090"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   api-gateway:
     profiles: ["backend"]
     build:
@@ -71,9 +129,12 @@ services:
         SERVICE_PATH: ./services/api-gateway/cmd/api
     image: microservices-go/api-gateway:prod
     restart: unless-stopped
+    networks:
+      - frontend-net
+      - backend-net
     environment:
-      HTTP_ADDR: :8080
-      METRICS_ADDR: :9090
+      HTTP_ADDR_FILE: /run/secrets/gateway_http_addr
+      METRICS_ADDR_FILE: /run/secrets/gateway_metrics_addr
       USER_SERVICE_URL: http://user-service:8081
       AUTH_SERVICE_URL: http://auth-service:8083
       ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
@@ -91,10 +152,22 @@ services:
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
       CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004
     secrets:
+      - gateway_http_addr
+      - gateway_metrics_addr
       - internal_jwt_secret
     ports:
-      - "50000:8080"
-
+      - "127.0.0.1:50000:8080"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+ 
   auth-service:
     profiles: ["backend"]
     build:
@@ -103,6 +176,8 @@ services:
         SERVICE_PATH: ./services/auth-service/cmd/api
     image: microservices-go/auth-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
     environment:
       HTTP_ADDR: :8083
       METRICS_ADDR: :9090
@@ -115,9 +190,18 @@ services:
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - internal_jwt_secret
-    ports:
-      - "50003:8083"
-
+    # Port non exposé publiquement — accessible uniquement via api-gateway
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   user-service:
     profiles: ["backend"]
     build:
@@ -126,6 +210,9 @@ services:
         SERVICE_PATH: ./services/user-service/cmd/api
     image: microservices-go/user-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     environment:
       HTTP_ADDR: :8081
       METRICS_ADDR: :9090
@@ -140,15 +227,24 @@ services:
     secrets:
       - usersvc_db_password
       - internal_jwt_secret
-    ports:
-      - "50001:8081"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   user-migrate:
     profiles: ["migrations"]
     build:
@@ -156,6 +252,8 @@ services:
       args:
         SERVICE_PATH: ./services/user-service/cmd/migrate
     image: microservices-go/user-migrate:prod
+    networks:
+      - infra-net
     environment:
       USER_DB_HOST: postgres
       USER_DB_PORT: "5432"
@@ -165,7 +263,7 @@ services:
       USER_DB_PASSWORD_FILE: /run/secrets/usersvc_db_password
     secrets:
       - usersvc_db_password
-
+ 
   organizations-service:
     profiles: ["backend"]
     build:
@@ -174,16 +272,17 @@ services:
         SERVICE_PATH: ./services/organizations-service/cmd/api
     image: microservices-go/organizations-service:prod
     restart: unless-stopped
-    depends_on:
-      - rabbitmq
+    networks:
+      - backend-net
+      - infra-net
     environment:
-      HTTP_ADDR: :8084
-      METRICS_ADDR: :9090
-      ORG_DB_HOST: postgres
-      ORG_DB_PORT: "5432"
-      ORG_DB_USER: orgsvc
-      ORG_DB_NAME: orgsvc
-      ORG_DB_SSLMODE: disable
+      HTTP_ADDR_FILE: /run/secrets/organizations_http_addr
+      METRICS_ADDR_FILE: /run/secrets/organizations_metrics_addr
+      ORG_DB_HOST_FILE: /run/secrets/db_host
+      ORG_DB_PORT_FILE: /run/secrets/db_port
+      ORG_DB_USER_FILE: /run/secrets/organizations_db_user
+      ORG_DB_NAME_FILE: /run/secrets/organizations_db_name
+      ORG_DB_SSLMODE_FILE: /run/secrets/db_sslmode
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
       USER_SERVICE_URL: http://user-service:8081
       PROJECT_SERVICE_URL: http://project-service:8088
@@ -196,18 +295,34 @@ services:
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
+      - organizations_http_addr
+      - organizations_metrics_addr
+      - db_host
+      - db_port
+      - organizations_db_user
+      - organizations_db_name
+      - db_sslmode
       - orgsvc_db_password
       - internal_jwt_secret
       - rabbitmq_url
-    ports:
-      - "50004:8084"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   organizations-migrate:
     profiles: ["migrations"]
     build:
@@ -215,6 +330,8 @@ services:
       args:
         SERVICE_PATH: ./services/organizations-service/cmd/migrate
     image: microservices-go/organizations-migrate:prod
+    networks:
+      - infra-net
     environment:
       ORG_DB_HOST: postgres
       ORG_DB_PORT: "5432"
@@ -224,7 +341,7 @@ services:
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
     secrets:
       - orgsvc_db_password
-
+ 
   permission-service:
     profiles: ["backend"]
     build:
@@ -233,6 +350,9 @@ services:
         SERVICE_PATH: ./services/permission-service/cmd/api
     image: microservices-go/permission-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     environment:
       HTTP_ADDR: :8085
       METRICS_ADDR: :9090
@@ -250,15 +370,24 @@ services:
     secrets:
       - permsvc_db_password
       - internal_jwt_secret
-    ports:
-      - "50005:8085"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   permission-migrate:
     profiles: ["migrations"]
     build:
@@ -266,6 +395,8 @@ services:
       args:
         SERVICE_PATH: ./services/permission-service/cmd/migrate
     image: microservices-go/permission-migrate:prod
+    networks:
+      - infra-net
     environment:
       PERMISSION_DB_HOST: postgres
       PERMISSION_DB_PORT: "5432"
@@ -275,7 +406,7 @@ services:
       PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
     secrets:
       - permsvc_db_password
-
+ 
   billing-service:
     profiles: ["backend"]
     build:
@@ -284,6 +415,9 @@ services:
         SERVICE_PATH: ./services/billing-service/cmd/api
     image: microservices-go/billing-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     environment:
       HTTP_ADDR: :8086
       METRICS_ADDR: :9090
@@ -324,15 +458,24 @@ services:
       - stripe_price_pro_monthly
       - stripe_price_pro_yearly
       - stripe_price_correction_credits
-    ports:
-      - "50006:8086"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   billing-migrate:
     profiles: ["migrations"]
     build:
@@ -340,6 +483,8 @@ services:
       args:
         SERVICE_PATH: ./services/billing-service/cmd/migrate
     image: microservices-go/billing-migrate:prod
+    networks:
+      - infra-net
     environment:
       BILLING_DB_HOST: postgres
       BILLING_DB_PORT: "5432"
@@ -349,7 +494,7 @@ services:
       BILLING_DB_PASSWORD_FILE: /run/secrets/billsvc_db_password
     secrets:
       - billsvc_db_password
-
+ 
   notification-service:
     profiles: ["backend"]
     build:
@@ -358,9 +503,9 @@ services:
         SERVICE_PATH: ./services/notification-service/cmd/api
     image: microservices-go/notification-service:prod
     restart: unless-stopped
-    depends_on:
-      - email
-      - rabbitmq
+    networks:
+      - backend-net
+      - infra-net
     environment:
       HTTP_ADDR: :8087
       METRICS_ADDR: :9090
@@ -372,7 +517,7 @@ services:
       NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
       EMAIL_RENDERER_URL: http://email:3002
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
-      RESEND_FROM_EMAIL: Acme <hello@bastiencouder.com>
+      RESEND_FROM_EMAIL_FILE: /run/secrets/resend_from_email
       RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
       RABBITMQ_EXCHANGE: microservices.events
       RABBITMQ_NOTIFICATION_EMAIL_QUEUE: notification.email.send
@@ -382,17 +527,27 @@ services:
     secrets:
       - notifsvc_db_password
       - resend_api_key
+      - resend_from_email
       - internal_jwt_secret
       - rabbitmq_url
-    ports:
-      - "50007:8087"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   project-service:
     profiles: ["backend"]
     build:
@@ -401,6 +556,9 @@ services:
         SERVICE_PATH: ./services/project-service/cmd/api
     image: microservices-go/project-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -433,16 +591,26 @@ services:
       - rabbitmq_url
       - ga4_oauth_client_id
       - ga4_oauth_client_secret
+    # gRPC port exposé uniquement en interne (pas de port HTTP public)
     ports:
-      - "50008:8088"
-      - "9088:9088"
+      - "127.0.0.1:9088:9088"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   analysis-service:
     profiles: ["backend"]
     build:
@@ -451,6 +619,9 @@ services:
         SERVICE_PATH: ./services/analysis-service/cmd/api
     image: microservices-go/analysis-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     environment:
       HTTP_ADDR: :8089
       METRICS_ADDR: :9090
@@ -471,16 +642,26 @@ services:
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret
+    # gRPC port exposé uniquement en interne (pas de port HTTP public)
     ports:
-      - "50009:8089"
-      - "9089:9089"
+      - "127.0.0.1:9089:9089"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   ia-service:
     profiles: ["backend"]
     build:
@@ -489,6 +670,8 @@ services:
         SERVICE_PATH: ./services/ia-service/cmd/api
     image: microservices-go/ia-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
     environment:
       HTTP_ADDR: :8091
       METRICS_ADDR: :9090
@@ -505,16 +688,26 @@ services:
     secrets:
       - internal_jwt_secret
       - openrouter_api_key
+    # gRPC port exposé uniquement en interne (pas de port HTTP public)
     ports:
-      - "50011:8091"
-      - "9091:9091"
+      - "127.0.0.1:9091:9091"
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   langgraph-scheduler:
     profiles: ["backend"]
     build:
@@ -522,10 +715,8 @@ services:
       dockerfile: services/langgraph-scheduler/Dockerfile
     image: microservices-go/langgraph-scheduler:prod
     restart: unless-stopped
-    depends_on:
-      - project-service
-      - analysis-service
-      - ia-service
+    networks:
+      - backend-net
     environment:
       PROJECT_SERVICE_GRPC_ADDR: project-service:9088
       ANALYSIS_SERVICE_GRPC_ADDR: analysis-service:9089
@@ -537,7 +728,23 @@ services:
       SCHEDULER_POLL_INTERVAL_MS: "30000"
     secrets:
       - internal_jwt_secret
-
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -x service || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   attribution-service:
     profiles: ["backend"]
     build:
@@ -546,6 +753,9 @@ services:
         SERVICE_PATH: ./services/attribution-service/cmd/api
     image: microservices-go/attribution-service:prod
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -571,15 +781,24 @@ services:
       - internal_jwt_secret
       - ga4_oauth_client_id
       - ga4_oauth_client_secret
-    ports:
-      - "50012:8092"
+    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
       timeout: 3s
       retries: 3
       start_period: 15s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   project-migrate:
     profiles: ["migrations"]
     build:
@@ -587,6 +806,8 @@ services:
       args:
         SERVICE_PATH: ./services/project-service/cmd/migrate
     image: microservices-go/project-migrate:prod
+    networks:
+      - infra-net
     environment:
       PROJECT_DB_HOST: postgres
       PROJECT_DB_PORT: "5432"
@@ -596,7 +817,7 @@ services:
       PROJECT_DB_PASSWORD_FILE: /run/secrets/projectsvc_db_password
     secrets:
       - projectsvc_db_password
-
+ 
   analysis-migrate:
     profiles: ["migrations"]
     build:
@@ -604,6 +825,8 @@ services:
       args:
         SERVICE_PATH: ./services/analysis-service/cmd/migrate
     image: microservices-go/analysis-migrate:prod
+    networks:
+      - infra-net
     environment:
       ANALYSIS_DB_HOST: postgres
       ANALYSIS_DB_PORT: "5432"
@@ -613,7 +836,7 @@ services:
       ANALYSIS_DB_PASSWORD_FILE: /run/secrets/analysissvc_db_password
     secrets:
       - analysissvc_db_password
-
+ 
   attribution-migrate:
     profiles: ["migrations"]
     build:
@@ -621,6 +844,8 @@ services:
       args:
         SERVICE_PATH: ./services/attribution-service/cmd/migrate
     image: microservices-go/attribution-migrate:prod
+    networks:
+      - infra-net
     environment:
       ATTRIBUTION_DB_HOST: postgres
       ATTRIBUTION_DB_PORT: "5432"
@@ -630,7 +855,7 @@ services:
       ATTRIBUTION_DB_PASSWORD_FILE: /run/secrets/attrsvc_db_password
     secrets:
       - attrsvc_db_password
-
+ 
   notification-migrate:
     profiles: ["migrations"]
     build:
@@ -638,6 +863,8 @@ services:
       args:
         SERVICE_PATH: ./services/notification-service/cmd/migrate
     image: microservices-go/notification-migrate:prod
+    networks:
+      - infra-net
     environment:
       NOTIFICATION_DB_HOST: postgres
       NOTIFICATION_DB_PORT: "5432"
@@ -647,62 +874,110 @@ services:
       NOTIFICATION_DB_PASSWORD_FILE: /run/secrets/notifsvc_db_password
     secrets:
       - notifsvc_db_password
-
+ 
   loki:
     profiles: ["monitoring"]
     image: grafana/loki:3.0.0
     restart: unless-stopped
+    networks:
+      - monitoring-net
     command: ["-config.file=/etc/loki/config.yaml"]
     volumes:
       - ./deployments/loki/loki-config.yaml:/etc/loki/config.yaml:ro
       - loki-data:/loki
     ports:
-      - "60002:3100"
-
+      - "127.0.0.1:60002:3100"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+ 
   promtail:
     profiles: ["monitoring"]
     image: grafana/promtail:3.0.0
     restart: unless-stopped
+    networks:
+      - monitoring-net
     command: ["-config.file=/etc/promtail/config.yaml"]
     volumes:
       - ./deployments/loki/promtail-config.yaml:/etc/promtail/config.yaml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - promtail-positions:/tmp
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+ 
   grafana:
     profiles: ["monitoring"]
     image: grafana/grafana:11.0.0
     restart: unless-stopped
+    networks:
+      - monitoring-net
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER_FILE: /run/secrets/grafana_admin_user
+      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
+      GF_SECURITY_DISABLE_GRAVATAR: "true"
+      GF_SECURITY_COOKIE_SECURE: "true"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    secrets:
+      - grafana_admin_user
+      - grafana_admin_password
     volumes:
       - grafana-data:/var/lib/grafana
       - ./deployments/loki/grafana/provisioning:/etc/grafana/provisioning:ro
     ports:
-      - "60000:3000"
-
+      - "127.0.0.1:60000:3000"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+ 
   prometheus:
     profiles: ["monitoring"]
     image: prom/prometheus:v3.3.1
     restart: unless-stopped
+    networks:
+      - monitoring-net
+      - backend-net
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--storage.tsdb.path=/prometheus"
       - "--storage.tsdb.retention.time=15d"
+      - "--web.listen-address=127.0.0.1:9090"
     volumes:
       - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     ports:
-      - "60001:9090"
-
+      - "127.0.0.1:60001:9090"
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+ 
   redis:
     profiles: ["backend", "infra"]
     image: redis:8.4.0-alpine
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
-    ports:
-      - "6379:6379"
+    networks:
+      - infra-net
+    command:
+      - "redis-server"
+      - "--appendonly"
+      - "yes"
+      - "--requirepass-file"
+      - "/run/secrets/redis_password"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    secrets:
+      - redis_password
+    # Port non exposé publiquement — accessible uniquement via le réseau infra-net
     volumes:
       - redis-data:/data
     healthcheck:
@@ -711,14 +986,21 @@ services:
       timeout: 3s
       retries: 5
       start_period: 5s
-
+    deploy:
+      resources:
+        limits:
+          memory: 640M
+          cpus: '0.5'
+ 
   rabbitmq:
     profiles: ["backend", "infra"]
     image: rabbitmq:4.2.3-management-alpine
     restart: unless-stopped
+    networks:
+      - infra-net
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      # Management UI restreint au loopback uniquement
+      - "127.0.0.1:15672:15672"
     volumes:
       - ./deployments/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
       - ./deployments/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
@@ -729,11 +1011,18 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+ 
   postgres:
     profiles: ["backend", "infra"]
     image: postgres:18.1-alpine
     restart: unless-stopped
+    networks:
+      - infra-net
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
@@ -749,13 +1038,22 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
-    ports:
-      - "55432:5432"
-
+    # Port non exposé publiquement — accessible uniquement via le réseau infra-net
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+ 
   postgres-backup-r2:
     profiles: ["backup"]
     image: postgres:18.1-alpine
     restart: unless-stopped
+    networks:
+      - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
     entrypoint: ["sh", "/opt/backups/postgres-r2-backup.sh"]
     environment:
       BACKUP_POSTGRES_HOST: postgres
@@ -777,11 +1075,13 @@ services:
       - r2_secret_access_key
     volumes:
       - ./deployments/backups/postgres-r2-backup.sh:/opt/backups/postgres-r2-backup.sh:ro
-
+ 
   kratos-migrate:
     profiles: ["migrations"]
     image: oryd/kratos:v25.4.0
     entrypoint: ["sh", "/etc/config/kratos/migrate.sh"]
+    networks:
+      - infra-net
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -800,11 +1100,14 @@ services:
       - google_oidc_client_secret
     volumes:
       - ./deployments/kratos:/etc/config/kratos:ro
-
+ 
   kratos:
     profiles: ["backend", "infra"]
     image: oryd/kratos:v25.4.0
     restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
     entrypoint: ["sh", "/etc/config/kratos/start.sh"]
     dns:
       - 1.1.1.1
@@ -832,7 +1135,12 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
-
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+ 
 volumes:
   redis-data:
   rabbitmq-data:
@@ -841,7 +1149,7 @@ volumes:
   promtail-positions:
   grafana-data:
   prometheus-data:
-
+ 
 secrets:
   postgres_superuser_password:
     file: ./deployments/secrets/postgres_superuser_password.txt
@@ -915,3 +1223,10 @@ secrets:
     file: ./deployments/secrets/ga4_oauth_client_id.txt
   ga4_oauth_client_secret:
     file: ./deployments/secrets/ga4_oauth_client_secret.txt
+  redis_password:
+    file: ./deployments/secrets/redis_password.txt
+  grafana_admin_user:
+    file: ./deployments/secrets/grafana_admin_user.txt
+  grafana_admin_password:
+    file: ./deployments/secrets/grafana_admin_password.txt
+ 

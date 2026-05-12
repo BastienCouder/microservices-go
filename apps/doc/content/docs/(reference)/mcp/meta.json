@@ -1,9 +1,0 @@
-{
-  "title": "MCP Reference",
-  "defaultOpen": true,
-  "pages": [
-    "index",
-    "backend-health-check",
-    "backend-list-endpoints"
-  ]
-}

@@ -1,0 +1,473 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { ArrowLeft, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { Link } from "react-router-dom";
+
+import { PageHeader } from "@/components/shared/page-header";
+import { PeriodFilterPicker, type PeriodFilterOption } from "@/components/shared/period-filter-picker";
+import { SectionTitle } from "@/components/shared/section-title";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getModelGroupForName, getModelIconForName } from "@/lib/app-data";
+import type { PerceptionSeverity } from "@/lib/perception-data";
+import type { OptimizationError } from "@/lib/optimization-errors-data";
+import { cn } from "@/lib/utils";
+import { useLocale } from "@/shared/hooks/use-i18n";
+import { PerceptionTopErrorCard } from "../_components";
+import { useOptimizationErrors } from "../core/use-optimization-errors";
+
+type PerceptionOptimizeActionsPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+const SEVERITY_COLUMNS: Array<{
+  severity: PerceptionSeverity;
+  title: string;
+  tone: string;
+}> = [
+  {
+    severity: "high",
+    title: "Haute",
+    tone: "bg-destructive/10 text-destructive",
+  },
+  {
+    severity: "medium",
+    title: "Moyenne",
+    tone: "bg-amber-500/10 text-amber-700",
+  },
+  {
+    severity: "low",
+    title: "Basse",
+    tone: "bg-green-500/10 text-green-700",
+  },
+];
+
+const PERIOD_OPTIONS = [
+  { value: "all", label: "Toutes les erreurs" },
+  { value: "7d", label: "7 jours" },
+  { value: "30d", label: "30 jours" },
+  { value: "90d", label: "90 jours" },
+] as const satisfies readonly PeriodFilterOption[];
+
+type PeriodFilter = (typeof PERIOD_OPTIONS)[number]["value"];
+
+function groupPerceptionErrors(errors: OptimizationError[]) {
+  return SEVERITY_COLUMNS.map((column) => ({
+    ...column,
+    errors: errors.filter((error) => error.severity === column.severity),
+  }));
+}
+
+function listAvailableModels(errors: OptimizationError[]) {
+  return Array.from(
+    new Set(errors.flatMap((error) => error.detectedInModels).filter(Boolean)),
+  ).sort((left, right) => left.localeCompare(right));
+}
+
+function parseErrorDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function filterErrorsByPeriod(errors: OptimizationError[], period: PeriodFilter) {
+  if (period === "all") return errors;
+
+  const days = period === "7d" ? 7 : period === "30d" ? 30 : 90;
+  const minTime = Date.now() - days * 24 * 60 * 60 * 1000;
+  return errors.filter((error) => {
+    const createdAt = parseErrorDate(error.createdAt);
+    return !createdAt || createdAt.getTime() >= minTime;
+  });
+}
+
+function filterErrorsByModels(errors: OptimizationError[], selectedModels: string[]) {
+  if (selectedModels.length === 0) return errors;
+  return errors.filter((error) =>
+    error.detectedInModels.some((model) => selectedModels.includes(model)),
+  );
+}
+
+function getModelVisual(model: string) {
+  return {
+    icon: getModelIconForName(model),
+    description: "Modele IA",
+    label: model,
+    provider: getModelGroupForName(model),
+    name: model,
+  };
+}
+
+function ModelsFilterPopover({
+  allModelsSelected,
+  availableModels,
+  onOpenChange,
+  open,
+  selectedModels,
+  toggleModel,
+}: {
+  allModelsSelected: boolean;
+  availableModels: string[];
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
+  selectedModels: string[];
+  toggleModel: (model: string) => void;
+}) {
+  const summaryLabel = allModelsSelected
+    ? "Tous les modèles"
+    : `${selectedModels.length} sélectionné${selectedModels.length > 1 ? "s" : ""}`;
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button variant="outline" className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-xs sm:h-8 sm:w-auto sm:min-w-[220px]">
+          <div className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
+            <span className="shrink-0 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
+              Modèles
+            </span>
+            <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
+            <span className="truncate text-sm font-medium text-foreground">{summaryLabel}</span>
+          </div>
+          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-[560px] max-w-[92vw] p-0">
+        <FloatingPanelHeader
+          title="Modèles"
+          description="Filtrer les erreurs par modèle IA détecté."
+        />
+        <div className="grid grid-cols-1 gap-2 px-4 pb-4 pt-1 sm:grid-cols-2">
+          {availableModels.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
+              Aucun modèle détecté
+            </div>
+          ) : (
+            availableModels.map((model) => {
+              const checked = selectedModels.includes(model);
+              const highlighted = !allModelsSelected && checked;
+              const meta = getModelVisual(model);
+
+              return (
+                <button
+                  key={model}
+                  type="button"
+                  onClick={() => toggleModel(model)}
+                  className={cn(
+                    "relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
+                    highlighted
+                      ? "border-primary/30 bg-primary/10"
+                      : "border-border/70 bg-background hover:bg-muted/30",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border p-2",
+                      highlighted ? "border-primary/30 bg-primary/10" : "border-border/50 bg-background",
+                    )}
+                  >
+                    <img src={meta.icon} alt={model} className="h-full w-full object-contain opacity-85" decoding="async" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className={cn("truncate text-sm font-semibold leading-tight", highlighted ? "text-primary" : "text-foreground")}>
+                      {meta.label}
+                    </div>
+                    <div className={cn("line-clamp-1 text-xs leading-snug", highlighted ? "text-primary/75" : "text-muted-foreground")}>
+                      {meta.provider} {meta.name !== meta.label ? `- ${meta.name}` : ""}
+                    </div>
+                  </div>
+                  <div className={cn("ml-auto mt-1 h-2.5 w-2.5 rounded-full", highlighted ? "bg-primary" : "bg-muted-foreground/30")} />
+                </button>
+              );
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function OptimizationFiltersToolbar({
+  allModelsSelected,
+  availableModels,
+  clearFilters,
+  hasActiveFilters,
+  modelsPopoverOpen,
+  period,
+  selectedModels,
+  setModelsPopoverOpen,
+  setPeriod,
+  toggleModel,
+}: {
+  allModelsSelected: boolean;
+  availableModels: string[];
+  clearFilters: () => void;
+  hasActiveFilters: boolean;
+  modelsPopoverOpen: boolean;
+  period: PeriodFilter;
+  selectedModels: string[];
+  setModelsPopoverOpen: (open: boolean) => void;
+  setPeriod: (period: PeriodFilter) => void;
+  toggleModel: (model: string) => void;
+}) {
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const filtersContent = (
+    <>
+      <PeriodFilterPicker
+        className="w-full sm:w-[220px]"
+        value={period}
+        onValueChange={(value) => setPeriod(value as PeriodFilter)}
+        options={PERIOD_OPTIONS}
+        label="Période"
+        title="Période"
+        description="Filtrer les erreurs par période."
+      />
+      <ModelsFilterPopover
+        open={modelsPopoverOpen}
+        onOpenChange={setModelsPopoverOpen}
+        allModelsSelected={allModelsSelected}
+        selectedModels={selectedModels}
+        availableModels={availableModels}
+        toggleModel={toggleModel}
+      />
+      {hasActiveFilters ? (
+        <Button
+          size="xs"
+          variant="ghost"
+          className="h-10 justify-center rounded-full px-4 text-xs"
+          onClick={clearFilters}
+        >
+          Réinitialiser
+        </Button>
+      ) : null}
+    </>
+  );
+
+  return (
+    <>
+      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="mt-5 md:hidden">
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex h-11 w-full items-center justify-between rounded-2xl px-4"
+          >
+            <span className="inline-flex items-center gap-2 text-sm font-medium">
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtres
+            </span>
+            <ChevronDown
+              className={cn("h-4 w-4 transition-transform", filtersOpen && "rotate-180")}
+            />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
+          <div className="mt-3 flex flex-col gap-2">{filtersContent}</div>
+        </CollapsibleContent>
+      </Collapsible>
+
+      <div className="mt-5 hidden flex-col gap-2 md:flex md:flex-row md:flex-wrap md:items-center">
+        {filtersContent}
+      </div>
+    </>
+  );
+}
+
+function OptimizationErrorsKanban({
+  errors,
+  generatedIds,
+  onCreateAction,
+  persistError,
+  routeSearch,
+  savingErrorIds,
+}: {
+  errors: OptimizationError[];
+  generatedIds: ReadonlySet<string>;
+  onCreateAction: (error: OptimizationError) => void | Promise<void>;
+  persistError: string | null;
+  routeSearch: string;
+  savingErrorIds: ReadonlySet<string>;
+}) {
+  const { locale } = useLocale();
+  const [modelsPopoverOpen, setModelsPopoverOpen] = useState(false);
+  const [period, setPeriod] = useState<PeriodFilter>("all");
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const availableModels = useMemo(() => listAvailableModels(errors), [errors]);
+  const filteredErrors = useMemo(
+    () => filterErrorsByModels(filterErrorsByPeriod(errors, period), selectedModels),
+    [errors, period, selectedModels],
+  );
+  const columns = useMemo(() => groupPerceptionErrors(filteredErrors), [filteredErrors]);
+  const allModelsSelected = selectedModels.length === 0;
+  const hasActiveFilters = period !== "all" || selectedModels.length > 0;
+  const clearFilters = () => {
+    setPeriod("all");
+    setSelectedModels([]);
+  };
+  const toggleModel = (model: string) => {
+    setSelectedModels((current) => {
+      if (current.length === 0) return [model];
+      if (current.includes(model)) {
+        return current.filter((item) => item !== model);
+      }
+      return [...current, model];
+    });
+  };
+
+  return (
+    <div className="flex h-auto min-h-full flex-col px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
+      <PageHeader
+        title="Erreurs relevées"
+        baseline="Kanban des erreurs détectées côté monitoring et optimisation de perception."
+        actionsVariant="classic"
+      />
+
+      <div className="rounded-md rounded-tr-none border-b bg-background px-3 pb-3 md:px-4 md:pb-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
+          <div className="min-w-0 flex-1">
+            {persistError ? (
+              <p className="mt-2 text-xs text-destructive">{persistError}</p>
+            ) : null}
+            <OptimizationFiltersToolbar
+              allModelsSelected={allModelsSelected}
+              availableModels={availableModels}
+              clearFilters={clearFilters}
+              hasActiveFilters={hasActiveFilters}
+              modelsPopoverOpen={modelsPopoverOpen}
+              period={period}
+              selectedModels={selectedModels}
+              setModelsPopoverOpen={setModelsPopoverOpen}
+              setPeriod={setPeriod}
+              toggleModel={toggleModel}
+            />
+          </div>
+        </div>
+      </div>
+
+      <main className="min-h-0 flex-1 overflow-y-auto">
+        <div className="grid gap-4 pt-4 xl:grid-cols-3">
+          {columns.map((column) => (
+            <section
+              key={column.severity}
+              className="min-h-[420px] rounded-md border border-border/70 bg-muted/20 p-3"
+            >
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <Badge className={cn("rounded-sm border px-2 py-0.5", column.tone)}>
+                      {column.errors.length}
+                      <div className="ml-1">{column.title}</div>
+                    </Badge>
+                  
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {column.errors.length > 0 ? (
+                  column.errors.map((error, index) => (
+                    <PerceptionTopErrorCard
+                      key={error.id}
+                      error={error}
+                      index={index}
+                      locale={locale}
+                      onOpenDetails={() => undefined}
+                      showIndex={false}
+                      actionGenerated={generatedIds.has(error.id)}
+                      actionSaving={savingErrorIds.has(error.id)}
+                      onCreateAction={() => void onCreateAction(error)}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-md border border-dashed border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
+                    Aucune erreur
+                  </div>
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </main>
+    </div>
+  );
+}
+
+function OptimizationErrorsLoading() {
+  return (
+    <div className="space-y-4 px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:px-0 lg:pb-0 lg:pt-0">
+      <div className="rounded-md border border-border/70 bg-background p-4">
+        <Skeleton className="h-6 w-56" />
+        <div className="mt-3 flex gap-2">
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-6 w-24" />
+          <Skeleton className="h-6 w-24" />
+        </div>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        {SEVERITY_COLUMNS.map((column) => (
+          <div key={column.severity} className="rounded-md border border-border/70 bg-muted/20 p-3">
+            <Skeleton className="h-6 w-28" />
+            <div className="mt-4 space-y-3">
+              <Skeleton className="h-36 w-full" />
+              <Skeleton className="h-36 w-full" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function PerceptionOptimizeActionsPage({
+  apiBaseURL,
+  routeSearch,
+}: PerceptionOptimizeActionsPageProps) {
+  const {
+    data,
+    error,
+    generatedIds,
+    handleFix,
+    loading,
+    persistError,
+    savingErrorIds,
+  } = useOptimizationErrors(apiBaseURL, routeSearch);
+
+  if (loading && !data) {
+    return <OptimizationErrorsLoading />;
+  }
+
+  if (!data) {
+    return (
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="w-full max-w-xl rounded-md border border-border/70 bg-background p-5">
+          <SectionTitle>Erreurs relevées</SectionTitle>
+          <p className="mt-3 text-sm text-muted-foreground">
+            {error || "Aucune erreur d'optimisation disponible pour ce projet."}
+          </p>
+          <Button asChild variant="outline" size="sm" className="mt-4 gap-2">
+            <Link to={{ pathname: "/perception", search: routeSearch }}>
+              <ArrowLeft className="h-4 w-4" />
+              Perception
+            </Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <OptimizationErrorsKanban
+      errors={data.errors}
+      generatedIds={generatedIds}
+      onCreateAction={handleFix}
+      persistError={persistError}
+      routeSearch={routeSearch}
+      savingErrorIds={savingErrorIds}
+    />
+  );
+}

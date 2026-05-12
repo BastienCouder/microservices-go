@@ -10,6 +10,8 @@ export const appQueryKeys = {
     ["prompt-quota", apiBaseURL, organizationId, projectId ?? "__default__"] as const,
   perception: (apiBaseURL: string, projectId: string | null, mode: string) =>
     ["perception", apiBaseURL, projectId ?? "__default__", mode] as const,
+  optimizationErrors: (apiBaseURL: string, projectId: string | null) =>
+    ["optimization-errors", apiBaseURL, projectId ?? "__default__"] as const,
   traffic: (
     apiBaseURL: string,
     projectId: string | null,

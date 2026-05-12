@@ -87,6 +87,7 @@ export const apiRoutes = {
     quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
+    optimizationErrors: (projectId: string) => `/analysis/projects/${projectId}/optimization-errors`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
     brandCanon: (projectId: string) => `/analysis/projects/${projectId}/brand-canon`,
   },

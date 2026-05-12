@@ -6,12 +6,11 @@ import {
   PerceptionDonutVisual,
   PerceptionLeftPanel,
   PerceptionModelAxisHeatmap,
+  PerceptionOptimizeActions,
   PerceptionScoreMiniCard,
   PerceptionThreeColumnLayout,
   PerceptionTrendChart,
-  // PerceptionScoreMiniCard,
-  // PerceptionTrendChart,
-  // TopErrorsPanel,
+  TopErrorsPanel,
 } from "../_components";
 import {
   getPerceptionPeriodBadgeLabel,
@@ -26,10 +25,10 @@ type PerceptionClientProps = {
 };
 
 const SCORE_CARD_ICONS = {
-   positioning: Target,
-   factual: CheckCircle2,
-   sentiment: Sparkles,
- } as const;
+  positioning: Target,
+  factual: CheckCircle2,
+  sentiment: Sparkles,
+} as const;
 
 export function PerceptionClient({ initialData }: PerceptionClientProps) {
   const { locale } = useLocale();
@@ -37,18 +36,21 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
   const periodLabel = getPerceptionPeriodLabel(viewModel.selectedPeriod, locale);
   const periodBadgeLabel = getPerceptionPeriodBadgeLabel(viewModel.selectedPeriod, locale);
 
-  // Right column temporarily disabled:
-  // const rightColumn = (
-  //   <div className="px-1 pb-4">
-  //     <TopErrorsPanel errors={viewModel.filteredTopErrors} />
-  //   </div>
-  // );
+  const rightColumn = (
+    <div className="px-1 pb-4">
+      <TopErrorsPanel
+        errors={viewModel.filteredTopErrors}
+        generatedIds={viewModel.generatedIds}
+        savingErrorIds={viewModel.savingErrorIds}
+        onCreateAction={viewModel.handleFix}
+      />
+    </div>
+  );
 
   return (
     <PerceptionThreeColumnLayout
       left={
         <div className="flex h-auto flex-col gap-4 xl:h-full xl:min-h-0">
-       
           <div className="min-h-0 flex-1 overflow-hidden">
             <PerceptionLeftPanel
               canon={initialData.brandCanon}
@@ -80,14 +82,11 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
               isDemo={!initialData.metadata.projectId}
             />
           </div>
-
-
         </div>
       }
       center={
-        <div className="px-1 space-y-4 pb-4">
-
-             <Card className="border-border/60 shrink-0 overflow-hidden py-4">
+        <div className="space-y-4 px-1 pb-4">
+          <Card className="shrink-0 overflow-hidden border-border/60 py-4">
             <CardContent className="p-0">
               <PerceptionDonutVisual
                 points={viewModel.filteredRadar}
@@ -95,31 +94,36 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
               />
             </CardContent>
           </Card>
-          
+
           <PerceptionModelAxisHeatmap
             axes={viewModel.modelAxisHeatmap.axes}
             rows={viewModel.modelAxisHeatmap.rows}
             periodLabel={periodBadgeLabel}
           />
-          
-            <PerceptionTrendChart
-              data={viewModel.perceptionTrend.data}
-              periodLabel={periodLabel}
-              badgeLabel={periodBadgeLabel}
-            />
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-              {viewModel.scoreCards.map((card) => (
-                <PerceptionScoreMiniCard
-                  key={card.id}
-                  {...card}
-                  icon={SCORE_CARD_ICONS[card.id as keyof typeof SCORE_CARD_ICONS]}
-                />
-              ))}
-            </div>
-      
+          <PerceptionTrendChart
+            data={viewModel.perceptionTrend.data}
+            periodLabel={periodLabel}
+            badgeLabel={periodBadgeLabel}
+          />
+
+          <PerceptionOptimizeActions
+            drafts={viewModel.optimizeDrafts}
+            persistError={viewModel.persistError}
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {viewModel.scoreCards.map((card) => (
+              <PerceptionScoreMiniCard
+                key={card.id}
+                {...card}
+                icon={SCORE_CARD_ICONS[card.id as keyof typeof SCORE_CARD_ICONS]}
+              />
+            ))}
+          </div>
         </div>
       }
+      right={rightColumn}
     />
   );
 }

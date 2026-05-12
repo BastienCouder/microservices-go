@@ -56,7 +56,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
       { href: buildScopedHref("/perception", { project: activeProjectToken }), label: content.perception },
-      { href: buildScopedHref("/optimize/actions", { project: activeProjectToken }), label: "Optimize actions" },
+      { href: buildScopedHref("/optimize/actions", { project: activeProjectToken }), label: content.optimizeActions },
       { href: buildScopedHref("/optimize/content-optimizer", { project: activeProjectToken }), label: "Content optimizer" },
       { href: buildScopedHref("/impact", { project: activeProjectToken }), label: "Impact" },
       ...ORGANIZATION_ITEMS.map((item) => ({

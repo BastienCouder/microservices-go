@@ -498,6 +498,8 @@
     "topErrorsAiClaim": "Ce que l’IA dit",
     "topErrorsImpact": "Impact",
     "topErrorsGeneratedFix": "Correction proposée",
+    "topErrorsAdded": "Ajoutée",
+    "topErrorsFix": "Corriger",
     "topErrorsErrorPrefix": "Erreur n°",
     "topErrorsSeverityHigh": "Critique",
     "topErrorsSeverityMedium": "Moyenne",
@@ -617,6 +619,7 @@
   "sidebar": {
     "monitoring": "Monitoring",
     "perception": "Perception",
+    "optimizeActions": "Optimisation",
     "prompts": "Prompts",
     "pages": "Pages",
     "traffic": "Traffic",

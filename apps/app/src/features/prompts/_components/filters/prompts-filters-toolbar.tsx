@@ -117,13 +117,6 @@ export function PromptsFiltersToolbar({
         onClick={() => setShowArchived(!showArchived)}
         title={content.archivedPromptsHelp}
       >
-        <span
-          className={cn(
-            "mr-2 h-2 w-2 rounded-full transition-colors",
-            showArchived ? "bg-primary" : "bg-muted-foreground/35",
-          )}
-          aria-hidden="true"
-        />
         <span>{content.showArchivedPrompts}</span>
       </Button>
 

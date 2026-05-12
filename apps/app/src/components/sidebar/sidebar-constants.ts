@@ -17,6 +17,7 @@ export type SidebarItem = {
     | "pages"
     | "traffic"
     | "brands"
+    | "optimizeActions"
     | "models"
     | "adminModels"
     | "organizations"
@@ -31,6 +32,7 @@ export const SIDEBAR_LABELS = {
   pages: "pages",
   traffic: "Traffic",
   brands: "brands",
+  optimizeActions: "optimization",
   models: "models",
   adminModels: "admin models",
   organizations: "organizations",

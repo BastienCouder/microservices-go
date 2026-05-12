@@ -1,5 +1,9 @@
 export { getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
 export {
+  buildPerceptionHeroInsight,
+  type PerceptionHeroInsight,
+} from "./perception-hero-insight";
+export {
   buildPerceptionPeriodOptions,
   formatPerceptionErrorTypeLabel,
   formatPerceptionFixTypeLabel,
