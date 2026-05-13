@@ -85,6 +85,12 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getPerception(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "optimization-errors" && r.Method == http.MethodGet:
 		h.getOptimizationErrors(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodPost:
+		h.startContentOptimizerCrawl(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodGet:
+		h.getLatestContentOptimizerCrawl(w, r, projectID)
+	case len(parts) == 4 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodGet:
+		h.getContentOptimizerCrawl(w, r, projectID, parts[3])
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
 		h.getBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
@@ -313,6 +319,91 @@ func (h *Handler) getOptimizationErrors(w http.ResponseWriter, r *http.Request, 
 	writeSuccess(w, http.StatusOK, board)
 }
 
+type startContentOptimizerCrawlRequest struct {
+	URL           string                               `json:"url"`
+	Limit         int                                  `json:"limit"`
+	Depth         int                                  `json:"depth"`
+	Source        string                               `json:"source"`
+	Formats       []string                             `json:"formats"`
+	Render        bool                                 `json:"render"`
+	Options       usecase.ContentOptimizerCrawlOptions `json:"options"`
+	CrawlPurposes []string                             `json:"crawlPurposes"`
+}
+
+func (h *Handler) startContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req startContentOptimizerCrawlRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	job, err := h.svc.StartContentOptimizerCrawl(r.Context(), projectID, organizationID, usecase.ContentOptimizerCrawlStartInput{
+		URL:           req.URL,
+		Limit:         req.Limit,
+		Depth:         req.Depth,
+		Source:        req.Source,
+		Formats:       req.Formats,
+		Render:        req.Render,
+		Options:       req.Options,
+		CrawlPurposes: req.CrawlPurposes,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, job)
+}
+
+func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string, jobID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	limit := 0
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid limit"})
+			return
+		}
+		limit = parsed
+	}
+
+	result, err := h.svc.GetContentOptimizerCrawl(r.Context(), projectID, organizationID, jobID, usecase.ContentOptimizerCrawlResultInput{
+		Cursor: r.URL.Query().Get("cursor"),
+		Limit:  limit,
+		Status: r.URL.Query().Get("status"),
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) getLatestContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	snapshot, err := h.svc.GetLatestContentOptimizerCrawl(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, snapshot)
+}
+
 func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -464,6 +555,8 @@ func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrQuotaExceeded):
 		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": err.Error()})
+	case errors.Is(err, usecase.ErrDependencyUnavailable):
+		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrUnauthorized):
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
 	case errors.Is(err, usecase.ErrNotFound):

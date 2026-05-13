@@ -8,4 +8,4 @@ export { PerceptionScoreMiniCard } from "./perception-score-mini-card";
 export { PerceptionThreeColumnLayout } from "./perception-three-column-layout";
 export { PerceptionTrendChart } from "./perception-trend-chart";
 export { BrandCanonUnavailableState, PerceptionUnavailableState } from "./perception-unavailable-state";
-export { PerceptionTopErrorCard, TopErrorsPanel } from "./top-errors-panel";
+export { buildPerceptionModelLookup, PerceptionTopErrorCard, TopErrorsPanel } from "./top-errors-panel";

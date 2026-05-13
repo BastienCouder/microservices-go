@@ -9,6 +9,7 @@ import {
   type OptimizationErrorsBoard,
 } from "@/lib/optimization-errors-data";
 import type { OptimizePriority, PerceptionError } from "@/lib/perception-data";
+import type { ProjectModelMeta } from "@/lib/project-models";
 import { appQueryKeys } from "@/lib/query-keys";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionClientJSON, postPerceptionClientJSON } from "../_lib/client-api";
@@ -29,6 +30,7 @@ type UseOptimizationErrorsResult = {
   data: OptimizationErrorsBoard | null;
   generatedIds: ReadonlySet<string>;
   loading: boolean;
+  modelCatalog: ProjectModelMeta[];
   error: string | null;
   persistError: string | null;
   savingErrorIds: ReadonlySet<string>;
@@ -142,6 +144,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     data: query.data?.data ?? null,
     generatedIds,
     loading: query.isLoading || (query.isFetching && !query.data),
+    modelCatalog: query.data?.modelCatalog ?? [],
     error: query.error instanceof Error ? query.error.message : null,
     persistError,
     savingErrorIds,

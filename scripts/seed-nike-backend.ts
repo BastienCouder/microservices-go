@@ -79,6 +79,14 @@ type SeedAlert = {
   description: string;
   createdAt: string;
 };
+type SeedContentCrawlRecord = {
+  url: string;
+  status: string;
+  httpStatus: number;
+  title: string;
+  markdown?: string;
+  html?: string;
+};
 
 type SuccessEnvelope<T> = {
   success: boolean;
@@ -862,6 +870,43 @@ const SEED_ALERTS: SeedAlert[] = [
     createdAt: isoDaysAgo(5, 35),
   },
 ];
+const SEED_CONTENT_CRAWL_RECORDS: SeedContentCrawlRecord[] = [
+  {
+    url: "https://www.nike.com",
+    status: "completed",
+    httpStatus: 200,
+    title: "Nike. Just Do It.",
+    markdown: "# Nike. Just Do It.\n\nNike presents performance footwear, apparel, and equipment for running, basketball, training, lifestyle, and sport culture.\n\n## Content optimizer notes\n\n- Strong global brand signal on the homepage.\n- Add concise internal links to running, basketball, membership, and sustainability pages.",
+  },
+  {
+    url: "https://www.nike.com/running",
+    status: "completed",
+    httpStatus: 200,
+    title: "Nike Running Shoes and Gear",
+    markdown: "# Nike Running\n\nDaily trainers, race shoes, trail running, and running apparel are grouped around comfort, speed, durability, and coaching.\n\n## Optimization opportunities\n\n- Add an answer for best Nike shoes for daily running.\n- Compare Pegasus, Vomero, Structure, and Vaporfly by runner profile.",
+  },
+  {
+    url: "https://www.nike.com/basketball",
+    status: "completed",
+    httpStatus: 200,
+    title: "Nike Basketball",
+    markdown: "# Nike Basketball\n\nBasketball content highlights signature athletes, performance cushioning, court traction, and lifestyle crossover.\n\n## Optimization opportunities\n\n- Explain which models fit guards, wings, and centers.\n- Clarify differences between signature lines.",
+  },
+  {
+    url: "https://www.nike.com/membership",
+    status: "completed",
+    httpStatus: 200,
+    title: "Nike Membership",
+    markdown: "# Nike Membership\n\nMembership combines product access, experiences, apps, rewards, and personalized services.\n\n## Optimization opportunities\n\n- Make benefits explicit in one scannable section.\n- Connect app experiences to shopping, training, and community outcomes.",
+  },
+  {
+    url: "https://www.nike.com/archive/spring-collection",
+    status: "errored",
+    httpStatus: 503,
+    title: "Archived campaign unavailable",
+    html: "<html><body><h1>503 Service Unavailable</h1><p>Seed crawl error example.</p></body></html>",
+  },
+];
 
 async function resetProjectRelationalData() {
   const managedModelIDs = MODELS.map((model) => model.id);
@@ -1201,10 +1246,54 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
   );
 }
 
+async function seedContentOptimizerCrawl(organization: OrganizationSeed) {
+  const completedRecords = SEED_CONTENT_CRAWL_RECORDS.filter((record) => record.status === "completed").length;
+  const result = {
+    id: "seed-crawl-nike",
+    status: "completed",
+    browserSecondsUsed: 0,
+    total: SEED_CONTENT_CRAWL_RECORDS.length,
+    finished: SEED_CONTENT_CRAWL_RECORDS.length,
+    records: SEED_CONTENT_CRAWL_RECORDS,
+  };
+  const resultJSON = JSON.stringify(result).replaceAll("'", "''");
+
+  await psql(
+    "analysissvc",
+    `
+      insert into content_optimizer_crawls (
+        project_id,
+        organization_id,
+        job_id,
+        result,
+        created_at,
+        updated_at
+      )
+      values (
+        ${quoteLiteral(PROJECT_ID)},
+        ${organization.id},
+        'seed-crawl-nike',
+        '${resultJSON}'::jsonb,
+        ${quoteLiteral(EARLIER)},
+        ${quoteLiteral(NOW)}
+      )
+      on conflict (project_id, organization_id) do update set
+        job_id = excluded.job_id,
+        result = excluded.result,
+        updated_at = excluded.updated_at;
+    `,
+  );
+
+  console.log(`  content optimizer pages=${SEED_CONTENT_CRAWL_RECORDS.length} completed=${completedRecords}`);
+}
+
 async function resetAnalysisDataForProject() {
   await psql(
     "analysissvc",
     `
+      delete from content_optimizer_crawls
+      where project_id = ${quoteLiteral(PROJECT_ID)};
+
       delete from brand_canon
       where project_id = ${quoteLiteral(PROJECT_ID)};
 
@@ -1355,6 +1444,9 @@ async function main() {
     await seedAnalysisRelational(user, organization);
   }
 
+  logStep("Create content optimizer crawl seed in analysissvc");
+  await seedContentOptimizerCrawl(organization);
+
   console.log("\nSeed terminé.");
   console.log(`- organization: ${ORGANIZATION_NAME} (#${organization.id})`);
   console.log(`- team: ${TEAM_NAME} (#${organization.teamID})`);
@@ -1362,6 +1454,7 @@ async function main() {
   console.log(`- projectId: ${PROJECT_ID}`);
   console.log(`- seeded prompts: ${PROMPTS.length}`);
   console.log(`- seeded competitors: ${COMPETITORS.length}`);
+  console.log(`- seeded content optimizer pages: ${SEED_CONTENT_CRAWL_RECORDS.length}`);
   if (SEED_ANALYSIS_MODE === "live" && liveResult) {
     console.log(`- live run id: ${liveResult.runId}`);
     console.log(`- live responses recorded: ${liveResult.responsesRecorded}`);

@@ -52,6 +52,11 @@ const AccountPage = lazy(() =>
     default: module.AccountPage,
   })),
 );
+const ContentOptimizerPage = lazy(() =>
+  import("@/features/content-optimizer/index").then((module) => ({
+    default: module.ContentOptimizerPage,
+  })),
+);
 
 const PerceptionBrandCanonPage = lazy(() =>
   import("@/features/brands/brand-canon/index").then((module) => ({
@@ -145,6 +150,14 @@ export function AppRouter({
         element={
           <Suspense fallback={null}>
             <PerceptionOptimizeActionsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/content-optimizer"
+        element={
+          <Suspense fallback={null}>
+            <ContentOptimizerPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

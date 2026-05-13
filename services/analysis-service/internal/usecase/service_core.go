@@ -22,6 +22,7 @@ func NewService() *Service {
 		alerts:              make(map[string]*Alert),
 		alertsByProject:     make(map[string][]string),
 		brandCanonByProject: make(map[string]*BrandCanon),
+		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
 	}
 }
 
@@ -34,6 +35,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.projectCompetitors = deps.ProjectCompetitors
 	svc.projectModels = deps.ProjectModels
 	svc.billingQuota = deps.BillingQuota
+	svc.contentCrawler = deps.ContentCrawler
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err
@@ -83,6 +85,7 @@ func (s *Service) snapshotLocked() *persistedState {
 		Alerts:              make(map[string]*Alert, len(s.alerts)),
 		AlertsByProject:     make(map[string][]string, len(s.alertsByProject)),
 		BrandCanonByProject: make(map[string]*BrandCanon, len(s.brandCanonByProject)),
+		ContentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot, len(s.contentCrawls)),
 	}
 
 	for key, value := range s.runs {
@@ -128,6 +131,10 @@ func (s *Service) snapshotLocked() *persistedState {
 		clone := copyBrandCanon(value)
 		state.BrandCanonByProject[key] = &clone
 	}
+	for key, value := range s.contentCrawls {
+		clone := copyContentOptimizerCrawlSnapshot(value)
+		state.ContentCrawls[key] = &clone
+	}
 
 	return state
 }
@@ -148,6 +155,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.alerts = nonNilAlertMap(state.Alerts)
 	s.alertsByProject = nonNilSliceMap(state.AlertsByProject)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
+	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
 }
 
 func (s *Service) persistLocked(ctx context.Context) error {

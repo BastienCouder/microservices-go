@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { PageHeader } from "@/components/shared/page-header";
 import { PeriodFilterPicker, type PeriodFilterOption } from "@/components/shared/period-filter-picker";
-import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -18,7 +18,7 @@ import type { PerceptionSeverity } from "@/lib/perception-data";
 import type { OptimizationError } from "@/lib/optimization-errors-data";
 import { cn } from "@/lib/utils";
 import { useLocale } from "@/shared/hooks/use-i18n";
-import { PerceptionTopErrorCard } from "../_components";
+import { buildPerceptionModelLookup, PerceptionTopErrorCard } from "../_components";
 import { useOptimizationErrors } from "../core/use-optimization-errors";
 
 type PerceptionOptimizeActionsPageProps = {
@@ -33,7 +33,7 @@ const SEVERITY_COLUMNS: Array<{
 }> = [
   {
     severity: "high",
-    title: "Haute",
+    title: "Critique",
     tone: "bg-destructive/10 text-destructive",
   },
   {
@@ -43,7 +43,7 @@ const SEVERITY_COLUMNS: Array<{
   },
   {
     severity: "low",
-    title: "Basse",
+    title: "Faible",
     tone: "bg-green-500/10 text-green-700",
   },
 ];
@@ -281,16 +281,18 @@ function OptimizationFiltersToolbar({
 function OptimizationErrorsKanban({
   errors,
   generatedIds,
+  loading,
+  modelCatalog,
   onCreateAction,
   persistError,
-  routeSearch,
   savingErrorIds,
 }: {
   errors: OptimizationError[];
   generatedIds: ReadonlySet<string>;
+  loading: boolean;
+  modelCatalog: Parameters<typeof buildPerceptionModelLookup>[0];
   onCreateAction: (error: OptimizationError) => void | Promise<void>;
   persistError: string | null;
-  routeSearch: string;
   savingErrorIds: ReadonlySet<string>;
 }) {
   const { locale } = useLocale();
@@ -298,6 +300,10 @@ function OptimizationErrorsKanban({
   const [period, setPeriod] = useState<PeriodFilter>("all");
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const availableModels = useMemo(() => listAvailableModels(errors), [errors]);
+  const modelLookup = useMemo(
+    () => buildPerceptionModelLookup(modelCatalog),
+    [modelCatalog],
+  );
   const filteredErrors = useMemo(
     () => filterErrorsByModels(filterErrorsByPeriod(errors, period), selectedModels),
     [errors, period, selectedModels],
@@ -327,7 +333,7 @@ function OptimizationErrorsKanban({
         actionsVariant="classic"
       />
 
-      <div className="rounded-md rounded-tr-none border-b bg-background px-3 pb-3 md:px-4 md:pb-4">
+      <div className="rounded-md bg-background px-3 pb-3 md:px-4 md:pb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
           <div className="min-w-0 flex-1">
             {persistError ? (
@@ -349,33 +355,43 @@ function OptimizationErrorsKanban({
         </div>
       </div>
 
-      <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="grid gap-4 pt-4 xl:grid-cols-3">
-          {columns.map((column) => (
+      <main className="min-h-0 flex-1 overflow-visible lg:overflow-hidden">
+        <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
+          {columns.map((column, columnIndex) => (
             <section
               key={column.severity}
-              className="min-h-[420px] rounded-md border border-border/70 bg-muted/20 p-3"
+              className="relative flex min-h-[420px] flex-col rounded-md bg-muted/20 p-2 lg:min-h-0"
             >
-              <div className="mb-3 flex items-start justify-between gap-3">
+              {columnIndex !== columns.length - 1 && (
+                <div className="absolute right-[-16px] top-4 hidden h-[calc(100%-32px)] w-1 bg-border lg:block" />
+              )}
+
+              <div className="mb-3 flex shrink-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <Badge className={cn("rounded-sm border px-2 py-0.5", column.tone)}>
-                      {column.errors.length}
+                      {loading ? (
+                        <Skeleton className="h-3 w-4 rounded-sm bg-current/20" />
+                      ) : (
+                        column.errors.length
+                      )}
                       <div className="ml-1">{column.title}</div>
                     </Badge>
-                  
                   </div>
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {column.errors.length > 0 ? (
+              <div className="min-h-0 space-y-3 lg:-mx-1 lg:flex-1 lg:overflow-y-auto lg:px-1 lg:pb-1 lg:pt-1">
+                {loading ? (
+                  <OptimizationColumnLoading />
+                ) : column.errors.length > 0 ? (
                   column.errors.map((error, index) => (
                     <PerceptionTopErrorCard
                       key={error.id}
                       error={error}
                       index={index}
                       locale={locale}
+                      modelLookup={modelLookup}
                       onOpenDetails={() => undefined}
                       showIndex={false}
                       actionGenerated={generatedIds.has(error.id)}
@@ -384,9 +400,7 @@ function OptimizationErrorsKanban({
                     />
                   ))
                 ) : (
-                  <div className="rounded-md border border-dashed border-border/70 bg-background/60 p-4 text-sm text-muted-foreground">
-                    Aucune erreur
-                  </div>
+                  <EmptyStateCard label="Aucune erreur" className="h-24 bg-background/60" />
                 )}
               </div>
             </section>
@@ -397,27 +411,47 @@ function OptimizationErrorsKanban({
   );
 }
 
-function OptimizationErrorsLoading() {
+function OptimizationColumnLoading() {
   return (
-    <div className="space-y-4 px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:px-0 lg:pb-0 lg:pt-0">
-      <div className="rounded-md border border-border/70 bg-background p-4">
-        <Skeleton className="h-6 w-56" />
-        <div className="mt-3 flex gap-2">
-          <Skeleton className="h-6 w-24" />
-          <Skeleton className="h-6 w-24" />
-          <Skeleton className="h-6 w-24" />
+    <>
+      {Array.from({ length: 3 }).map((_, index) => (
+        <OptimizationErrorCardSkeleton key={index} />
+      ))}
+    </>
+  );
+}
+
+function OptimizationErrorCardSkeleton() {
+  return (
+    <div className="w-full rounded-md bg-background p-4">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Skeleton className="h-6 w-6 shrink-0 rounded-md" />
+          <div className="min-w-0 space-y-1.5">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
         </div>
       </div>
-      <div className="grid gap-4 xl:grid-cols-3">
-        {SEVERITY_COLUMNS.map((column) => (
-          <div key={column.severity} className="rounded-md border border-border/70 bg-muted/20 p-3">
-            <Skeleton className="h-6 w-28" />
-            <div className="mt-4 space-y-3">
-              <Skeleton className="h-36 w-full" />
-              <Skeleton className="h-36 w-full" />
-            </div>
-          </div>
-        ))}
+
+      <div className="mb-3 space-y-2">
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+      <div className="mb-3 space-y-2">
+        <Skeleton className="h-3 w-full" />
+        <Skeleton className="h-3 w-4/5" />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <Skeleton className="h-6 w-20 rounded-sm" />
+          <Skeleton className="h-6 w-24 rounded-sm" />
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Skeleton className="h-6 w-16 rounded-sm" />
+          <Skeleton className="h-7 w-20 rounded-sm" />
+        </div>
       </div>
     </div>
   );
@@ -433,23 +467,25 @@ export function PerceptionOptimizeActionsPage({
     generatedIds,
     handleFix,
     loading,
+    modelCatalog,
     persistError,
     savingErrorIds,
   } = useOptimizationErrors(apiBaseURL, routeSearch);
 
-  if (loading && !data) {
-    return <OptimizationErrorsLoading />;
-  }
-
-  if (!data) {
+  if (!loading && !data) {
     return (
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="w-full max-w-xl rounded-md border border-border/70 bg-background p-5">
-          <SectionTitle>Erreurs relevées</SectionTitle>
-          <p className="mt-3 text-sm text-muted-foreground">
-            {error || "Aucune erreur d'optimisation disponible pour ce projet."}
-          </p>
-          <Button asChild variant="outline" size="sm" className="mt-4 gap-2">
+      <div className="flex h-auto min-h-full flex-col px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:px-0 lg:pb-0 lg:pt-0">
+        <PageHeader
+          title="Erreurs relevées"
+          baseline="Kanban des erreurs détectées côté monitoring et optimisation de perception."
+          actionsVariant="classic"
+        />
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 py-8">
+          <EmptyStateCard
+            label={error || "Aucune erreur d'optimisation disponible pour ce projet."}
+            className="h-32 w-full max-w-xl text-sm"
+          />
+          <Button asChild variant="outline" size="sm" className="gap-2">
             <Link to={{ pathname: "/perception", search: routeSearch }}>
               <ArrowLeft className="h-4 w-4" />
               Perception
@@ -462,11 +498,12 @@ export function PerceptionOptimizeActionsPage({
 
   return (
     <OptimizationErrorsKanban
-      errors={data.errors}
+      errors={data?.errors ?? []}
       generatedIds={generatedIds}
+      loading={loading && !data}
+      modelCatalog={modelCatalog}
       onCreateAction={handleFix}
       persistError={persistError}
-      routeSearch={routeSearch}
       savingErrorIds={savingErrorIds}
     />
   );

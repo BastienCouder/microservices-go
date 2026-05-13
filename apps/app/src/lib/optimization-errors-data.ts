@@ -1,5 +1,10 @@
 import { apiRoutes } from "@/lib/api-config";
 import type { PerceptionError, PerceptionSeverity } from "@/lib/perception-data";
+import {
+  normalizeModelPayloadList,
+  toProjectModelMeta,
+  type ProjectModelMeta,
+} from "@/lib/project-models";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
 
@@ -32,6 +37,7 @@ export type OptimizationErrorsBoard = {
 
 export type OptimizationErrorsLoadResult = {
   data: OptimizationErrorsBoard;
+  modelCatalog: ProjectModelMeta[];
   projectId: string;
 };
 
@@ -235,6 +241,27 @@ async function resolveProjectSlug(
   return findBySlugOrId(projects, projectId)?.id ?? null;
 }
 
+async function loadOptimizationModelCatalog(
+  apiBaseURL: string,
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectModelMeta[]> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.projects.models(encodeURIComponent(projectId)),
+    {
+      method: "GET",
+      signal,
+    },
+  );
+
+  if (!result.ok) return [];
+
+  return normalizeModelPayloadList(unwrapSuccessEnvelope(result.data)).map((model) =>
+    toProjectModelMeta(model),
+  );
+}
+
 export async function loadOptimizationErrors(
   apiBaseURL: string,
   routeSearch: string,
@@ -278,6 +305,7 @@ export async function loadOptimizationErrors(
 
   return {
     data: normalizeBoard(unwrapRequiredEnvelope(result, "optimization-errors")),
+    modelCatalog: await loadOptimizationModelCatalog(apiBaseURL, projectId, options?.signal),
     projectId,
   };
 }

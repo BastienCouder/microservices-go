@@ -27,6 +27,8 @@ type Config struct {
 	RedisAddr                string
 	RedisPassword            string
 	DashboardCacheTTL        time.Duration
+	CloudflareAccountID      string
+	CloudflareAPIToken       string
 }
 
 func Load() (Config, error) {
@@ -78,6 +80,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	cloudflareAPIToken, err := optionalPasswordFromEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_TOKEN_FILE")
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
 		HTTPAddr:                 httpAddr,
@@ -98,6 +104,8 @@ func Load() (Config, error) {
 		RedisAddr:                redisAddr,
 		RedisPassword:            redisPassword,
 		DashboardCacheTTL:        dashboardCacheTTL,
+		CloudflareAccountID:      optionalEnv("CLOUDFLARE_ACCOUNT_ID"),
+		CloudflareAPIToken:       cloudflareAPIToken,
 	}, nil
 }
 

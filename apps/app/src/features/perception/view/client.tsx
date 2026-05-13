@@ -41,6 +41,7 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
       <TopErrorsPanel
         errors={viewModel.filteredTopErrors}
         generatedIds={viewModel.generatedIds}
+        modelCatalog={viewModel.modelCatalog}
         savingErrorIds={viewModel.savingErrorIds}
         onCreateAction={viewModel.handleFix}
       />

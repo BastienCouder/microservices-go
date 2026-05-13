@@ -1,14 +1,14 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { getModelIconForName } from "@/lib/app-data";
+import type { PerceptionError, PerceptionModelOption } from "@/lib/perception-data";
+import { buildProviderLabel } from "@/lib/project-models";
 import { cn } from "@/lib/utils";
-import type { PerceptionError } from "@/lib/perception-data";
 import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
@@ -21,12 +21,14 @@ import {
 export function TopErrorsPanel({
   errors,
   generatedIds,
+  modelCatalog,
   onCreateAction,
   savingErrorIds,
   showSeeMore = true,
 }: {
   errors: PerceptionError[];
   generatedIds?: ReadonlySet<string>;
+  modelCatalog?: PerceptionModelOption[];
   onCreateAction?: (error: PerceptionError) => void | Promise<void>;
   savingErrorIds?: ReadonlySet<string>;
   showSeeMore?: boolean;
@@ -34,6 +36,10 @@ export function TopErrorsPanel({
   const { locale, t } = useScopedI18n("perception");
   const [selectedError, setSelectedError] = useState<PerceptionError | null>(null);
   const isMobile = useIsMobile();
+  const modelLookup = useMemo(
+    () => buildPerceptionModelLookup(modelCatalog ?? []),
+    [modelCatalog],
+  );
   const handleDetailsOpenChange = (open: boolean) => {
     if (!open) {
       setSelectedError(null);
@@ -71,6 +77,7 @@ export function TopErrorsPanel({
               index={index}
               onOpenDetails={() => setSelectedError(error)}
               locale={locale}
+              modelLookup={modelLookup}
               actionGenerated={generatedIds?.has(error.id) ?? false}
               actionSaving={savingErrorIds?.has(error.id) ?? false}
               onCreateAction={onCreateAction ? () => void onCreateAction(error) : undefined}
@@ -96,6 +103,7 @@ export function TopErrorsPanel({
               <ErrorDetailsContent
                 error={selectedError}
                 locale={locale}
+                modelLookup={modelLookup}
                 mobile
                 actionGenerated={selectedActionGenerated}
                 actionSaving={selectedActionSaving}
@@ -113,6 +121,7 @@ export function TopErrorsPanel({
               <ErrorDetailsContent
                 error={selectedError}
                 locale={locale}
+                modelLookup={modelLookup}
                 mobile={false}
                 actionGenerated={selectedActionGenerated}
                 actionSaving={selectedActionSaving}
@@ -157,6 +166,7 @@ function ErrorDetailsContent({
   actionSaving = false,
   error,
   locale,
+  modelLookup,
   mobile,
   onCreateAction,
 }: {
@@ -164,6 +174,7 @@ function ErrorDetailsContent({
   actionSaving?: boolean;
   error: PerceptionError;
   locale: string;
+  modelLookup: ReadonlyMap<string, PerceptionModelOption>;
   mobile: boolean;
   onCreateAction?: () => void;
 }) {
@@ -182,21 +193,22 @@ function ErrorDetailsContent({
               <Badge variant={error.optimizePriority === "high" ? "destructive" : "secondary"} className="text-sm">
                 {formatPerceptionPriorityLabelI18n(error.optimizePriority, locale)}
               </Badge>
-              {error.detectedInModels.map((model) => (
-                <span
-                  key={`details-${error.id}-${model}`}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-white px-3 py-1.5 text-sm font-medium text-foreground"
-                >
-                  <img
-                    src={getModelIconForName(model)}
-                    alt={model}
-                    className="h-4 w-4 object-contain"
-                    decoding="async"
-                    loading="lazy"
-                  />
-                  {model}
-                </span>
-              ))}
+              {error.detectedInModels.map((model) => {
+                const modelBadge = getPerceptionModelBadgeMeta(model, modelLookup);
+
+                return (
+                  <span
+                    key={`details-${error.id}-${model}`}
+                    className="inline-flex max-w-full items-center gap-2 rounded-full border border-slate-100 bg-white px-3 py-1.5 text-sm font-medium text-foreground"
+                    title={modelBadge.title}
+                  >
+                    <ModelBadgeIcon model={modelBadge} className="h-4 w-4" />
+                    <span className="min-w-0 truncate">
+                      {modelBadge.provider} - {modelBadge.name}
+                    </span>
+                  </span>
+                );
+              })}
             </div>
 
             <h1 className="[overflow-wrap:anywhere] text-xl leading-tight tracking-tight md:text-3xl">
@@ -263,12 +275,135 @@ function getSeverityTone(severity: PerceptionError["severity"], locale: string) 
   return { dot: "bg-sky-500", label: "text-sky-600", tag: getPerceptionSeverityLabel("low", locale) };
 }
 
+type PerceptionModelBadgeMeta = {
+  iconPath: string;
+  name: string;
+  provider: string;
+  title: string;
+};
+
+const PROVIDER_VISUALS = [
+  { keys: ["openai", "chatgpt", "gpt", "o1", "o3", "o4"], provider: "OpenAI", iconPath: "/models/openai.svg" },
+  { keys: ["google", "gemini"], provider: "Google", iconPath: "/models/google.svg" },
+  { keys: ["anthropic", "claude"], provider: "Anthropic", iconPath: "/models/anthropic.svg" },
+  { keys: ["perplexity"], provider: "Perplexity", iconPath: "/models/perplexity.svg" },
+  { keys: ["mistral"], provider: "Mistral", iconPath: "/models/mistral.svg" },
+  { keys: ["microsoft", "copilot"], provider: "Microsoft", iconPath: "/models/copilot.svg" },
+  { keys: ["xai", "grok"], provider: "xAI", iconPath: "/models/xai.svg" },
+  { keys: ["deepseek"], provider: "DeepSeek", iconPath: "/models/deepseek.svg" },
+  { keys: ["qwen"], provider: "Qwen", iconPath: "/models/qwen.svg" },
+  { keys: ["meta", "llama"], provider: "Meta", iconPath: "/models/meta.svg" },
+  { keys: ["groq"], provider: "Groq", iconPath: "/models/groq.svg" },
+  { keys: ["openrouter"], provider: "OpenRouter", iconPath: "/models/openrouter.svg" },
+  { keys: ["zai"], provider: "Z.ai", iconPath: "/models/zai.svg" },
+] as const;
+
+function normalizeModelLookupKey(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+export function buildPerceptionModelLookup(
+  models: PerceptionModelOption[],
+): Map<string, PerceptionModelOption> {
+  const lookup = new Map<string, PerceptionModelOption>();
+
+  for (const model of models) {
+    for (const value of [
+      model.id,
+      model.providerModelId,
+      model.displayName,
+      model.groupName,
+    ]) {
+      const key = normalizeModelLookupKey(value);
+      if (key) lookup.set(key, model);
+    }
+  }
+
+  return lookup;
+}
+
+function findProviderVisual(provider: string, modelName: string) {
+  const providerValue = normalizeModelLookupKey(provider);
+  const modelValue = normalizeModelLookupKey(modelName);
+  const providerMatch = PROVIDER_VISUALS.find(({ keys }) =>
+    keys.some((key) => providerValue.includes(key)),
+  );
+  if (providerMatch) return providerMatch;
+
+  return PROVIDER_VISUALS.find(({ keys }) =>
+    keys.some((key) => modelValue.includes(key)),
+  );
+}
+
+function getProviderModelName(providerModelId: string): string {
+  const parts = providerModelId.split("/").map((part) => part.trim()).filter(Boolean);
+  return parts.at(-1) ?? providerModelId.trim();
+}
+
+function getPerceptionModelBadgeMeta(
+  modelName: string,
+  modelLookup: ReadonlyMap<string, PerceptionModelOption>,
+): PerceptionModelBadgeMeta {
+  const model = modelLookup.get(normalizeModelLookupKey(modelName));
+
+  if (model) {
+    const providerVisual = findProviderVisual(model.provider, model.providerModelId || model.displayName);
+    const provider = providerVisual?.provider ?? buildProviderLabel(model.provider);
+    const name =
+      model.displayName ||
+      getProviderModelName(model.providerModelId) ||
+      model.groupName ||
+      model.id;
+
+    return {
+      iconPath: providerVisual?.iconPath || model.iconPath,
+      name,
+      provider: provider || "AI provider",
+      title: `${provider || "AI provider"} - ${name}`,
+    };
+  }
+
+  const providerVisual = findProviderVisual("", modelName);
+  const provider = providerVisual?.provider ?? "AI provider";
+  const name = getProviderModelName(modelName) || modelName || "Modele IA";
+
+  return {
+    iconPath: providerVisual?.iconPath ?? "",
+    name,
+    provider,
+    title: `${provider} - ${name}`,
+  };
+}
+
+function ModelBadgeIcon({
+  className,
+  model,
+}: {
+  className: string;
+  model: PerceptionModelBadgeMeta;
+}) {
+  if (!model.iconPath) {
+    return <span className={cn("shrink-0 rounded-full bg-muted-foreground/40", className)} />;
+  }
+
+  return (
+    <img
+      src={model.iconPath}
+      alt={model.provider}
+      className={cn("shrink-0 object-contain", className)}
+      decoding="async"
+      loading="lazy"
+    />
+  );
+}
+
 export function PerceptionTopErrorCard({
   actionGenerated = false,
   actionSaving = false,
   error,
   index,
   showIndex = true,
+  modelLookup = new Map(),
   onOpenDetails,
   onCreateAction,
   locale,
@@ -278,13 +413,16 @@ export function PerceptionTopErrorCard({
   error: PerceptionError;
   index: number;
   showIndex?: boolean;
+  modelLookup?: ReadonlyMap<string, PerceptionModelOption>;
   onOpenDetails: () => void;
   onCreateAction?: () => void;
   locale: string;
 }) {
   const { t } = useScopedI18n("perception");
   const tone = getSeverityTone(error.severity, locale);
-  const primaryModel = error.detectedInModels[0] || "";
+  const primaryModel = error.detectedInModels[0]
+    ? getPerceptionModelBadgeMeta(error.detectedInModels[0], modelLookup)
+    : null;
 
   return (
     <div className="group w-full rounded-md bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20">
@@ -298,15 +436,7 @@ export function PerceptionTopErrorCard({
           <div className="flex min-w-0 items-center gap-2">
             {primaryModel ? (
               <div className="rounded-md border border-border/50 bg-white p-1">
-                <img
-                  src={getModelIconForName(primaryModel)}
-                  alt={primaryModel}
-                  width={14}
-                  height={14}
-                  className="h-3.5 w-3.5 object-contain"
-                  decoding="async"
-                  loading="lazy"
-                />
+                <ModelBadgeIcon model={primaryModel} className="h-3.5 w-3.5" />
               </div>
             ) : (
               <div className={cn("h-3.5 w-3.5 rounded-full", tone.dot)} />
@@ -339,19 +469,25 @@ export function PerceptionTopErrorCard({
 
       <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/40 pt-3">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          {error.detectedInModels.slice(0, 2).map((model) => (
-            <Badge key={model} variant="outline" className="inline-flex min-w-0 items-center gap-1 font-normal">
-              <img
-                src={getModelIconForName(model)}
-                alt=""
-                className="h-3 w-3 shrink-0"
-                aria-hidden="true"
-                decoding="async"
-                loading="lazy"
-              />
-              <span className="truncate">{model}</span>
-            </Badge>
-          ))}
+          {error.detectedInModels.slice(0, 2).map((model) => {
+            const modelBadge = getPerceptionModelBadgeMeta(model, modelLookup);
+
+            return (
+              <Badge
+                key={model}
+                variant="outline"
+                className="inline-flex max-w-[190px] min-w-0 items-center gap-1 font-normal"
+                title={modelBadge.title}
+              >
+                <ModelBadgeIcon model={modelBadge} className="h-3 w-3" />
+                <span className="min-w-0 truncate">{modelBadge.provider}</span>
+                <span className="shrink-0 text-muted-foreground/70">-</span>
+                <span className="min-w-0 truncate text-muted-foreground">
+                  {modelBadge.name}
+                </span>
+              </Badge>
+            );
+          })}
           {error.detectedInModels.length > 2 ? (
             <Badge variant="outline" className="font-normal">
               +{error.detectedInModels.length - 2}

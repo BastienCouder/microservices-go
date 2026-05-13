@@ -8,10 +8,11 @@ import (
 )
 
 var (
-	ErrValidation    = errors.New("validation error")
-	ErrUnauthorized  = errors.New("unauthorized")
-	ErrNotFound      = errors.New("not found")
-	ErrQuotaExceeded = errors.New("quota exceeded")
+	ErrValidation            = errors.New("validation error")
+	ErrUnauthorized          = errors.New("unauthorized")
+	ErrNotFound              = errors.New("not found")
+	ErrQuotaExceeded         = errors.New("quota exceeded")
+	ErrDependencyUnavailable = errors.New("dependency unavailable")
 )
 
 type PromptText struct {
@@ -238,6 +239,11 @@ type BillingQuotaProvider interface {
 	GetMonthlyQuota(ctx context.Context, organizationID int64) (monthlyQuota int, found bool, err error)
 }
 
+type ContentCrawler interface {
+	StartCrawl(ctx context.Context, input ContentOptimizerCrawlStartInput) (ContentOptimizerCrawlJob, error)
+	GetCrawl(ctx context.Context, jobID string, input ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error)
+}
+
 type Dependencies struct {
 	Store              StateStore
 	DashboardCache     DashboardCache
@@ -246,21 +252,23 @@ type Dependencies struct {
 	ProjectCompetitors ProjectCompetitorsProvider
 	ProjectModels      ProjectModelsProvider
 	BillingQuota       BillingQuotaProvider
+	ContentCrawler     ContentCrawler
 }
 
 type persistedState struct {
-	Seq                 int64                        `json:"seq"`
-	Runs                map[string]*AnalysisRun      `json:"runs"`
-	RunsByProject       map[string][]string          `json:"runsByProject"`
-	PromptRuns          map[string]*PromptRun        `json:"promptRuns"`
-	PromptRunsByRun     map[string][]string          `json:"promptRunsByRun"`
-	Responses           map[string]*AIResponse       `json:"responses"`
-	ResponsesByRun      map[string][]string          `json:"responsesByRun"`
-	ResponseIndexByRun  map[string]map[string]string `json:"responseIndexByRun"`
-	RunByRequest        map[string]string            `json:"runByRequest"`
-	Alerts              map[string]*Alert            `json:"alerts"`
-	AlertsByProject     map[string][]string          `json:"alertsByProject"`
-	BrandCanonByProject map[string]*BrandCanon       `json:"brandCanonByProject"`
+	Seq                 int64                                     `json:"seq"`
+	Runs                map[string]*AnalysisRun                   `json:"runs"`
+	RunsByProject       map[string][]string                       `json:"runsByProject"`
+	PromptRuns          map[string]*PromptRun                     `json:"promptRuns"`
+	PromptRunsByRun     map[string][]string                       `json:"promptRunsByRun"`
+	Responses           map[string]*AIResponse                    `json:"responses"`
+	ResponsesByRun      map[string][]string                       `json:"responsesByRun"`
+	ResponseIndexByRun  map[string]map[string]string              `json:"responseIndexByRun"`
+	RunByRequest        map[string]string                         `json:"runByRequest"`
+	Alerts              map[string]*Alert                         `json:"alerts"`
+	AlertsByProject     map[string][]string                       `json:"alertsByProject"`
+	BrandCanonByProject map[string]*BrandCanon                    `json:"brandCanonByProject"`
+	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 }
 
 type Service struct {
@@ -278,6 +286,7 @@ type Service struct {
 	alerts              map[string]*Alert
 	alertsByProject     map[string][]string
 	brandCanonByProject map[string]*BrandCanon
+	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
 
 	store              StateStore
 	dashboardCache     DashboardCache
@@ -286,4 +295,5 @@ type Service struct {
 	projectCompetitors ProjectCompetitorsProvider
 	projectModels      ProjectModelsProvider
 	billingQuota       BillingQuotaProvider
+	contentCrawler     ContentCrawler
 }

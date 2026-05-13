@@ -16,18 +16,19 @@ import (
 const singletonStateID = 1
 
 type persistedState struct {
-	Seq                 int64                           `json:"seq"`
-	Runs                map[string]*usecase.AnalysisRun `json:"runs"`
-	RunsByProject       map[string][]string             `json:"runsByProject"`
-	PromptRuns          map[string]*usecase.PromptRun   `json:"promptRuns"`
-	PromptRunsByRun     map[string][]string             `json:"promptRunsByRun"`
-	Responses           map[string]*usecase.AIResponse  `json:"responses"`
-	ResponsesByRun      map[string][]string             `json:"responsesByRun"`
-	ResponseIndexByRun  map[string]map[string]string    `json:"responseIndexByRun"`
-	RunByRequest        map[string]string               `json:"runByRequest"`
-	Alerts              map[string]*usecase.Alert       `json:"alerts"`
-	AlertsByProject     map[string][]string             `json:"alertsByProject"`
-	BrandCanonByProject map[string]*usecase.BrandCanon  `json:"brandCanonByProject"`
+	Seq                 int64                                             `json:"seq"`
+	Runs                map[string]*usecase.AnalysisRun                   `json:"runs"`
+	RunsByProject       map[string][]string                               `json:"runsByProject"`
+	PromptRuns          map[string]*usecase.PromptRun                     `json:"promptRuns"`
+	PromptRunsByRun     map[string][]string                               `json:"promptRunsByRun"`
+	Responses           map[string]*usecase.AIResponse                    `json:"responses"`
+	ResponsesByRun      map[string][]string                               `json:"responsesByRun"`
+	ResponseIndexByRun  map[string]map[string]string                      `json:"responseIndexByRun"`
+	RunByRequest        map[string]string                                 `json:"runByRequest"`
+	Alerts              map[string]*usecase.Alert                         `json:"alerts"`
+	AlertsByProject     map[string][]string                               `json:"alertsByProject"`
+	BrandCanonByProject map[string]*usecase.BrandCanon                    `json:"brandCanonByProject"`
+	ContentCrawls       map[string]*usecase.ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 }
 
 type StateStore struct {
@@ -51,6 +52,7 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		Alerts:              make(map[string]*usecase.Alert),
 		AlertsByProject:     make(map[string][]string),
 		BrandCanonByProject: make(map[string]*usecase.BrandCanon),
+		ContentCrawls:       make(map[string]*usecase.ContentOptimizerCrawlSnapshot),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -78,6 +80,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadBrandCanon(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadContentCrawls(ctx, &state); err != nil {
 		return nil, false, err
 	}
 
@@ -115,6 +120,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 	for _, statement := range []string{
 		`DELETE FROM brand_canon`,
+		`DELETE FROM content_optimizer_crawls`,
 		`DELETE FROM alerts`,
 		`DELETE FROM ai_responses`,
 		`DELETE FROM prompt_runs`,
@@ -138,6 +144,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertBrandCanon(ctx, tx, state.BrandCanonByProject); err != nil {
+		return err
+	}
+	if err := insertContentCrawls(ctx, tx, state.ContentCrawls); err != nil {
 		return err
 	}
 
@@ -346,6 +355,41 @@ func (s *StateStore) loadBrandCanon(ctx context.Context, state *persistedState) 
 	return rows.Err()
 }
 
+func (s *StateStore) loadContentCrawls(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, organization_id, job_id, result, created_at, updated_at
+		FROM content_optimizer_crawls
+		ORDER BY updated_at ASC, project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select content optimizer crawls: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item      usecase.ContentOptimizerCrawlSnapshot
+			rawResult []byte
+		)
+		if err := rows.Scan(
+			&item.ProjectID,
+			&item.OrganizationID,
+			&item.JobID,
+			&rawResult,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan content optimizer crawl: %w", err)
+		}
+		if err := json.Unmarshal(rawResult, &item.Result); err != nil {
+			return fmt.Errorf("decode content optimizer crawl result: %w", err)
+		}
+		snapshot := item
+		state.ContentCrawls[fmt.Sprintf("%d|%s", item.OrganizationID, item.ProjectID)] = &snapshot
+	}
+	return rows.Err()
+}
+
 func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase.AnalysisRun, runByRequest map[string]string) error {
 	requestIDs := reverseRunRequestMap(runByRequest)
 	for _, runID := range sortedAnalysisRunIDs(runs) {
@@ -434,6 +478,23 @@ func insertBrandCanon(ctx context.Context, tx pgx.Tx, canonByProject map[string]
 	return nil
 }
 
+func insertContentCrawls(ctx context.Context, tx pgx.Tx, crawls map[string]*usecase.ContentOptimizerCrawlSnapshot) error {
+	for _, key := range sortedContentCrawlKeys(crawls) {
+		crawl := crawls[key]
+		rawResult, err := json.Marshal(crawl.Result)
+		if err != nil {
+			return fmt.Errorf("marshal content optimizer crawl result for %s: %w", key, err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO content_optimizer_crawls (project_id, organization_id, job_id, result, created_at, updated_at)
+			VALUES ($1, $2, $3, $4::jsonb, $5, $6)
+		`, crawl.ProjectID, crawl.OrganizationID, crawl.JobID, string(rawResult), crawl.CreatedAt, crawl.UpdatedAt); err != nil {
+			return fmt.Errorf("insert content optimizer crawl %s: %w", key, err)
+		}
+	}
+	return nil
+}
+
 func reverseRunRequestMap(runByRequest map[string]string) map[string]string {
 	reversed := make(map[string]string, len(runByRequest))
 	for key, runID := range runByRequest {
@@ -486,6 +547,15 @@ func sortedAlertIDs(items map[string]*usecase.Alert) []string {
 }
 
 func sortedBrandCanonProjectIDs(items map[string]*usecase.BrandCanon) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedContentCrawlKeys(items map[string]*usecase.ContentOptimizerCrawlSnapshot) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)

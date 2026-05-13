@@ -308,6 +308,7 @@ function SidebarComponent({
       models: buildScopedHref("/models", { project }),
       perception: buildScopedHref("/perception", { project }),
       optimizeActions: buildScopedHref("/optimize/actions", { project }),
+      contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       traffic: buildScopedHref("/traffic", { project }),
       organizations: buildScopedHref("/organizations", { org }),
       account: "/account",
@@ -413,6 +414,11 @@ function SidebarComponent({
       group: "main",
       href: scopedLinks.optimizeActions,
       label: content.optimizeActions || "Optimisation",
+    },
+    {
+      group: "main",
+      href: scopedLinks.contentOptimizer,
+      label: "Content optimizer",
     },
     {
       group: "main",

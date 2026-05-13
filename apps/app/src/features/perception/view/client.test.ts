@@ -9,6 +9,7 @@ describe("perception client layout", () => {
     expect(source.includes("persistError={viewModel.persistError}")).toBe(true);
     expect(source.includes("onCreateAction={viewModel.handleFix}")).toBe(true);
     expect(source.includes("generatedIds={viewModel.generatedIds}")).toBe(true);
+    expect(source.includes("modelCatalog={viewModel.modelCatalog}")).toBe(true);
     expect(source.includes("savingErrorIds={viewModel.savingErrorIds}")).toBe(true);
   });
 });

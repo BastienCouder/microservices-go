@@ -6,6 +6,10 @@ describe("top errors panel", () => {
   test("renders fix buttons on error cards when action creation is available", () => {
     expect(source.includes("actionGenerated={generatedIds?.has(error.id) ?? false}")).toBe(true);
     expect(source.includes("actionSaving={savingErrorIds?.has(error.id) ?? false}")).toBe(true);
+    expect(source.includes("modelLookup={modelLookup}")).toBe(true);
+    expect(source.includes("export function buildPerceptionModelLookup")).toBe(true);
+    expect(source.includes("getPerceptionModelBadgeMeta")).toBe(true);
+    expect(source.includes("{modelBadge.provider} - {modelBadge.name}")).toBe(true);
     expect(source.includes("onCreateAction ? () => void onCreateAction(error) : undefined")).toBe(true);
     expect(source.includes("{actionGenerated ? t(\"topErrorsAdded\") : t(\"topErrorsFix\")}")).toBe(true);
   });

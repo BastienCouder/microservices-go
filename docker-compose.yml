@@ -1,4 +1,4 @@
-etworks:
+networks:
   frontend-net:
   backend-net:
   infra-net:
@@ -634,11 +634,14 @@ services:
       ANALYSIS_DB_PASSWORD_FILE: /run/secrets/analysissvc_db_password
       PROJECT_SERVICE_GRPC_ADDR: project-service:9088
       PROJECT_SERVICE_URL: http://project-service:8088
+      BILLING_SERVICE_URL: http://billing-service:8086
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
       REDIS_ADDR: redis:6379
       DASHBOARD_CACHE_TTL: 30s
+      CLOUDFLARE_ACCOUNT_ID: "${CLOUDFLARE_ACCOUNT_ID:-}"
+      CLOUDFLARE_API_TOKEN: "${CLOUDFLARE_API_TOKEN:-}"
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret

@@ -234,6 +234,21 @@ func copyBrandCanon(canon *BrandCanon) BrandCanon {
 	return out
 }
 
+func copyContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
+	out := result
+	out.Records = append([]ContentOptimizerCrawlRecord(nil), result.Records...)
+	return out
+}
+
+func copyContentOptimizerCrawlSnapshot(snapshot *ContentOptimizerCrawlSnapshot) ContentOptimizerCrawlSnapshot {
+	if snapshot == nil {
+		return ContentOptimizerCrawlSnapshot{}
+	}
+	out := *snapshot
+	out.Result = copyContentOptimizerCrawlResult(snapshot.Result)
+	return out
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -276,6 +291,18 @@ func nonNilBrandCanonMap(input map[string]*BrandCanon) map[string]*BrandCanon {
 	out := make(map[string]*BrandCanon, len(input))
 	for key, value := range input {
 		clone := copyBrandCanon(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilContentOptimizerCrawlMap(input map[string]*ContentOptimizerCrawlSnapshot) map[string]*ContentOptimizerCrawlSnapshot {
+	if input == nil {
+		return make(map[string]*ContentOptimizerCrawlSnapshot)
+	}
+	out := make(map[string]*ContentOptimizerCrawlSnapshot, len(input))
+	for key, value := range input {
+		clone := copyContentOptimizerCrawlSnapshot(value)
 		out[key] = &clone
 	}
 	return out

@@ -20,7 +20,9 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	billingclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/billing"
+	cloudflarecrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/cloudflarecrawl"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
+	seedcrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/seedcrawl"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
 	analysisstate "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/state/postgres"
@@ -62,6 +64,23 @@ func main() {
 	}
 
 	dashboardCache := rediscache.NewDashboardCache(cfg.RedisAddr, cfg.RedisPassword)
+	var contentCrawler usecase.ContentCrawler
+	if cfg.CloudflareAccountID != "" && cfg.CloudflareAPIToken != "" {
+		contentCrawler, err = cloudflarecrawl.NewClient(cloudflarecrawl.Config{
+			AccountID: cfg.CloudflareAccountID,
+			APIToken:  cfg.CloudflareAPIToken,
+		})
+		if err != nil {
+			log.Fatalf("init cloudflare crawl client: %v", err)
+		}
+	} else {
+		if cfg.CloudflareAccountID != "" || cfg.CloudflareAPIToken != "" {
+			log.Printf("content optimizer using seed crawl data: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are both required for live crawling")
+		} else {
+			log.Printf("content optimizer using seed crawl data")
+		}
+		contentCrawler = seedcrawl.NewNikeCrawler()
+	}
 
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
 		Store:              analysisstate.NewStateStore(db),
@@ -71,6 +90,7 @@ func main() {
 		ProjectCompetitors: projectGRPCClient,
 		ProjectModels:      projectGRPCClient,
 		BillingQuota:       billingHTTPClient,
+		ContentCrawler:     contentCrawler,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)
