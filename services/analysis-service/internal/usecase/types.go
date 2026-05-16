@@ -244,15 +244,27 @@ type ContentCrawler interface {
 	GetCrawl(ctx context.Context, jobID string, input ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error)
 }
 
+type ContentIssueAnalysisInput struct {
+	ProjectID           string
+	OrganizationID      int64
+	Record              ContentOptimizerCrawlRecord
+	DeterministicIssues []ContentOptimizerIssue
+}
+
+type ContentIssueAnalyzer interface {
+	AnalyzeContentIssues(ctx context.Context, input ContentIssueAnalysisInput) ([]ContentOptimizerIssue, error)
+}
+
 type Dependencies struct {
-	Store              StateStore
-	DashboardCache     DashboardCache
-	DashboardCacheTTL  time.Duration
-	ProjectVerifier    ProjectAccessVerifier
-	ProjectCompetitors ProjectCompetitorsProvider
-	ProjectModels      ProjectModelsProvider
-	BillingQuota       BillingQuotaProvider
-	ContentCrawler     ContentCrawler
+	Store                StateStore
+	DashboardCache       DashboardCache
+	DashboardCacheTTL    time.Duration
+	ProjectVerifier      ProjectAccessVerifier
+	ProjectCompetitors   ProjectCompetitorsProvider
+	ProjectModels        ProjectModelsProvider
+	BillingQuota         BillingQuotaProvider
+	ContentCrawler       ContentCrawler
+	ContentIssueAnalyzer ContentIssueAnalyzer
 }
 
 type persistedState struct {
@@ -288,12 +300,13 @@ type Service struct {
 	brandCanonByProject map[string]*BrandCanon
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
 
-	store              StateStore
-	dashboardCache     DashboardCache
-	dashboardCacheTTL  time.Duration
-	projectVerifier    ProjectAccessVerifier
-	projectCompetitors ProjectCompetitorsProvider
-	projectModels      ProjectModelsProvider
-	billingQuota       BillingQuotaProvider
-	contentCrawler     ContentCrawler
+	store                StateStore
+	dashboardCache       DashboardCache
+	dashboardCacheTTL    time.Duration
+	projectVerifier      ProjectAccessVerifier
+	projectCompetitors   ProjectCompetitorsProvider
+	projectModels        ProjectModelsProvider
+	billingQuota         BillingQuotaProvider
+	contentCrawler       ContentCrawler
+	contentIssueAnalyzer ContentIssueAnalyzer
 }

@@ -31,20 +31,20 @@ func TestClassifyGeoEngineRecognizesGenerativeSources(t *testing.T) {
 	}
 }
 
-func TestClientCanDisableFakeTrafficFallback(t *testing.T) {
+func TestClientKeepsFakeTrafficFallbackDisabledByDefault(t *testing.T) {
 	client := NewClient()
-	if !client.fakeTrafficEnabled {
-		t.Fatalf("expected fake traffic fallback to be enabled by default")
+	if client.fakeTrafficEnabled {
+		t.Fatalf("expected fake traffic fallback to be disabled by default")
 	}
 
-	client.SetFakeTrafficEnabled(false)
+	client.SetFakeTrafficEnabled(true)
 
-	if client.fakeTrafficEnabled {
-		t.Fatalf("expected fake traffic fallback to be disabled")
+	if !client.fakeTrafficEnabled {
+		t.Fatalf("expected fake traffic fallback to be enabled when explicitly requested")
 	}
 }
 
-func TestBuildGeoDimensionFilterIncludesOnlySourceAndReferrer(t *testing.T) {
+func TestBuildGeoDimensionFilterIncludesGeoAndPublicPageFilters(t *testing.T) {
 	filter := buildGeoDimensionFilter(usecase.GeoTrafficFilters{})
 	root, ok := filter["andGroup"].(map[string]any)
 	if !ok {
@@ -54,8 +54,8 @@ func TestBuildGeoDimensionFilterIncludesOnlySourceAndReferrer(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected expressions, got %#v", root["expressions"])
 	}
-	if len(expressions) != 1 {
-		t.Fatalf("expected only geo OR filter, got %#v", expressions)
+	if len(expressions) != 2 {
+		t.Fatalf("expected geo and public page filters, got %#v", expressions)
 	}
 
 	rawGeo := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
@@ -72,6 +72,19 @@ func TestBuildGeoDimensionFilterIncludesOnlySourceAndReferrer(t *testing.T) {
 	}
 	if !hasSessionSource || !hasPageReferrer {
 		t.Fatalf("expected sessionSource and pageReferrer filters, got %#v", rawGeo)
+	}
+
+	notExpression, ok := expressions[1]["notExpression"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected private pages to be excluded with a notExpression, got %#v", expressions[1])
+	}
+	filterNode := notExpression["filter"].(map[string]any)
+	if filterNode["fieldName"] != "pagePath" {
+		t.Fatalf("expected pagePath private-page filter, got %#v", filterNode)
+	}
+	stringFilter := filterNode["stringFilter"].(map[string]any)
+	if stringFilter["matchType"] != "BEGINS_WITH" || stringFilter["value"] != "/admin" {
+		t.Fatalf("expected /admin prefix exclusion, got %#v", stringFilter)
 	}
 }
 
@@ -118,8 +131,8 @@ func TestBuildGeoDimensionFilterAddsBackendSearchAndEngineFilters(t *testing.T) 
 	if !ok {
 		t.Fatalf("expected expressions, got %#v", root["expressions"])
 	}
-	if len(expressions) != 2 {
-		t.Fatalf("expected geo and search filters, got %#v", expressions)
+	if len(expressions) != 3 {
+		t.Fatalf("expected geo, public page, and search filters, got %#v", expressions)
 	}
 
 	geoExpressions := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
@@ -132,7 +145,7 @@ func TestBuildGeoDimensionFilterAddsBackendSearchAndEngineFilters(t *testing.T) 
 		}
 	}
 
-	searchExpressions := expressions[1]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
+	searchExpressions := expressions[2]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
 	var hasPagePath bool
 	for _, expression := range searchExpressions {
 		filterNode := expression["filter"].(map[string]any)

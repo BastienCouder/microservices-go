@@ -26,6 +26,7 @@ export type TrafficReportViewData = {
 
 const defaultPageSize = 10;
 const maxTrendPoints = 60;
+const privatePagePathPrefixes = ["/admin"];
 
 function clampPage(page: number, totalPages: number): number {
   if (!Number.isFinite(page) || page < 1) {
@@ -61,6 +62,13 @@ function capTimeseries(points: GeoTrafficDailyPoint[]): GeoTrafficDailyPoint[] {
   return [...sampled, points[points.length - 1]].filter(Boolean);
 }
 
+export function isPrivateTrafficPage(page: GeoTrafficPage): boolean {
+  const normalizedPath = (page.path || "/").trim().toLowerCase();
+  return privatePagePathPrefixes.some(
+    (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`),
+  );
+}
+
 export function buildTrafficReportViewData({
   sources,
   topPages,
@@ -72,9 +80,10 @@ export function buildTrafficReportViewData({
   timeseries: GeoTrafficDailyPoint[];
   filters: TrafficReportFilters;
 }): TrafficReportViewData {
+  const publicTopPages = topPages.filter((page) => !isPrivateTrafficPage(page));
   const availableEngines = Array.from(
     new Set(
-      [...sources.map((source) => source.engine), ...topPages.map((page) => page.engine)].filter(
+      [...sources.map((source) => source.engine), ...publicTopPages.map((page) => page.engine)].filter(
         (engine) => engine.trim() !== "",
       ),
     ),
@@ -83,7 +92,7 @@ export function buildTrafficReportViewData({
   return {
     availableEngines,
     sources: paginate(sources, filters.sourcePage),
-    topPages: paginate(topPages, filters.topPagesPage),
+    topPages: paginate(publicTopPages, filters.topPagesPage),
     timeseries: capTimeseries(timeseries),
   };
 }

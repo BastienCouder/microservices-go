@@ -82,6 +82,28 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	}
 }
 
+func TestExecutePromptProviderModeKeepsContentOptimizerAuditPromptStructured(t *testing.T) {
+	provider := &stubProvider{result: ProviderResult{RawResponse: `{"issues":[]}`, TokensUsed: 42}}
+	svc, err := NewServiceWithDependencies(Dependencies{Mode: ExecutionModeProvider, Provider: provider})
+	if err != nil {
+		t.Fatalf("new service with provider: %v", err)
+	}
+
+	prompt := `Retourne uniquement {"issues":[]}`
+	_, err = svc.ExecutePrompt(context.Background(), ExecutePromptInput{
+		PromptID:   "content-optimizer-page-audit",
+		PromptText: prompt,
+		ModelID:    "gpt-oss-20b-free",
+		ProviderID: "openrouter",
+	})
+	if err != nil {
+		t.Fatalf("execute prompt in provider mode: %v", err)
+	}
+	if provider.input.Prompt != prompt {
+		t.Fatalf("expected structured audit prompt to be sent unchanged, got %q", provider.input.Prompt)
+	}
+}
+
 func TestExecutePromptSupportsProjectCatalogModels(t *testing.T) {
 	t.Parallel()
 

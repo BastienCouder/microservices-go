@@ -305,13 +305,20 @@ function SidebarComponent({
       prompts: buildScopedHref("/prompts", { project, tab: "prompts" }),
       responses: buildScopedHref("/prompts", { project, tab: "responses" }),
       pages: buildScopedHref("/pages", { project }),
-      models: buildScopedHref("/models", { project }),
+
       perception: buildScopedHref("/perception", { project }),
-      optimizeActions: buildScopedHref("/optimize/actions", { project }),
-      contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       traffic: buildScopedHref("/traffic", { project }),
+      models: buildScopedHref("/models", { project }),
+      brands: buildScopedHref("/brands", { project }),
+
+      crawler: buildScopedHref("/crawler", { project }),
+      contentOptimizer: buildScopedHref("/content-optimizer", { project }),
+      errorHub: buildScopedHref("/error-hub", { project }),
+      aiAgentReady: buildScopedHref("/ai-agent-ready", { project }),
+
       organizations: buildScopedHref("/organizations", { org }),
       account: "/account",
+
       addProject: buildCreateProjectOnboardingHref(selectedOrganizationId),
     };
   }, [
@@ -334,10 +341,12 @@ function SidebarComponent({
       ]),
     ) as Record<(typeof ORGANIZATION_VIEW_TABS)[number]["value"], string>;
   }, [activeOrganization?.slug, activeProject?.organizationSlug]);
+
   const visibleOrganizationViewTabs = useMemo(
     () => getOrganizationViewTabsForRoles([activeOrganization?.role ?? "member"]),
     [activeOrganization?.role],
   );
+
   const canManageActiveOrganization = canManageOrganizationPages([
     activeOrganization?.role ?? "member",
   ]);
@@ -351,7 +360,6 @@ function SidebarComponent({
 
     if (currentPath !== hrefPath) return false;
 
-    // For prompts page, check the tab parameter
     if (hrefPath === "/prompts") {
       const currentTab = readRouteQueryParam(location.search, "tab") || "prompts";
       const hrefTab = hrefParams.get("tab") || "prompts";
@@ -385,6 +393,7 @@ function SidebarComponent({
   };
 
   const mainNavItems = [
+    // Monitoring
     {
       group: "monitoring",
       href: scopedLinks.dashboard,
@@ -405,41 +414,64 @@ function SidebarComponent({
       href: scopedLinks.pages,
       label: "Pages",
     },
+
+    // Core
     {
-      group: "main",
+      group: "core",
       href: scopedLinks.perception,
-      label: content.perception || "Perception",
+      label: content.perception,
     },
     {
-      group: "main",
-      href: scopedLinks.optimizeActions,
-      label: content.optimizeActions || "Optimisation",
+      group: "core",
+      href: scopedLinks.brands,
+      label: content.brands,
     },
+
     {
-      group: "main",
-      href: scopedLinks.contentOptimizer,
-      label: "Content optimizer",
-    },
-    {
-      group: "main",
-      href: scopedLinks.traffic,
-      label: content.traffic || "Traffic",
-    },
-        {
-      group: "main",
+      group: "core",
       href: scopedLinks.models,
       label: "Modèles",
     },
+
+    // Optimization
+    {
+      group: "optimization",
+      href: scopedLinks.crawler,
+      label: "Crawler",
+    },
+    {
+      group: "optimization",
+      href: scopedLinks.contentOptimizer,
+      label: "Content Optimizer",
+    },
+    {
+      group: "optimization",
+      href: scopedLinks.errorHub,
+      label: "Error Hub",
+    },
+    {
+      group: "optimization",
+      href: scopedLinks.aiAgentReady,
+      label: "AI Agent Ready",
+    },
+
+    {
+      group: "traffic",
+      href: scopedLinks.traffic,
+      label: content.traffic,
+    },
+
+    // Settings
     {
       group: "settings",
       href: scopedLinks.organizations,
-      label: content.organisation || "Organisations",
+      label: content.organisation,
       opensSettings: true,
     },
     {
       group: "settings",
       href: scopedLinks.account,
-      label: content.account || "Compte",
+      label: content.account,
       opensSettings: true,
     },
   ] as const;
@@ -506,7 +538,7 @@ function SidebarComponent({
                         href={organizationSettingsLinks[item.value]}
                         label={item.label}
                         active={active}
-                        indent={!collapsed}   // 👈 important
+                        indent={!collapsed}
                         collapsed={collapsed}
                       />
                     );
@@ -538,6 +570,7 @@ function SidebarComponent({
             </div>
           ) : (
             <div className="space-y-3">
+              {/* Monitoring */}
               <section className="space-y-1.5">
                 {!collapsed && (
                   <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
@@ -565,9 +598,10 @@ function SidebarComponent({
                 </div>
               </section>
 
+              {/* Core */}
               <section className="space-y-2 pb-2">
                 {mainNavItems
-                  .filter((item) => item.group === "main")
+                  .filter((item) => item.group === "core")
                   .map((item) => (
                     <SidebarNavItem
                       key={item.href}
@@ -579,6 +613,49 @@ function SidebarComponent({
                   ))}
               </section>
 
+              {/* Optimization */}
+              <section className="space-y-1.5">
+                {!collapsed && (
+                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
+                    Optimisation
+                  </div>
+                )}
+
+                <div className="relative space-y-1.5">
+                  {!collapsed && (
+                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
+                  )}
+
+                  {mainNavItems
+                    .filter((item) => item.group === "optimization")
+                    .map((item) => (
+                      <SidebarNavItem
+                        key={item.href}
+                        href={item.href}
+                        label={item.label}
+                        active={isActiveHref(item.href)}
+                        indent={!collapsed}
+                        collapsed={collapsed}
+                      />
+                    ))}
+                </div>
+              </section>
+
+                <section className="space-y-2 pb-2">
+                {mainNavItems
+                  .filter((item) => item.group === "traffic")
+                  .map((item) => (
+                    <SidebarNavItem
+                      key={item.href}
+                      href={item.href}
+                      label={item.label}
+                      active={isActiveHref(item.href)}
+                      collapsed={collapsed}
+                    />
+                  ))}
+              </section>
+
+              {/* Settings */}
               <section className="space-y-1.5">
                 {!collapsed && (
                   <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">

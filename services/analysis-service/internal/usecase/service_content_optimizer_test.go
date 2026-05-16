@@ -18,6 +18,20 @@ type recordingContentCrawler struct {
 	result      ContentOptimizerCrawlResult
 }
 
+type recordingContentIssueAnalyzer struct {
+	input  ContentIssueAnalysisInput
+	issues []ContentOptimizerIssue
+	err    error
+}
+
+func (a *recordingContentIssueAnalyzer) AnalyzeContentIssues(_ context.Context, input ContentIssueAnalysisInput) ([]ContentOptimizerIssue, error) {
+	a.input = input
+	if a.err != nil {
+		return nil, a.err
+	}
+	return append([]ContentOptimizerIssue(nil), a.issues...), nil
+}
+
 func (c *recordingContentCrawler) StartCrawl(_ context.Context, input ContentOptimizerCrawlStartInput) (ContentOptimizerCrawlJob, error) {
 	c.startInput = input
 	return c.job, nil
@@ -236,6 +250,111 @@ func TestGetContentOptimizerCrawlAnalyzesSEOAndGEOIssues(t *testing.T) {
 	}
 	if !strings.Contains(strings.ToLower(thinContent.Recommendation), "running") {
 		t.Fatalf("expected recommendation to mention page topic, got %q", thinContent.Recommendation)
+	}
+}
+
+func TestGetContentOptimizerCrawlReportsDetailedSEOAndGEOIssues(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		result: ContentOptimizerCrawlResult{
+			ID:       "crawl-123",
+			Status:   "completed",
+			Total:    1,
+			Finished: 1,
+			Records: []ContentOptimizerCrawlRecord{{
+				URL:        "https://example.com/pricing",
+				Status:     "completed",
+				HTTPStatus: 200,
+				Title:      "Pricing",
+				Markdown: strings.Join([]string{
+					"# Pricing",
+					"Buy now. Best platform. Contact us.",
+					"Features. Powerful. Fast. Simple.",
+				}, "\n"),
+			}},
+		},
+	}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{ContentCrawler: crawler})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
+	if err != nil {
+		t.Fatalf("get content optimizer crawl: %v", err)
+	}
+
+	issues := result.Records[0].Issues
+	expectedFixTypes := []string{
+		"add_meta_description",
+		"improve_h1",
+		"add_internal_links",
+		"add_schema_markup",
+		"add_faq",
+		"add_direct_answer",
+		"add_evidence",
+		"add_entity_context",
+		"create_blog",
+	}
+	for _, fixType := range expectedFixTypes {
+		if !hasContentOptimizerIssueFixType(issues, fixType) {
+			t.Fatalf("expected issue %q, got %#v", fixType, issues)
+		}
+	}
+}
+
+func TestGetContentOptimizerCrawlEnrichesIssuesWithAIAnalyzer(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		result: ContentOptimizerCrawlResult{
+			ID:       "crawl-123",
+			Status:   "completed",
+			Total:    1,
+			Finished: 1,
+			Records: []ContentOptimizerCrawlRecord{{
+				URL:        "https://example.com/pricing",
+				Status:     "completed",
+				HTTPStatus: 200,
+				Title:      "Pricing",
+				Markdown:   "# Pricing\nPricing details for teams.",
+			}},
+		},
+	}
+	analyzer := &recordingContentIssueAnalyzer{
+		issues: []ContentOptimizerIssue{{
+			ID:             "ai-pricing-intent-gap",
+			Category:       "geo",
+			Severity:       "high",
+			Title:          "Intent utilisateur incomplet",
+			Description:    "La page ne traite pas les objections d'achat principales.",
+			Recommendation: "Ajouter une section comparaison prix, objections et criteres de decision.",
+			FixType:        "ai_add_intent_coverage",
+		}},
+	}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ContentCrawler:       crawler,
+		ContentIssueAnalyzer: analyzer,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
+	if err != nil {
+		t.Fatalf("get content optimizer crawl: %v", err)
+	}
+
+	if analyzer.input.ProjectID != "project-1" || analyzer.input.OrganizationID != 42 {
+		t.Fatalf("expected project scope to be passed to analyzer, got %#v", analyzer.input)
+	}
+	if analyzer.input.Record.URL != "https://example.com/pricing" {
+		t.Fatalf("expected crawled record to be passed to analyzer, got %#v", analyzer.input.Record)
+	}
+	if len(analyzer.input.DeterministicIssues) == 0 {
+		t.Fatalf("expected deterministic issues to be passed to analyzer")
+	}
+	if !hasContentOptimizerIssueFixType(result.Records[0].Issues, "ai_add_intent_coverage") {
+		t.Fatalf("expected AI issue to be merged, got %#v", result.Records[0].Issues)
 	}
 }
 

@@ -25,9 +25,9 @@ export function SourceBreakdown({ sources, pagination, loading = false }: Source
     <section className="rounded-md bg-card p-4 text-card-foreground">
       <div className="mb-4 flex flex-col gap-1">
         <SectionTitle>
-          Sources traffic
+          Sources IA détectées
         </SectionTitle>
-        <p className="text-xs text-muted-foreground">Moteurs IA détectés dans GA4.</p>
+        <p className="text-xs text-muted-foreground">Moteurs génératifs identifiés par la source, le référent ou les UTM GA4.</p>
       </div>
 
       <div className="space-y-3">

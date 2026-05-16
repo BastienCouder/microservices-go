@@ -44,6 +44,7 @@ export type TrafficKpiItem = {
   title: string;
   value: string;
   sub: string;
+  description: string;
   tone: "primary" | "default";
 };
 
@@ -147,27 +148,31 @@ function buildKpis(report: GeoTrafficReport | null): TrafficKpiItem[] {
   const summary = report?.summary;
   return [
     {
-      title: "Sessions traffic",
+      title: "Visites IA détectées",
       value: formatInteger(summary?.totalGeoSessions ?? 0),
-      sub: `${formatPercent(summary?.geoShareOfTotal ?? 0)} du trafic GA4`,
+      sub: `${formatPercent(summary?.geoShareOfTotal ?? 0)} de toutes les visites GA4`,
+      description: "Sessions GA4 dont la source ou le référent permet d'identifier un moteur génératif, par exemple ChatGPT ou Perplexity.",
       tone: "primary",
     },
     {
-      title: "Engagement",
+      title: "Taux d'engagement",
       value: formatPercent(summary?.geoEngagementRate ?? 0),
       sub: `${formatInteger(summary?.geoEngagedSessions ?? 0)} sessions engagées`,
+      description: "Part des visites IA détectées considérées comme engagées par GA4: durée significative, conversion ou au moins deux pages vues.",
       tone: "default",
     },
     {
       title: "Conversions",
       value: formatInteger(summary?.geoConversions ?? 0),
       sub: `${formatPercent(summary?.geoConversionRate ?? 0)} de conversion`,
+      description: "Événements marqués comme conversions ou key events dans GA4 pendant ces visites IA détectées.",
       tone: "default",
     },
     {
-      title: "Durée moyenne",
+      title: "Durée moyenne des visites",
       value: formatDuration(summary?.geoAvgSessionSeconds ?? 0),
       sub: `${formatPercent(summary?.geoBounceRate ?? 0)} rebond`,
+      description: "Durée moyenne d'une visite IA détectée, calculée depuis la métrique GA4 de durée moyenne de session.",
       tone: "default",
     },
   ];

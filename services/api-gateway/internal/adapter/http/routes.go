@@ -57,6 +57,13 @@ func (h *Handler) buildRoutes() []routeEntry {
 			}),
 			service: "api-gateway",
 		},
+		{
+			match: func(r *http.Request) bool {
+				return isAgentReadyScanCollectionRequest(r) || isAgentReadyScanItemRequest(r)
+			},
+			handler: h.withAuth(http.HandlerFunc(h.handleAgentReadyScan), "api-gateway", "analysis"),
+			service: "api-gateway",
+		},
 		{match: matchPathPrefix("/auth"), handler: authHandler, service: "auth-service"},
 		{match: matchPathPrefix("/users"), handler: userHandler, service: "user-service"},
 		{match: matchPathPrefix("/admin/users"), handler: userHandler, service: "user-service"},

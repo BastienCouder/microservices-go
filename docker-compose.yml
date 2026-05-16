@@ -133,6 +133,8 @@ services:
       - frontend-net
       - backend-net
     environment:
+      HTTP_ADDR: :8080
+      METRICS_ADDR: :9090
       HTTP_ADDR_FILE: /run/secrets/gateway_http_addr
       METRICS_ADDR_FILE: /run/secrets/gateway_metrics_addr
       USER_SERVICE_URL: http://user-service:8081
@@ -150,7 +152,7 @@ services:
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
-      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004
+      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004,http://localhost:30005
     secrets:
       - gateway_http_addr
       - gateway_metrics_addr
@@ -642,6 +644,9 @@ services:
       DASHBOARD_CACHE_TTL: 30s
       CLOUDFLARE_ACCOUNT_ID: "${CLOUDFLARE_ACCOUNT_ID:-}"
       CLOUDFLARE_API_TOKEN: "${CLOUDFLARE_API_TOKEN:-}"
+      IA_SERVICE_URL: http://ia-service:8091
+      CONTENT_ISSUE_ANALYZER_MODEL_ID: "${CONTENT_ISSUE_ANALYZER_MODEL_ID:-gpt-oss-20b-free}"
+      CONTENT_ISSUE_ANALYZER_PROVIDER_ID: "${CONTENT_ISSUE_ANALYZER_PROVIDER_ID:-openrouter}"
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret
@@ -1176,10 +1181,30 @@ secrets:
     file: ./deployments/secrets/kratos_db_password.txt
   internal_jwt_secret:
     file: ./deployments/secrets/internal_jwt_secret.txt
+  gateway_http_addr:
+    file: ./deployments/secrets/gateway_http_addr.txt
+  gateway_metrics_addr:
+    file: ./deployments/secrets/gateway_metrics_addr.txt
+  organizations_http_addr:
+    file: ./deployments/secrets/organizations_http_addr.txt
+  organizations_metrics_addr:
+    file: ./deployments/secrets/organizations_metrics_addr.txt
+  db_host:
+    file: ./deployments/secrets/db_host.txt
+  db_port:
+    file: ./deployments/secrets/db_port.txt
+  db_sslmode:
+    file: ./deployments/secrets/db_sslmode.txt
+  organizations_db_user:
+    file: ./deployments/secrets/organizations_db_user.txt
+  organizations_db_name:
+    file: ./deployments/secrets/organizations_db_name.txt
   openrouter_api_key:
     file: ./deployments/secrets/openrouter_api_key.txt
   resend_api_key:
     file: ./deployments/secrets/resend_api_key.txt
+  resend_from_email:
+    file: ./deployments/secrets/resend_from_email.txt
   resend_smtp_connection_uri:
     file: ./deployments/secrets/resend_smtp_connection_uri.txt
   google_oidc_client_id:

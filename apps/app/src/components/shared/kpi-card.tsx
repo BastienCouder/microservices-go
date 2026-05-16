@@ -1,17 +1,24 @@
 import { memo } from "react";
-import { ArrowDownRight, ArrowRight, ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowRight, ArrowUpRight, Info, TrendingDown, TrendingUp } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 
 export type KpiCardProps = {
   title: string;
   value: string;
   sub?: string;
+  description?: string;
   trend?: string;
   trendDir?: "up" | "down" | "stable";
   variant?: "default" | "active";
 };
 
-export const KpiCard = memo(function KpiCard({ title, value, sub, trend, trendDir, variant = "default" }: KpiCardProps) {
+export const KpiCard = memo(function KpiCard({ title, value, sub, description, trend, trendDir, variant = "default" }: KpiCardProps) {
   const isActive = variant === "active";
   const trendTone = isActive
     ? "border-transparent bg-white/20 text-white"
@@ -31,7 +38,32 @@ export const KpiCard = memo(function KpiCard({ title, value, sub, trend, trendDi
       )}
     >
       <div className="mb-2 flex items-start justify-between">
-        <span className={cn("text-[15px] font-medium leading-tight md:text-sm", isActive ? "text-primary-foreground/90" : "text-muted-foreground")}>{title}</span>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <span className={cn("text-[15px] font-medium leading-tight md:text-sm", isActive ? "text-primary-foreground/90" : "text-muted-foreground")}>{title}</span>
+          {description ? (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full",
+                      isActive
+                        ? "text-primary-foreground/80 hover:bg-white/15 hover:text-primary-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                    aria-label={`Définition: ${title}`}
+                  >
+                    <Info className="h-3.5 w-3.5" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-72 leading-relaxed">
+                  {description}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          ) : null}
+        </div>
         <div className={cn("flex h-8 w-8 items-center justify-center rounded-full border", isActive ? "border-transparent bg-white/20 text-white backdrop-blur-sm" : "border-border bg-background text-foreground")}>
           {trendDir === "up" ? <ArrowUpRight className="h-4 w-4" /> : null}
           {trendDir === "down" ? <ArrowDownRight className="h-4 w-4" /> : null}

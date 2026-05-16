@@ -21,6 +21,7 @@ import (
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	billingclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/billing"
 	cloudflarecrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/cloudflarecrawl"
+	iaclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/ia"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
 	seedcrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/seedcrawl"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
@@ -82,15 +83,33 @@ func main() {
 		contentCrawler = seedcrawl.NewNikeCrawler()
 	}
 
+	var contentIssueAnalyzer usecase.ContentIssueAnalyzer
+	if cfg.IAServiceURL != "" && cfg.ContentIssueAnalyzerModelID != "" {
+		contentIssueAnalyzer, err = iaclient.NewClient(iaclient.Config{
+			BaseURL:    cfg.IAServiceURL,
+			JWTSecret:  cfg.InternalJWTSecret,
+			JWTIssuer:  cfg.InternalJWTIssuer,
+			ModelID:    cfg.ContentIssueAnalyzerModelID,
+			ProviderID: cfg.ContentIssueAnalyzerProviderID,
+		})
+		if err != nil {
+			log.Fatalf("init content issue analyzer: %v", err)
+		}
+		log.Printf("content optimizer AI issue analyzer enabled with model %s", cfg.ContentIssueAnalyzerModelID)
+	} else {
+		log.Printf("content optimizer AI issue analyzer disabled: IA_SERVICE_URL and CONTENT_ISSUE_ANALYZER_MODEL_ID are required")
+	}
+
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:              analysisstate.NewStateStore(db),
-		DashboardCache:     dashboardCache,
-		DashboardCacheTTL:  cfg.DashboardCacheTTL,
-		ProjectVerifier:    projectGRPCClient,
-		ProjectCompetitors: projectGRPCClient,
-		ProjectModels:      projectGRPCClient,
-		BillingQuota:       billingHTTPClient,
-		ContentCrawler:     contentCrawler,
+		Store:                analysisstate.NewStateStore(db),
+		DashboardCache:       dashboardCache,
+		DashboardCacheTTL:    cfg.DashboardCacheTTL,
+		ProjectVerifier:      projectGRPCClient,
+		ProjectCompetitors:   projectGRPCClient,
+		ProjectModels:        projectGRPCClient,
+		BillingQuota:         billingHTTPClient,
+		ContentCrawler:       contentCrawler,
+		ContentIssueAnalyzer: contentIssueAnalyzer,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)

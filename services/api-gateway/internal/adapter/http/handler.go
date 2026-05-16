@@ -13,35 +13,36 @@ import (
 )
 
 type Handler struct {
-	userProxy          *httputil.ReverseProxy
-	authProxy          *httputil.ReverseProxy
-	organizationsProxy *httputil.ReverseProxy
-	permissionProxy    *httputil.ReverseProxy
-	billingProxy       *httputil.ReverseProxy
-	notificationProxy  *httputil.ReverseProxy
-	projectProxy       *httputil.ReverseProxy
-	analysisProxy      *httputil.ReverseProxy
-	iaProxy            *httputil.ReverseProxy
-	attributionProxy   *httputil.ReverseProxy
-	routes             []routeEntry
-	authURL            string
-	userURL            string
-	organizationsURL   string
-	permissionGRPC     *permissionGRPCClient
-	httpClient         *http.Client
-	rateLimiter        *rateLimiter
-	authBreaker        *circuitBreaker
-	authBulkhead       *bulkhead
-	userBreaker        *circuitBreaker
-	userBulkhead       *bulkhead
+	userProxy            *httputil.ReverseProxy
+	authProxy            *httputil.ReverseProxy
+	organizationsProxy   *httputil.ReverseProxy
+	permissionProxy      *httputil.ReverseProxy
+	billingProxy         *httputil.ReverseProxy
+	notificationProxy    *httputil.ReverseProxy
+	projectProxy         *httputil.ReverseProxy
+	analysisProxy        *httputil.ReverseProxy
+	iaProxy              *httputil.ReverseProxy
+	attributionProxy     *httputil.ReverseProxy
+	routes               []routeEntry
+	authURL              string
+	userURL              string
+	organizationsURL     string
+	permissionGRPC       *permissionGRPCClient
+	httpClient           *http.Client
+	scanStore            *agentReadyScanStore
+	rateLimiter          *rateLimiter
+	authBreaker          *circuitBreaker
+	authBulkhead         *bulkhead
+	userBreaker          *circuitBreaker
+	userBulkhead         *bulkhead
 	organizationBreaker  *circuitBreaker
 	organizationBulkhead *bulkhead
-	permissionBreaker  *circuitBreaker
-	permissionBulkhead *bulkhead
-	internalJWTSecret  string
-	internalJWTIssuer  string
-	corsAllowedOrigins map[string]struct{}
-	trustedProxyNets   []*net.IPNet
+	permissionBreaker    *circuitBreaker
+	permissionBulkhead   *bulkhead
+	internalJWTSecret    string
+	internalJWTIssuer    string
+	corsAllowedOrigins   map[string]struct{}
+	trustedProxyNets     []*net.IPNet
 }
 
 func NewHandler(userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, billingServiceURL, notificationServiceURL string, rateLimitRPM int, internalJWTSecret, internalJWTIssuer string) (*Handler, error) {
@@ -215,19 +216,20 @@ func NewHandlerWithGRPCAndServices(
 			Transport: transport,
 			Timeout:   3 * time.Second,
 		},
-		rateLimiter:        limiter,
-		authBreaker:        authBreaker,
-		authBulkhead:       authBulkhead,
-		userBreaker:        userBreaker,
-		userBulkhead:       userBulkhead,
+		scanStore:            newAgentReadyScanStore(),
+		rateLimiter:          limiter,
+		authBreaker:          authBreaker,
+		authBulkhead:         authBulkhead,
+		userBreaker:          userBreaker,
+		userBulkhead:         userBulkhead,
 		organizationBreaker:  organizationBreaker,
 		organizationBulkhead: organizationBulkhead,
-		permissionBreaker:  permissionBreaker,
-		permissionBulkhead: permissionBulkhead,
-		internalJWTSecret:  internalJWTSecret,
-		internalJWTIssuer:  internalJWTIssuer,
-		corsAllowedOrigins: allowedOriginSet,
-		trustedProxyNets:   trustedProxyNets,
+		permissionBreaker:    permissionBreaker,
+		permissionBulkhead:   permissionBulkhead,
+		internalJWTSecret:    internalJWTSecret,
+		internalJWTIssuer:    internalJWTIssuer,
+		corsAllowedOrigins:   allowedOriginSet,
+		trustedProxyNets:     trustedProxyNets,
 	}
 	h.routes = h.buildRoutes()
 	return h, nil

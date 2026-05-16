@@ -4,7 +4,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import type { AppRouterProps } from "./App";
 import { MonitoringPage } from "@/features/monitoring/index";
 import { ModelsPage } from "@/features/models/index";
-import { PerceptionOptimizeActionsPage, PerceptionPage } from "@/features/perception";
+import { PerceptionPage } from "@/features/perception";
 import { PromptsPage } from "@/features/prompts/index";
 
 const OnboardingPage = lazy(() =>
@@ -52,15 +52,26 @@ const AccountPage = lazy(() =>
     default: module.AccountPage,
   })),
 );
-const ContentOptimizerPage = lazy(() =>
-  import("@/features/content-optimizer/index").then((module) => ({
-    default: module.ContentOptimizerPage,
+const CrawlerPage = lazy(() =>
+  import("@/features/crawler/index").then((module) => ({
+    default: module.CrawlerPage,
+  })),
+);
+const AgentReadyPage = lazy(() =>
+  import("@/features/ai-agent-ready/index").then((module) => ({
+    default: module.AgentReadyPage,
   })),
 );
 
 const PerceptionBrandCanonPage = lazy(() =>
   import("@/features/brands/brand-canon/index").then((module) => ({
     default: module.BrandCanonPage,
+  })),
+);
+
+const ErrorHubPage = lazy(() =>
+  import("@/features/error-hub/index").then((module) => ({
+    default: module.ErrorHubPage,
   })),
 );
 
@@ -146,18 +157,26 @@ export function AppRouter({
         }
       />
       <Route
-        path="/optimize/actions"
+        path="/crawler"
         element={
           <Suspense fallback={null}>
-            <PerceptionOptimizeActionsPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+            <CrawlerPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />
       <Route
-        path="/content-optimizer"
+        path="/ai-agent-ready"
         element={
           <Suspense fallback={null}>
-            <ContentOptimizerPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+            <AgentReadyPage apiBaseURL={apiBaseURL} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/error-hub"
+        element={
+          <Suspense fallback={null}>
+            <ErrorHubPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

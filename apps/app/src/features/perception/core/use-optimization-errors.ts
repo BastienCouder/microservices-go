@@ -27,6 +27,7 @@ type PersistedOptimizeAction = {
 };
 
 type UseOptimizationErrorsResult = {
+  competitors: string[];
   data: OptimizationErrorsBoard | null;
   generatedIds: ReadonlySet<string>;
   loading: boolean;
@@ -141,6 +142,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   }, [query.refetch]);
 
   return {
+    competitors: query.data?.competitors ?? [],
     data: query.data?.data ?? null,
     generatedIds,
     loading: query.isLoading || (query.isFetching && !query.data),

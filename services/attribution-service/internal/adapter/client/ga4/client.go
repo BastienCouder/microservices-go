@@ -67,8 +67,7 @@ type Client struct {
 
 func NewClient() *Client {
 	return &Client{
-		httpClient:         &http.Client{Timeout: defaultHTTPTimeout},
-		fakeTrafficEnabled: true,
+		httpClient: &http.Client{Timeout: defaultHTTPTimeout},
 	}
 }
 

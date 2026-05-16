@@ -26,6 +26,9 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		switch s.mode {
 		case ExecutionModeProvider:
 			providerPrompt := buildProviderPrompt(promptText, strings.TrimSpace(input.BrandName), input.Competitors)
+			if isStructuredProviderPrompt(promptID) {
+				providerPrompt = promptText
+			}
 			result, err := s.provider.Generate(ctx, ProviderGenerateInput{
 				ProviderID: strings.TrimSpace(input.ProviderID),
 				ModelID:    modelID,
@@ -66,6 +69,10 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		},
 		Analysis: analysis,
 	}, nil
+}
+
+func isStructuredProviderPrompt(promptID string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(promptID)), "content-optimizer-")
 }
 
 func (s *Service) ExtractBrand(_ context.Context, input ExtractBrandInput) (ExtractBrandResult, error) {

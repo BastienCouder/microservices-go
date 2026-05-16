@@ -37,6 +37,7 @@ export type OptimizationErrorsBoard = {
 
 export type OptimizationErrorsLoadResult = {
   data: OptimizationErrorsBoard;
+  competitors: string[];
   modelCatalog: ProjectModelMeta[];
   projectId: string;
 };
@@ -205,6 +206,20 @@ function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
   );
 }
 
+function normalizeCompetitorNames(value: unknown): string[] {
+  const payload = unwrapSuccessEnvelope(value);
+  if (!Array.isArray(payload)) return [];
+
+  return Array.from(
+    new Set(
+      payload
+        .map(asObject)
+        .map((entry) => asString(getField(entry, ["name", "Name"])).trim())
+        .filter(Boolean),
+    ),
+  ).sort((left, right) => left.localeCompare(right));
+}
+
 export function readOptimizationProjectIdFromSearch(routeSearch: string): string | null {
   const normalized = routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch;
   const params = new URLSearchParams(normalized);
@@ -262,6 +277,25 @@ async function loadOptimizationModelCatalog(
   );
 }
 
+async function loadOptimizationCompetitors(
+  apiBaseURL: string,
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<string[]> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.projects.competitors(encodeURIComponent(projectId)),
+    {
+      method: "GET",
+      signal,
+    },
+  );
+
+  if (!result.ok) return [];
+
+  return normalizeCompetitorNames(result.data);
+}
+
 export async function loadOptimizationErrors(
   apiBaseURL: string,
   routeSearch: string,
@@ -304,6 +338,7 @@ export async function loadOptimizationErrors(
   }
 
   return {
+    competitors: await loadOptimizationCompetitors(apiBaseURL, projectId, options?.signal),
     data: normalizeBoard(unwrapRequiredEnvelope(result, "optimization-errors")),
     modelCatalog: await loadOptimizationModelCatalog(apiBaseURL, projectId, options?.signal),
     projectId,

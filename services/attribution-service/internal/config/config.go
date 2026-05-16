@@ -148,7 +148,7 @@ func loadGA4Config() (GA4Config, error) {
 	if err != nil {
 		return GA4Config{}, err
 	}
-	fakeTrafficEnabled, err := optionalBoolEnv("ATTRIBUTION_ENABLE_FAKE_TRAFFIC", true)
+	fakeTrafficEnabled, err := optionalBoolEnv("ATTRIBUTION_ENABLE_FAKE_TRAFFIC", false)
 	if err != nil {
 		return GA4Config{}, err
 	}

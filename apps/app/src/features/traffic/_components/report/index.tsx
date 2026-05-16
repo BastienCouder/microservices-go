@@ -51,7 +51,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
       <PageHeader
         title="Traffic"
-        baseline="Trafic issu des moteurs génératifs détecté par Google Analytics 4."
+        baseline="Visites provenant de moteurs IA lorsque Google Analytics 4 peut identifier la source."
       />
 
       <div className="min-h-0 space-y-4 overflow-visible lg:overflow-y-auto">

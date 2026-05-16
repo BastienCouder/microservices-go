@@ -91,4 +91,42 @@ describe("buildTrafficReportViewData", () => {
     expect(view.topPages.totalPages).toBe(1);
     expect(view.timeseries).toHaveLength(0);
   });
+
+  test("hides private admin pages from the top pages table", () => {
+    const view = buildTrafficReportViewData({
+      sources: buildSources(1),
+      topPages: [
+        {
+          path: "/admin/posts",
+          title: "Articles | Admin KAHIER",
+          source: "chatgpt.com",
+          engine: "ChatGPT",
+          sessions: 3,
+          engagedSessions: 3,
+          engagementRate: 100,
+          conversions: 0,
+          pageViews: 3,
+        },
+        {
+          path: "/blog/application-cahier",
+          title: "Application de cahier",
+          source: "chatgpt.com",
+          engine: "ChatGPT",
+          sessions: 2,
+          engagedSessions: 2,
+          engagementRate: 100,
+          conversions: 0,
+          pageViews: 2,
+        },
+      ],
+      timeseries: [],
+      filters: {
+        sourcePage: 1,
+        topPagesPage: 1,
+      },
+    });
+
+    expect(view.topPages.totalItems).toBe(1);
+    expect(view.topPages.items[0]?.path).toBe("/blog/application-cahier");
+  });
 });

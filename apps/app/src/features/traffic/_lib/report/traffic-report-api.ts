@@ -308,23 +308,10 @@ function normalizeTrafficDataSource(value: unknown): GeoTrafficReport["dataSourc
   return normalized === "ga4" || normalized === "fake" ? normalized : "";
 }
 
-function logFakeTrafficReport(report: GeoTrafficReport) {
-  console.info("[traffic] fake data", {
-    projectId: report.projectId,
-    propertyId: report.propertyId,
-    dataSource: report.dataSource,
-    summary: report.summary,
-    bySourcePreview: report.bySource.slice(0, 5),
-    topPagesPreview: report.topPages.slice(0, 5),
-    timeseriesCount: report.timeseries.length,
-    timeseriesHead: report.timeseries.slice(0, 5),
-  });
-}
-
 export function normalizeTrafficReport(value: unknown): GeoTrafficReport {
   const payload = asObject(unwrapSuccessEnvelope(value));
   const dateRange = asObject(getField(payload, ["dateRange", "DateRange"]));
-  const report = {
+  return {
     projectId: asString(getField(payload, ["projectId", "ProjectID"])).trim(),
     propertyId: asString(getField(payload, ["propertyId", "PropertyID"])).trim(),
     dataSource: normalizeTrafficDataSource(getField(payload, ["dataSource", "DataSource"])),
@@ -341,12 +328,6 @@ export function normalizeTrafficReport(value: unknown): GeoTrafficReport {
     ),
     propertyQuota: normalizeQuota(getField(payload, ["propertyQuota", "PropertyQuota"])),
   };
-
-  if (report.dataSource === "fake") {
-    logFakeTrafficReport(report);
-  }
-
-  return report;
 }
 
 export function normalizeTrafficImpactIntegrations(value: unknown): TrafficImpactIntegrations {
@@ -530,8 +511,21 @@ export async function loadTrafficPageData(
     };
   }
 
+  const report = normalizeTrafficReport(unwrapRequiredEnvelope(trafficRes, "traffic"));
+  if (report.dataSource === "fake") {
+    return {
+      report: emptyReport,
+      integration,
+      projectId: project.id,
+      projectName: project.name,
+      organizationId: project.organizationId,
+      period,
+      reportError: "Aucune donnée GA4 réelle disponible pour cette période.",
+    };
+  }
+
   return {
-    report: normalizeTrafficReport(unwrapRequiredEnvelope(trafficRes, "traffic")),
+    report,
     integration,
     projectId: project.id,
     projectName: project.name,

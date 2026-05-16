@@ -22,6 +22,10 @@ type UseContentOptimizerViewModelInput = {
 
 type CrawlPhase = "idle" | "discovering" | "review" | "crawling" | "completed";
 type ActiveJobKind = "discover" | "crawl";
+type CrawlRequestOptions = {
+  limit?: number;
+  includePatterns?: string[];
+};
 
 const TERMINAL_STATUSES = new Set([
   "completed",
@@ -101,6 +105,7 @@ export function useContentOptimizerViewModel({
     phase !== "discovering" &&
     phase !== "crawling";
   const canCrawlSelected = phase === "review" && selectedCount > 0;
+  const canReanalyze = canDiscover && (selectedCount > 0 || crawlRecords.length > 0);
 
   useEffect(() => {
     const loadKey = `${organizationId}|${projectId}`;
@@ -162,7 +167,7 @@ export function useContentOptimizerViewModel({
         projectId,
         organizationId,
         url,
-        limit: 100,
+        limit: 50,
         depth: 3,
         render: false,
       }),
@@ -194,31 +199,39 @@ export function useContentOptimizerViewModel({
   });
 
   const crawlMutation = useMutation({
-    mutationFn: () =>
-      startContentOptimizerCrawl(apiBaseURL, {
+    mutationFn: (options?: CrawlRequestOptions) => {
+      const includePatterns = options?.includePatterns ?? Array.from(selectedURLs);
+      const limit = options?.limit ?? Math.max(includePatterns.length, 1);
+
+      return startContentOptimizerCrawl(apiBaseURL, {
         projectId,
         organizationId,
         url,
-        limit: selectedCount,
+        limit,
         depth: 1,
         render: false,
-        includePatterns: Array.from(selectedURLs),
-      }),
-    onMutate: () => {
+        includePatterns,
+      });
+    },
+    onMutate: (options) => {
+      const includePatterns = options?.includePatterns ?? Array.from(selectedURLs);
+      const limit = options?.limit ?? Math.max(includePatterns.length, 1);
+
       setError(null);
       setPhase("crawling");
       setActiveJobId("");
       setActiveJobKind(null);
       setCrawlResult(null);
       setSelectedResultURL("");
+      return { limit };
     },
-    onSuccess: (job) => {
+    onSuccess: (job, _options, context) => {
       setActiveJobId(job.id);
       setActiveJobKind("crawl");
       setCrawlResult({
         id: job.id,
         status: job.status,
-        total: selectedCount,
+        total: context?.limit ?? selectedCount,
         finished: 0,
         records: [],
       });
@@ -341,6 +354,14 @@ export function useContentOptimizerViewModel({
     setError(null);
   }
 
+  function reanalyze(options?: CrawlRequestOptions) {
+    if (options || selectedCount > 0) {
+      crawlMutation.mutate(options);
+      return;
+    }
+    discoverMutation.mutate();
+  }
+
   return {
     projectId,
     organizationId,
@@ -362,12 +383,14 @@ export function useContentOptimizerViewModel({
     allDiscoveredSelected,
     canDiscover,
     canCrawlSelected,
+    canReanalyze,
     error,
     loadingLatest,
     discovering: phase === "discovering" || discoverMutation.isPending,
     crawling: phase === "crawling" || crawlMutation.isPending,
     discover: () => discoverMutation.mutate(),
-    crawlSelected: () => crawlMutation.mutate(),
+    crawlSelected: () => crawlMutation.mutate(undefined),
+    reanalyze,
     togglePage,
     toggleAllPages,
     reset,

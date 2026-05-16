@@ -24,7 +24,7 @@ export function TrafficTrend({ points, loading = false }: TrafficTrendProps) {
         <SectionTitle>
           Trafic dans le temps
         </SectionTitle>
-        <p className="text-xs text-muted-foreground">Sessions traffic agrégées par jour.</p>
+        <p className="text-xs text-muted-foreground">Visites IA détectées agrégées par jour.</p>
       </div>
 
       <div className="h-36 min-w-0 overflow-hidden rounded-md border border-border bg-background px-3 pb-9 pt-4">
@@ -64,7 +64,7 @@ export function TrafficTrend({ points, loading = false }: TrafficTrendProps) {
                     <div
                       className="w-full rounded-t-md bg-primary/85 transition-[height]"
                       style={{ height: `${height}%` }}
-                      title={`${formatInteger(point.sessions)} sessions`}
+                      title={`${formatInteger(point.sessions)} visites IA détectées`}
                     />
                   </div>
                   <span

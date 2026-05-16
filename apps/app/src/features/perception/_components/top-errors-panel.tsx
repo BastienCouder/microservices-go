@@ -272,7 +272,7 @@ function getSeverityTone(severity: PerceptionError["severity"], locale: string) 
   if (severity === "medium") {
     return { dot: "bg-amber-500", label: "text-amber-600", tag: getPerceptionSeverityLabel("medium", locale) };
   }
-  return { dot: "bg-sky-500", label: "text-sky-600", tag: getPerceptionSeverityLabel("low", locale) };
+  return { dot: "bg-green-500", label: "text-green-700", tag: getPerceptionSeverityLabel("low", locale) };
 }
 
 type PerceptionModelBadgeMeta = {

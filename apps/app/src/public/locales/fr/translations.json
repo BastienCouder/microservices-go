@@ -528,7 +528,7 @@
     "topErrorsGeneratedCompetitiveIssue": "Le score concurrentiel est de {{score}}/100. Les IA placent encore trop souvent la marque derrière des concurrents dans les comparatifs.",
     "topErrorsGeneratedCompetitiveImpact": "Le trafic de considération peut être capté par d’autres acteurs sur les requêtes de comparaison.",
     "topErrorsGeneratedCompetitiveContent": "Ajouter des comparatifs, des tableaux de différenciation et des contenus de preuve sur les concurrents réels du projet.",
-    "priorityHigh": "Élevée",
+    "priorityHigh": "Critique",
     "priorityMedium": "Moyenne",
     "priorityLow": "Faible",
     "statusDraft": "Brouillon",

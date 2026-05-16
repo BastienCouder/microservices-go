@@ -387,7 +387,7 @@ describe("loadTrafficPageData", () => {
     expect(calls).toHaveLength(4);
   });
 
-  test("logs fake traffic data in the frontend when the fallback report is received", async () => {
+  test("does not expose fake traffic reports in the frontend", async () => {
     const consoleCalls: unknown[][] = [];
     console.info = (...args: unknown[]) => {
       consoleCalls.push(args);
@@ -445,32 +445,15 @@ describe("loadTrafficPageData", () => {
       }),
     ]);
 
-    await loadTrafficPageData("http://api.test", "?project=site-france");
+    const result = await loadTrafficPageData("http://api.test", "?project=site-france");
 
-    expect(consoleCalls).toHaveLength(1);
-    expect(consoleCalls[0]?.[0]).toBe("[traffic] fake data");
-    const payload = consoleCalls[0]?.[1] as {
-      projectId: string;
-      propertyId: string;
-      dataSource: string;
-      summary: { totalGeoSessions: number; topEngine: string };
-      bySourcePreview: Array<{ source: string; sessions: number }>;
-      topPagesPreview: Array<{ path: string; sessions: number }>;
-      timeseriesCount: number;
-      timeseriesHead: Array<{ date: string; sessions: number }>;
-    };
-    expect(payload.projectId).toBe("prj_1");
-    expect(payload.propertyId).toBe("123456789");
-    expect(payload.dataSource).toBe("fake");
-    expect(payload.summary.totalGeoSessions).toBe(183);
-    expect(payload.summary.topEngine).toBe("ChatGPT");
-    expect(payload.bySourcePreview[0]?.source).toBe("chatgpt.com");
-    expect(payload.bySourcePreview[0]?.sessions).toBe(86);
-    expect(payload.topPagesPreview[0]?.path).toBe("/");
-    expect(payload.topPagesPreview[0]?.sessions).toBe(38);
-    expect(payload.timeseriesCount).toBe(1);
-    expect(payload.timeseriesHead[0]?.date).toBe("2026-04-28");
-    expect(payload.timeseriesHead[0]?.sessions).toBe(12);
+    expect(consoleCalls).toHaveLength(0);
+    expect(result.report.dataSource).toBe("");
+    expect(result.report.summary.totalGeoSessions).toBe(0);
+    expect(result.report.bySource).toHaveLength(0);
+    expect(result.report.topPages).toHaveLength(0);
+    expect(result.report.timeseries).toHaveLength(0);
+    expect(result.reportError).toBe("Aucune donnée GA4 réelle disponible pour cette période.");
   });
 
   test("does not log real GA4 data even when values look like fallback rows", async () => {

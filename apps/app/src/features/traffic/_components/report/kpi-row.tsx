@@ -35,6 +35,7 @@ export function TrafficKpiRow({ items, loading = false }: TrafficKpiRowProps) {
           title={item.title}
           value={item.value}
           sub={item.sub}
+          description={item.description}
           trendDir="stable"
           variant={item.tone === "primary" ? "active" : "default"}
         />

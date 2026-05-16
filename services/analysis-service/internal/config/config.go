@@ -9,26 +9,29 @@ import (
 )
 
 type Config struct {
-	HTTPAddr                 string
-	MetricsAddr              string
-	GRPCAddr                 string
-	DatabaseURL              string
-	BillingServiceURL        string
-	ProjectServiceGRPCAddr   string
-	InternalJWTSecret        string
-	InternalJWTIssuer        string
-	GRPCAllowInsecure        bool
-	GRPCTLSCAFile            string
-	GRPCTLSCertFile          string
-	GRPCTLSKeyFile           string
-	GRPCTLSServerName        string
-	GRPCTLSClientCAFile      string
-	GRPCTLSRequireClientCert bool
-	RedisAddr                string
-	RedisPassword            string
-	DashboardCacheTTL        time.Duration
-	CloudflareAccountID      string
-	CloudflareAPIToken       string
+	HTTPAddr                       string
+	MetricsAddr                    string
+	GRPCAddr                       string
+	DatabaseURL                    string
+	BillingServiceURL              string
+	ProjectServiceGRPCAddr         string
+	InternalJWTSecret              string
+	InternalJWTIssuer              string
+	GRPCAllowInsecure              bool
+	GRPCTLSCAFile                  string
+	GRPCTLSCertFile                string
+	GRPCTLSKeyFile                 string
+	GRPCTLSServerName              string
+	GRPCTLSClientCAFile            string
+	GRPCTLSRequireClientCert       bool
+	RedisAddr                      string
+	RedisPassword                  string
+	DashboardCacheTTL              time.Duration
+	CloudflareAccountID            string
+	CloudflareAPIToken             string
+	IAServiceURL                   string
+	ContentIssueAnalyzerModelID    string
+	ContentIssueAnalyzerProviderID string
 }
 
 func Load() (Config, error) {
@@ -86,26 +89,29 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		HTTPAddr:                 httpAddr,
-		MetricsAddr:              optionalEnv("METRICS_ADDR"),
-		GRPCAddr:                 grpcAddr,
-		DatabaseURL:              databaseURL,
-		BillingServiceURL:        billingServiceURL,
-		ProjectServiceGRPCAddr:   projectServiceGRPCAddr,
-		InternalJWTSecret:        internalJWTSecret,
-		InternalJWTIssuer:        internalJWTIssuer,
-		GRPCAllowInsecure:        grpcAllowInsecure,
-		GRPCTLSCAFile:            optionalEnv("GRPC_TLS_CA_FILE"),
-		GRPCTLSCertFile:          optionalEnv("GRPC_TLS_CERT_FILE"),
-		GRPCTLSKeyFile:           optionalEnv("GRPC_TLS_KEY_FILE"),
-		GRPCTLSServerName:        optionalEnv("GRPC_TLS_SERVER_NAME"),
-		GRPCTLSClientCAFile:      optionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
-		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
-		RedisAddr:                redisAddr,
-		RedisPassword:            redisPassword,
-		DashboardCacheTTL:        dashboardCacheTTL,
-		CloudflareAccountID:      optionalEnv("CLOUDFLARE_ACCOUNT_ID"),
-		CloudflareAPIToken:       cloudflareAPIToken,
+		HTTPAddr:                       httpAddr,
+		MetricsAddr:                    optionalEnv("METRICS_ADDR"),
+		GRPCAddr:                       grpcAddr,
+		DatabaseURL:                    databaseURL,
+		BillingServiceURL:              billingServiceURL,
+		ProjectServiceGRPCAddr:         projectServiceGRPCAddr,
+		InternalJWTSecret:              internalJWTSecret,
+		InternalJWTIssuer:              internalJWTIssuer,
+		GRPCAllowInsecure:              grpcAllowInsecure,
+		GRPCTLSCAFile:                  optionalEnv("GRPC_TLS_CA_FILE"),
+		GRPCTLSCertFile:                optionalEnv("GRPC_TLS_CERT_FILE"),
+		GRPCTLSKeyFile:                 optionalEnv("GRPC_TLS_KEY_FILE"),
+		GRPCTLSServerName:              optionalEnv("GRPC_TLS_SERVER_NAME"),
+		GRPCTLSClientCAFile:            optionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
+		GRPCTLSRequireClientCert:       grpcTLSRequireClientCert,
+		RedisAddr:                      redisAddr,
+		RedisPassword:                  redisPassword,
+		DashboardCacheTTL:              dashboardCacheTTL,
+		CloudflareAccountID:            optionalEnv("CLOUDFLARE_ACCOUNT_ID"),
+		CloudflareAPIToken:             cloudflareAPIToken,
+		IAServiceURL:                   optionalEnv("IA_SERVICE_URL"),
+		ContentIssueAnalyzerModelID:    optionalEnv("CONTENT_ISSUE_ANALYZER_MODEL_ID"),
+		ContentIssueAnalyzerProviderID: optionalEnv("CONTENT_ISSUE_ANALYZER_PROVIDER_ID"),
 	}, nil
 }
 

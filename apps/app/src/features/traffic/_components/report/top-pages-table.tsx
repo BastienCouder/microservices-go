@@ -36,7 +36,9 @@ export function TopPagesTable({ pages, pagination, loading = false }: TopPagesTa
         <SectionTitle>
           Top pages traffic
         </SectionTitle>
-        <p className="text-xs text-muted-foreground">Pages d’entrée captées depuis les moteurs IA.</p>
+        <p className="text-xs text-muted-foreground">
+          Pages publiques vues après une arrivée IA détectée. Les routes privées comme /admin sont masquées.
+        </p>
       </div>
 
       {loading ? (
@@ -57,9 +59,9 @@ export function TopPagesTable({ pages, pagination, loading = false }: TopPagesTa
             <TableRow>
               <TableHead>Page</TableHead>
               <TableHead>Source</TableHead>
-              <TableHead className="text-right">Sessions</TableHead>
-              <TableHead className="text-right">Engagement</TableHead>
-              <TableHead className="text-right">Conv.</TableHead>
+              <TableHead className="text-right">Visites IA détectées</TableHead>
+              <TableHead className="text-right">Taux engagé</TableHead>
+              <TableHead className="text-right">Conversions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

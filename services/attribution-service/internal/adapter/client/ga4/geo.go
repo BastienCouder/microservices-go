@@ -52,6 +52,8 @@ var geoDetectionPatterns = []struct {
 	{pattern: "mistral", engine: "Mistral"},
 }
 
+var privatePagePathPrefixes = []string{"/admin"}
+
 type ga4RunReportResponse struct {
 	Rows          []ga4RunReportRow `json:"rows"`
 	PropertyQuota *ga4PropertyQuota `json:"propertyQuota"`
@@ -281,7 +283,10 @@ func dateRangePayload(from, to time.Time) map[string]string {
 }
 
 func buildGeoDimensionFilter(filters usecase.GeoTrafficFilters) map[string]any {
-	expressions := []map[string]any{buildGeoOnlyDimensionFilter(filters.Engine)}
+	expressions := []map[string]any{
+		buildGeoOnlyDimensionFilter(filters.Engine),
+		buildPublicPageDimensionFilter(),
+	}
 	return map[string]any{
 		"andGroup": map[string]any{
 			"expressions": appendTrafficDimensionFilters(expressions, filters.Search),
@@ -322,6 +327,32 @@ func buildGeoOnlyDimensionFilter(engineFilter string) map[string]any {
 	return map[string]any{
 		"orGroup": map[string]any{
 			"expressions": expressions,
+		},
+	}
+}
+
+func buildPublicPageDimensionFilter() map[string]any {
+	expressions := make([]map[string]any, 0, len(privatePagePathPrefixes))
+	for _, prefix := range privatePagePathPrefixes {
+		expressions = append(expressions, map[string]any{
+			"filter": map[string]any{
+				"fieldName": "pagePath",
+				"stringFilter": map[string]any{
+					"matchType":     "BEGINS_WITH",
+					"value":         prefix,
+					"caseSensitive": false,
+				},
+			},
+		})
+	}
+	if len(expressions) == 1 {
+		return map[string]any{"notExpression": expressions[0]}
+	}
+	return map[string]any{
+		"notExpression": map[string]any{
+			"orGroup": map[string]any{
+				"expressions": expressions,
+			},
 		},
 	}
 }

@@ -138,7 +138,7 @@ func (s *Service) GetContentOptimizerCrawl(
 	if err != nil {
 		return ContentOptimizerCrawlResult{}, err
 	}
-	result = analyzeContentOptimizerCrawlResult(result)
+	result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
 	if isTerminalCrawlJobStatus(result.Status) && shouldSaveContentOptimizerCrawlResult(normalized, result) {
 		if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
 			return ContentOptimizerCrawlResult{}, err
@@ -330,13 +330,66 @@ func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
 	result.Records = append([]ContentOptimizerCrawlRecord(nil), result.Records...)
 	for index := range result.Records {
-		result.Records[index].Issues = analyzeContentOptimizerRecord(result.Records[index])
+		result.Records[index].Issues = mergeContentOptimizerIssues(
+			analyzeContentOptimizerRecord(result.Records[index]),
+			result.Records[index].Issues,
+		)
 	}
 	return result
 }
 
+func (s *Service) analyzeContentOptimizerCrawlResult(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	result ContentOptimizerCrawlResult,
+) ContentOptimizerCrawlResult {
+	result = analyzeContentOptimizerCrawlResult(result)
+	if s.contentIssueAnalyzer == nil {
+		return result
+	}
+
+	for index := range result.Records {
+		record := result.Records[index]
+		aiIssues, err := s.contentIssueAnalyzer.AnalyzeContentIssues(ctx, ContentIssueAnalysisInput{
+			ProjectID:           projectID,
+			OrganizationID:      organizationID,
+			Record:              record,
+			DeterministicIssues: append([]ContentOptimizerIssue(nil), record.Issues...),
+		})
+		if err != nil {
+			continue
+		}
+		result.Records[index].Issues = mergeContentOptimizerIssues(record.Issues, aiIssues)
+	}
+	return result
+}
+
+func mergeContentOptimizerIssues(groups ...[]ContentOptimizerIssue) []ContentOptimizerIssue {
+	merged := make([]ContentOptimizerIssue, 0)
+	seen := make(map[string]struct{})
+	for _, group := range groups {
+		for _, issue := range group {
+			fixType := strings.TrimSpace(issue.FixType)
+			if fixType == "" {
+				continue
+			}
+			if strings.TrimSpace(issue.ID) == "" {
+				issue.ID = fixType
+			}
+			key := fixType
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			merged = append(merged, issue)
+		}
+	}
+	return merged
+}
+
 func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []ContentOptimizerIssue {
-	issues := make([]ContentOptimizerIssue, 0, 5)
+	issues := make([]ContentOptimizerIssue, 0, 12)
 	topic := contentOptimizerPageTopic(record)
 	host := contentOptimizerPageHost(record.URL)
 	if record.Status != "completed" || record.HTTPStatus >= 400 {
@@ -356,7 +409,11 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		content = strings.TrimSpace(record.HTML)
 	}
 	lowerContent := strings.ToLower(content)
+	lowerHTML := strings.ToLower(record.HTML)
 	wordCount := len(strings.Fields(content))
+	h1Count := contentOptimizerMarkdownHeadingCount(content, 1)
+	h1Text := contentOptimizerFirstMarkdownHeading(content, 1)
+	h2Count := contentOptimizerMarkdownHeadingCount(content, 2) + contentOptimizerMarkdownHeadingCount(content, 3)
 
 	if strings.TrimSpace(record.Title) == "" {
 		issues = append(issues, ContentOptimizerIssue{
@@ -367,6 +424,28 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 			Description:    "Le crawl ne remonte pas de titre exploitable pour cette page.",
 			Recommendation: fmt.Sprintf("Definir le title SEO: \"%s: guide, avantages et FAQ | %s\".", topic, host),
 			FixType:        "add_title",
+		})
+	} else if titleLength := len([]rune(strings.TrimSpace(record.Title))); titleLength < 20 || titleLength > 65 {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "weak_title"),
+			Category:       "seo",
+			Severity:       "medium",
+			Title:          "Title SEO peu optimise",
+			Description:    "Le titre existe mais sa longueur ou son contexte limite sa performance dans les resultats de recherche.",
+			Recommendation: fmt.Sprintf("Reecrire le title autour de 45 a 60 caracteres: \"%s: avantages, prix et FAQ | %s\".", topic, host),
+			FixType:        "improve_title",
+		})
+	}
+
+	if !contentOptimizerHasMetaDescription(record.HTML) {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_meta_description"),
+			Category:       "seo",
+			Severity:       "medium",
+			Title:          "Meta description absente",
+			Description:    "Aucune meta description exploitable n'a ete detectee dans le HTML crawle.",
+			Recommendation: fmt.Sprintf("Ajouter une meta description de 140 a 160 caracteres qui resume %s, la preuve principale et l'action suivante.", strings.ToLower(topic)),
+			FixType:        "add_meta_description",
 		})
 	}
 
@@ -379,6 +458,52 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 			Description:    "La page donne peu de contexte aux moteurs de recherche et aux reponses IA.",
 			Recommendation: fmt.Sprintf("Ajouter un bloc H2 \"Pourquoi choisir %s\" avec 3 sous-parties: benefices cles, cas d'usage, preuves chiffrables, puis 2 liens internes vers une FAQ et un guide.", topic),
 			FixType:        "expand_content",
+		})
+	} else if wordCount < 300 {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "limited_depth"),
+			Category:       "geo",
+			Severity:       "low",
+			Title:          "Profondeur de contenu limitee",
+			Description:    "La page couvre le sujet mais donne encore peu de contexte pour une reponse IA fiable.",
+			Recommendation: fmt.Sprintf("Ajouter des sections \"Cas d'usage\", \"Limites\", \"Comparaison\" et \"Preuves\" pour rendre %s plus citable.", strings.ToLower(topic)),
+			FixType:        "add_topic_depth",
+		})
+	}
+
+	if h1Count != 1 || len([]rune(h1Text)) < 20 {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "weak_h1"),
+			Category:       "seo",
+			Severity:       "medium",
+			Title:          "H1 absent ou ambigu",
+			Description:    "La page devrait exposer un seul H1 clair qui confirme le sujet principal.",
+			Recommendation: fmt.Sprintf("Ajouter un H1 unique et descriptif du type \"%s: prix, avantages et cas d'usage\".", topic),
+			FixType:        "improve_h1",
+		})
+	}
+
+	if h2Count < 2 {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "weak_structure"),
+			Category:       "seo",
+			Severity:       "low",
+			Title:          "Structure de contenu faible",
+			Description:    "La page manque de sous-sections lisibles pour le crawl et la synthese IA.",
+			Recommendation: fmt.Sprintf("Ajouter ces H2 exacts sur la page: \"Pour qui est %s\", \"Benefices\", \"Preuves\", \"Questions frequentes\".", strings.ToLower(topic)),
+			FixType:        "improve_headings",
+		})
+	}
+
+	if !contentOptimizerHasInternalLinks(content, record.URL) && !contentOptimizerHasInternalLinks(record.HTML, record.URL) {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_internal_links"),
+			Category:       "seo",
+			Severity:       "medium",
+			Title:          "Maillage interne insuffisant",
+			Description:    "Aucun lien interne utile n'a ete detecte dans le contenu extrait.",
+			Recommendation: fmt.Sprintf("Ajouter 2 a 4 liens internes depuis %s vers une FAQ, un guide comparatif, une page preuve et une page conversion.", record.URL),
+			FixType:        "add_internal_links",
 		})
 	}
 
@@ -394,6 +519,54 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		})
 	}
 
+	if !containsAny(lowerContent, "en resume", "en résumé", "reponse courte", "réponse courte", "la reponse", "la réponse", "definition", "définition") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_direct_answer"),
+			Category:       "geo",
+			Severity:       "medium",
+			Title:          "Reponse directe absente",
+			Description:    "Les moteurs generatifs privilegient les pages qui donnent une reponse concise avant le detail.",
+			Recommendation: fmt.Sprintf("Ajouter en haut de page un paragraphe \"Reponse courte\" de 40 a 60 mots expliquant clairement %s.", strings.ToLower(topic)),
+			FixType:        "add_direct_answer",
+		})
+	}
+
+	if !contentOptimizerHasEvidenceSignals(lowerContent) {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_evidence"),
+			Category:       "geo",
+			Severity:       "medium",
+			Title:          "Preuves et sources insuffisantes",
+			Description:    "Le contenu manque de chiffres, sources, temoignages ou preuves qui rendent une reponse IA verifiable.",
+			Recommendation: fmt.Sprintf("Ajouter au moins 3 preuves pour %s: chiffre, exemple client, source citee, date de mise a jour ou resultat mesurable.", strings.ToLower(topic)),
+			FixType:        "add_evidence",
+		})
+	}
+
+	if !containsAny(lowerContent, host, "entreprise", "marque", "produit", "service", "secteur", "audience", "localisation") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_entity_context"),
+			Category:       "geo",
+			Severity:       "low",
+			Title:          "Contexte d'entite incomplet",
+			Description:    "La page ne donne pas assez de contexte sur l'entite, l'offre, le secteur ou l'audience visee.",
+			Recommendation: fmt.Sprintf("Ajouter un bloc \"A propos\" indiquant qui propose %s, pour quelle audience, dans quel secteur et avec quelle differenciation.", strings.ToLower(topic)),
+			FixType:        "add_entity_context",
+		})
+	}
+
+	if !containsAny(lowerHTML, "schema.org", "application/ld+json", "\"@type\"", "\"@context\"") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_schema_markup"),
+			Category:       "geo",
+			Severity:       "medium",
+			Title:          "Schema markup absent",
+			Description:    "Aucune donnee structuree JSON-LD ou schema.org n'a ete detectee dans le HTML crawle.",
+			Recommendation: fmt.Sprintf("Ajouter un JSON-LD adapte a %s: WebPage, BreadcrumbList, FAQPage si FAQ presente, et Organization ou Product selon la page.", strings.ToLower(topic)),
+			FixType:        "add_schema_markup",
+		})
+	}
+
 	if !containsAny(lowerContent, "guide", "blog", "article", "comparatif", "comment choisir") {
 		issues = append(issues, ContentOptimizerIssue{
 			ID:             contentOptimizerIssueID(record.URL, "missing_blog_support"),
@@ -406,19 +579,62 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		})
 	}
 
-	if !containsAny(content, "\n## ", "\n### ") {
-		issues = append(issues, ContentOptimizerIssue{
-			ID:             contentOptimizerIssueID(record.URL, "weak_structure"),
-			Category:       "seo",
-			Severity:       "low",
-			Title:          "Structure de contenu faible",
-			Description:    "La page manque de sous-sections lisibles pour le crawl et la synthese IA.",
-			Recommendation: fmt.Sprintf("Ajouter ces H2 exacts sur la page: \"Pour qui est %s\", \"Benefices\", \"Preuves\", \"Questions frequentes\".", strings.ToLower(topic)),
-			FixType:        "improve_headings",
-		})
-	}
-
 	return issues
+}
+
+func contentOptimizerHasMetaDescription(html string) bool {
+	lowerHTML := strings.ToLower(html)
+	return strings.Contains(lowerHTML, "<meta") &&
+		strings.Contains(lowerHTML, "name=\"description\"") &&
+		strings.Contains(lowerHTML, "content=")
+}
+
+func contentOptimizerMarkdownHeadingCount(content string, level int) int {
+	prefix := strings.Repeat("#", level) + " "
+	count := 0
+	for _, line := range strings.Split(content, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), prefix) {
+			count++
+		}
+	}
+	return count
+}
+
+func contentOptimizerFirstMarkdownHeading(content string, level int) string {
+	prefix := strings.Repeat("#", level) + " "
+	for _, line := range strings.Split(content, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, prefix) {
+			return strings.TrimSpace(strings.TrimPrefix(trimmed, prefix))
+		}
+	}
+	return ""
+}
+
+func contentOptimizerHasInternalLinks(content string, pageURL string) bool {
+	if strings.TrimSpace(content) == "" {
+		return false
+	}
+	host := contentOptimizerPageHost(pageURL)
+	lowerContent := strings.ToLower(content)
+	return strings.Contains(lowerContent, "](/") ||
+		strings.Contains(lowerContent, "href=\"/") ||
+		strings.Contains(lowerContent, "href='/") ||
+		(host != "site" && strings.Contains(lowerContent, strings.ToLower(host)))
+}
+
+func contentOptimizerHasEvidenceSignals(lowerContent string) bool {
+	if containsAny(lowerContent, "%", "source", "etude", "étude", "client", "temoignage", "témoignage", "cas client", "benchmark", "donnees", "données") {
+		return true
+	}
+	for _, token := range strings.Fields(lowerContent) {
+		for _, char := range token {
+			if char >= '0' && char <= '9' {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func contentOptimizerPageTopic(record ContentOptimizerCrawlRecord) string {
