@@ -29,6 +29,8 @@ type persistedState struct {
 	AlertsByProject     map[string][]string                               `json:"alertsByProject"`
 	BrandCanonByProject map[string]*usecase.BrandCanon                    `json:"brandCanonByProject"`
 	ContentCrawls       map[string]*usecase.ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
+	OptimizeActions     map[string]*usecase.OptimizeAction                `json:"optimizeActions"`
+	ActionsByProject    map[string][]string                               `json:"actionsByProject"`
 }
 
 type StateStore struct {
@@ -53,6 +55,8 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		AlertsByProject:     make(map[string][]string),
 		BrandCanonByProject: make(map[string]*usecase.BrandCanon),
 		ContentCrawls:       make(map[string]*usecase.ContentOptimizerCrawlSnapshot),
+		OptimizeActions:     make(map[string]*usecase.OptimizeAction),
+		ActionsByProject:    make(map[string][]string),
 	}
 
 	err := s.db.QueryRow(ctx, `
@@ -83,6 +87,9 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadContentCrawls(ctx, &state); err != nil {
+		return nil, false, err
+	}
+	if err := s.loadOptimizeActions(ctx, &state); err != nil {
 		return nil, false, err
 	}
 
@@ -121,6 +128,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	for _, statement := range []string{
 		`DELETE FROM brand_canon`,
 		`DELETE FROM content_optimizer_crawls`,
+		`DELETE FROM optimize_actions`,
 		`DELETE FROM alerts`,
 		`DELETE FROM ai_responses`,
 		`DELETE FROM prompt_runs`,
@@ -147,6 +155,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertContentCrawls(ctx, tx, state.ContentCrawls); err != nil {
+		return err
+	}
+	if err := insertOptimizeActions(ctx, tx, state.OptimizeActions); err != nil {
 		return err
 	}
 
@@ -390,6 +401,51 @@ func (s *StateStore) loadContentCrawls(ctx context.Context, state *persistedStat
 	return rows.Err()
 }
 
+func (s *StateStore) loadOptimizeActions(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT id, project_id, priority, type, title, issue, impact, generated_content, status, source_error_id, metadata, created_at, updated_at
+		FROM optimize_actions
+		ORDER BY created_at ASC, id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select optimize actions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item          usecase.OptimizeAction
+			impact        *string
+			sourceErrorID *string
+			rawMetadata   []byte
+		)
+		if err := rows.Scan(
+			&item.ID,
+			&item.ProjectID,
+			&item.Priority,
+			&item.Type,
+			&item.Title,
+			&item.Issue,
+			&impact,
+			&item.GeneratedContent,
+			&item.Status,
+			&sourceErrorID,
+			&rawMetadata,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan optimize action: %w", err)
+		}
+		item.Impact = stringValue(impact)
+		item.SourceErrorID = stringValue(sourceErrorID)
+		item.Metadata = decodeMap(rawMetadata)
+		action := item
+		state.OptimizeActions[item.ID] = &action
+		state.ActionsByProject[item.ProjectID] = append(state.ActionsByProject[item.ProjectID], item.ID)
+	}
+	return rows.Err()
+}
+
 func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase.AnalysisRun, runByRequest map[string]string) error {
 	requestIDs := reverseRunRequestMap(runByRequest)
 	for _, runID := range sortedAnalysisRunIDs(runs) {
@@ -495,6 +551,23 @@ func insertContentCrawls(ctx context.Context, tx pgx.Tx, crawls map[string]*usec
 	return nil
 }
 
+func insertOptimizeActions(ctx context.Context, tx pgx.Tx, actions map[string]*usecase.OptimizeAction) error {
+	for _, actionID := range sortedOptimizeActionIDs(actions) {
+		action := actions[actionID]
+		rawMetadata, err := json.Marshal(action.Metadata)
+		if err != nil {
+			return fmt.Errorf("marshal optimize action metadata for %s: %w", action.ID, err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO optimize_actions (id, project_id, priority, type, title, issue, impact, generated_content, status, source_error_id, metadata, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12, $13)
+		`, action.ID, action.ProjectID, action.Priority, action.Type, action.Title, action.Issue, nullIfEmpty(action.Impact), action.GeneratedContent, action.Status, nullIfEmpty(action.SourceErrorID), string(rawMetadata), action.CreatedAt, action.UpdatedAt); err != nil {
+			return fmt.Errorf("insert optimize action %s: %w", action.ID, err)
+		}
+	}
+	return nil
+}
+
 func reverseRunRequestMap(runByRequest map[string]string) map[string]string {
 	reversed := make(map[string]string, len(runByRequest))
 	for key, runID := range runByRequest {
@@ -556,6 +629,15 @@ func sortedBrandCanonProjectIDs(items map[string]*usecase.BrandCanon) []string {
 }
 
 func sortedContentCrawlKeys(items map[string]*usecase.ContentOptimizerCrawlSnapshot) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedOptimizeActionIDs(items map[string]*usecase.OptimizeAction) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)

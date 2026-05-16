@@ -565,12 +565,21 @@ describe("Traffic GA4 OAuth", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          projectId: "prj_1",
-          ga4: {
-            propertyId: "123456789",
-            authMode: "oauth",
-            hasOAuthToken: true,
-            isConnected: true,
+          integration: {
+            projectId: "prj_1",
+            ga4: {
+              propertyId: "123456789",
+              authMode: "oauth",
+              hasOAuthToken: true,
+              isConnected: true,
+            },
+          },
+          llmSetup: {
+            setupStatus: "success",
+            createdResources: {
+              channelGroupName: "properties/123/channelGroups/456",
+              customDimensionName: "properties/123/customDimensions/789",
+            },
           },
         },
       }),
@@ -588,8 +597,12 @@ describe("Traffic GA4 OAuth", () => {
     });
 
     expect(start.authorizationUrl.includes("accounts.google.com")).toBe(true);
-    expect(selected.ga4.authMode).toBe("oauth");
-    expect(selected.ga4.isConnected).toBe(true);
+    expect(selected.integration.ga4.authMode).toBe("oauth");
+    expect(selected.integration.ga4.isConnected).toBe(true);
+    expect(selected.llmSetup?.setupStatus).toBe("success");
+    expect(selected.llmSetup?.createdResources.customDimensionName).toBe(
+      "properties/123/customDimensions/789",
+    );
     expect(calls[0]?.url.includes("/projects/prj_1/impact-integrations/ga4/oauth/start")).toBe(true);
     expect(calls[1]?.url.includes("/projects/prj_1/impact-integrations/ga4/oauth/property")).toBe(true);
     expect(new Headers(calls[1]?.init?.headers).get("X-Organization-ID")).toBe("42");
@@ -616,6 +629,18 @@ describe("Traffic GA4 OAuth", () => {
               accountName: "Acme",
             },
           ],
+          llmSetup: {
+            setupStatus: "partial_success",
+            createdResources: {
+              channelGroupName: "properties/123/channelGroups/456",
+            },
+            errors: [
+              {
+                resource: "customDimension",
+                message: "already archived",
+              },
+            ],
+          },
         },
       }),
     ]);
@@ -631,6 +656,8 @@ describe("Traffic GA4 OAuth", () => {
     expect(completed.integration.ga4.propertyId).toBe("");
     expect(completed.integration.ga4.hasOAuthToken).toBe(true);
     expect(completed.properties[0]?.propertyId).toBe("123456789");
+    expect(completed.llmSetup?.setupStatus).toBe("partial_success");
+    expect(completed.llmSetup?.errors[0]?.resource).toBe("customDimension");
     expect(calls[0]?.init?.body).toBe(
       JSON.stringify({
         code: "auth-code",

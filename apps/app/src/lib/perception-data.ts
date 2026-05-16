@@ -822,166 +822,48 @@ function buildTrendSeriesByPeriod(
   };
 }
 
-function severityFromScore(score: number): PerceptionSeverity {
-  if (score < 50) return "high";
-  if (score < 75) return "medium";
+function normalizePerceptionSeverity(value: unknown): PerceptionSeverity {
+  if (value === "high" || value === "medium" || value === "low") return value;
   return "low";
 }
 
-function priorityFromSeverity(severity: PerceptionSeverity): OptimizePriority {
-  if (severity === "high") return "high";
-  if (severity === "medium") return "medium";
-  return "low";
+function normalizeOptimizePriority(value: unknown, severity: PerceptionSeverity): OptimizePriority {
+  if (value === "high" || value === "medium" || value === "low") return value;
+  return severity;
 }
 
-function lowScoringModels(
-  heatmap: PerceptionViewData["modelAxisHeatmap"],
-  axis: keyof PerceptionHeatmapRow["values"],
-): string[] {
-  const sorted = [...heatmap.rows]
-    .sort((left, right) => (left.values[axis] ?? 0) - (right.values[axis] ?? 0))
-    .filter((row) => (row.values[axis] ?? 0) < 75)
-    .map((row) => row.model);
-  return sorted.length > 0 ? sorted : heatmap.rows.slice(0, 2).map((row) => row.model);
-}
-
-function deriveTopErrors(
-  payload: PerceptionApiPayload,
-  brandCanon: BrandCanon,
-  scores: PerceptionScores,
-  radar: PerceptionRadarPoint[],
-  heatmap: PerceptionViewData["modelAxisHeatmap"],
-  locale: string,
-): PerceptionError[] {
-  if (payload.topErrors && payload.topErrors.length > 0) {
-    return payload.topErrors.slice(0, 3).map((error, index) => {
-      const score = radar[index]?.score ?? 0;
-      const severity = (error.severity as PerceptionSeverity) || severityFromScore(score);
-      return {
-        id: error.id || `perception-error-${index + 1}`,
-        type: error.type || `perception-gap-${index + 1}`,
-        severity,
-        title: error.title || translatePerceptionText(locale, "topErrorsFallbackTitle"),
-        issue: error.issue || translatePerceptionText(locale, "topErrorsFallbackIssue"),
-        impact: error.impact || translatePerceptionText(locale, "topErrorsFallbackImpact"),
-        detectedInModels: error.detectedInModels ?? heatmap.rows.slice(0, 2).map((row) => row.model),
-        fixType: (error.fixType as PerceptionError["fixType"]) || "website_copy",
-        optimizePriority: (error.optimizePriority as OptimizePriority) || priorityFromSeverity(severity),
-        generatedContent:
-          error.generatedContent ||
-          translatePerceptionText(locale, "topErrorsFallbackGeneratedContent", {
-            brand: brandCanon.brandName || translatePerceptionText(locale, "brandFallbackName"),
-          }),
-      };
-    });
+function normalizeFixType(value: unknown): PerceptionError["fixType"] {
+  if (
+    value === "prompt_patch" ||
+    value === "website_copy" ||
+    value === "schema_update" ||
+    value === "faq_snippet"
+  ) {
+    return value;
   }
-
-  const radarByAxis = new Map(radar.map((point) => [point.axis, point.score] as const));
-  const brandLabel = brandCanon.brandName || translatePerceptionText(locale, "brandFallbackName");
-
-  const candidates: Array<{
-    type: string;
-    score: number;
-    axis: keyof PerceptionHeatmapRow["values"];
-    title: string;
-    issue: string;
-    impact: string;
-    fixType: PerceptionError["fixType"];
-    generatedContent: string;
-  }> = [
-    {
-      type: "positioning_gap",
-      score: scores.positioningAccuracy,
-      axis: "positioning",
-      title: translatePerceptionText(locale, "topErrorsGeneratedPositioningTitle"),
-      issue: translatePerceptionText(locale, "topErrorsGeneratedPositioningIssue", {
-        score: scores.positioningAccuracy,
-        brand: brandLabel,
-      }),
-      impact: translatePerceptionText(locale, "topErrorsGeneratedPositioningImpact"),
-      fixType: "website_copy",
-      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedPositioningContent"),
-    },
-    {
-      type: "citation_gap",
-      score: scores.factualAccuracy,
-      axis: "features",
-      title: translatePerceptionText(locale, "topErrorsGeneratedCitationTitle"),
-      issue: translatePerceptionText(locale, "topErrorsGeneratedCitationIssue", {
-        score: scores.factualAccuracy,
-      }),
-      impact: translatePerceptionText(locale, "topErrorsGeneratedCitationImpact"),
-      fixType: "faq_snippet",
-      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedCitationContent"),
-    },
-    {
-      type: "use_case_gap",
-      score: radarByAxis.get("use_cases") ?? 0,
-      axis: "use_cases",
-      title: translatePerceptionText(locale, "topErrorsGeneratedUseCaseTitle"),
-      issue: translatePerceptionText(locale, "topErrorsGeneratedUseCaseIssue", {
-        score: radarByAxis.get("use_cases") ?? 0,
-        brand: brandLabel,
-      }),
-      impact: translatePerceptionText(locale, "topErrorsGeneratedUseCaseImpact"),
-      fixType: "website_copy",
-      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedUseCaseContent"),
-    },
-    {
-      type: "sentiment_gap",
-      score: scores.sentimentScore,
-      axis: "sentiment",
-      title: translatePerceptionText(locale, "topErrorsGeneratedSentimentTitle"),
-      issue: translatePerceptionText(locale, "topErrorsGeneratedSentimentIssue", {
-        score: scores.sentimentScore,
-      }),
-      impact: translatePerceptionText(locale, "topErrorsGeneratedSentimentImpact"),
-      fixType: "prompt_patch",
-      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedSentimentContent"),
-    },
-    {
-      type: "competitive_gap",
-      score: radarByAxis.get("competitors") ?? 0,
-      axis: "competitors",
-      title: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveTitle"),
-      issue: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveIssue", {
-        score: radarByAxis.get("competitors") ?? 0,
-      }),
-      impact: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveImpact"),
-      fixType: "schema_update",
-      generatedContent: translatePerceptionText(locale, "topErrorsGeneratedCompetitiveContent"),
-    },
-  ];
-
-  return candidates
-    .filter((candidate) => candidate.score < 90)
-    .sort((left, right) => left.score - right.score)
-    .slice(0, 3)
-    .map((candidate, index) => {
-      const severity = severityFromScore(candidate.score);
-      return {
-        id: candidate.type,
-        type: candidate.type,
-        severity,
-        title: candidate.title,
-        issue: candidate.issue,
-        impact: candidate.impact,
-        detectedInModels: lowScoringModels(heatmap, candidate.axis),
-        fixType: candidate.fixType,
-        optimizePriority: priorityFromSeverity(severity),
-        generatedContent: candidate.generatedContent,
-      };
-    });
+  return "website_copy";
 }
 
-function deriveTopErrorsFromMetrics(
-  brandCanon: BrandCanon,
-  scores: PerceptionScores,
-  radar: PerceptionRadarPoint[],
-  heatmap: PerceptionViewData["modelAxisHeatmap"],
-  locale: string,
-): PerceptionError[] {
-  return deriveTopErrors({}, brandCanon, scores, radar, heatmap, locale);
+function normalizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item !== "") : [];
+}
+
+function normalizeBackendTopErrors(payload: PerceptionApiPayload): PerceptionError[] {
+  return (payload.topErrors ?? []).map((error, index) => {
+    const severity = normalizePerceptionSeverity(error.severity);
+    return {
+      id: error.id || `backend-perception-error-${index + 1}`,
+      type: error.type || error.id || `backend-perception-error-${index + 1}`,
+      severity,
+      title: error.title || "",
+      issue: error.issue || "",
+      impact: error.impact || "",
+      detectedInModels: normalizeStringList(error.detectedInModels),
+      fixType: normalizeFixType(error.fixType),
+      optimizePriority: normalizeOptimizePriority(error.optimizePriority, severity),
+      generatedContent: error.generatedContent || "",
+    };
+  });
 }
 
 function serializeResponses(responses: ParsedResponse[]): PerceptionResponseRecord[] {
@@ -1070,19 +952,6 @@ export function derivePerceptionHeatmapFromResponses(
   );
 }
 
-export function derivePerceptionTopErrorsFromResponses(
-  brandCanon: BrandCanon,
-  responses: PerceptionResponseRecord[],
-  locale = "en",
-): PerceptionError[] {
-  if (responses.length === 0) return [];
-  const parsedResponses = responses.map(parseResponseRecord);
-  const scores = deriveScoresFromParsedResponses(parsedResponses);
-  const radar = deriveRadarFromParsedResponses(parsedResponses);
-  const heatmap = deriveModelAxisHeatmapFromParsedResponses(parsedResponses);
-  return deriveTopErrorsFromMetrics(brandCanon, scores, radar, heatmap, locale);
-}
-
 export function derivePerceptionTrendSeries(
   responses: PerceptionResponseRecord[],
   {
@@ -1136,14 +1005,7 @@ function buildPerceptionBase(
   const visibleModelCatalog = activeModelCatalog.length > 0 ? activeModelCatalog : modelCatalog;
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, visibleModelCatalog);
   const trend = deriveTrend(responses, latestRunId, referenceDate);
-  const topErrors = deriveTopErrors(
-    perceptionPayload,
-    brandCanon,
-    scores,
-    radar,
-    modelAxisHeatmap,
-    "en",
-  );
+  const topErrors = normalizeBackendTopErrors(perceptionPayload);
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
   );

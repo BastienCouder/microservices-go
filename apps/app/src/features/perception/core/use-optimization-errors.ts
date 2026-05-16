@@ -12,7 +12,10 @@ import type { OptimizePriority, PerceptionError } from "@/lib/perception-data";
 import type { ProjectModelMeta } from "@/lib/project-models";
 import { appQueryKeys } from "@/lib/query-keys";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
-import { getPerceptionClientJSON, postPerceptionClientJSON } from "../_lib/client-api";
+import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../_lib/client-api";
+import { getOptimizationActionMatchIds } from "../_lib/optimization-action-ids";
+
+type OptimizeActionStatus = "draft" | "published" | "processing" | "done" | string;
 
 type PersistedOptimizeAction = {
   id: string;
@@ -22,7 +25,7 @@ type PersistedOptimizeAction = {
   issue: string;
   impact?: string | null;
   generatedContent: string;
-  status?: string | null;
+  status?: OptimizeActionStatus | null;
   sourceErrorId?: string | null;
 };
 
@@ -30,12 +33,15 @@ type UseOptimizationErrorsResult = {
   competitors: string[];
   data: OptimizationErrorsBoard | null;
   generatedIds: ReadonlySet<string>;
+  actionStatusesByErrorId: ReadonlyMap<string, OptimizeActionStatus>;
   loading: boolean;
+  markingDoneErrorIds: ReadonlySet<string>;
   modelCatalog: ProjectModelMeta[];
   error: string | null;
   persistError: string | null;
   savingErrorIds: ReadonlySet<string>;
   handleFix: (error: OptimizationError) => Promise<void>;
+  handleMarkDone: (error: OptimizationError) => Promise<void>;
   reload: () => Promise<void>;
 };
 
@@ -44,6 +50,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   const projectId = readOptimizationProjectIdFromSearch(routeSearch);
   const [persistedActions, setPersistedActions] = useState<PersistedOptimizeAction[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
+  const [markingDoneErrorIds, setMarkingDoneErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
   const query = useQuery({
     queryKey: appQueryKeys.optimizationErrors(apiBaseURL, projectId),
@@ -75,11 +82,27 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     () =>
       new Set(
         persistedActions
-          .map((action) => action.sourceErrorId || action.id)
-          .filter(Boolean),
+          .flatMap((action) => getOptimizationActionMatchIds(action.sourceErrorId || action.id)),
       ),
     [persistedActions],
   );
+  const actionsByErrorId = useMemo(() => {
+    const actions = new Map<string, PersistedOptimizeAction>();
+    for (const action of persistedActions) {
+      const errorIds = getOptimizationActionMatchIds(action.sourceErrorId || action.id);
+      for (const errorId of errorIds) {
+        if (!actions.has(errorId)) actions.set(errorId, action);
+      }
+    }
+    return actions;
+  }, [persistedActions]);
+  const actionStatusesByErrorId = useMemo(() => {
+    const statuses = new Map<string, OptimizeActionStatus>();
+    for (const [errorId, action] of actionsByErrorId) {
+      statuses.set(errorId, action.status || "draft");
+    }
+    return statuses;
+  }, [actionsByErrorId]);
 
   const handleFix = useCallback(
     async (error: OptimizationError) => {
@@ -88,7 +111,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
 
       setSavingErrorIds((current) => new Set(current).add(error.id));
       try {
-        const result = await postPerceptionClientJSON<{ id: string; status: string }>(
+        const result = await postPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
           apiRoutes.analysis.optimizeActions(activeProjectId),
           {
             priority: error.optimizePriority,
@@ -97,12 +120,14 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             issue: error.issue,
             impact: error.impact,
             generatedContent: error.generatedContent,
-            status: "draft",
+            status: "processing",
             sourceErrorId: error.id,
             metadata: {
               source: error.source,
               detectedInModels: error.detectedInModels,
               aiModels: error.detectedInModels,
+              createdBy: "ai",
+              workflow: "error_hub_fix",
               promptsCount: 0,
             },
           },
@@ -117,7 +142,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             issue: error.issue,
             impact: error.impact,
             generatedContent: error.generatedContent,
-            status: "draft",
+            status: result.status || "processing",
             sourceErrorId: error.id,
           },
           ...current,
@@ -137,6 +162,46 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     [activeProjectId, generatedIds, savingErrorIds, t],
   );
 
+  const handleMarkDone = useCallback(
+    async (error: OptimizationError) => {
+      setPersistError(null);
+      const action = actionsByErrorId.get(error.id);
+      if (!action || action.status === "done" || markingDoneErrorIds.has(error.id) || !activeProjectId) return;
+
+      setMarkingDoneErrorIds((current) => new Set(current).add(error.id));
+      const previousStatus = action.status || "processing";
+      setPersistedActions((current) =>
+        current.map((item) => (item.id === action.id ? { ...item, status: "done" } : item)),
+      );
+
+      try {
+        const result = await patchPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
+          apiRoutes.analysis.optimizeAction(activeProjectId, action.id),
+          { status: "done" },
+        );
+        setPersistedActions((current) =>
+          current.map((item) =>
+            item.id === action.id ? { ...item, status: result.status || "done" } : item,
+          ),
+        );
+      } catch (err) {
+        setPersistedActions((current) =>
+          current.map((item) => (item.id === action.id ? { ...item, status: previousStatus } : item)),
+        );
+        setPersistError(
+          err instanceof Error ? err.message : t("optimizeActionsCreateError"),
+        );
+      } finally {
+        setMarkingDoneErrorIds((current) => {
+          const next = new Set(current);
+          next.delete(error.id);
+          return next;
+        });
+      }
+    },
+    [actionsByErrorId, activeProjectId, markingDoneErrorIds, t],
+  );
+
   const reload = useCallback(async () => {
     await query.refetch();
   }, [query.refetch]);
@@ -145,12 +210,15 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     competitors: query.data?.competitors ?? [],
     data: query.data?.data ?? null,
     generatedIds,
+    actionStatusesByErrorId,
     loading: query.isLoading || (query.isFetching && !query.data),
+    markingDoneErrorIds,
     modelCatalog: query.data?.modelCatalog ?? [],
     error: query.error instanceof Error ? query.error.message : null,
     persistError,
     savingErrorIds,
     handleFix,
+    handleMarkDone,
     reload,
   };
 }

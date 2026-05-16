@@ -70,6 +70,10 @@ func (p handlerTestGA4OAuthProvider) ListProperties(_ context.Context, _ string)
 	return []usecase.GA4OAuthProperty{{PropertyID: "123456789", DisplayName: "Site France"}}, nil
 }
 
+func (p handlerTestGA4OAuthProvider) SetupLLMTracking(_ context.Context, _, _ string) (usecase.GA4LLMSetupResult, error) {
+	return usecase.GA4LLMSetupResult{SetupStatus: usecase.GA4LLMSetupStatusSuccess}, nil
+}
+
 func TestLLMProviderCredentialsRoutes(t *testing.T) {
 	svc := usecase.NewService()
 	project, err := svc.CreateProject(context.Background(), usecase.CreateProjectInput{

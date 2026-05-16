@@ -698,6 +698,122 @@ func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 	}
 }
 
+func TestGetPerceptionUsesBackendPositioningTopErrorTitle(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME de services"
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"sonar"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "sonar",
+		RawResponse:    "La reponse recommande une solution generique sans citer Acme ni son positionnement.",
+		BrandMentioned: false,
+		BrandPosition:  "",
+		CitationFound:  false,
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+
+	for _, item := range perception.TopErrors {
+		if item.Type == "positioning_gap" {
+			if item.Title != "Le positionnement est encore mal cite" {
+				t.Fatalf("expected backend positioning title, got %q", item.Title)
+			}
+			return
+		}
+	}
+
+	t.Fatalf("expected positioning top error, got %+v", perception.TopErrors)
+}
+
+func TestGetPerceptionReturnsReplacementTopErrors(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME de services"
+	useCases := []string{"Prospection", "Suivi commercial"}
+	features := []string{"Automatisation", "Reporting"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"sonar"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "sonar",
+		RawResponse:    "Reponse generique sans source, sans Acme, sans use case, sans fonctionnalite et avec un concurrent devant.",
+		BrandMentioned: false,
+		BrandPosition:  "bottom",
+		CitationFound:  false,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+	if len(perception.TopErrors) < 4 {
+		t.Fatalf("expected replacement top errors beyond the first three, got %+v", perception.TopErrors)
+	}
+}
+
 func TestGetPerceptionUsesProjectCompetitorsForCompetitiveAxis(t *testing.T) {
 	ctx := context.Background()
 	svc, err := NewServiceWithDependencies(ctx, Dependencies{
@@ -959,6 +1075,80 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsAndPerceptionErrors(t *testi
 	}
 	if board.Metadata["monitoringErrors"] != 1 {
 		t.Fatalf("expected 1 monitoring error, got %#v", board.Metadata["monitoringErrors"])
+	}
+}
+
+func TestOptimizeActionsCanMoveFromProcessingToDone(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		Impact:           "La recommandation devient moins fiable.",
+		GeneratedContent: "Mettre a jour la page d'accueil avec une promesse claire.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-1",
+		Metadata: map[string]any{
+			"createdBy": "ai",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create optimize action: %v", err)
+	}
+	if created.Status != "processing" {
+		t.Fatalf("expected created action to be processing, got %q", created.Status)
+	}
+	if created.SourceErrorID != "perception:error-1" {
+		t.Fatalf("expected source error id to be kept, got %q", created.SourceErrorID)
+	}
+
+	actions, err := svc.ListOptimizeActions(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("list optimize actions: %v", err)
+	}
+	if len(actions) != 1 || actions[0].ID != created.ID {
+		t.Fatalf("expected created action in list, got %#v", actions)
+	}
+
+	done, err := svc.UpdateOptimizeActionStatus(ctx, "project-1", 42, created.ID, "done")
+	if err != nil {
+		t.Fatalf("mark optimize action done: %v", err)
+	}
+	if done.Status != "done" {
+		t.Fatalf("expected done status, got %q", done.Status)
+	}
+}
+
+func TestOptimizeActionsCanBeDeleted(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		Priority:         "medium",
+		Type:             "website_copy",
+		Title:            "Clarifier le positionnement",
+		Issue:            "Les IA citent mal le positionnement.",
+		GeneratedContent: "Mettre a jour la page de positionnement.",
+		Status:           "processing",
+		SourceErrorID:    "perception:positioning_gap",
+	})
+	if err != nil {
+		t.Fatalf("create optimize action: %v", err)
+	}
+
+	if err := svc.DeleteOptimizeAction(ctx, "project-1", 42, created.ID); err != nil {
+		t.Fatalf("delete optimize action: %v", err)
+	}
+
+	actions, err := svc.ListOptimizeActions(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("list optimize actions: %v", err)
+	}
+	if len(actions) != 0 {
+		t.Fatalf("expected deleted action to disappear, got %#v", actions)
 	}
 }
 

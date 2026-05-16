@@ -107,7 +107,7 @@ export function PerceptionLeftPanel({
             canon={canon}
             isDemo={isDemo}
             action={
-              <Button asChild variant="outline" size="sm" className="w-full justify-center rounded-full">
+              <Button asChild variant="outline"  className="w-full justify-center rounded-full">
                 <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
                   {t("leftPanelChangeBrand")}
                 </Link>

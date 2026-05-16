@@ -157,6 +157,7 @@ describe("loadPerceptionData", () => {
     ]);
     expect(result.data.metadata.analyzedResponses).toBe(3);
     expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT", "Claude"]);
+    expect(result.data.topErrors).toEqual([]);
     expect(
       result.data.radar.map((point) => [point.axis, point.score]),
     ).toEqual([
@@ -253,6 +254,56 @@ describe("loadPerceptionData", () => {
             responses: 1,
             analyzedResponses: 1,
           },
+          topErrors: [
+            {
+              id: "positioning_gap",
+              type: "positioning_gap",
+              severity: "medium",
+              title: "Le positionnement est encore mal cite",
+              issue: "Backend issue",
+              impact: "Backend impact",
+              detectedInModels: ["gpt-4o-mini"],
+              fixType: "website_copy",
+              generatedContent: "Backend generated content",
+              optimizePriority: "medium",
+            },
+            {
+              id: "citation_gap",
+              type: "citation_gap",
+              severity: "high",
+              title: "Factualite encore fragile",
+              issue: "Backend issue 2",
+              impact: "Backend impact 2",
+              detectedInModels: ["gpt-4o-mini"],
+              fixType: "faq_snippet",
+              generatedContent: "Backend generated content 2",
+              optimizePriority: "high",
+            },
+            {
+              id: "use_case_gap",
+              type: "use_case_gap",
+              severity: "medium",
+              title: "Cas d'usage encore incomplets",
+              issue: "Backend issue 3",
+              impact: "Backend impact 3",
+              detectedInModels: ["gpt-4o-mini"],
+              fixType: "website_copy",
+              generatedContent: "Backend generated content 3",
+              optimizePriority: "medium",
+            },
+            {
+              id: "sentiment_gap",
+              type: "sentiment_gap",
+              severity: "low",
+              title: "Tonalite encore trop neutre",
+              issue: "Backend issue 4",
+              impact: "Backend impact 4",
+              detectedInModels: ["gpt-4o-mini"],
+              fixType: "prompt_patch",
+              generatedContent: "Backend generated content 4",
+              optimizePriority: "low",
+            },
+          ],
         },
       }),
     ]);
@@ -265,6 +316,12 @@ describe("loadPerceptionData", () => {
     expect(result.data.responses).toHaveLength(1);
     expect(result.data.responses[0]?.modelId).toBe("gpt-4o-mini");
     expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT"]);
+    expect(result.data.topErrors.map((error) => error.title)).toEqual([
+      "Le positionnement est encore mal cite",
+      "Factualite encore fragile",
+      "Cas d'usage encore incomplets",
+      "Tonalite encore trop neutre",
+    ]);
   });
 
   test("resolves a readable project slug from the route before loading perception", async () => {

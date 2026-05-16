@@ -44,6 +44,7 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
         modelCatalog={viewModel.modelCatalog}
         savingErrorIds={viewModel.savingErrorIds}
         onCreateAction={viewModel.handleFix}
+        onRemoveAction={viewModel.handleRemoveAction}
       />
     </div>
   );
@@ -109,7 +110,7 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
           />
 
           <PerceptionOptimizeActions
-            drafts={viewModel.optimizeDrafts}
+            drafts={viewModel.visibleOptimizeDrafts}
             persistError={viewModel.persistError}
           />
 

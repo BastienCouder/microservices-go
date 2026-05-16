@@ -377,6 +377,11 @@ type fakeGA4OAuthProvider struct {
 	exchangeToken GA4OAuthToken
 	properties    []GA4OAuthProperty
 	listCalls     int
+	setupResult   GA4LLMSetupResult
+	setupErr      error
+	setupCalls    int
+	setupRefresh  string
+	setupProperty string
 }
 
 func (p *fakeGA4OAuthProvider) AuthorizationURL(state, redirectURI string) (string, error) {
@@ -398,10 +403,21 @@ func (p *fakeGA4OAuthProvider) ListProperties(_ context.Context, refreshToken st
 	return p.properties, nil
 }
 
+func (p *fakeGA4OAuthProvider) SetupLLMTracking(_ context.Context, refreshToken, propertyID string) (GA4LLMSetupResult, error) {
+	p.setupCalls++
+	p.setupRefresh = refreshToken
+	p.setupProperty = propertyID
+	if p.setupErr != nil {
+		return GA4LLMSetupResult{}, p.setupErr
+	}
+	return p.setupResult, nil
+}
+
 func TestGA4OAuthConnectsDirectlyWithProvidedProjectProperty(t *testing.T) {
 	svc := NewService()
 	provider := &fakeGA4OAuthProvider{
 		exchangeToken: GA4OAuthToken{RefreshToken: "refresh_token_123"},
+		setupResult:   GA4LLMSetupResult{SetupStatus: GA4LLMSetupStatusSuccess},
 		properties: []GA4OAuthProperty{
 			{PropertyID: "123456789", DisplayName: "Site France"},
 			{PropertyID: "987654321", DisplayName: "Site Europe"},
@@ -447,6 +463,76 @@ func TestGA4OAuthConnectsDirectlyWithProvidedProjectProperty(t *testing.T) {
 	}
 	if callback.Integration.GA4.PropertyID != "123456789" || !callback.Integration.GA4.IsConnected {
 		t.Fatalf("expected oauth integration to connect selected property, got %+v", callback.Integration.GA4)
+	}
+	if provider.setupCalls != 1 {
+		t.Fatalf("expected direct property callback to run llm setup once, got %d calls", provider.setupCalls)
+	}
+	if provider.setupRefresh != "refresh_token_123" || provider.setupProperty != "123456789" {
+		t.Fatalf("expected llm setup to use selected oauth property, got refresh=%q property=%q", provider.setupRefresh, provider.setupProperty)
+	}
+	if callback.LLMSetup.SetupStatus != GA4LLMSetupStatusSuccess {
+		t.Fatalf("expected llm setup result to be returned, got %+v", callback.LLMSetup)
+	}
+}
+
+func TestSelectProjectGA4OAuthPropertyRunsLLMSetup(t *testing.T) {
+	svc := NewService()
+	provider := &fakeGA4OAuthProvider{
+		exchangeToken: GA4OAuthToken{RefreshToken: "refresh_token_123"},
+		setupResult: GA4LLMSetupResult{
+			SetupStatus: GA4LLMSetupStatusSuccess,
+			CreatedResources: GA4LLMSetupResources{
+				ChannelGroupName:    "properties/123/channelGroups/456",
+				CustomDimensionName: "properties/123/customDimensions/789",
+			},
+		},
+		properties: []GA4OAuthProperty{
+			{PropertyID: "123456789", DisplayName: "Site France"},
+		},
+	}
+	svc.ConfigureGA4OAuth(provider, "state-secret")
+	ctx := context.Background()
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "GA4 OAuth Project",
+		Domain:         "oauth.test",
+		WebsiteURL:     "https://oauth.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	start, err := svc.StartProjectGA4OAuth(ctx, project.ID, 42, StartProjectGA4OAuthInput{
+		RedirectURI: "http://localhost:30006/traffic",
+	})
+	if err != nil {
+		t.Fatalf("start ga4 oauth: %v", err)
+	}
+	if _, err := svc.CompleteProjectGA4OAuth(ctx, project.ID, 42, CompleteProjectGA4OAuthInput{
+		Code:        "auth-code",
+		State:       start.State,
+		RedirectURI: "http://localhost:30006/traffic",
+	}); err != nil {
+		t.Fatalf("complete ga4 oauth: %v", err)
+	}
+	if provider.setupCalls != 0 {
+		t.Fatalf("expected setup to wait for property selection, got %d calls", provider.setupCalls)
+	}
+
+	selected, err := svc.SelectProjectGA4OAuthProperty(ctx, project.ID, 42, SelectProjectGA4OAuthPropertyInput{
+		PropertyID: "123456789",
+	})
+	if err != nil {
+		t.Fatalf("select ga4 property: %v", err)
+	}
+	if provider.setupCalls != 1 {
+		t.Fatalf("expected property selection to run llm setup once, got %d calls", provider.setupCalls)
+	}
+	if selected.Integration.GA4.PropertyID != "123456789" || !selected.Integration.GA4.IsConnected {
+		t.Fatalf("expected selected property integration, got %+v", selected.Integration.GA4)
+	}
+	if selected.LLMSetup.CreatedResources.CustomDimensionName != "properties/123/customDimensions/789" {
+		t.Fatalf("expected llm setup resources in response, got %+v", selected.LLMSetup)
 	}
 }
 

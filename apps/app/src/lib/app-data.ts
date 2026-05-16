@@ -206,6 +206,7 @@ export const PERCEPTION_TEXT = {
     generatedFix: "Correction proposée",
     added: "Ajoutée",
     fix: "Corriger",
+    markDone: "Marquer fait",
     errorPrefix: "Erreur n°",
     severity: {
       high: "Critique",

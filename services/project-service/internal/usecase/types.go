@@ -277,6 +277,29 @@ type GA4OAuthProvider interface {
 	AuthorizationURL(state, redirectURI string) (string, error)
 	ExchangeCode(ctx context.Context, code, redirectURI string) (GA4OAuthToken, error)
 	ListProperties(ctx context.Context, refreshToken string) ([]GA4OAuthProperty, error)
+	SetupLLMTracking(ctx context.Context, refreshToken, propertyID string) (GA4LLMSetupResult, error)
+}
+
+const (
+	GA4LLMSetupStatusSuccess        = "success"
+	GA4LLMSetupStatusPartialSuccess = "partial_success"
+	GA4LLMSetupStatusFailed         = "failed"
+)
+
+type GA4LLMSetupResult struct {
+	SetupStatus      string               `json:"setupStatus"`
+	CreatedResources GA4LLMSetupResources `json:"createdResources"`
+	Errors           []GA4LLMSetupError   `json:"errors,omitempty"`
+}
+
+type GA4LLMSetupResources struct {
+	ChannelGroupName    string `json:"channelGroupName,omitempty"`
+	CustomDimensionName string `json:"customDimensionName,omitempty"`
+}
+
+type GA4LLMSetupError struct {
+	Resource string `json:"resource"`
+	Message  string `json:"message"`
 }
 
 type StartProjectGA4OAuthInput struct {
@@ -298,10 +321,16 @@ type CompleteProjectGA4OAuthInput struct {
 type CompleteProjectGA4OAuthResult struct {
 	Integration ProjectImpactIntegrationsView `json:"integration"`
 	Properties  []GA4OAuthProperty            `json:"properties"`
+	LLMSetup    GA4LLMSetupResult             `json:"llmSetup,omitempty"`
 }
 
 type SelectProjectGA4OAuthPropertyInput struct {
 	PropertyID string
+}
+
+type SelectProjectGA4OAuthPropertyResult struct {
+	Integration ProjectImpactIntegrationsView `json:"integration"`
+	LLMSetup    GA4LLMSetupResult             `json:"llmSetup,omitempty"`
 }
 
 type UpdateProjectStripeIntegrationInput struct {

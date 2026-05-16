@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, KeyRound, Plug, RefreshCw, Settings2, Unplug } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,7 @@ import {
   getGA4PropertySummary,
 } from "../../_lib/report/ga4-property-labels";
 import type { TrafficGA4OAuthProperty } from "../../_lib/report/types";
+import type { TrafficGA4LLMSetupResult } from "../../_lib/report/types";
 
 type GA4IntegrationCardProps = {
   connected: boolean;
@@ -28,6 +29,7 @@ type GA4IntegrationCardProps = {
   serviceAccountJSON: string;
   oauthProperties: TrafficGA4OAuthProperty[];
   selectedOAuthPropertyId: string;
+  llmSetup: TrafficGA4LLMSetupResult | null;
   oauthPropertiesLoading: boolean;
   saving: boolean;
   loading?: boolean;
@@ -49,6 +51,7 @@ export function GA4IntegrationCard({
   serviceAccountJSON,
   oauthProperties,
   selectedOAuthPropertyId,
+  llmSetup,
   oauthPropertiesLoading,
   saving,
   loading = false,
@@ -75,6 +78,7 @@ export function GA4IntegrationCard({
     selectedOAuthPropertyId,
     oauthProperties,
   );
+  const llmSetupStatus = getLLMSetupStatus(llmSetup);
 
   function handlePrimaryAction() {
     if (!connected && !hasOAuthToken) {
@@ -127,6 +131,29 @@ export function GA4IntegrationCard({
           <Skeleton className="h-4 w-40" />
         ) : propertySummary ? (
           <p className="truncate text-sm text-muted-foreground">{propertySummary}</p>
+        ) : null}
+
+        {llmSetupStatus ? (
+          <div
+            className={cn(
+              "mt-3 flex gap-2 rounded-md px-3 py-2 text-sm",
+              llmSetupStatus.tone === "success"
+                ? "bg-primary/10 text-primary"
+                : llmSetupStatus.tone === "warning"
+                  ? "bg-amber-500/10 text-amber-700"
+                  : "bg-destructive/10 text-destructive",
+            )}
+          >
+            {llmSetupStatus.tone === "success" ? (
+              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            )}
+            <div className="min-w-0">
+              <p className="font-medium">{llmSetupStatus.title}</p>
+              <p className="text-xs opacity-85">{llmSetupStatus.description}</p>
+            </div>
+          </div>
         ) : null}
       </div>
 
@@ -341,4 +368,33 @@ export function GA4IntegrationCard({
       </div>
     </section>
   );
+}
+
+function getLLMSetupStatus(setup: TrafficGA4LLMSetupResult | null): {
+  title: string;
+  description: string;
+  tone: "success" | "warning" | "error";
+} | null {
+  if (!setup) {
+    return null;
+  }
+  if (setup.setupStatus === "success") {
+    return {
+      title: "Tracking LLM GA4 activé",
+      description: "Channel group AI / LLM et dimension llm_source prêts.",
+      tone: "success",
+    };
+  }
+  if (setup.setupStatus === "partial_success") {
+    return {
+      title: "Tracking LLM GA4 partiel",
+      description: setup.errors[0]?.message || "Une ressource GA4 reste à vérifier.",
+      tone: "warning",
+    };
+  }
+  return {
+    title: "Tracking LLM GA4 non configuré",
+    description: setup.errors[0]?.message || "Google Analytics a refusé la configuration automatique.",
+    tone: "error",
+  };
 }

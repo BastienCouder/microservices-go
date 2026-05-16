@@ -1,4 +1,4 @@
-export { getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
+export { deletePerceptionClientJSON, getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
 export {
   buildPerceptionHeroInsight,
   type PerceptionHeroInsight,
@@ -16,4 +16,12 @@ export {
   getPerceptionPeriodLabel,
   getPerceptionSeverityLabel,
 } from "./perception-i18n";
+export {
+  getPerceptionActionStatusTone,
+  getPerceptionPriorityTone,
+} from "./perception-tones";
+export {
+  getOptimizationActionMatchIds,
+  toCanonicalPerceptionSourceErrorId,
+} from "./optimization-action-ids";
 export { usePerceptionViewModel } from "./use-perception-view-model";

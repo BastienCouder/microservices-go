@@ -18,8 +18,10 @@ import type {
   CompleteTrafficGA4OAuthResult,
   SaveTrafficGA4IntegrationInput,
   SelectTrafficGA4OAuthPropertyInput,
+  SelectTrafficGA4OAuthPropertyResult,
   StartTrafficGA4OAuthInput,
   StartTrafficGA4OAuthResult,
+  TrafficGA4LLMSetupResult,
   TrafficGA4OAuthProperty,
   TrafficImpactIntegrations,
   TrafficPageData,
@@ -348,6 +350,43 @@ export function normalizeTrafficImpactIntegrations(value: unknown): TrafficImpac
   };
 }
 
+function normalizeTrafficGA4LLMSetup(value: unknown): TrafficGA4LLMSetupResult | null {
+  const payload = asObject(value);
+  const setupStatus = asString(getField(payload, ["setupStatus", "SetupStatus"])).trim();
+  if (!setupStatus) {
+    return null;
+  }
+  const createdResources = asObject(
+    getField(payload, ["createdResources", "CreatedResources"]),
+  );
+  return {
+    setupStatus:
+      setupStatus === "success" ||
+      setupStatus === "partial_success" ||
+      setupStatus === "failed"
+        ? setupStatus
+        : "",
+    createdResources: {
+      channelGroupName: asString(
+        getField(createdResources, ["channelGroupName", "ChannelGroupName"]),
+      ).trim(),
+      customDimensionName: asString(
+        getField(createdResources, [
+          "customDimensionName",
+          "CustomDimensionName",
+        ]),
+      ).trim(),
+    },
+    errors: asArray(getField(payload, ["errors", "Errors"])).map((item) => {
+      const error = asObject(item);
+      return {
+        resource: asString(getField(error, ["resource", "Resource"])).trim(),
+        message: asString(getField(error, ["message", "Message"])).trim(),
+      };
+    }),
+  };
+}
+
 function emptyTrafficImpactIntegrations(projectId = ""): TrafficImpactIntegrations {
   return {
     projectId,
@@ -673,6 +712,7 @@ export async function completeTrafficGA4OAuth(
   return {
     integration: normalizeTrafficImpactIntegrations(getField(payload, ["integration", "Integration"])),
     properties: normalizeTrafficGA4OAuthProperties(getField(payload, ["properties", "Properties"])),
+    llmSetup: normalizeTrafficGA4LLMSetup(getField(payload, ["llmSetup", "LLMSetup"])),
   };
 }
 
@@ -698,7 +738,7 @@ export async function selectTrafficGA4OAuthProperty(
   apiBaseURL: string,
   input: SelectTrafficGA4OAuthPropertyInput,
   signal?: AbortSignal,
-): Promise<TrafficImpactIntegrations> {
+): Promise<SelectTrafficGA4OAuthPropertyResult> {
   const projectId = input.projectId.trim();
   const organizationId = input.organizationId.trim();
   const propertyId = input.propertyId.trim();
@@ -715,7 +755,11 @@ export async function selectTrafficGA4OAuthProperty(
       body: JSON.stringify({ propertyId }),
     },
   );
-  return normalizeTrafficImpactIntegrations(
-    unwrapRequiredEnvelope(response, "integrations"),
-  );
+  const payload = unwrapRequiredEnvelope(response, "integrations");
+  const payloadObject = asObject(payload);
+  const wrappedIntegration = getField(payloadObject, ["integration", "Integration"]);
+  return {
+    integration: normalizeTrafficImpactIntegrations(wrappedIntegration ?? payload),
+    llmSetup: normalizeTrafficGA4LLMSetup(getField(payloadObject, ["llmSetup", "LLMSetup"])),
+  };
 }

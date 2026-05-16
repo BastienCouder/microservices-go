@@ -38,3 +38,26 @@ export async function postPerceptionClientJSON<T>(
 
   return readJSON<T>(res);
 }
+
+export async function patchPerceptionClientJSON<T>(
+  path: string,
+  body: unknown,
+): Promise<T> {
+  const res = await fetch(buildURL(path), {
+    method: "PATCH",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  return readJSON<T>(res);
+}
+
+export async function deletePerceptionClientJSON<T>(path: string): Promise<T> {
+  const res = await fetch(buildURL(path), {
+    method: "DELETE",
+    credentials: "include",
+  });
+
+  return readJSON<T>(res);
+}

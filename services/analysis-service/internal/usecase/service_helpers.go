@@ -249,6 +249,20 @@ func copyContentOptimizerCrawlSnapshot(snapshot *ContentOptimizerCrawlSnapshot) 
 	return out
 }
 
+func copyOptimizeAction(action *OptimizeAction) OptimizeAction {
+	if action == nil {
+		return OptimizeAction{}
+	}
+	out := *action
+	if action.Metadata != nil {
+		out.Metadata = make(map[string]any, len(action.Metadata))
+		for key, value := range action.Metadata {
+			out.Metadata[key] = value
+		}
+	}
+	return out
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -303,6 +317,18 @@ func nonNilContentOptimizerCrawlMap(input map[string]*ContentOptimizerCrawlSnaps
 	out := make(map[string]*ContentOptimizerCrawlSnapshot, len(input))
 	for key, value := range input {
 		clone := copyContentOptimizerCrawlSnapshot(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilOptimizeActionMap(input map[string]*OptimizeAction) map[string]*OptimizeAction {
+	if input == nil {
+		return make(map[string]*OptimizeAction)
+	}
+	out := make(map[string]*OptimizeAction, len(input))
+	for key, value := range input {
+		clone := copyOptimizeAction(value)
 		out[key] = &clone
 	}
 	return out

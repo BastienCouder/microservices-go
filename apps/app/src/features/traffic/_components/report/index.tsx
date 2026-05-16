@@ -63,6 +63,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           serviceAccountJSON={vm.form.serviceAccountJSON}
           oauthProperties={vm.oauth.properties}
           selectedOAuthPropertyId={vm.oauth.selectedPropertyId}
+          llmSetup={vm.llmSetup}
           oauthPropertiesLoading={vm.oauth.loadingProperties}
           saving={vm.saving}
           loading={vm.loading}

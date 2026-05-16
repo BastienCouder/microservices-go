@@ -138,10 +138,34 @@ export type CompleteTrafficGA4OAuthInput = {
 export type CompleteTrafficGA4OAuthResult = {
   integration: TrafficImpactIntegrations;
   properties: TrafficGA4OAuthProperty[];
+  llmSetup: TrafficGA4LLMSetupResult | null;
 };
 
 export type SelectTrafficGA4OAuthPropertyInput = {
   projectId: string;
   organizationId: string;
   propertyId: string;
+};
+
+export type TrafficGA4LLMSetupStatus = "success" | "partial_success" | "failed" | "";
+
+export type TrafficGA4LLMSetupResources = {
+  channelGroupName: string;
+  customDimensionName: string;
+};
+
+export type TrafficGA4LLMSetupError = {
+  resource: string;
+  message: string;
+};
+
+export type TrafficGA4LLMSetupResult = {
+  setupStatus: TrafficGA4LLMSetupStatus;
+  createdResources: TrafficGA4LLMSetupResources;
+  errors: TrafficGA4LLMSetupError[];
+};
+
+export type SelectTrafficGA4OAuthPropertyResult = {
+  integration: TrafficImpactIntegrations;
+  llmSetup: TrafficGA4LLMSetupResult | null;
 };

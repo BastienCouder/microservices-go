@@ -23,6 +23,8 @@ func NewService() *Service {
 		alertsByProject:     make(map[string][]string),
 		brandCanonByProject: make(map[string]*BrandCanon),
 		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
+		optimizeActions:     make(map[string]*OptimizeAction),
+		actionsByProject:    make(map[string][]string),
 	}
 }
 
@@ -87,6 +89,8 @@ func (s *Service) snapshotLocked() *persistedState {
 		AlertsByProject:     make(map[string][]string, len(s.alertsByProject)),
 		BrandCanonByProject: make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 		ContentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot, len(s.contentCrawls)),
+		OptimizeActions:     make(map[string]*OptimizeAction, len(s.optimizeActions)),
+		ActionsByProject:    make(map[string][]string, len(s.actionsByProject)),
 	}
 
 	for key, value := range s.runs {
@@ -136,6 +140,13 @@ func (s *Service) snapshotLocked() *persistedState {
 		clone := copyContentOptimizerCrawlSnapshot(value)
 		state.ContentCrawls[key] = &clone
 	}
+	for key, value := range s.optimizeActions {
+		clone := copyOptimizeAction(value)
+		state.OptimizeActions[key] = &clone
+	}
+	for key, ids := range s.actionsByProject {
+		state.ActionsByProject[key] = append([]string(nil), ids...)
+	}
 
 	return state
 }
@@ -157,6 +168,8 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.alertsByProject = nonNilSliceMap(state.AlertsByProject)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
+	s.optimizeActions = nonNilOptimizeActionMap(state.OptimizeActions)
+	s.actionsByProject = nonNilSliceMap(state.ActionsByProject)
 }
 
 func (s *Service) persistLocked(ctx context.Context) error {

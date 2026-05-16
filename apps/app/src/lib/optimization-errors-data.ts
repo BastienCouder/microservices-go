@@ -337,9 +337,11 @@ export async function loadOptimizationErrors(
     }
   }
 
+  const board = normalizeBoard(unwrapRequiredEnvelope(result, "optimization-errors"));
+
   return {
     competitors: await loadOptimizationCompetitors(apiBaseURL, projectId, options?.signal),
-    data: normalizeBoard(unwrapRequiredEnvelope(result, "optimization-errors")),
+    data: board,
     modelCatalog: await loadOptimizationModelCatalog(apiBaseURL, projectId, options?.signal),
     projectId,
   };

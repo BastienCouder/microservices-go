@@ -25,7 +25,12 @@ import {
   formatPercent,
 } from "./traffic-report-formatters";
 import { buildTrafficReportViewData } from "./traffic-report-view-data";
-import type { GeoPeriod, GeoTrafficReport, TrafficGA4OAuthProperty } from "./types";
+import type {
+  GeoPeriod,
+  GeoTrafficReport,
+  TrafficGA4LLMSetupResult,
+  TrafficGA4OAuthProperty,
+} from "./types";
 
 type UseTrafficReportPanelViewModelInput = {
   apiBaseURL: string;
@@ -144,6 +149,19 @@ function toTrafficErrorMessage(err: unknown): string | null {
   return "Impossible de charger le rapport Traffic.";
 }
 
+function ga4LLMSetupToastDescription(setup: TrafficGA4LLMSetupResult | null): string {
+  if (!setup) {
+    return "Le tracking LLM GA4 sera disponible après sélection d'une propriété.";
+  }
+  if (setup.setupStatus === "success") {
+    return "Channel group AI / LLM et dimension llm_source configurés.";
+  }
+  if (setup.setupStatus === "partial_success") {
+    return "Une partie du tracking LLM GA4 a été configurée. Vérifie les détails dans la carte GA4.";
+  }
+  return "Le tracking LLM GA4 n'a pas pu être configuré automatiquement.";
+}
+
 function buildKpis(report: GeoTrafficReport | null): TrafficKpiItem[] {
   const summary = report?.summary;
   return [
@@ -200,6 +218,7 @@ export function useTrafficReportPanelViewModel({
   const [trafficEngine, setTrafficEngine] = useState("all");
   const [sourcePage, setSourcePage] = useState(1);
   const [topPagesPage, setTopPagesPage] = useState(1);
+  const [llmSetup, setLLMSetup] = useState<TrafficGA4LLMSetupResult | null>(null);
   const [saving, setSaving] = useState(false);
   const showFormError = useCallback((message: string) => {
     setFormError(message);
@@ -271,12 +290,12 @@ export function useTrafficReportPanelViewModel({
   const result = query.data;
   const report = result?.report ?? null;
   const integration = result?.integration ?? null;
-  const sources = report?.bySource ?? [];
-  const topPages = report?.topPages ?? [];
-  const timeseries = report?.timeseries ?? [];
   const viewData = useMemo(
-    () =>
-      buildTrafficReportViewData({
+    () => {
+      const sources = report?.bySource ?? [];
+      const topPages = report?.topPages ?? [];
+      const timeseries = report?.timeseries ?? [];
+      return buildTrafficReportViewData({
         sources,
         topPages,
         timeseries,
@@ -284,8 +303,9 @@ export function useTrafficReportPanelViewModel({
           sourcePage,
           topPagesPage,
         },
-      }),
-    [sourcePage, sources, timeseries, topPages, topPagesPage, trafficEngine, trafficSearch],
+      });
+    },
+    [report?.bySource, report?.timeseries, report?.topPages, sourcePage, topPagesPage],
   );
   const hasData = (report?.summary.totalGeoSessions ?? 0) > 0;
   const isConnected = integration?.ga4.isConnected === true;
@@ -295,6 +315,10 @@ export function useTrafficReportPanelViewModel({
   useEffect(() => {
     setPropertyId(integration?.ga4.propertyId ?? "");
   }, [integration?.ga4.propertyId]);
+
+  useEffect(() => {
+    setLLMSetup(null);
+  }, [result?.projectId]);
 
   useEffect(() => {
     const propertyIds = new Set(oauthProperties.map((item) => item.propertyId));
@@ -382,10 +406,14 @@ export function useTrafficReportPanelViewModel({
     })
       .then(async (response) => {
         setOAuthProperties(response.properties);
+        setLLMSetup(response.llmSetup);
         clearPendingGA4OAuth();
         clearOAuthCallbackParams(pendingOAuth?.routeSearch ?? "");
         await query.refetch();
-        pushSuccessToast("Google Analytics connecté.");
+        pushSuccessToast(
+          "Google Analytics connecté.",
+          ga4LLMSetupToastDescription(response.llmSetup),
+        );
       })
       .catch((err) => {
         releaseGA4OAuthCallbackState(state);
@@ -486,13 +514,17 @@ export function useTrafficReportPanelViewModel({
     setSaving(true);
     setFormError(null);
     try {
-      await selectTrafficGA4OAuthProperty(apiBaseURL, {
+      const response = await selectTrafficGA4OAuthProperty(apiBaseURL, {
         projectId: result.projectId,
         organizationId: result.organizationId,
         propertyId: selectedOAuthPropertyId,
       });
+      setLLMSetup(response.llmSetup);
       await query.refetch();
-      pushSuccessToast("Propriété GA4 sélectionnée.");
+      pushSuccessToast(
+        "Propriété GA4 sélectionnée.",
+        ga4LLMSetupToastDescription(response.llmSetup),
+      );
     } catch (err) {
       showCaughtFormError(err, "Impossible de sélectionner cette propriété GA4.");
     } finally {
@@ -516,6 +548,7 @@ export function useTrafficReportPanelViewModel({
       setOAuthProperties([]);
       setSelectedOAuthPropertyId("");
       setOAuthPropertiesLoadedForProject("");
+      setLLMSetup(null);
       await query.refetch();
       pushSuccessToast("Google Analytics déconnecté.");
     } catch (err) {
@@ -531,6 +564,7 @@ export function useTrafficReportPanelViewModel({
     isConnected,
     authMode,
     hasOAuthToken,
+    llmSetup,
     period,
     setPeriod: updatePeriod,
     projectName: result?.projectName ?? "",

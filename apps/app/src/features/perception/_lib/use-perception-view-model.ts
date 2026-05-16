@@ -6,7 +6,6 @@ import {
   derivePerceptionHeatmapFromResponses,
   derivePerceptionRadarFromResponses,
   derivePerceptionScoresFromResponses,
-  derivePerceptionTopErrorsFromResponses,
   derivePerceptionTrendSeries,
   filterPerceptionResponses,
   type OptimizePriority,
@@ -15,7 +14,11 @@ import {
   type PerceptionViewData,
 } from "@/lib/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
-import { getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
+import { deletePerceptionClientJSON, getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
+import {
+  getOptimizationActionMatchIds,
+  toCanonicalPerceptionSourceErrorId,
+} from "./optimization-action-ids";
 
 type OptimizeDraft = {
   id: string;
@@ -26,7 +29,7 @@ type OptimizeDraft = {
   issue: string;
   impact: string;
   generatedContent: string;
-  status: "draft";
+  status: string;
 };
 
 type PersistedOptimizeAction = {
@@ -61,7 +64,8 @@ function mergeDrafts(
   const merged = new Map(current.map((draft) => [draft.id, draft] as const));
 
   for (const action of actions) {
-    const uiId = action.sourceErrorId || action.id;
+    const matchIds = getOptimizationActionMatchIds(action.sourceErrorId || action.id);
+    const uiId = matchIds.find((id) => !id.includes(":")) || action.sourceErrorId || action.id;
     if (merged.has(uiId)) continue;
     merged.set(uiId, {
       id: uiId,
@@ -72,7 +76,7 @@ function mergeDrafts(
       issue: action.issue,
       impact: action.impact ?? "",
       generatedContent: action.generatedContent,
-      status: "draft",
+      status: action.status || "draft",
     });
   }
 
@@ -80,7 +84,7 @@ function mergeDrafts(
 }
 
 export function usePerceptionViewModel(initialData: PerceptionViewData) {
-  const { locale, t } = useScopedI18n("perception");
+  const { t } = useScopedI18n("perception");
   const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -149,13 +153,25 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     [initialData],
   );
 
+  const actionStatusesByErrorId = useMemo(() => {
+    const statuses = new Map<string, string>();
+    for (const draft of optimizeDrafts) {
+      for (const id of getOptimizationActionMatchIds(draft.id)) {
+        statuses.set(id, draft.status);
+      }
+    }
+    return statuses;
+  }, [optimizeDrafts]);
   const filteredRadar = useMemo(
     () => derivePerceptionRadarFromResponses(filteredResponses),
     [filteredResponses],
   );
   const filteredTopErrors = useMemo(
-    () => derivePerceptionTopErrorsFromResponses(initialData.brandCanon, filteredResponses, locale),
-    [filteredResponses, initialData.brandCanon, locale],
+    () =>
+      initialData.topErrors
+        .filter((error) => actionStatusesByErrorId.get(error.id) !== "done")
+        .slice(0, 3),
+    [actionStatusesByErrorId, initialData.topErrors],
   );
   const modelAxisHeatmap = useMemo(
     () =>
@@ -174,7 +190,11 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     [initialData.metadata.generatedAt, initialData.metadata.latestRunId, modelScopedResponses, selectedPeriod],
   );
   const generatedIds = useMemo(
-    () => new Set(optimizeDrafts.map((draft) => draft.id)),
+    () => new Set(optimizeDrafts.flatMap((draft) => getOptimizationActionMatchIds(draft.id))),
+    [optimizeDrafts],
+  );
+  const visibleOptimizeDrafts = useMemo(
+    () => optimizeDrafts.filter((draft) => draft.status !== "done"),
     [optimizeDrafts],
   );
   const scoreCards = useMemo(
@@ -201,9 +221,49 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     [lastRunScores, t],
   );
 
+  const findDraftForError = (error: PerceptionError) =>
+    optimizeDrafts.find((draft) => getOptimizationActionMatchIds(draft.id).includes(error.id));
+
+  const handleRemoveAction = async (error: PerceptionError) => {
+    setPersistError(null);
+    const draft = findDraftForError(error);
+    if (!draft || savingErrorIds.has(error.id)) return;
+
+    if (!initialData.metadata.projectId || !draft.persistedId) {
+      setOptimizeDrafts((current) =>
+        current.filter((item) => !getOptimizationActionMatchIds(item.id).includes(error.id)),
+      );
+      return;
+    }
+
+    setSavingErrorIds((current) => new Set(current).add(error.id));
+    try {
+      await deletePerceptionClientJSON<{ deleted: boolean }>(
+        apiRoutes.analysis.optimizeAction(initialData.metadata.projectId, draft.persistedId),
+      );
+      setOptimizeDrafts((current) =>
+        current.filter((item) => !getOptimizationActionMatchIds(item.id).includes(error.id)),
+      );
+    } catch (err) {
+      setPersistError(
+        err instanceof Error ? err.message : t("optimizeActionsCreateError"),
+      );
+    } finally {
+      setSavingErrorIds((current) => {
+        const next = new Set(current);
+        next.delete(error.id);
+        return next;
+      });
+    }
+  };
+
   const handleFix = async (error: PerceptionError) => {
     setPersistError(null);
     if (savingErrorIds.has(error.id)) return;
+    if (generatedIds.has(error.id)) {
+      await handleRemoveAction(error);
+      return;
+    }
 
     if (!initialData.metadata.projectId) {
       setOptimizeDrafts((current) =>
@@ -218,7 +278,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
                 issue: error.issue,
                 impact: error.impact,
                 generatedContent: error.generatedContent,
-                status: "draft",
+                status: "processing",
               },
               ...current,
             ],
@@ -237,11 +297,13 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
           issue: error.issue,
           impact: error.impact,
           generatedContent: error.generatedContent,
-          status: "draft",
-          sourceErrorId: error.id,
+          status: "processing",
+          sourceErrorId: toCanonicalPerceptionSourceErrorId(error.id),
           metadata: {
             detectedInModels: error.detectedInModels,
             aiModels: error.detectedInModels,
+            createdBy: "ai",
+            workflow: "perception_fix",
             promptsCount: 0,
           },
         },
@@ -260,7 +322,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
                 issue: error.issue,
                 impact: error.impact,
                 generatedContent: error.generatedContent,
-                status: "draft",
+                status: result.status || "processing",
               },
               ...current,
             ],
@@ -297,7 +359,10 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     optimizeDrafts,
     persistError,
     generatedIds,
+    visibleOptimizeDrafts,
+    actionStatusesByErrorId,
     savingErrorIds,
     handleFix,
+    handleRemoveAction,
   };
 }

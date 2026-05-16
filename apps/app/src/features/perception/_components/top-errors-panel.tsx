@@ -15,7 +15,10 @@ import { useIsMobile } from "@/shared/hooks/use-mobile";
 import {
   formatPerceptionErrorTypeLabel as formatPerceptionErrorTypeLabelI18n,
   formatPerceptionPriorityLabel as formatPerceptionPriorityLabelI18n,
+  formatPerceptionStatusLabel as formatPerceptionStatusLabelI18n,
+  getPerceptionActionStatusTone,
   getPerceptionSeverityLabel,
+  getPerceptionPriorityTone,
 } from "../_lib";
 
 export function TopErrorsPanel({
@@ -23,6 +26,7 @@ export function TopErrorsPanel({
   generatedIds,
   modelCatalog,
   onCreateAction,
+  onRemoveAction,
   savingErrorIds,
   showSeeMore = true,
 }: {
@@ -30,6 +34,7 @@ export function TopErrorsPanel({
   generatedIds?: ReadonlySet<string>;
   modelCatalog?: PerceptionModelOption[];
   onCreateAction?: (error: PerceptionError) => void | Promise<void>;
+  onRemoveAction?: (error: PerceptionError) => void | Promise<void>;
   savingErrorIds?: ReadonlySet<string>;
   showSeeMore?: boolean;
 }) {
@@ -81,6 +86,7 @@ export function TopErrorsPanel({
               actionGenerated={generatedIds?.has(error.id) ?? false}
               actionSaving={savingErrorIds?.has(error.id) ?? false}
               onCreateAction={onCreateAction ? () => void onCreateAction(error) : undefined}
+              onRemoveAction={onRemoveAction ? () => void onRemoveAction(error) : undefined}
             />
           ))
         )}
@@ -108,6 +114,7 @@ export function TopErrorsPanel({
                 actionGenerated={selectedActionGenerated}
                 actionSaving={selectedActionSaving}
                 onCreateAction={onCreateAction ? () => void onCreateAction(selectedError) : undefined}
+                onRemoveAction={onRemoveAction ? () => void onRemoveAction(selectedError) : undefined}
               />
             </DrawerContent>
           </Drawer>
@@ -126,6 +133,7 @@ export function TopErrorsPanel({
                 actionGenerated={selectedActionGenerated}
                 actionSaving={selectedActionSaving}
                 onCreateAction={onCreateAction ? () => void onCreateAction(selectedError) : undefined}
+                onRemoveAction={onRemoveAction ? () => void onRemoveAction(selectedError) : undefined}
               />
             </SheetContent>
           </Sheet>
@@ -161,25 +169,45 @@ function ErrorTextBlock({
   );
 }
 
-function ErrorDetailsContent({
+export function ErrorDetailsContent({
   actionGenerated = false,
   actionSaving = false,
+  actionStatus,
   error,
   locale,
+  markingActionDone = false,
   modelLookup,
   mobile,
   onCreateAction,
+  onMarkActionDone,
+  onRemoveAction,
 }: {
   actionGenerated?: boolean;
   actionSaving?: boolean;
+  actionStatus?: string;
   error: PerceptionError;
   locale: string;
+  markingActionDone?: boolean;
   modelLookup: ReadonlyMap<string, PerceptionModelOption>;
   mobile: boolean;
   onCreateAction?: () => void;
+  onMarkActionDone?: () => void;
+  onRemoveAction?: () => void;
 }) {
   const { t } = useScopedI18n("perception");
   const severity = getSeverityTone(error.severity, locale);
+  const canRemoveAction = Boolean(actionGenerated && onRemoveAction);
+  const canMarkDone = Boolean(actionStatus && actionStatus !== "done" && onMarkActionDone);
+  const shouldShowActionButton = Boolean(onCreateAction && (actionStatus !== "done" || canRemoveAction));
+  const actionButtonHandler =
+    canRemoveAction && !canMarkDone ? onRemoveAction : canMarkDone ? onMarkActionDone : onCreateAction;
+  const actionButtonLabel = canRemoveAction && !canMarkDone
+    ? t("topErrorsRemove")
+    : canMarkDone
+      ? t("topErrorsMarkDone")
+      : actionGenerated
+        ? t("topErrorsAdded")
+        : t("topErrorsFix");
 
   return (
     <div className={cn("flex h-full flex-col bg-white font-sans antialiased", mobile && "overflow-y-auto")}>
@@ -187,10 +215,7 @@ function ErrorDetailsContent({
         <div className="mb-10 flex flex-col items-start justify-between gap-4">
           <div className="min-w-0 space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline" className={cn("text-sm", severity.label)}>
-                {severity.tag}
-              </Badge>
-              <Badge variant={error.optimizePriority === "high" ? "destructive" : "secondary"} className="text-sm">
+              <Badge variant="outline" className={cn("text-sm", getPerceptionPriorityTone(error.optimizePriority))}>
                 {formatPerceptionPriorityLabelI18n(error.optimizePriority, locale)}
               </Badge>
               {error.detectedInModels.map((model) => {
@@ -215,15 +240,14 @@ function ErrorDetailsContent({
               {error.title}
             </h1>
 
-            {onCreateAction ? (
+            {shouldShowActionButton ? (
               <Button
                 type="button"
-                size="sm"
                 className="w-fit"
-                disabled={actionGenerated || actionSaving}
-                onClick={onCreateAction}
+                disabled={actionSaving || markingActionDone || (actionStatus === "done" && !canRemoveAction) || (actionGenerated && !canMarkDone && !canRemoveAction)}
+                onClick={actionButtonHandler}
               >
-                {actionGenerated ? t("topErrorsAdded") : t("topErrorsFix")}
+                {actionButtonLabel}
               </Button>
             ) : null}
           </div>
@@ -400,26 +424,47 @@ function ModelBadgeIcon({
 export function PerceptionTopErrorCard({
   actionGenerated = false,
   actionSaving = false,
+  actionStatus,
   error,
   index,
+  markingActionDone = false,
   showIndex = true,
   modelLookup = new Map(),
   onOpenDetails,
   onCreateAction,
+  onMarkActionDone,
+  onRemoveAction,
   locale,
 }: {
   actionGenerated?: boolean;
   actionSaving?: boolean;
+  actionStatus?: string;
   error: PerceptionError;
   index: number;
+  markingActionDone?: boolean;
   showIndex?: boolean;
   modelLookup?: ReadonlyMap<string, PerceptionModelOption>;
   onOpenDetails: () => void;
   onCreateAction?: () => void;
+  onMarkActionDone?: () => void;
+  onRemoveAction?: () => void;
   locale: string;
 }) {
   const { t } = useScopedI18n("perception");
   const tone = getSeverityTone(error.severity, locale);
+  const statusTone = getPerceptionActionStatusTone(actionStatus);
+  const canRemoveAction = Boolean(actionGenerated && onRemoveAction);
+  const canMarkDone = Boolean(actionStatus && actionStatus !== "done" && onMarkActionDone);
+  const shouldShowActionButton = Boolean(onCreateAction && (actionStatus !== "done" || canRemoveAction));
+  const actionButtonHandler =
+    canRemoveAction && !canMarkDone ? onRemoveAction : canMarkDone ? onMarkActionDone : onCreateAction;
+  const actionButtonLabel = canRemoveAction && !canMarkDone
+    ? t("topErrorsRemove")
+    : canMarkDone
+      ? t("topErrorsMarkDone")
+      : actionGenerated
+        ? t("topErrorsAdded")
+        : t("topErrorsFix");
   const primaryModel = error.detectedInModels[0]
     ? getPerceptionModelBadgeMeta(error.detectedInModels[0], modelLookup)
     : null;
@@ -496,28 +541,30 @@ export function PerceptionTopErrorCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {actionStatus ? (
+            <Badge variant="outline" className={cn("h-6 rounded-sm px-2 text-xs font-bold", statusTone)}>
+              {formatPerceptionStatusLabelI18n(actionStatus, locale)}
+            </Badge>
+          ) : null}
+
           <div
             className={cn(
               "flex h-6 items-center rounded-sm px-2 text-xs font-bold",
-              error.optimizePriority === "high"
-                ? "bg-destructive/10 text-destructive"
-                : error.optimizePriority === "medium"
-                  ? "bg-amber-500/10 text-amber-700"
-                  : "bg-green-500/10 text-green-700",
+              getPerceptionPriorityTone(error.optimizePriority),
             )}
           >
             {formatPerceptionPriorityLabelI18n(error.optimizePriority, locale)}
           </div>
 
-          {onCreateAction ? (
+          {shouldShowActionButton ? (
             <Button
               type="button"
               size="sm"
               className="h-7 shrink-0 px-2 text-xs"
-              disabled={actionGenerated || actionSaving}
-              onClick={onCreateAction}
+              disabled={actionSaving || markingActionDone || (actionStatus === "done" && !canRemoveAction) || (actionGenerated && !canMarkDone && !canRemoveAction)}
+              onClick={actionButtonHandler}
             >
-              {actionGenerated ? t("topErrorsAdded") : t("topErrorsFix")}
+              {actionButtonLabel}
             </Button>
           ) : null}
         </div>

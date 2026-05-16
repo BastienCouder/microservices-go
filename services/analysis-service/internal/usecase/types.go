@@ -164,6 +164,34 @@ type OptimizationErrorBoard struct {
 	Metadata map[string]any            `json:"metadata"`
 }
 
+type OptimizeAction struct {
+	ID               string         `json:"id"`
+	ProjectID        string         `json:"projectId"`
+	Priority         string         `json:"priority"`
+	Type             string         `json:"type"`
+	Title            string         `json:"title"`
+	Issue            string         `json:"issue"`
+	Impact           string         `json:"impact,omitempty"`
+	GeneratedContent string         `json:"generatedContent"`
+	Status           string         `json:"status"`
+	SourceErrorID    string         `json:"sourceErrorId,omitempty"`
+	Metadata         map[string]any `json:"metadata,omitempty"`
+	CreatedAt        time.Time      `json:"createdAt"`
+	UpdatedAt        time.Time      `json:"updatedAt"`
+}
+
+type CreateOptimizeActionInput struct {
+	Priority         string
+	Type             string
+	Title            string
+	Issue            string
+	Impact           string
+	GeneratedContent string
+	Status           string
+	SourceErrorID    string
+	Metadata         map[string]any
+}
+
 type BrandCanon struct {
 	ProjectID   string         `json:"projectId,omitempty"`
 	BrandName   string         `json:"brandName,omitempty"`
@@ -281,6 +309,8 @@ type persistedState struct {
 	AlertsByProject     map[string][]string                       `json:"alertsByProject"`
 	BrandCanonByProject map[string]*BrandCanon                    `json:"brandCanonByProject"`
 	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
+	OptimizeActions     map[string]*OptimizeAction                `json:"optimizeActions"`
+	ActionsByProject    map[string][]string                       `json:"actionsByProject"`
 }
 
 type Service struct {
@@ -299,6 +329,8 @@ type Service struct {
 	alertsByProject     map[string][]string
 	brandCanonByProject map[string]*BrandCanon
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
+	optimizeActions     map[string]*OptimizeAction
+	actionsByProject    map[string][]string
 
 	store                StateStore
 	dashboardCache       DashboardCache

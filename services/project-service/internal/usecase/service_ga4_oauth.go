@@ -104,6 +104,14 @@ func (s *Service) CompleteProjectGA4OAuth(
 			return CompleteProjectGA4OAuthResult{}, ga4OAuthDependencyError("list ga4 properties", err)
 		}
 	}
+	llmSetup := GA4LLMSetupResult{}
+	if propertyID != "" {
+		var err error
+		llmSetup, err = provider.SetupLLMTracking(ctx, token.RefreshToken, propertyID)
+		if err != nil {
+			return CompleteProjectGA4OAuthResult{}, ga4OAuthDependencyError("setup ga4 llm tracking", err)
+		}
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -131,6 +139,7 @@ func (s *Service) CompleteProjectGA4OAuth(
 	return CompleteProjectGA4OAuthResult{
 		Integration: buildProjectImpactIntegrationsView(current, ""),
 		Properties:  normalizeGA4OAuthProperties(properties),
+		LLMSetup:    llmSetup,
 	}, nil
 }
 
@@ -176,23 +185,46 @@ func (s *Service) SelectProjectGA4OAuthProperty(
 	projectID string,
 	organizationID int64,
 	input SelectProjectGA4OAuthPropertyInput,
-) (ProjectImpactIntegrationsView, error) {
+) (SelectProjectGA4OAuthPropertyResult, error) {
 	propertyID := strings.TrimSpace(input.PropertyID)
 	if propertyID == "" {
-		return ProjectImpactIntegrationsView{}, fmt.Errorf("%w: propertyId is required", ErrValidation)
+		return SelectProjectGA4OAuthPropertyResult{}, fmt.Errorf("%w: propertyId is required", ErrValidation)
+	}
+	provider, _, err := s.ga4OAuthConfig()
+	if err != nil {
+		return SelectProjectGA4OAuthPropertyResult{}, err
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return SelectProjectGA4OAuthPropertyResult{}, err
+	}
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		s.mu.Unlock()
+		return SelectProjectGA4OAuthPropertyResult{}, err
+	}
+	current := normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
+	if current.GA4.OAuthRefreshToken == "" {
+		s.mu.Unlock()
+		return SelectProjectGA4OAuthPropertyResult{}, fmt.Errorf("%w: ga4 oauth is not connected for project", ErrValidation)
+	}
+	refreshToken := current.GA4.OAuthRefreshToken
+	s.mu.Unlock()
+
+	llmSetup, err := provider.SetupLLMTracking(ctx, refreshToken, propertyID)
+	if err != nil {
+		return SelectProjectGA4OAuthPropertyResult{}, ga4OAuthDependencyError("setup ga4 llm tracking", err)
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err := s.reloadLocked(ctx); err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		return SelectProjectGA4OAuthPropertyResult{}, err
 	}
-	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
-		return ProjectImpactIntegrationsView{}, err
-	}
-	current := normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
+	current = normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
 	if current.GA4.OAuthRefreshToken == "" {
-		return ProjectImpactIntegrationsView{}, fmt.Errorf("%w: ga4 oauth is not connected for project", ErrValidation)
+		return SelectProjectGA4OAuthPropertyResult{}, fmt.Errorf("%w: ga4 oauth is not connected for project", ErrValidation)
 	}
 	now := s.now().UTC()
 	current.GA4.PropertyID = propertyID
@@ -203,9 +235,12 @@ func (s *Service) SelectProjectGA4OAuthProperty(
 	current.GA4.UpdatedAt = now
 	s.impactIntegrations[projectID] = &current
 	if err := s.persistLocked(ctx); err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		return SelectProjectGA4OAuthPropertyResult{}, err
 	}
-	return buildProjectImpactIntegrationsView(current, ""), nil
+	return SelectProjectGA4OAuthPropertyResult{
+		Integration: buildProjectImpactIntegrationsView(current, ""),
+		LLMSetup:    llmSetup,
+	}, nil
 }
 
 func (s *Service) ga4OAuthConfig() (GA4OAuthProvider, string, error) {

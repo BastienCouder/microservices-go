@@ -12,16 +12,19 @@ import { PeriodFilterPicker, type PeriodFilterOption } from "@/components/shared
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getModelGroupForName, getModelIconForName } from "@/lib/app-data";
 import type { PerceptionSeverity } from "@/lib/perception-data";
 import type { OptimizationError } from "@/lib/optimization-errors-data";
 import { cn } from "@/lib/utils";
-import { useLocale } from "@/shared/hooks/use-i18n";
-import { buildPerceptionModelLookup, PerceptionTopErrorCard } from "../perception/_components";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
+import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
+import { buildPerceptionModelLookup, ErrorDetailsContent, PerceptionTopErrorCard } from "../perception/_components";
 import { useOptimizationErrors } from "../perception/core/use-optimization-errors";
 
 type PerceptionOptimizeActionsPageProps = {
@@ -60,10 +63,43 @@ const PERIOD_OPTIONS = [
 
 type PeriodFilter = (typeof PERIOD_OPTIONS)[number]["value"];
 
-function groupPerceptionErrors(errors: OptimizationError[]) {
+const ACTION_STATUS_OPTIONS = [
+  { value: "all", label: "Toutes les actions" },
+  { value: "processing", label: "En cours" },
+  { value: "done", label: "Terminées" },
+] as const satisfies readonly PeriodFilterOption[];
+
+type ActionStatusFilter = (typeof ACTION_STATUS_OPTIONS)[number]["value"];
+
+function getActionStatusRank(status: string | undefined) {
+  if (status === "processing") return 0;
+  if (status === "done") return 2;
+  return 1;
+}
+
+function sortErrorsByActionStatus(
+  errors: OptimizationError[],
+  actionStatusesByErrorId: ReadonlyMap<string, string>,
+) {
+  return [...errors].sort((left, right) => {
+    const rankDiff =
+      getActionStatusRank(actionStatusesByErrorId.get(left.id)) -
+      getActionStatusRank(actionStatusesByErrorId.get(right.id));
+    if (rankDiff !== 0) return rankDiff;
+    return left.title.localeCompare(right.title);
+  });
+}
+
+function groupPerceptionErrors(
+  errors: OptimizationError[],
+  actionStatusesByErrorId: ReadonlyMap<string, string>,
+) {
   return SEVERITY_COLUMNS.map((column) => ({
     ...column,
-    errors: errors.filter((error) => error.severity === column.severity),
+    errors: sortErrorsByActionStatus(
+      errors.filter((error) => error.severity === column.severity),
+      actionStatusesByErrorId,
+    ),
   }));
 }
 
@@ -128,6 +164,15 @@ function filterErrorsBySearch(errors: OptimizationError[], search: string) {
   return errors.filter((error) => {
     return getErrorSearchText(error).includes(needle);
   });
+}
+
+function filterErrorsByActionStatus(
+  errors: OptimizationError[],
+  actionStatusesByErrorId: ReadonlyMap<string, string>,
+  actionStatusFilter: ActionStatusFilter,
+) {
+  if (actionStatusFilter === "all") return errors;
+  return errors.filter((error) => actionStatusesByErrorId.get(error.id) === actionStatusFilter);
 }
 
 function getModelVisual(model: string) {
@@ -323,6 +368,7 @@ function CompetitorsFilterPopover({
 }
 
 function OptimizationFiltersToolbar({
+  actionStatusFilter,
   allCompetitorsSelected,
   allModelsSelected,
   availableCompetitors,
@@ -336,12 +382,14 @@ function OptimizationFiltersToolbar({
   selectedCompetitors,
   selectedModels,
   setCompetitorsPopoverOpen,
+  setActionStatusFilter,
   setModelsPopoverOpen,
   setPeriod,
   setSearch,
   toggleCompetitor,
   toggleModel,
 }: {
+  actionStatusFilter: ActionStatusFilter;
   allCompetitorsSelected: boolean;
   allModelsSelected: boolean;
   availableCompetitors: string[];
@@ -355,6 +403,7 @@ function OptimizationFiltersToolbar({
   selectedCompetitors: string[];
   selectedModels: string[];
   setCompetitorsPopoverOpen: (open: boolean) => void;
+  setActionStatusFilter: (status: ActionStatusFilter) => void;
   setModelsPopoverOpen: (open: boolean) => void;
   setPeriod: (period: PeriodFilter) => void;
   setSearch: (value: string) => void;
@@ -373,6 +422,15 @@ function OptimizationFiltersToolbar({
         label="Période"
         title="Période"
         description="Filtrer les erreurs par période."
+      />
+      <PeriodFilterPicker
+        className="w-full sm:w-[220px]"
+        value={actionStatusFilter}
+        onValueChange={(value) => setActionStatusFilter(value as ActionStatusFilter)}
+        options={ACTION_STATUS_OPTIONS}
+        label="Statut"
+        title="Statut"
+        description="Afficher les actions en cours ou terminées."
       />
       <ModelsFilterPopover
         open={modelsPopoverOpen}
@@ -434,29 +492,39 @@ function OptimizationFiltersToolbar({
 }
 
 function OptimizationErrorsKanban({
+  actionStatusesByErrorId,
   competitors,
   errors,
   generatedIds,
   loading,
+  markingDoneErrorIds,
   modelCatalog,
   onCreateAction,
+  onMarkDone,
   persistError,
   savingErrorIds,
 }: {
+  actionStatusesByErrorId: ReadonlyMap<string, string>;
   competitors: string[];
   errors: OptimizationError[];
   generatedIds: ReadonlySet<string>;
   loading: boolean;
+  markingDoneErrorIds: ReadonlySet<string>;
   modelCatalog: Parameters<typeof buildPerceptionModelLookup>[0];
   onCreateAction: (error: OptimizationError) => void | Promise<void>;
+  onMarkDone: (error: OptimizationError) => void | Promise<void>;
   persistError: string | null;
   savingErrorIds: ReadonlySet<string>;
 }) {
   const { locale } = useLocale();
+  const { t } = useScopedI18n("perception");
+  const isMobile = useIsMobile();
   const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
   const [modelsPopoverOpen, setModelsPopoverOpen] = useState(false);
   const [period, setPeriod] = useState<PeriodFilter>("all");
+  const [actionStatusFilter, setActionStatusFilter] = useState<ActionStatusFilter>("all");
   const [search, setSearch] = useState("");
+  const [selectedError, setSelectedError] = useState<OptimizationError | null>(null);
   const [selectedCompetitors, setSelectedCompetitors] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
   const availableModels = useMemo(() => listAvailableModels(errors), [errors]);
@@ -467,24 +535,33 @@ function OptimizationErrorsKanban({
   const filteredErrors = useMemo(
     () =>
       filterErrorsBySearch(
-        filterErrorsByCompetitors(
-          filterErrorsByModels(filterErrorsByPeriod(errors, period), selectedModels),
-          selectedCompetitors,
+        filterErrorsByActionStatus(
+          filterErrorsByCompetitors(
+            filterErrorsByModels(filterErrorsByPeriod(errors, period), selectedModels),
+            selectedCompetitors,
+          ),
+          actionStatusesByErrorId,
+          actionStatusFilter,
         ),
         search,
       ),
-    [errors, period, search, selectedCompetitors, selectedModels],
+    [actionStatusFilter, actionStatusesByErrorId, errors, period, search, selectedCompetitors, selectedModels],
   );
-  const columns = useMemo(() => groupPerceptionErrors(filteredErrors), [filteredErrors]);
+  const columns = useMemo(
+    () => groupPerceptionErrors(filteredErrors, actionStatusesByErrorId),
+    [actionStatusesByErrorId, filteredErrors],
+  );
   const allCompetitorsSelected = selectedCompetitors.length === 0;
   const allModelsSelected = selectedModels.length === 0;
   const hasActiveFilters =
     search.trim() !== "" ||
     period !== "all" ||
+    actionStatusFilter !== "all" ||
     selectedCompetitors.length > 0 ||
     selectedModels.length > 0;
   const clearFilters = () => {
     setPeriod("all");
+    setActionStatusFilter("all");
     setSearch("");
     setSelectedCompetitors([]);
     setSelectedModels([]);
@@ -507,6 +584,11 @@ function OptimizationErrorsKanban({
       return [...current, model];
     });
   };
+  const handleDetailsOpenChange = (open: boolean) => {
+    if (!open) {
+      setSelectedError(null);
+    }
+  };
 
   return (
     <div className="flex h-auto min-h-full flex-col px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
@@ -523,6 +605,7 @@ function OptimizationErrorsKanban({
               <p className="mt-2 text-xs text-destructive">{persistError}</p>
             ) : null}
             <OptimizationFiltersToolbar
+              actionStatusFilter={actionStatusFilter}
               allCompetitorsSelected={allCompetitorsSelected}
               allModelsSelected={allModelsSelected}
               availableCompetitors={competitors}
@@ -536,6 +619,7 @@ function OptimizationErrorsKanban({
               selectedCompetitors={selectedCompetitors}
               selectedModels={selectedModels}
               setCompetitorsPopoverOpen={setCompetitorsPopoverOpen}
+              setActionStatusFilter={setActionStatusFilter}
               setModelsPopoverOpen={setModelsPopoverOpen}
               setPeriod={setPeriod}
               setSearch={setSearch}
@@ -583,11 +667,14 @@ function OptimizationErrorsKanban({
                       index={index}
                       locale={locale}
                       modelLookup={modelLookup}
-                      onOpenDetails={() => undefined}
+                      onOpenDetails={() => setSelectedError(error)}
                       showIndex={false}
                       actionGenerated={generatedIds.has(error.id)}
                       actionSaving={savingErrorIds.has(error.id)}
+                      actionStatus={actionStatusesByErrorId.get(error.id)}
+                      markingActionDone={markingDoneErrorIds.has(error.id)}
                       onCreateAction={() => void onCreateAction(error)}
+                      onMarkActionDone={() => void onMarkDone(error)}
                     />
                   ))
                 ) : (
@@ -598,6 +685,52 @@ function OptimizationErrorsKanban({
           ))}
         </div>
       </main>
+
+      {selectedError ? (
+        isMobile ? (
+          <Drawer open={selectedError !== null} onOpenChange={handleDetailsOpenChange}>
+            <DrawerContent className="h-[94vh] rounded-t-[32px] border-none bg-white">
+              <DrawerHeader className="sr-only">
+                <DrawerTitle>{selectedError.title}</DrawerTitle>
+                <DrawerDescription>{t("topErrorsSheetDescription")}</DrawerDescription>
+              </DrawerHeader>
+              <ErrorDetailsContent
+                error={selectedError}
+                locale={locale}
+                modelLookup={modelLookup}
+                mobile
+                actionGenerated={generatedIds.has(selectedError.id)}
+                actionSaving={savingErrorIds.has(selectedError.id)}
+                actionStatus={actionStatusesByErrorId.get(selectedError.id)}
+                markingActionDone={markingDoneErrorIds.has(selectedError.id)}
+                onCreateAction={() => void onCreateAction(selectedError)}
+                onMarkActionDone={() => void onMarkDone(selectedError)}
+              />
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Sheet open={selectedError !== null} onOpenChange={handleDetailsOpenChange}>
+            <SheetContent side="right" className="!max-w-2xl">
+              <SheetHeader className="sr-only">
+                <SheetTitle>{selectedError.title}</SheetTitle>
+                <SheetDescription>{t("topErrorsSheetDescription")}</SheetDescription>
+              </SheetHeader>
+              <ErrorDetailsContent
+                error={selectedError}
+                locale={locale}
+                modelLookup={modelLookup}
+                mobile={false}
+                actionGenerated={generatedIds.has(selectedError.id)}
+                actionSaving={savingErrorIds.has(selectedError.id)}
+                actionStatus={actionStatusesByErrorId.get(selectedError.id)}
+                markingActionDone={markingDoneErrorIds.has(selectedError.id)}
+                onCreateAction={() => void onCreateAction(selectedError)}
+                onMarkActionDone={() => void onMarkDone(selectedError)}
+              />
+            </SheetContent>
+          </Sheet>
+        )
+      ) : null}
     </div>
   );
 }
@@ -656,9 +789,12 @@ export function ErrorHubPage({
     competitors,
     data,
     error,
+    actionStatusesByErrorId,
     generatedIds,
     handleFix,
+    handleMarkDone,
     loading,
+    markingDoneErrorIds,
     modelCatalog,
     persistError,
     savingErrorIds,
@@ -668,10 +804,13 @@ export function ErrorHubPage({
     <OptimizationErrorsKanban
       competitors={competitors}
       errors={data?.errors ?? []}
+      actionStatusesByErrorId={actionStatusesByErrorId}
       generatedIds={generatedIds}
       loading={loading && !data && !error}
+      markingDoneErrorIds={markingDoneErrorIds}
       modelCatalog={modelCatalog}
       onCreateAction={handleFix}
+      onMarkDone={handleMarkDone}
       persistError={persistError || error}
       savingErrorIds={savingErrorIds}
     />

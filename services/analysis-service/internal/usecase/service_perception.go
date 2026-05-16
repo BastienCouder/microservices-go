@@ -287,7 +287,7 @@ func derivePerceptionTopErrors(
 			errorType:        "positioning_gap",
 			score:            scores.PositioningAccuracy,
 			axis:             "positioning",
-			title:            "Positionnement encore mal compris",
+			title:            "Le positionnement est encore mal cite",
 			issue:            brandLabel + " n'est pas encore rattache de maniere fiable a son positionnement dans toutes les reponses.",
 			impact:           "La marque peut etre oubliee ou mal classee sur les requetes de consideration.",
 			fixType:          "website_copy",
@@ -339,7 +339,7 @@ func derivePerceptionTopErrors(
 		return candidates[i].score < candidates[j].score
 	})
 
-	topErrors := make([]PerceptionError, 0, 3)
+	topErrors := make([]PerceptionError, 0, len(candidates))
 	for _, item := range candidates {
 		if item.score >= 90 {
 			continue
@@ -368,9 +368,6 @@ func derivePerceptionTopErrors(
 			GeneratedContent: item.generatedContent,
 			OptimizePriority: priority,
 		})
-		if len(topErrors) == 3 {
-			break
-		}
 	}
 
 	return topErrors

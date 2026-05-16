@@ -85,6 +85,14 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getPerception(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "optimization-errors" && r.Method == http.MethodGet:
 		h.getOptimizationErrors(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "optimize-actions" && r.Method == http.MethodGet:
+		h.listOptimizeActions(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "optimize-actions" && r.Method == http.MethodPost:
+		h.createOptimizeAction(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "optimize-actions" && r.Method == http.MethodPatch:
+		h.updateOptimizeActionStatus(w, r, projectID, parts[2])
+	case len(parts) == 3 && parts[1] == "optimize-actions" && r.Method == http.MethodDelete:
+		h.deleteOptimizeAction(w, r, projectID, parts[2])
 	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodPost:
 		h.startContentOptimizerCrawl(w, r, projectID)
 	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodGet:
@@ -317,6 +325,101 @@ func (h *Handler) getOptimizationErrors(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	writeSuccess(w, http.StatusOK, board)
+}
+
+type createOptimizeActionRequest struct {
+	Priority         string         `json:"priority"`
+	Type             string         `json:"type"`
+	Title            string         `json:"title"`
+	Issue            string         `json:"issue"`
+	Impact           string         `json:"impact"`
+	GeneratedContent string         `json:"generatedContent"`
+	Status           string         `json:"status"`
+	SourceErrorID    string         `json:"sourceErrorId"`
+	Metadata         map[string]any `json:"metadata"`
+}
+
+type updateOptimizeActionStatusRequest struct {
+	Status string `json:"status"`
+}
+
+func (h *Handler) listOptimizeActions(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	actions, err := h.svc.ListOptimizeActions(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, actions)
+}
+
+func (h *Handler) createOptimizeAction(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req createOptimizeActionRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	action, err := h.svc.CreateOptimizeAction(r.Context(), projectID, organizationID, usecase.CreateOptimizeActionInput{
+		Priority:         req.Priority,
+		Type:             req.Type,
+		Title:            req.Title,
+		Issue:            req.Issue,
+		Impact:           req.Impact,
+		GeneratedContent: req.GeneratedContent,
+		Status:           req.Status,
+		SourceErrorID:    req.SourceErrorID,
+		Metadata:         req.Metadata,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, action)
+}
+
+func (h *Handler) updateOptimizeActionStatus(w http.ResponseWriter, r *http.Request, projectID string, actionID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req updateOptimizeActionStatusRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+	action, err := h.svc.UpdateOptimizeActionStatus(r.Context(), projectID, organizationID, actionID, req.Status)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, action)
+}
+
+func (h *Handler) deleteOptimizeAction(w http.ResponseWriter, r *http.Request, projectID string, actionID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	if err := h.svc.DeleteOptimizeAction(r.Context(), projectID, organizationID, actionID); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 type startContentOptimizerCrawlRequest struct {
