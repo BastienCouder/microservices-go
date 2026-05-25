@@ -24,8 +24,8 @@ export function PageHeader({
   actionsClassName,
 }: PageHeaderProps) {
   return (
-    <div className={cn("flex flex-col md:gap-4 lg:flex-row lg:items-start lg:justify-between md:mb-4", className)}>
-      <div className="min-w-0 space-y-0 px-2">
+    <div className={cn("bg-background md:bg-transparent flex flex-col md:gap-4 lg:flex-row lg:items-start lg:justify-between md:mb-4", className)}>
+      <div className="space-y-0 px-4 md:px-0 md:px-2">
         <div className="flex items-end gap-2.5 ">
           <h1>
             <SectionTitle className={cn("text-base md:text-lg", titleClassName)}>
@@ -34,7 +34,7 @@ export function PageHeader({
           </h1>
           {meta ? <div className="flex flex-wrap items-center gap-2.5 mb-1">{meta}</div> : null}
         </div>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{baseline}</p>
+        <p className="hidden md:block max-w-3xl text-sm leading-6 text-muted-foreground">{baseline}</p>
       </div>
 
       {actions ? (
@@ -42,7 +42,7 @@ export function PageHeader({
           className={cn(
             "relative",
             actionsVariant === "classic"
-              ? "md:mt-3 flex w-full flex-wrap gap-2 rounded-md rounded-b-none bg-background p-4 lg:mt-0 lg:w-auto lg:min-w-fit lg:justify-end translate-y-5"
+              ? "md:mt-3 flex w-full flex-wrap gap-2 rounded-none md:rounded-md md:rounded-b-none bg-background p-4 lg:mt-0 lg:w-auto lg:min-w-fit lg:justify-end translate-y-5"
               : "flex w-full flex-col gap-3 rounded-3xl border border-border/60 bg-card/70 p-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end lg:w-auto lg:min-w-fit",
             actionsClassName,
           )}

@@ -26,13 +26,14 @@ type Service struct {
 	outbox                map[string]*OutboxEvent
 	outboxOrder           []string
 
-	store             StateStore
-	analysisClient    AnalysisClient
-	iaClient          IAClient
-	attributionClient AttributionClient
-	billingClient     BillingClient
-	ga4OAuthProvider  GA4OAuthProvider
-	ga4OAuthStateKey  string
+	store               StateStore
+	analysisClient      AnalysisClient
+	iaClient            IAClient
+	attributionClient   AttributionClient
+	billingClient       BillingClient
+	ga4OAuthProvider    GA4OAuthProvider
+	ga4LLMSetupProvider GA4LLMSetupProvider
+	ga4OAuthStateKey    string
 }
 
 func NewService() *Service {
@@ -107,7 +108,10 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	if len(s.models) == 0 {
 		s.seedDefaultModels()
 	}
+	s.normalizeDefaultModelDefinitionsLocked()
+	s.normalizeModelSourcesLocked()
 	for _, prompt := range s.prompts {
+		prompt.Kind = normalizePromptKind(prompt.Kind)
 		if prompt.Status == "" {
 			if prompt.IsActive {
 				prompt.Status = PromptStatusActive
@@ -218,13 +222,95 @@ func (s *Service) persistLocked(ctx context.Context) error {
 
 func (s *Service) seedDefaultModels() {
 	defaults := []AIModel{
-		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", IsActive: true},
-		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", IsActive: true},
-		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B (free)", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it:free", IsActive: true},
-		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B (free)", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it:free", IsActive: true},
+		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", Source: AIModelSourceOpenRouter, IsActive: true},
+		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", Source: AIModelSourceOpenRouter, IsActive: true},
+		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it", Source: AIModelSourceOpenRouter, IsActive: true},
+		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it", Source: AIModelSourceOpenRouter, IsActive: true},
 	}
 	for _, model := range defaults {
 		s.models[model.ID] = model
+	}
+}
+
+func (s *Service) normalizeDefaultModelDefinitionsLocked() {
+	replacements := map[string]string{
+		"google/gemma-3-4b-it:free":  "google/gemma-3-4b-it",
+		"google/gemma-3-27b-it:free": "google/gemma-3-27b-it",
+	}
+	existingCanonical := make(map[string]string, len(s.models))
+	for modelID, model := range s.models {
+		key := strings.TrimSpace(model.Provider) + "\x00" + strings.TrimSpace(model.ModelID)
+		existingCanonical[key] = modelID
+	}
+	for modelID, model := range s.models {
+		if replacement, ok := replacements[strings.TrimSpace(model.ModelID)]; ok {
+			key := strings.TrimSpace(model.Provider) + "\x00" + replacement
+			if existingModelID, exists := existingCanonical[key]; exists && existingModelID != modelID {
+				s.migrateLegacyModelReferencesLocked(modelID, existingModelID)
+				delete(s.models, modelID)
+				continue
+			}
+			model.ModelID = replacement
+			if model.ID == "gemma-3-4b-free" {
+				model.Label = "Gemma 3 4B"
+			}
+			if model.ID == "gemma-3-27b-free" {
+				model.Label = "Gemma 3 27B"
+			}
+			s.models[modelID] = model
+		}
+	}
+}
+
+func (s *Service) migrateLegacyModelReferencesLocked(legacyModelID, canonicalModelID string) {
+	if strings.TrimSpace(legacyModelID) == "" || strings.TrimSpace(canonicalModelID) == "" || legacyModelID == canonicalModelID {
+		return
+	}
+
+	for projectID, enabledByID := range s.projectModels {
+		if enabledByID == nil || !enabledByID[legacyModelID] {
+			continue
+		}
+		enabledByID[canonicalModelID] = true
+		delete(enabledByID, legacyModelID)
+		s.projectModels[projectID] = enabledByID
+	}
+
+	for _, prompt := range s.prompts {
+		if prompt == nil {
+			continue
+		}
+		replaced := false
+		modelIDs := make([]string, 0, len(prompt.ModelIDs))
+		for _, modelID := range prompt.ModelIDs {
+			if strings.TrimSpace(modelID) == legacyModelID {
+				modelID = canonicalModelID
+				replaced = true
+			}
+			modelIDs = append(modelIDs, modelID)
+		}
+		if replaced {
+			prompt.ModelIDs = normalizeModelIDs(modelIDs)
+		}
+
+		if len(prompt.Schedule.ModelCrons) > 0 {
+			if cron, ok := prompt.Schedule.ModelCrons[legacyModelID]; ok {
+				if prompt.Schedule.ModelCrons == nil {
+					prompt.Schedule.ModelCrons = make(map[string]string)
+				}
+				if _, exists := prompt.Schedule.ModelCrons[canonicalModelID]; !exists {
+					prompt.Schedule.ModelCrons[canonicalModelID] = cron
+				}
+				delete(prompt.Schedule.ModelCrons, legacyModelID)
+			}
+		}
+	}
+}
+
+func (s *Service) normalizeModelSourcesLocked() {
+	for modelID, model := range s.models {
+		model.Source = normalizeAIModelSource(model)
+		s.models[modelID] = model
 	}
 }
 
@@ -488,7 +574,7 @@ func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[
 	enabledModelIDs := filterEnabledModels(projectModels, models, projectID)
 	out := make([]AnalysisPromptText, 0)
 	for _, prompt := range prompts {
-		if prompt.ProjectID == projectID && prompt.IsActive {
+		if prompt.ProjectID == projectID && prompt.IsActive && normalizePromptKind(prompt.Kind) == PromptKindMonitoring {
 			out = append(out, AnalysisPromptText{
 				ID:       prompt.ID,
 				Text:     prompt.Text,

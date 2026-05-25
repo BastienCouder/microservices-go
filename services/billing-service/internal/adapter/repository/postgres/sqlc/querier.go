@@ -10,7 +10,13 @@ import (
 
 type Querier interface {
 	GetSubscriptionByOrganizationID(ctx context.Context, organizationID int64) (BillingSubscription, error)
+	ListBillingPlanSettings(ctx context.Context) ([]BillingPlanSetting, error)
+	ListBillingPricingTiers(ctx context.Context) ([]BillingPricingTier, error)
 	RecordStripeWebhookEvent(ctx context.Context, arg RecordStripeWebhookEventParams) (int64, error)
+	UpdateDefaultQuotaForPlan(ctx context.Context, arg UpdateDefaultQuotaForPlanParams) error
+	UpdateSubscriptionEntitlements(ctx context.Context, arg UpdateSubscriptionEntitlementsParams) error
+	UpsertBillingPlanSettings(ctx context.Context, arg UpsertBillingPlanSettingsParams) error
+	UpsertBillingPricingTier(ctx context.Context, arg UpsertBillingPricingTierParams) error
 	UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) error
 }
 

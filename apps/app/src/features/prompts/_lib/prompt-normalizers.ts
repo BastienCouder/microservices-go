@@ -2,6 +2,7 @@
 
 import { SELECTED_ORG_KEY } from "@/features/models/_lib/model-access";
 import {
+  comparePromptRunsByRecency,
   DEFAULT_PROMPT_CRON,
   DEFAULT_PROMPT_TIMEZONE,
   defaultPromptSchedule,
@@ -11,6 +12,7 @@ import {
 import { buildTrend30dFromRuns } from "./prompt-data-factory";
 import type {
   PromptItem,
+  PromptKind,
   PromptPageResult,
   PromptRowMode,
   PromptSchedule,
@@ -79,6 +81,10 @@ function normalizePromptStatus(value: unknown): PromptItem["status"] | undefined
   return undefined;
 }
 
+function normalizePromptKind(value: unknown): PromptKind {
+  return getString(value).toLowerCase() === "perception" ? "perception" : "monitoring";
+}
+
 export function dedupeModels(models: string[]): string[] {
   const seen = new Set<string>();
   const unique: string[] = [];
@@ -126,7 +132,7 @@ export function buildScopedPromptMetrics(item: PromptItem, models: string[]): Pr
   const rank =
     rankedRuns.length > 0
       ? Number((rankedRuns.reduce((sum, run) => sum + (run.rank ?? 0), 0) / rankedRuns.length).toFixed(1))
-      : 9.9;
+      : null;
   const sov =
     scopedRuns.length > 0
       ? Math.round(scopedRuns.reduce((sum, run) => sum + run.score, 0) / scopedRuns.length)
@@ -165,6 +171,11 @@ export function normalizeProjectPromptRecord(entry: Record<string, unknown>): Pr
     id: getString(getField(entry, ["id", "ID"])),
     text: getString(getField(entry, ["text", "Text"])),
     intent: getString(getField(entry, ["intent", "Intent"])) || undefined,
+    kind: normalizePromptKind(getField(entry, ["kind", "Kind"])),
+    type:
+      getString(
+        getField(entry, ["type", "Type", "responseFormat", "response_format", "ResponseFormat"]),
+      ) || undefined,
     modelIds: dedupeModels(
       (getField(entry, ["modelIds", "ModelIds"]) as unknown[] | undefined)?.filter(
         (item): item is string => typeof item === "string",
@@ -220,7 +231,12 @@ function comparePromptItems(a: PromptItem, b: PromptItem, field: PromptSort): nu
     return compareStrings(aModels || "\uffff", bModels || "\uffff");
   }
   if (field === "mention") return a.mentionRate - b.mentionRate;
-  if (field === "rank") return a.rank - b.rank;
+  if (field === "rank") {
+    if (a.rank === null && b.rank === null) return 0;
+    if (a.rank === null) return 1;
+    if (b.rank === null) return -1;
+    return a.rank - b.rank;
+  }
   if (field === "sov") return a.sov - b.sov;
   if (field === "lastRun") return a.lastRunMinutes - b.lastRunMinutes;
   if (field === "status") {
@@ -260,7 +276,7 @@ export function buildModelScopedPromptRows(prompts: PromptItem[]): PromptItem[] 
           : [];
 
     return models.map((model, index) => {
-      const runs = [...(runsByModel.get(model) ?? [])].sort((a, b) => a.minutesAgo - b.minutesAgo);
+      const runs = [...(runsByModel.get(model) ?? [])].sort(comparePromptRunsByRecency);
       const overrideCron = prompt.schedule.modelCrons[model];
       const nextPrompt = buildScopedPromptMetrics(prompt, [model]);
       return {

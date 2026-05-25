@@ -25,6 +25,7 @@ export type PromptSortDirection = "asc" | "desc";
 export type ResponseView = "table" | "timeline";
 export type PromptRowMode = "global" | "model";
 export type PromptScheduleMode = "global" | "per_model";
+export type PromptKind = "monitoring" | "perception";
 
 export type PromptSchedule = {
   mode: PromptScheduleMode;
@@ -57,6 +58,7 @@ export type PromptItem = {
   rowMode: PromptRowMode;
   prompt: string;
   type?: string | null;
+  kind: PromptKind;
   stage: Stage;
   persona?: Persona | null;
   models: AIModel[];
@@ -65,7 +67,7 @@ export type PromptItem = {
   effectiveScheduleLabel: string;
   effectiveScheduleSource: "global" | "override";
   mentionRate: number;
-  rank: number;
+  rank: number | null;
   sov: number;
   lastRunMinutes: number;
   trend30d: number[];
@@ -94,6 +96,8 @@ export type ProjectPromptRecord = {
   id: string;
   text: string;
   intent?: string;
+  type?: string;
+  kind: PromptKind;
   modelIds?: string[];
   schedule?: PromptSchedule;
   status?: PromptItem["status"];

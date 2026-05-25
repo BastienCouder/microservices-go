@@ -1,7 +1,8 @@
 "use client";
 
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -25,9 +26,11 @@ type OptimizeDraft = {
 
 export function PerceptionOptimizeActions({
   drafts,
+  emptyLabel,
   persistError,
 }: {
   drafts: OptimizeDraft[];
+  emptyLabel?: string | null;
   persistError: string | null;
 }) {
   const { locale, t } = useScopedI18n("perception");
@@ -40,9 +43,7 @@ export function PerceptionOptimizeActions({
       </CardHeader>
       <CardContent className="space-y-3">
         {drafts.length === 0 ? (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            {t("optimizeActionsEmpty")}
-          </div>
+          <EmptyStateCard label={emptyLabel || t("optimizeActionsEmpty")} className="h-[120px] text-sm" />
         ) : (
           drafts.map((draft) => (
             <div key={draft.id} className="rounded-lg border p-3">

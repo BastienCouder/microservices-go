@@ -185,6 +185,16 @@ func (s *Service) resolveProviderCredentialForModelLocked(projectID, modelID str
 	}
 
 	credentials := s.providerCredentials[projectID]
+	if prefersOpenRouterCredential(model) {
+		if credential, ok := credentials["openrouter"]; ok && strings.TrimSpace(credential.APIKey) != "" {
+			return resolvedModelProviderCredential{
+				ProviderID:      "openrouter",
+				ProviderModelID: providerModelID,
+				ProviderAPIKey:  strings.TrimSpace(credential.APIKey),
+			}, nil
+		}
+	}
+
 	if credential, ok := credentials[providerID]; ok && strings.TrimSpace(credential.APIKey) != "" && supportsDirectProviderCredential(providerID) {
 		return resolvedModelProviderCredential{
 			ProviderID:      providerID,
@@ -220,4 +230,19 @@ func supportsDirectProviderCredential(providerID string) bool {
 	default:
 		return false
 	}
+}
+
+func prefersOpenRouterCredential(model AIModel) bool {
+	if normalizeAIModelSource(model) == AIModelSourceOpenRouter {
+		return true
+	}
+
+	group := strings.TrimSpace(model.Group)
+	if strings.EqualFold(group, "gpt-oss") {
+		return true
+	}
+
+	modelID := strings.ToLower(strings.TrimSpace(model.ID))
+	providerModelID := strings.ToLower(strings.TrimSpace(model.ModelID))
+	return strings.Contains(modelID, "gpt-oss") || strings.Contains(providerModelID, "gpt-oss")
 }

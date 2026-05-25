@@ -75,6 +75,7 @@ export function AdminModelsTemplate({
   const [onlyFree, setOnlyFree] = useState(false);
   const [purgeUnsupportedProviders, setPurgeUnsupportedProviders] =
     useState(false);
+  const [purgeMissingModels, setPurgeMissingModels] = useState(false);
   const [minContext, setMinContext] = useState("");
 
   useEffect(() => {
@@ -117,13 +118,14 @@ export function AdminModelsTemplate({
     () =>
       sortCatalogItemsByProvider(
         filterModelCatalogForAdmin(catalog, {
-        provider: provider === "all" ? "" : provider,
-        search,
-        status,
-        supportsLiveSearch: toolsOnly,
+          provider: provider === "all" ? "" : provider,
+          search,
+          status,
+          supportsLiveSearch: toolsOnly,
+          freeOnly: onlyFree,
         }),
       ),
-    [catalog, provider, search, status, toolsOnly],
+    [catalog, onlyFree, provider, search, status, toolsOnly],
   );
   const activeCount = catalog.filter((model) => model.isActive).length;
   const inactiveCount = catalog.length - activeCount;
@@ -173,7 +175,6 @@ export function AdminModelsTemplate({
   const syncOpenRouterMutation = useMutation({
     mutationFn: () =>
       syncOpenRouterModelCatalog(apiBaseURL, organizationId, {
-        onlyFree,
         minContext: Number.parseInt(minContext, 10) || undefined,
         supportsTools: toolsOnly,
         variant,
@@ -181,6 +182,7 @@ export function AdminModelsTemplate({
         searchQuery: search,
         activateImported: false,
         purgeUnsupportedProviders,
+        purgeMissingModels,
       }),
     onSuccess: async (result) => {
       await Promise.all([
@@ -250,7 +252,7 @@ export function AdminModelsTemplate({
 
       <div className="flex flex-col rounded-md rounded-tr-none bg-background">
         <div className="border-b px-4 py-4 md:px-6">
-          <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_160px_150px_150px_auto_auto_auto] xl:items-center">
+          <div className="grid gap-3 xl:grid-cols-[minmax(260px,1fr)_180px_160px_150px_150px_auto_auto_auto_auto] xl:items-center">
             <div className="relative min-w-0">
               <Search
                 aria-hidden="true"
@@ -342,12 +344,22 @@ export function AdminModelsTemplate({
               />
               Purger
             </label>
+
+            <label className="flex min-h-8 items-center gap-2 rounded-lg border border-border/70 px-3 text-sm text-muted-foreground">
+              <Checkbox
+                checked={purgeMissingModels}
+                onCheckedChange={(checked) => setPurgeMissingModels(checked === true)}
+              />
+              Purger absents
+            </label>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
             L'import OpenRouter utilise la recherche, le provider, le type
-            chat/instruct, le contexte minimum, Free et Tools comme filtres.
-            Purger supprime les anciens imports OpenRouter dont le provider
-            n'est plus supporte.
+            chat/instruct, le contexte minimum et Tools comme filtres. `Free`
+            filtre seulement la liste affichee dans cette page. Purger supprime
+            les anciens imports OpenRouter dont le provider n'est plus
+            supporte. Purger absents retire les imports OpenRouter qui ne sont
+            plus renvoyes par l'API OpenRouter.
           </p>
         </div>
 

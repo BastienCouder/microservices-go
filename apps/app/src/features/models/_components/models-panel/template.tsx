@@ -40,19 +40,6 @@ export function ProviderApiKeysPanelTemplate() {
   );
 }
 
-export function DeveloperPlanHeroBannerTemplate() {
-  return (
-    <div className="rounded-md border bg-card p-4 md:p-5">
-      <div className="space-y-3">
-        <Skeleton className="h-8 w-3/4 rounded-md" />
-        <Skeleton className="h-4 w-full rounded-md" />
-        <Skeleton className="h-4 w-5/6 rounded-md" />
-        <Skeleton className="h-10 w-44 rounded-md" />
-      </div>
-    </div>
-  );
-}
-
 export function CatalogTemplate() {
   return (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-stretch gap-4">

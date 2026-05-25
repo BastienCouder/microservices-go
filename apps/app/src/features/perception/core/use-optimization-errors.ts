@@ -14,6 +14,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../_lib/client-api";
 import { getOptimizationActionMatchIds } from "../_lib/optimization-action-ids";
+import { resolvePerceptionGeneratedContent } from "../_lib/perception-i18n";
 
 type OptimizeActionStatus = "draft" | "published" | "processing" | "done" | string;
 
@@ -46,7 +47,7 @@ type UseOptimizationErrorsResult = {
 };
 
 export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): UseOptimizationErrorsResult {
-  const { t } = useScopedI18n("perception");
+  const { locale, t } = useScopedI18n("perception");
   const projectId = readOptimizationProjectIdFromSearch(routeSearch);
   const [persistedActions, setPersistedActions] = useState<PersistedOptimizeAction[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
@@ -109,6 +110,12 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
       setPersistError(null);
       if (savingErrorIds.has(error.id) || generatedIds.has(error.id) || !activeProjectId) return;
 
+      const localizedGeneratedContent = resolvePerceptionGeneratedContent(
+        error.generatedContent,
+        error.generatedContentKey,
+        locale,
+      );
+
       setSavingErrorIds((current) => new Set(current).add(error.id));
       try {
         const result = await postPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
@@ -119,7 +126,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             title: error.title,
             issue: error.issue,
             impact: error.impact,
-            generatedContent: error.generatedContent,
+            generatedContent: localizedGeneratedContent,
             status: "processing",
             sourceErrorId: error.id,
             metadata: {
@@ -141,7 +148,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             title: error.title,
             issue: error.issue,
             impact: error.impact,
-            generatedContent: error.generatedContent,
+            generatedContent: localizedGeneratedContent,
             status: result.status || "processing",
             sourceErrorId: error.id,
           },
@@ -159,7 +166,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         });
       }
     },
-    [activeProjectId, generatedIds, savingErrorIds, t],
+    [activeProjectId, generatedIds, locale, savingErrorIds, t],
   );
 
   const handleMarkDone = useCallback(

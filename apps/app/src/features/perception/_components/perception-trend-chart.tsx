@@ -1,5 +1,6 @@
 "use client";
 
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
@@ -20,10 +21,12 @@ export function PerceptionTrendChart({
   data,
   periodLabel,
   badgeLabel,
+  emptyLabel,
 }: {
   data: TrendPoint[];
   periodLabel: string;
   badgeLabel: string;
+  emptyLabel?: string | null;
 }) {
   const { t } = useScopedI18n("perception");
   const chartConfig = {
@@ -51,57 +54,61 @@ export function PerceptionTrendChart({
       </CardHeader>
       <CardContent className="min-w-0">
         <div className="h-[230px] w-full">
-          <ChartContainer config={chartConfig} className="h-full w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                <XAxis
-                  dataKey="label"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  fontSize={11}
-                  tick={{ fill: APP_CHART_UI_COLORS.axisTick }}
-                />
-                <YAxis
-                  domain={[0, 100]}
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  width={28}
-                  fontSize={11}
-                  tick={{ fill: APP_CHART_UI_COLORS.axisTick }}
-                />
-                <ChartTooltip
-                  cursor={false}
-                  content={<PerceptionTrendTooltip />}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="positioning"
-                  stroke={PERCEPTION_TREND_COLORS.positioning}
-                  strokeWidth={2}
-                  dot={{ r: 2.5 }}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="factual"
-                  stroke={PERCEPTION_TREND_COLORS.factual}
-                  strokeWidth={2}
-                  dot={{ r: 2.5 }}
-                  activeDot={{ r: 4 }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="sentiment"
-                  stroke={PERCEPTION_TREND_COLORS.sentiment}
-                  strokeWidth={2}
-                  dot={{ r: 2.5 }}
-                  activeDot={{ r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </ChartContainer>
+          {data.length === 0 ? (
+            <EmptyStateCard label={emptyLabel || t("trendEmpty")} className="h-full min-h-0 w-full text-sm" />
+          ) : (
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    fontSize={11}
+                    tick={{ fill: APP_CHART_UI_COLORS.axisTick }}
+                  />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                    width={28}
+                    fontSize={11}
+                    tick={{ fill: APP_CHART_UI_COLORS.axisTick }}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<PerceptionTrendTooltip />}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="positioning"
+                    stroke={PERCEPTION_TREND_COLORS.positioning}
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    activeDot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="factual"
+                    stroke={PERCEPTION_TREND_COLORS.factual}
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    activeDot={{ r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="sentiment"
+                    stroke={PERCEPTION_TREND_COLORS.sentiment}
+                    strokeWidth={2}
+                    dot={{ r: 2.5 }}
+                    activeDot={{ r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          )}
         </div>
         <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
           <TrendDefinitionCard

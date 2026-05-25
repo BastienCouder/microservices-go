@@ -4,12 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionTitle } from "@/components/shared/section-title";
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
+import { createEmptyPerceptionViewData } from "@/lib/perception-data";
 import {
   deriveShortDescription,
 } from "../../_lib/overview/brand-overview-helpers";
@@ -21,34 +21,34 @@ type BrandsOverviewPanelProps = {
 };
 
 export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewPanelProps) {
-  const { data, error, loading, reload } = usePerceptionData(apiBaseURL, routeSearch);
+  const { data, error, loading } = usePerceptionData(apiBaseURL, routeSearch);
 
   if (loading && !data) {
     return <BrandPageLoadingState />;
   }
 
-  if (!data) {
-    return <BrandPageUnavailableState error={error} routeSearch={routeSearch} onReload={reload} />;
-  }
-
-  const shortDescription = deriveShortDescription(data.brandCanon);
+  const viewData = data ?? createEmptyPerceptionViewData(routeSearch);
+  const emptyLabel = error || PERCEPTION_TEXT.brandCanon.empty;
+  const shortDescription = deriveShortDescription(viewData.brandCanon);
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
       <PageHeader
-        title="Marque"
-        baseline="Toutes les informations essentielles de la marque réunies sur un seul écran pour être relues rapidement."
+        title="Identité"
+        baseline="Toutes les informations essentielles de la marque sont réunies sur un seul écran pour être relues rapidement."
         actionsVariant="classic"
+        className="gap-3 md:gap-4"
+        actionsClassName="flex-row items-center justify-start translate-y-0 md:translate-y-5"
         actions={
-          <Button asChild variant="default">
+          <Button asChild variant="default" className="w-auto max-w-full whitespace-nowrap">
             <Link to={buildBrandCanonLocation(routeSearch)}>
-              Modifier le référentiel
+              Modifier l'identité
             </Link>
           </Button>
         }
       />
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <Card className="border-border/60 rounded-tr-none">
           <CardHeader>
             <CardTitle className="text-base">
@@ -58,10 +58,10 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
               Les informations les plus utiles pour comprendre la marque immédiatement.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <BrandField label="Nom de la marque" value={data.brandCanon.brandName} />
-            <BrandField label="Secteur" value={data.brandCanon.category} />
-            <BrandField label="Résumé court" value={shortDescription} />
+          <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <BrandField label="Nom de la marque" value={viewData.brandCanon.brandName} emptyLabel={emptyLabel} />
+            <BrandField label="Secteur" value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
+            <BrandField label="Résumé court" value={shortDescription} emptyLabel={emptyLabel} />
           </CardContent>
         </Card>
 
@@ -77,30 +77,30 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
           <CardContent>
             <BrandField
               label="Description"
-              value={data.brandCanon.positioning}
+              value={viewData.brandCanon.positioning}
+              emptyLabel={emptyLabel}
               multiline
             />
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+        <div className="grid gap-3 sm:gap-4 xl:grid-cols-2 2xl:grid-cols-3">
        
           <BrandListSection
             label="Cas d’usage prioritaires"
-            items={data.brandCanon.useCases}
-            emptyLabel={PERCEPTION_TEXT.brandCanon.empty}
+            items={viewData.brandCanon.useCases}
+            emptyLabel={emptyLabel}
             variant="numbered"
           />
           <BrandListSection
             label="Fonctionnalités clés"
-            items={data.brandCanon.features}
-            emptyLabel={PERCEPTION_TEXT.brandCanon.empty}
+            items={viewData.brandCanon.features}
+            emptyLabel={emptyLabel}
             variant="stack"
           />
           <BrandCompetitorsSection
-            competitors={data.competitors}
-            emptyLabel={PERCEPTION_TEXT.brandCanon.empty
-            }
+            competitors={viewData.competitors}
+            emptyLabel={emptyLabel}
           />
         </div>
       </div>
@@ -109,10 +109,12 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
 }
 
 function BrandField({
+  emptyLabel = PERCEPTION_TEXT.brandCanon.empty,
   label,
   value,
   multiline = false,
 }: {
+  emptyLabel?: string;
   label: string;
   value: string;
   multiline?: boolean;
@@ -120,14 +122,14 @@ function BrandField({
   const safeValue = value.trim();
 
   return (
-    <div className="rounded-xl border border-border/60 bg-background/80 p-4">
+    <div className="h-full rounded-xl border border-border/60 bg-background/80 p-4">
       <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
       {safeValue ? (
-        <div className={multiline ? "mt-2 text-sm leading-relaxed whitespace-pre-wrap" : "mt-2 text-sm font-medium"}>
+        <div className={multiline ? "mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed" : "mt-2 break-words text-sm font-medium"}>
           {safeValue}
         </div>
       ) : (
-        <EmptyStateCard label={PERCEPTION_TEXT.brandCanon.empty} className="mt-3 h-14" />
+        <EmptyStateCard label={emptyLabel} className="mt-3 h-14" />
       )}
     </div>
   );
@@ -166,7 +168,7 @@ function BrandListSection({
           <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-muted text-[11px] font-medium">
             {index + 1}
           </span>
-          <span>{item}</span>
+          <span className="break-words">{item}</span>
         </div>
       ))}
     </div>
@@ -175,7 +177,7 @@ function BrandListSection({
       {items.map((item) => (
         <div key={item} className="flex items-start gap-2 rounded-lg bg-muted/15 px-3 py-2 text-sm">
           <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-          <span>{item}</span>
+          <span className="break-words">{item}</span>
         </div>
       ))}
     </div>
@@ -183,7 +185,7 @@ function BrandListSection({
 
   return (
     <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+      <CardHeader className="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <CardTitle className="text-base">
             <SectionTitle showIndicator={false}>{label}</SectionTitle>
@@ -195,9 +197,9 @@ function BrandListSection({
         {items.length === 0 ? (
           content
         ) : (
-          <ScrollArea className="h-[220px] pr-3 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+          <div className="max-h-[50vh] overflow-y-auto pr-1 sm:h-[220px] sm:max-h-none sm:pr-3">
             {content}
-          </ScrollArea>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -222,9 +224,9 @@ function BrandCompetitorsSection({
           key={`${competitor.name}-${competitor.website}`}
           className="rounded-lg border border-border/60 bg-muted/15 px-3 py-2"
         >
-          <div className="text-sm font-medium text-foreground">{competitor.name}</div>
+          <div className="break-words text-sm font-medium text-foreground">{competitor.name}</div>
           {competitor.website ? (
-            <div className="mt-1 text-xs text-muted-foreground">{competitor.website}</div>
+            <div className="mt-1 break-all text-xs text-muted-foreground">{competitor.website}</div>
           ) : null}
         </div>
       ))}
@@ -233,7 +235,7 @@ function BrandCompetitorsSection({
 
   return (
     <Card className="border-border/60">
-      <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+      <CardHeader className="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <CardTitle className="text-base">
             <SectionTitle showIndicator={false}>Concurrents</SectionTitle>
@@ -245,9 +247,9 @@ function BrandCompetitorsSection({
         {competitors.length === 0 ? (
           content
         ) : (
-          <ScrollArea className="h-[280px] pr-3 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+          <div className="max-h-[50vh] overflow-y-auto pr-1 sm:h-[280px] sm:max-h-none sm:pr-3">
             {content}
-          </ScrollArea>
+          </div>
         )}
       </CardContent>
     </Card>
@@ -256,20 +258,19 @@ function BrandCompetitorsSection({
 
 function BrandPageLoadingState() {
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
-      <div className="space-y-3 px-2">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
+      <div className="space-y-3 px-2 sm:px-0">
         <Skeleton className="h-5 w-28" />
         <Skeleton className="h-4 w-[36rem] max-w-full" />
       </div>
 
-      <div className="mt-4 space-y-4">
+      <div className="mt-4 space-y-3 sm:space-y-4">
         <Card className="border-border/60">
           <CardHeader>
             <CardTitle><Skeleton className="h-4 w-32" /></CardTitle>
             <CardDescription><Skeleton className="h-3 w-64 max-w-full" /></CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <Skeleton className="h-24 w-full rounded-xl" />
+          <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
             <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
             <Skeleton className="h-24 w-full rounded-xl" />
@@ -286,53 +287,12 @@ function BrandPageLoadingState() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-4">
-          <Skeleton className="h-52 w-full rounded-xl" />
+        <div className="grid gap-3 sm:gap-4 xl:grid-cols-2 2xl:grid-cols-3">
           <Skeleton className="h-52 w-full rounded-xl" />
           <Skeleton className="h-52 w-full rounded-xl" />
           <Skeleton className="h-52 w-full rounded-xl" />
         </div>
       </div>
-    </div>
-  );
-}
-
-function BrandPageUnavailableState({
-  error,
-  routeSearch,
-  onReload,
-}: {
-  error: string | null;
-  routeSearch: string;
-  onReload: () => Promise<void>;
-}) {
-  return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
-      <PageHeader
-        title="Marque"
-        baseline="Toutes les informations essentielles de la marque réunies sur un seul écran."
-        actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => void onReload()}>
-              Réessayer
-            </Button>
-            <Button asChild>
-              <Link to={buildBrandCanonLocation(routeSearch)}>
-                Modifier le référentiel
-              </Link>
-            </Button>
-          </div>
-        }
-      />
-
-      <Card className="mt-4 border-border/60">
-        <CardHeader>
-          <CardTitle>Impossible de charger la marque</CardTitle>
-          <CardDescription>
-            {error || "Aucune donnée de référentiel ou de perception n’est disponible pour ce projet."}
-          </CardDescription>
-        </CardHeader>
-      </Card>
     </div>
   );
 }

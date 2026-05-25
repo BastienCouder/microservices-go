@@ -8,14 +8,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-assets";
 
 type TrafficEngineFilterProps = {
   value: string;
   engines: string[];
   onValueChange: (value: string) => void;
 };
-
-const engineIcon = "/google_analytics.svg";
 
 export function TrafficEngineFilter({
   value,
@@ -31,7 +30,7 @@ export function TrafficEngineFilter({
         <Button
           type="button"
           variant="outline"
-          className="h-10 justify-between"
+          className="h-10 w-full min-w-0 justify-between"
         >
           <span className="truncate">{currentLabel}</span>
           <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -48,9 +47,9 @@ export function TrafficEngineFilter({
             return (
               <ModelCard
                 key={engine}
-                name={engine === "all" ? "Toutes les sources" : "Traffic GA4"}
+                name={engine === "all" ? "Toutes les sources" : "Moteur IA"}
                 modelGroup={label}
-                icon={engineIcon}
+                icon={getTrafficEngineIconPath(engine)}
                 selected={value === engine}
                 onClick={() => onValueChange(engine)}
                 size="small"

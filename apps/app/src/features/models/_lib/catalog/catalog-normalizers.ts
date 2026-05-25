@@ -25,6 +25,7 @@ export type ModelCatalogAdminFilters = {
   search?: string;
   status?: "all" | "active" | "inactive";
   supportsLiveSearch?: boolean;
+  freeOnly?: boolean;
 };
 
 export function normalizeProjects(value: unknown): ModelsProjectSummary[] {
@@ -100,6 +101,7 @@ export function filterModelCatalogForAdmin(
   const provider = normalizeProviderId(filters.provider ?? "");
   const search = filters.search?.trim().toLowerCase() ?? "";
   const status = filters.status ?? "all";
+  const freeOnly = filters.freeOnly === true;
 
   return sortCatalogItemsByProvider(
     catalog.filter((model) => {
@@ -109,6 +111,9 @@ export function filterModelCatalogForAdmin(
         return false;
       }
       if (filters.supportsLiveSearch === true && !model.supportsLiveSearch) {
+        return false;
+      }
+      if (freeOnly && !looksLikeFreeModel(model)) {
         return false;
       }
       if (!search) return true;
@@ -123,6 +128,19 @@ export function filterModelCatalogForAdmin(
       ].some((value) => value.toLowerCase().includes(search));
     }),
   );
+}
+
+function looksLikeFreeModel(model: ModelCatalogItem): boolean {
+  const haystack = [
+    model.id,
+    model.name,
+    model.providerModelId,
+    model.description,
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(":free") || haystack.includes("(free)");
 }
 
 export type { CatalogModelUpdatePayload };

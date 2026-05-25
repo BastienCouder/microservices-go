@@ -8,7 +8,7 @@ import (
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 )
 
-func TestClassifyGeoEngineRecognizesGenerativeSources(t *testing.T) {
+func TestClassifyTrafficEngineRecognizesGenerativeSources(t *testing.T) {
 	tests := []struct {
 		source string
 		want   string
@@ -18,12 +18,17 @@ func TestClassifyGeoEngineRecognizesGenerativeSources(t *testing.T) {
 		{source: "chat.deepseek.com", want: "DeepSeek"},
 		{source: "copilot.microsoft.com", want: "Microsoft Copilot"},
 		{source: "anthropic.com", want: "Claude"},
+		{source: "https://chat.qwen.ai/c/abc", want: "Qwen"},
+		{source: "z.ai", want: "Z.ai"},
+		{source: "poe.com", want: "Poe"},
+		{source: "kimi.moonshot.cn", want: "Kimi"},
+		{source: "meta.ai", want: "Meta AI"},
 	}
 
 	for _, tt := range tests {
-		got, ok := classifyGeoEngine(tt.source)
+		got, ok := classifyTrafficEngine(tt.source)
 		if !ok {
-			t.Fatalf("expected %q to be classified as GEO", tt.source)
+			t.Fatalf("expected %q to be classified as traffic", tt.source)
 		}
 		if got != tt.want {
 			t.Fatalf("expected %q for %q, got %q", tt.want, tt.source, got)
@@ -44,8 +49,8 @@ func TestClientKeepsFakeTrafficFallbackDisabledByDefault(t *testing.T) {
 	}
 }
 
-func TestBuildGeoDimensionFilterIncludesGeoAndPublicPageFilters(t *testing.T) {
-	filter := buildGeoDimensionFilter(usecase.GeoTrafficFilters{})
+func TestBuildTrafficDimensionFilterIncludesTrafficAndPublicPageFilters(t *testing.T) {
+	filter := buildTrafficDimensionFilter(usecase.TrafficFilters{})
 	root, ok := filter["andGroup"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected root andGroup, got %#v", filter)
@@ -55,13 +60,13 @@ func TestBuildGeoDimensionFilterIncludesGeoAndPublicPageFilters(t *testing.T) {
 		t.Fatalf("expected expressions, got %#v", root["expressions"])
 	}
 	if len(expressions) != 2 {
-		t.Fatalf("expected geo and public page filters, got %#v", expressions)
+		t.Fatalf("expected traffic and public page filters, got %#v", expressions)
 	}
 
-	rawGeo := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
+	rawTraffic := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
 	var hasSessionSource bool
 	var hasPageReferrer bool
-	for _, expression := range rawGeo {
+	for _, expression := range rawTraffic {
 		filterNode := expression["filter"].(map[string]any)
 		switch filterNode["fieldName"] {
 		case "sessionSource":
@@ -70,8 +75,11 @@ func TestBuildGeoDimensionFilterIncludesGeoAndPublicPageFilters(t *testing.T) {
 			hasPageReferrer = true
 		}
 	}
-	if !hasSessionSource || !hasPageReferrer {
-		t.Fatalf("expected sessionSource and pageReferrer filters, got %#v", rawGeo)
+	if !hasSessionSource {
+		t.Fatalf("expected sessionSource filter, got %#v", rawTraffic)
+	}
+	if hasPageReferrer {
+		t.Fatalf("expected traffic filter to align with GA4 channel group and ignore pageReferrer, got %#v", rawTraffic)
 	}
 
 	notExpression, ok := expressions[1]["notExpression"].(map[string]any)
@@ -88,14 +96,58 @@ func TestBuildGeoDimensionFilterIncludesGeoAndPublicPageFilters(t *testing.T) {
 	}
 }
 
-func TestGeoTrafficRequestsUseKeyEventsMetric(t *testing.T) {
+func TestBuildTrafficDimensionFilterUsesAITrafficRegexOnSessionSourceMedium(t *testing.T) {
+	filter := buildTrafficDimensionFilter(usecase.TrafficFilters{})
+	root, ok := filter["andGroup"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected root andGroup, got %#v", filter)
+	}
+	expressions, ok := root["expressions"].([]map[string]any)
+	if !ok {
+		t.Fatalf("expected expressions, got %#v", root["expressions"])
+	}
+
+	trafficExpressions := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
+	var sessionSourceMediumFilter map[string]any
+	for _, expression := range trafficExpressions {
+		filterNode := expression["filter"].(map[string]any)
+		if filterNode["fieldName"] == "sessionSourceMedium" {
+			sessionSourceMediumFilter = filterNode["stringFilter"].(map[string]any)
+			break
+		}
+	}
+	if sessionSourceMediumFilter == nil {
+		t.Fatalf("expected AI traffic regex on sessionSourceMedium, got %#v", trafficExpressions)
+	}
+	if sessionSourceMediumFilter["matchType"] != "FULL_REGEXP" || sessionSourceMediumFilter["caseSensitive"] != false {
+		t.Fatalf("expected case-insensitive full regexp filter, got %#v", sessionSourceMediumFilter)
+	}
+	regex := sessionSourceMediumFilter["value"].(string)
+	for _, expected := range []string{
+		"(?i)",
+		"perplexity",
+		"claude\\.ai",
+		"gemini\\.google\\.com",
+		"copy\\.ai",
+		"chat-gpt\\.org",
+		"qwen",
+		"z\\.ai",
+		"poe",
+	} {
+		if !strings.Contains(regex, expected) {
+			t.Fatalf("expected AI traffic regex to include %q, got %q", expected, regex)
+		}
+	}
+}
+
+func TestTrafficRequestsUseKeyEventsMetric(t *testing.T) {
 	from := time.Date(2026, 3, 29, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)
 
 	requests := []map[string]any{
-		buildGeoSourceRequest(from, to, usecase.GeoTrafficFilters{}),
-		buildGeoTopPagesRequest(from, to, usecase.GeoTrafficFilters{}),
-		buildGeoTimeseriesRequest(from, to, usecase.GeoTrafficFilters{}),
+		buildTrafficSourceRequest(from, to, usecase.TrafficFilters{}),
+		buildTrafficTopPagesRequest(from, to, usecase.TrafficFilters{}),
+		buildTrafficTimeseriesRequest(from, to, usecase.TrafficFilters{}),
 	}
 
 	for _, request := range requests {
@@ -118,8 +170,8 @@ func TestGeoTrafficRequestsUseKeyEventsMetric(t *testing.T) {
 	}
 }
 
-func TestBuildGeoDimensionFilterAddsBackendSearchAndEngineFilters(t *testing.T) {
-	filter := buildGeoDimensionFilter(usecase.GeoTrafficFilters{
+func TestBuildTrafficDimensionFilterAddsBackendSearchAndEngineFilters(t *testing.T) {
+	filter := buildTrafficDimensionFilter(usecase.TrafficFilters{
 		Search: "pricing",
 		Engine: "ChatGPT",
 	})
@@ -132,16 +184,16 @@ func TestBuildGeoDimensionFilterAddsBackendSearchAndEngineFilters(t *testing.T) 
 		t.Fatalf("expected expressions, got %#v", root["expressions"])
 	}
 	if len(expressions) != 3 {
-		t.Fatalf("expected geo, public page, and search filters, got %#v", expressions)
+		t.Fatalf("expected traffic, public page, and search filters, got %#v", expressions)
 	}
 
-	geoExpressions := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
-	for _, expression := range geoExpressions {
+	trafficExpressions := expressions[0]["orGroup"].(map[string]any)["expressions"].([]map[string]any)
+	for _, expression := range trafficExpressions {
 		filterNode := expression["filter"].(map[string]any)
 		stringFilter := filterNode["stringFilter"].(map[string]any)
 		if !strings.Contains(strings.ToLower(stringFilter["value"].(string)), "chatgpt") &&
 			!strings.Contains(strings.ToLower(stringFilter["value"].(string)), "openai") {
-			t.Fatalf("expected ChatGPT-only geo filter, got %#v", geoExpressions)
+			t.Fatalf("expected ChatGPT-only traffic filter, got %#v", trafficExpressions)
 		}
 	}
 
@@ -181,10 +233,19 @@ func TestBuildRunReportRequestDoesNotFilterByHostName(t *testing.T) {
 		if filterNode["fieldName"] == "hostName" {
 			t.Fatalf("expected no GA4 hostName filter, got %#v", expressions)
 		}
+		if filterNode["fieldName"] == "sessionSource" {
+			values := filterNode["inListFilter"].(map[string]any)["values"].([]string)
+			joined := strings.Join(values, ",")
+			for _, expected := range []string{"chat.qwen.ai", "z.ai", "poe.com"} {
+				if !strings.Contains(joined, expected) {
+					t.Fatalf("expected expanded AI source %q in GA4 request values, got %#v", expected, values)
+				}
+			}
+		}
 	}
 }
 
-func TestParseGeoSourceRowsUsesPageReferrerWhenSessionSourceIsDirect(t *testing.T) {
+func TestParseTrafficSourceRowsIgnoresPageReferrerOnlyTraffic(t *testing.T) {
 	rows := []ga4RunReportRow{
 		{
 			DimensionValues: []ga4Value{
@@ -205,20 +266,14 @@ func TestParseGeoSourceRowsUsesPageReferrerWhenSessionSourceIsDirect(t *testing.
 		},
 	}
 
-	sources := parseGeoSourceRows(rows)
+	sources := parseTrafficSourceRows(rows)
 
-	if len(sources) != 1 {
-		t.Fatalf("expected pageReferrer ChatGPT row to be kept, got %+v", sources)
-	}
-	if sources[0].Source != "chatgpt.com" || sources[0].Engine != "ChatGPT" {
-		t.Fatalf("expected ChatGPT source from pageReferrer, got %+v", sources[0])
-	}
-	if sources[0].Medium != "referral" || sources[0].SourceMedium != "chatgpt.com / referral" {
-		t.Fatalf("expected referral source medium from pageReferrer, got %+v", sources[0])
+	if len(sources) != 0 {
+		t.Fatalf("expected pageReferrer-only ChatGPT row to be ignored for GA4 channel alignment, got %+v", sources)
 	}
 }
 
-func TestParseGeoSourceRowsAggregatesSameChatGPTSource(t *testing.T) {
+func TestParseTrafficSourceRowsAggregatesSameChatGPTSource(t *testing.T) {
 	rows := []ga4RunReportRow{
 		{
 			DimensionValues: []ga4Value{
@@ -256,7 +311,7 @@ func TestParseGeoSourceRowsAggregatesSameChatGPTSource(t *testing.T) {
 		},
 	}
 
-	sources := parseGeoSourceRows(rows)
+	sources := parseTrafficSourceRows(rows)
 
 	if len(sources) != 1 {
 		t.Fatalf("expected duplicate ChatGPT rows to be aggregated, got %+v", sources)
@@ -265,18 +320,18 @@ func TestParseGeoSourceRowsAggregatesSameChatGPTSource(t *testing.T) {
 	if got.Source != "chatgpt.com" || got.Engine != "ChatGPT" {
 		t.Fatalf("expected normalized ChatGPT source, got %+v", got)
 	}
-	if got.Sessions != 2 || got.EngagedSessions != 1 || got.PageViews != 5 {
-		t.Fatalf("expected aggregated metrics, got %+v", got)
+	if got.Sessions != 1 || got.EngagedSessions != 0 || got.PageViews != 2 {
+		t.Fatalf("expected only session-source AI metrics, got %+v", got)
 	}
-	if got.EngagementRate != 50 || got.BounceRate != 50 || got.AvgSessionSeconds != 80 {
-		t.Fatalf("expected weighted rates and duration, got %+v", got)
+	if got.EngagementRate != 0 || got.BounceRate != 100 || got.AvgSessionSeconds != 0 {
+		t.Fatalf("expected rates from session-source AI row only, got %+v", got)
 	}
-	if got.ShareOfGeoSessions != 100 {
+	if got.ShareOfTrafficSessions != 100 {
 		t.Fatalf("expected source share to be recomputed, got %+v", got)
 	}
 }
 
-func TestParseGeoTopPageRowsAggregatesSamePageAndSource(t *testing.T) {
+func TestParseTrafficTopPageRowsAggregatesSamePageAndSource(t *testing.T) {
 	rows := []ga4RunReportRow{
 		{
 			DimensionValues: []ga4Value{
@@ -308,7 +363,7 @@ func TestParseGeoTopPageRowsAggregatesSamePageAndSource(t *testing.T) {
 		},
 	}
 
-	pages := parseGeoTopPageRows(rows)
+	pages := parseTrafficTopPageRows(rows)
 
 	if len(pages) != 1 {
 		t.Fatalf("expected duplicate page/source rows to be aggregated, got %+v", pages)
@@ -317,8 +372,8 @@ func TestParseGeoTopPageRowsAggregatesSamePageAndSource(t *testing.T) {
 	if got.Path != "/" || got.Source != "chatgpt.com" || got.Engine != "ChatGPT" {
 		t.Fatalf("expected normalized page source, got %+v", got)
 	}
-	if got.Sessions != 2 || got.EngagedSessions != 1 || got.PageViews != 5 || got.EngagementRate != 50 {
-		t.Fatalf("expected aggregated page metrics, got %+v", got)
+	if got.Sessions != 1 || got.EngagedSessions != 0 || got.PageViews != 2 || got.EngagementRate != 0 {
+		t.Fatalf("expected page metrics from session-source AI row only, got %+v", got)
 	}
 }
 
@@ -382,12 +437,12 @@ func TestBuildGA4TrafficLogPreviewIncludesRawRowsAndFilters(t *testing.T) {
 		usecase.ProjectMetadata{ID: "project-1"},
 		from,
 		to,
-		usecase.GeoTrafficFilters{Search: "chatgpt", Engine: "ChatGPT"},
+		usecase.TrafficFilters{Search: "chatgpt", Engine: "ChatGPT"},
 		ga4RunReportResponse{Rows: []ga4RunReportRow{{MetricValues: []ga4Value{{Value: "8"}}}}},
 		sourceResponse,
 		topPagesResponse,
 		timeseriesResponse,
-		usecase.GeoTrafficReport{PropertyID: "123456"},
+		usecase.TrafficReport{PropertyID: "123456"},
 	)
 
 	if preview.DateRange.StartDate != "2026-04-28" || preview.DateRange.EndDate != "2026-04-28" {
@@ -417,20 +472,20 @@ func TestBuildGA4TrafficLogPreviewIncludesRawRowsAndFilters(t *testing.T) {
 	}
 }
 
-func TestBuildFakeGeoTrafficReportFillsDashboardRows(t *testing.T) {
+func TestBuildFakeTrafficReportFillsDashboardRows(t *testing.T) {
 	from := time.Date(2026, 3, 29, 0, 0, 0, 0, time.UTC)
 	to := time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)
-	base := usecase.GeoTrafficReport{
+	base := usecase.TrafficReport{
 		ProjectID:  "nike",
 		PropertyID: "379124317",
-		DateRange: usecase.GeoTrafficDateRange{
+		DateRange: usecase.TrafficDateRange{
 			StartDate: from.Format("2006-01-02"),
 			EndDate:   to.Format("2006-01-02"),
 		},
-		Summary: usecase.GeoTrafficSummary{TotalSessions: 1200},
+		Summary: usecase.TrafficSummary{TotalSessions: 1200},
 	}
 
-	report := buildFakeGeoTrafficReport(base, from, to)
+	report := buildFakeTrafficReport(base, from, to)
 
 	if report.ProjectID != "nike" || report.PropertyID != "379124317" {
 		t.Fatalf("expected project and property to be preserved, got %+v", report)
@@ -438,10 +493,10 @@ func TestBuildFakeGeoTrafficReportFillsDashboardRows(t *testing.T) {
 	if report.DataSource != "fake" {
 		t.Fatalf("expected fake data source, got %q", report.DataSource)
 	}
-	if report.Summary.TotalGeoSessions <= 0 || report.Summary.TotalSessions < report.Summary.TotalGeoSessions {
+	if report.Summary.TotalTrafficSessions <= 0 || report.Summary.TotalSessions < report.Summary.TotalTrafficSessions {
 		t.Fatalf("expected coherent fake summary, got %+v", report.Summary)
 	}
-	if len(report.BySource) < 4 {
+	if len(report.BySource) < 8 {
 		t.Fatalf("expected multiple fake sources, got %+v", report.BySource)
 	}
 	if len(report.TopPages) == 0 {
@@ -450,7 +505,7 @@ func TestBuildFakeGeoTrafficReportFillsDashboardRows(t *testing.T) {
 	if len(report.Timeseries) == 0 {
 		t.Fatalf("expected fake timeseries")
 	}
-	if report.BySource[0].ShareOfGeoSessions <= 0 {
+	if report.BySource[0].ShareOfTrafficSessions <= 0 {
 		t.Fatalf("expected fake source shares, got %+v", report.BySource[0])
 	}
 }

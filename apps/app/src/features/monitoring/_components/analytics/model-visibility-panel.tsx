@@ -3,8 +3,8 @@
 import { memo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChartContainer } from "@/components/ui/chart";
-import { Bar, BarChart, Cell, LabelList, XAxis, YAxis } from "recharts";
+import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from "recharts";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { VISIBILITY_ANALYTICS_COLORS } from "@/lib/app-data";
 import { SectionTitle } from "@/components/shared/section-title";
@@ -45,7 +45,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
             <CardTitle className="text-base font-semibold sm:text-lg">
               <SectionTitle>{title || content.visibilityAnalyticsTitle}</SectionTitle>
             </CardTitle>
-            <CardDescription className="text-xs leading-relaxed md:text-sm">
+            <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">
               {content.modelVisibilityMetricDescription}
               {hasCompetitorFilter
                 ? ` ${content.modelVisibilityMetricDescriptionWithCompetitor}`
@@ -57,59 +57,101 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="min-w-0">
+      <CardContent className="min-w-0 px-0 md:px-4 group-data-[size=lg]/card:px-0 md:group-data-[size=sm]/card:px-3">
         {!hasData ? (
           <EmptyStateCard label={content.noDataAvailable} className="h-[220px] text-sm" />
         ) : (
           <div className="flex min-w-0 flex-col">
-          <ChartContainer
-            config={chartConfig}
-            className="!aspect-auto min-h-0 w-full overflow-x-hidden"
-            style={{ height: `${chartAreaHeight}px`, minHeight: `${chartAreaHeight}px` }}
-          >
-            <BarChart
-              data={barData}
-              layout="vertical"
-              height={chartAreaHeight}
-              margin={{ top: 8, right: 26, bottom: 0, left: 4 }}
-              barCategoryGap={10}
+            <ChartContainer
+              config={chartConfig}
+              className="!aspect-auto h-[220px] min-h-0 w-full overflow-x-hidden md:hidden"
             >
-              <XAxis
-                type="number"
-                domain={[0, Math.ceil(maxValue * 1.15)]}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={6}
-                fontSize={11}
-                tick={{ fill: VISIBILITY_ANALYTICS_COLORS.axisTick }}
-              />
-              <YAxis
-                type="category"
-                dataKey="label"
-                width={yAxisWidth}
-                tickLine={false}
-                axisLine={false}
-                tickMargin={10}
-                tick={<VisibilityYAxisTick />}
-              />
-              <Bar
-                dataKey="value"
-                radius={[0, 5, 5, 0]}
-                isAnimationActive
-                fill={VISIBILITY_ANALYTICS_COLORS.fallbackBar}
+              <BarChart
+                data={barData}
+                margin={{ top: 20, right: 16, bottom: 20, left: 0 }}
+                barCategoryGap={14}
               >
-                {barData.map((entry, index) => (
-                  <Cell key={entry.id} fill={entry.fill} />
-                ))}
-                <LabelList
-                  dataKey="value"
-                  position="right"
-                  formatter={(value) => `${value ?? 0}`}
-                  className="fill-foreground text-xs font-medium"
+                <CartesianGrid vertical={false} strokeDasharray="3 3" opacity={0.1} />
+                <XAxis
+                  dataKey="label"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  fontSize={11}
+                  interval={0}
+                  tick={{ fill: VISIBILITY_ANALYTICS_COLORS.axisTick }}
                 />
-              </Bar>
-            </BarChart>
-          </ChartContainer>
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  domain={[0, Math.ceil(maxValue * 1.15)]}
+                  tickFormatter={(value) => `${value}`}
+                  fontSize={11}
+                  tick={{ fill: VISIBILITY_ANALYTICS_COLORS.axisTick }}
+                />
+                <ChartTooltip content={<ModelVisibilityTooltip />} cursor={{ fill: "hsl(var(--chart-cursor) / 0.2)" }} />
+                <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={56}>
+                  {barData.map((entry) => (
+                    <Cell key={entry.id} fill={entry.fill} />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="top"
+                    formatter={(value) => `${value ?? 0}`}
+                    className="fill-foreground text-xs font-medium"
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
+
+            <ChartContainer
+              config={chartConfig}
+              className="!aspect-auto hidden min-h-0 w-full overflow-x-hidden md:block"
+              style={{ height: `${chartAreaHeight}px`, minHeight: `${chartAreaHeight}px` }}
+            >
+              <BarChart
+                data={barData}
+                layout="vertical"
+                height={chartAreaHeight}
+                margin={{ top: 8, right: 26, bottom: 0, left: 4 }}
+                barCategoryGap={10}
+              >
+                <XAxis
+                  type="number"
+                  domain={[0, Math.ceil(maxValue * 1.15)]}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={6}
+                  fontSize={11}
+                  tick={{ fill: VISIBILITY_ANALYTICS_COLORS.axisTick }}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="label"
+                  width={yAxisWidth}
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={10}
+                  tick={<VisibilityYAxisTick />}
+                />
+                <Bar
+                  dataKey="value"
+                  radius={[0, 5, 5, 0]}
+                  isAnimationActive
+                  fill={VISIBILITY_ANALYTICS_COLORS.fallbackBar}
+                >
+                  {barData.map((entry) => (
+                    <Cell key={entry.id} fill={entry.fill} />
+                  ))}
+                  <LabelList
+                    dataKey="value"
+                    position="right"
+                    formatter={(value) => `${value ?? 0}`}
+                    className="fill-foreground text-xs font-medium"
+                  />
+                </Bar>
+              </BarChart>
+            </ChartContainer>
           </div>
         )}
       </CardContent>
@@ -211,5 +253,39 @@ function VisibilityYAxisTick({
         </tspan>
       ))}
     </text>
+  );
+}
+
+function ModelVisibilityTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    value?: number;
+    payload?: VisibilityBarDatum;
+    color?: string;
+  }>;
+}) {
+  const item = payload?.[0];
+  const row = item?.payload;
+
+  if (!active || !item || !row) {
+    return null;
+  }
+
+  return (
+    <div className="min-w-[180px] max-w-[260px] rounded-md border border-border/60 bg-background/95 p-3 shadow-sm backdrop-blur-sm">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color ?? row.fill }} />
+        <span className="min-w-0 break-words text-sm font-medium leading-snug">
+          {row.label}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Visibility</span>
+        <span className="font-mono tabular-nums">{row.value}</span>
+      </div>
+    </div>
   );
 }

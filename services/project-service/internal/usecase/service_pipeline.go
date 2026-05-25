@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -83,9 +84,24 @@ func (s *Service) ProcessFinalizedProjectOutboxEvent(ctx context.Context, eventI
 
 	err = s.runInitialAnalysis(ctx, payload.Project, payload.Prompts, payload.ModelIDs, payload.Competitors)
 	if err != nil {
+		log.Printf(
+			"prompt_analysis.initial_failed event_id=%s project_id=%s prompts=%d models=%v error=%v",
+			eventID,
+			payload.Project.ID,
+			len(payload.Prompts),
+			payload.ModelIDs,
+			err,
+		)
 		_ = s.markOutboxProcessingFailed(context.Background(), eventID)
 		return err
 	}
+	log.Printf(
+		"prompt_analysis.initial_completed event_id=%s project_id=%s prompts=%d models=%v",
+		eventID,
+		payload.Project.ID,
+		len(payload.Prompts),
+		payload.ModelIDs,
+	)
 	if err := s.markOutboxProcessed(ctx, eventID); err != nil {
 		return err
 	}
@@ -297,6 +313,17 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		runType = "manual"
 	}
 
+	log.Printf(
+		"prompt_analysis.start project_id=%s organization_id=%d run_type=%s request_id=%s prompts=%d models=%v competitors=%d",
+		project.ID,
+		project.OrganizationID,
+		runType,
+		strings.TrimSpace(requestID),
+		len(prompts),
+		effectiveModelIDs,
+		len(competitors),
+	)
+
 	startResp, err := s.analysisClient.StartAnalysis(ctx, AnalysisStartRequest{
 		RequestID:      requestID,
 		OrganizationID: project.OrganizationID,
@@ -307,11 +334,27 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		RunType:        runType,
 	})
 	if err != nil {
+		log.Printf(
+			"prompt_analysis.start_failed project_id=%s run_type=%s prompts=%d models=%v error=%v",
+			project.ID,
+			runType,
+			len(prompts),
+			effectiveModelIDs,
+			err,
+		)
 		return AnalysisStartResponse{}, fmt.Errorf("start analysis run: %w", err)
 	}
 	if startResp.RunID == "" {
 		return AnalysisStartResponse{}, fmt.Errorf("start analysis run: empty run id")
 	}
+	log.Printf(
+		"prompt_analysis.run_created run_id=%s project_id=%s run_type=%s prompt_runs=%d models=%v",
+		startResp.RunID,
+		project.ID,
+		runType,
+		len(startResp.PromptRuns),
+		effectiveModelIDs,
+	)
 
 	if len(startResp.PromptRuns) == 0 {
 		startResp.PromptRuns = make([]AnalysisPromptRun, 0, len(prompts))
@@ -334,19 +377,50 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		for _, modelID := range promptModelIDs {
 			credential, err := s.resolveProviderCredentialForModel(ctx, project.ID, project.OrganizationID, modelID)
 			if err != nil {
+				log.Printf(
+					"prompt_analysis.credential_failed run_id=%s project_id=%s prompt_id=%s model_id=%s error=%v",
+					startResp.RunID,
+					project.ID,
+					promptRun.PromptID,
+					modelID,
+					err,
+				)
 				return AnalysisStartResponse{}, fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
 			}
 
+			execStart := time.Now()
+			log.Printf(
+				"prompt_analysis.model_start run_id=%s project_id=%s prompt_id=%s prompt_run_id=%s model_id=%s provider_id=%s provider_model_id=%s",
+				startResp.RunID,
+				project.ID,
+				promptRun.PromptID,
+				promptRun.ID,
+				modelID,
+				credential.ProviderID,
+				credential.ProviderModelID,
+			)
 			iaResult, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{
 				PromptID:       promptRun.PromptID,
 				PromptText:     promptRun.PromptText,
 				ModelID:        credential.ProviderModelID,
 				ProviderID:     credential.ProviderID,
 				ProviderAPIKey: credential.ProviderAPIKey,
+				PromptMode:     PromptModeOrganic,
 				BrandName:      project.BrandName,
 				Competitors:    competitors,
 			})
 			if err != nil {
+				log.Printf(
+					"prompt_analysis.model_failed run_id=%s project_id=%s prompt_id=%s prompt_run_id=%s model_id=%s provider_id=%s duration_ms=%d error=%v",
+					startResp.RunID,
+					project.ID,
+					promptRun.PromptID,
+					promptRun.ID,
+					modelID,
+					credential.ProviderID,
+					time.Since(execStart).Milliseconds(),
+					err,
+				)
 				return AnalysisStartResponse{}, fmt.Errorf("execute ia prompt %s on %s: %w", promptRun.PromptID, modelID, err)
 			}
 			err = s.analysisClient.RecordResponse(ctx, startResp.RunID, AnalysisRecordResponseInput{
@@ -360,10 +434,42 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 				Sentiment:      iaResult.Analysis.Sentiment,
 			})
 			if err != nil {
+				log.Printf(
+					"prompt_analysis.record_failed run_id=%s project_id=%s prompt_id=%s prompt_run_id=%s model_id=%s duration_ms=%d error=%v",
+					startResp.RunID,
+					project.ID,
+					promptRun.PromptID,
+					promptRun.ID,
+					modelID,
+					time.Since(execStart).Milliseconds(),
+					err,
+				)
 				return AnalysisStartResponse{}, fmt.Errorf("record analysis response: %w", err)
 			}
+			log.Printf(
+				"prompt_analysis.model_completed run_id=%s project_id=%s prompt_id=%s prompt_run_id=%s model_id=%s duration_ms=%d brand_mentioned=%t brand_position=%s citation_found=%t sentiment=%s response_chars=%d",
+				startResp.RunID,
+				project.ID,
+				promptRun.PromptID,
+				promptRun.ID,
+				modelID,
+				time.Since(execStart).Milliseconds(),
+				iaResult.Analysis.BrandMentioned,
+				iaResult.Analysis.BrandPosition,
+				iaResult.Analysis.CitationFound,
+				iaResult.Analysis.Sentiment,
+				len(iaResult.RawResponse),
+			)
 		}
 	}
 
+	log.Printf(
+		"prompt_analysis.completed run_id=%s project_id=%s run_type=%s prompts=%d models=%v",
+		startResp.RunID,
+		project.ID,
+		runType,
+		len(prompts),
+		effectiveModelIDs,
+	)
 	return startResp, nil
 }

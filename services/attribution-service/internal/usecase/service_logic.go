@@ -18,9 +18,9 @@ func (s *Service) EnableVisitProvider(projectResolver ProjectMetadataResolver, v
 	s.visitProvider = visitProvider
 }
 
-func (s *Service) EnableGeoTrafficProvider(projectResolver ProjectMetadataResolver, geoTrafficProvider GeoTrafficProvider) {
+func (s *Service) EnableTrafficProvider(projectResolver ProjectMetadataResolver, trafficProvider TrafficProvider) {
 	s.projectResolver = projectResolver
-	s.geoTrafficProvider = geoTrafficProvider
+	s.trafficProvider = trafficProvider
 }
 
 func (s *Service) RecordEvent(ctx context.Context, input RecordEventInput) (Event, error) {
@@ -187,49 +187,49 @@ func (s *Service) GetFunnel(
 	}, nil
 }
 
-func (s *Service) GetGeoTrafficReport(
+func (s *Service) GetTrafficReport(
 	ctx context.Context,
 	projectID,
 	userID string,
 	organizationID int64,
 	from,
 	to time.Time,
-	filters GeoTrafficFilters,
-) (GeoTrafficReport, error) {
+	filters TrafficFilters,
+) (TrafficReport, error) {
 	projectID = strings.TrimSpace(projectID)
 	userID = strings.TrimSpace(userID)
 	if projectID == "" || userID == "" {
-		return GeoTrafficReport{}, fmt.Errorf("%w: projectId and userId are required", ErrValidation)
+		return TrafficReport{}, fmt.Errorf("%w: projectId and userId are required", ErrValidation)
 	}
 	if organizationID <= 0 {
-		return GeoTrafficReport{}, fmt.Errorf("%w: organizationId is required", ErrValidation)
+		return TrafficReport{}, fmt.Errorf("%w: organizationId is required", ErrValidation)
 	}
-	if s.projectResolver == nil || s.geoTrafficProvider == nil {
-		return GeoTrafficReport{}, fmt.Errorf("%w: ga4 traffic provider is not configured", ErrValidation)
+	if s.projectResolver == nil || s.trafficProvider == nil {
+		return TrafficReport{}, fmt.Errorf("%w: ga4 traffic provider is not configured", ErrValidation)
 	}
 
 	windowFrom, windowTo, err := normalizeWindow(from, to, s.now)
 	if err != nil {
-		return GeoTrafficReport{}, err
+		return TrafficReport{}, err
 	}
 
 	project, err := s.projectResolver.GetProject(ctx, projectID, organizationID)
 	if err != nil {
 		if errors.Is(err, ErrValidation) || errors.Is(err, ErrUnauthorized) || errors.Is(err, ErrNotFound) {
-			return GeoTrafficReport{}, err
+			return TrafficReport{}, err
 		}
-		return GeoTrafficReport{}, fmt.Errorf("%w: project metadata unavailable: %v", ErrDependencyUnavailable, err)
+		return TrafficReport{}, fmt.Errorf("%w: project metadata unavailable: %v", ErrDependencyUnavailable, err)
 	}
 	if strings.TrimSpace(project.GA4.PropertyID) == "" ||
 		(strings.TrimSpace(project.GA4.ServiceAccountJSON) == "" && strings.TrimSpace(project.GA4.OAuthRefreshToken) == "") {
-		return GeoTrafficReport{}, fmt.Errorf("%w: ga4 integration is not configured for project", ErrValidation)
+		return TrafficReport{}, fmt.Errorf("%w: ga4 integration is not configured for project", ErrValidation)
 	}
 
 	filters.Search = strings.TrimSpace(filters.Search)
 	filters.Engine = strings.TrimSpace(filters.Engine)
-	report, err := s.geoTrafficProvider.GetGeoTrafficReport(ctx, project, windowFrom, windowTo, filters)
+	report, err := s.trafficProvider.GetTrafficReport(ctx, project, windowFrom, windowTo, filters)
 	if err != nil {
-		return GeoTrafficReport{}, fmt.Errorf("%w: ga4 traffic unavailable: %v", ErrDependencyUnavailable, err)
+		return TrafficReport{}, fmt.Errorf("%w: ga4 traffic unavailable: %v", ErrDependencyUnavailable, err)
 	}
 	if strings.TrimSpace(report.ProjectID) == "" {
 		report.ProjectID = projectID

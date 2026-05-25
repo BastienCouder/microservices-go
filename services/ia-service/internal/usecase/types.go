@@ -17,12 +17,20 @@ const (
 	ExecutionModeProvider ExecutionMode = "provider"
 )
 
+type PromptMode string
+
+const (
+	PromptModeOrganic PromptMode = "organic"
+	PromptModeGuided  PromptMode = "guided"
+)
+
 type ExecutePromptInput struct {
 	PromptID       string
 	PromptText     string
 	ModelID        string
 	ProviderID     string
 	ProviderAPIKey string
+	PromptMode     PromptMode
 	BrandName      string
 	Competitors    []string
 	MockResponse   string

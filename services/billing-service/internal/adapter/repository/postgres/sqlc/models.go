@@ -24,6 +24,26 @@ type BillingSubscription struct {
 	UpdatedAt            pgtype.Timestamptz
 }
 
+type BillingPlanSetting struct {
+	Plan                    string
+	MonthlyPriceCents       int32
+	YearlyPriceCents        int32
+	MonthlyQuota            int32
+	ModelSelectionLimit     int32
+	MonthlyModelChangeLimit int32
+	UpdatedAt               pgtype.Timestamptz
+}
+
+type BillingPricingTier struct {
+	PromptVolume        int32
+	Label               string
+	DeveloperPriceCents pgtype.Int4
+	StarterPriceCents   pgtype.Int4
+	GrowthPriceCents    pgtype.Int4
+	ProPriceCents       pgtype.Int4
+	UpdatedAt           pgtype.Timestamptz
+}
+
 type BillingStripeWebhookEvent struct {
 	EventID     string
 	EventType   string

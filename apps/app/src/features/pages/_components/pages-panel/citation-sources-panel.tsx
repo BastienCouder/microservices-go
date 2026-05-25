@@ -10,11 +10,13 @@ import type { CitationSource } from "../../_lib/pages-panel/types";
 import { ModelIconStack } from "./model-badge";
 
 type CitationSourcesPanelProps = {
+  errorLabel?: string | null;
   sources: CitationSource[];
   loading?: boolean;
 };
 
 export function CitationSourcesPanel({
+  errorLabel,
   sources,
   loading = false,
 }: CitationSourcesPanelProps) {
@@ -56,7 +58,7 @@ export function CitationSourcesPanel({
           </div>
         ) : sources.length === 0 ? (
           <EmptyStateCard
-            label="Aucun site tiers détecté pour le moment."
+            label={errorLabel || "Aucun site tiers détecté pour le moment."}
             className="h-[190px]"
           />
         ) : (

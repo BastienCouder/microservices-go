@@ -1,7 +1,7 @@
 import type {
-  GeoTrafficDailyPoint,
-  GeoTrafficPage,
-  GeoTrafficSource,
+  TrafficDailyPoint,
+  TrafficPage,
+  TrafficSource,
 } from "./types";
 
 export type TrafficReportFilters = {
@@ -19,9 +19,9 @@ export type PaginatedTrafficItems<T> = {
 
 export type TrafficReportViewData = {
   availableEngines: string[];
-  sources: PaginatedTrafficItems<GeoTrafficSource>;
-  topPages: PaginatedTrafficItems<GeoTrafficPage>;
-  timeseries: GeoTrafficDailyPoint[];
+  sources: PaginatedTrafficItems<TrafficSource>;
+  topPages: PaginatedTrafficItems<TrafficPage>;
+  timeseries: TrafficDailyPoint[];
 };
 
 const defaultPageSize = 10;
@@ -52,7 +52,7 @@ function paginate<T>(
   };
 }
 
-function capTimeseries(points: GeoTrafficDailyPoint[]): GeoTrafficDailyPoint[] {
+function capTimeseries(points: TrafficDailyPoint[]): TrafficDailyPoint[] {
   if (points.length <= maxTrendPoints) {
     return points;
   }
@@ -62,7 +62,7 @@ function capTimeseries(points: GeoTrafficDailyPoint[]): GeoTrafficDailyPoint[] {
   return [...sampled, points[points.length - 1]].filter(Boolean);
 }
 
-export function isPrivateTrafficPage(page: GeoTrafficPage): boolean {
+export function isPrivateTrafficPage(page: TrafficPage): boolean {
   const normalizedPath = (page.path || "/").trim().toLowerCase();
   return privatePagePathPrefixes.some(
     (prefix) => normalizedPath === prefix || normalizedPath.startsWith(`${prefix}/`),
@@ -75,9 +75,9 @@ export function buildTrafficReportViewData({
   timeseries,
   filters,
 }: {
-  sources: GeoTrafficSource[];
-  topPages: GeoTrafficPage[];
-  timeseries: GeoTrafficDailyPoint[];
+  sources: TrafficSource[];
+  topPages: TrafficPage[];
+  timeseries: TrafficDailyPoint[];
   filters: TrafficReportFilters;
 }): TrafficReportViewData {
   const publicTopPages = topPages.filter((page) => !isPrivateTrafficPage(page));

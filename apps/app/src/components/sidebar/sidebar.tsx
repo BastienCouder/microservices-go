@@ -1,9 +1,8 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ArrowLeft, LogOut } from "lucide-react";
 
-import { Separator } from "@/components/ui/separator";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
@@ -46,8 +45,16 @@ import {
   normalizeOrganizationHierarchy,
   selectPreferredID,
 } from "./sidebar-state";
+import { Button } from "../ui/button";
 
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
+const SETTINGS_PATHS = [
+  "/organizations",
+  "/account",
+  "/admin/organizations",
+  "/admin/pricing",
+  "/admin/models",
+];
 
 type SidebarProps = {
   apiBaseURL?: string;
@@ -57,50 +64,53 @@ type SidebarProps = {
   onLogout?: () => Promise<void>;
 };
 
-function getInitials(value: string): string {
-  const [first = "", second = ""] = value.trim().split(/\s+/);
+type NavItem = {
+  href: string;
+  label: string;
+  active: boolean;
+  onClick?: () => void;
+};
 
-  if (!first) return "PR";
-  if (!second) return first.slice(0, 2).toUpperCase();
+type NavSectionProps = {
+  title?: string;
+  items: NavItem[];
+  collapsed: boolean;
+  indent?: boolean;
+};
 
-  return `${first[0]}${second[0]}`.toUpperCase();
-}
+const initials = (value: string) => {
+  const [a = "", b = ""] = value.trim().split(/\s+/);
+  return (!a ? "PR" : b ? `${a[0]}${b[0]}` : a.slice(0, 2)).toUpperCase();
+};
 
-function normalizeSidebarProjects(
+const normalizeProjects = (
   hierarchy: OrganizationHierarchy | null,
-): SidebarProjectOption[] {
-  if (!hierarchy) return [];
+): SidebarProjectOption[] =>
+  hierarchy
+    ? [...hierarchy.projects]
+      .sort((a, b) => a.name.localeCompare(b.name, "en"))
+      .map((project) => ({
+        id: project.id,
+        slug: project.slug,
+        name: project.name,
+        organizationId: hierarchy.organization.id,
+        organizationSlug: hierarchy.organization.slug,
+        organizationName: hierarchy.organization.name,
+        brandName: project.brandName,
+        status: project.status,
+        initials: initials(project.name),
+      }))
+    : [];
 
-  const { organization, projects } = hierarchy;
-
-  return [...projects]
-    .sort((left, right) => left.name.localeCompare(right.name, "en"))
-    .map((project) => ({
-      id: project.id,
-      slug: project.slug,
-      name: project.name,
-      organizationId: organization.id,
-      organizationSlug: organization.slug,
-      organizationName: organization.name,
-      brandName: project.brandName,
-      status: project.status,
-      initials: getInitials(project.name),
-    }));
-}
-
-async function loadSidebarHierarchy(
+async function loadHierarchy(
   apiBaseURL: string,
   organizationId: string,
   signal?: AbortSignal,
-): Promise<OrganizationHierarchy | null> {
+) {
   const response = await gatewayJSON<unknown>(
     apiBaseURL,
     apiRoutes.organizations.hierarchy(organizationId),
-    {
-      method: "GET",
-      organizationId,
-      signal,
-    },
+    { method: "GET", organizationId, signal },
   );
 
   if (!response.ok) {
@@ -110,15 +120,44 @@ async function loadSidebarHierarchy(
   return normalizeOrganizationHierarchy(response.data, organizationId);
 }
 
-async function loadSidebarHierarchies(
+const loadHierarchies = (
   apiBaseURL: string,
   organizations: OrganizationSummary[],
   signal?: AbortSignal,
-): Promise<Array<OrganizationHierarchy | null>> {
-  return Promise.all(
-    organizations.map((organization) =>
-      loadSidebarHierarchy(apiBaseURL, organization.id, signal).catch(() => null),
+) =>
+  Promise.all(
+    organizations.map(({ id }) =>
+      loadHierarchy(apiBaseURL, id, signal).catch(() => null),
     ),
+  );
+
+function NavSection({ title, items, collapsed, indent }: NavSectionProps) {
+  return (
+    <section className={indent ? "space-y-1.5" : "space-y-2 pb-2"}>
+      {title && !collapsed && (
+        <div className="px-2 pb-1 text-xs font-bold uppercase tracking-[0.04em] text-white/55">
+          {title}
+        </div>
+      )}
+
+      <div className={indent ? "relative space-y-1.5" : "space-y-1.5"}>
+        {indent && !collapsed && (
+          <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-white/22" />
+        )}
+
+        {items.map((item) => (
+          <SidebarNavItem
+            key={item.href}
+            href={item.href}
+            label={item.label}
+            active={item.active}
+            indent={indent && !collapsed}
+            collapsed={collapsed}
+            onClick={item.onClick}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -133,568 +172,381 @@ function SidebarComponent({
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed] = useState(false);
   const [orgOpen, setOrgOpen] = useState(false);
-  const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(() =>
-    ["/organizations", "/account"].includes(location.pathname),
+  const [settingsOpen, setSettingsOpen] = useState(() =>
+    SETTINGS_PATHS.includes(location.pathname),
   );
-  const [selectedContext, setSelectedContext] = useState(() => ({
+  const [stored, setStored] = useState(() => ({
     organizationId: readSelectedOrganizationID(),
     projectToken: readSelectedProjectToken(),
   }));
 
+  const apiEnabled = !!apiBaseURL.trim();
   const currentPath = activePath || location.pathname;
-  const apiEnabled = apiBaseURL.trim() !== "";
-  const settingsPathActive =
-    currentPath === "/organizations" || currentPath === "/account";
+  const isSettingsPath = SETTINGS_PATHS.includes(currentPath);
+  const showSettings = settingsOpen && isSettingsPath;
 
-  const organizationsQuery = useQuery({
+  const routeOrgToken = readOrganizationIdFromSearch(location.search);
+  const routeProjectToken = readProjectIdFromSearch(location.search);
+  const preferredProjectToken = routeProjectToken || stored.projectToken;
+
+  useEffect(() => {
+    const sync = () =>
+      setStored({
+        organizationId: readSelectedOrganizationID(),
+        projectToken: readSelectedProjectToken(),
+      });
+
+    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, sync);
+    window.addEventListener("storage", sync);
+
+    return () => {
+      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  const { data: organizations = EMPTY_ORGANIZATIONS } = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
     enabled: apiEnabled,
     queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
   });
 
-  const organizations = organizationsQuery.data ?? EMPTY_ORGANIZATIONS;
+  const routeOrg = findBySlugOrId(organizations, routeOrgToken);
+  const organizationIds = organizations.map(({ id }) => id);
 
-  const routeOrganizationToken = readOrganizationIdFromSearch(location.search);
-  const storedOrganizationId = selectedContext.organizationId;
-  const routeProjectToken = readProjectIdFromSearch(location.search);
-  const storedProjectId = selectedContext.projectToken;
-  const preferredProjectToken = routeProjectToken || storedProjectId;
-
-  useEffect(() => {
-    const syncSelectedContext = () => {
-      setSelectedContext({
-        organizationId: readSelectedOrganizationID(),
-        projectToken: readSelectedProjectToken(),
-      });
-    };
-
-    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncSelectedContext);
-    window.addEventListener("storage", syncSelectedContext);
-
-    return () => {
-      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncSelectedContext);
-      window.removeEventListener("storage", syncSelectedContext);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (settingsPathActive) {
-      setSettingsSidebarOpen(true);
-    }
-  }, [settingsPathActive]);
-
-  const routeOrganization = useMemo(
-    () => findBySlugOrId(organizations, routeOrganizationToken),
-    [organizations, routeOrganizationToken],
-  );
-
-  const shouldResolveProjectOrganization =
+  const shouldResolveOrg =
     apiEnabled &&
-    organizations.length > 0 &&
-    preferredProjectToken !== "" &&
-    storedOrganizationId === "" &&
-    routeOrganizationToken === "";
+    !!organizations.length &&
+    !!preferredProjectToken &&
+    !routeOrgToken;
 
-  const projectOrganizationQuery = useQuery({
+  const projectOrgQuery = useQuery({
     queryKey: [
       "sidebar-project-organization",
       apiBaseURL,
-      organizations.map(({ id }) => id).join(","),
+      organizationIds.join(","),
       preferredProjectToken,
     ],
-    enabled: shouldResolveProjectOrganization,
-    queryFn: ({ signal }) => loadSidebarHierarchies(apiBaseURL, organizations, signal),
+    enabled: shouldResolveOrg,
+    queryFn: ({ signal }) => loadHierarchies(apiBaseURL, organizations, signal),
   });
 
-  const projectOrganizationId = useMemo(
-    () =>
-      findOrganizationIdForProjectToken(
-        projectOrganizationQuery.data ?? [],
-        preferredProjectToken,
-      ),
-    [preferredProjectToken, projectOrganizationQuery.data],
+  const projectOrgId = findOrganizationIdForProjectToken(
+    projectOrgQuery.data ?? [],
+    preferredProjectToken,
   );
 
-  const selectedOrganizationId = useMemo(
-    () =>
-      selectPreferredID({
-        candidates: [
-          routeOrganization?.id,
-          projectOrganizationId,
-          storedOrganizationId,
-          organizations[0]?.id,
-        ],
-        availableIds: organizations.map(({ id }) => id),
-      }),
-    [organizations, projectOrganizationId, routeOrganization?.id, storedOrganizationId],
-  );
-
-  const hierarchyQuery = useQuery({
-    queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrganizationId),
-    enabled: apiEnabled && selectedOrganizationId !== "",
-    queryFn: ({ signal }) =>
-      loadSidebarHierarchy(apiBaseURL, selectedOrganizationId, signal),
+  const selectedOrgId = selectPreferredID({
+    candidates: [
+      routeOrg?.id,
+      projectOrgId,
+      stored.organizationId,
+      organizations[0]?.id,
+    ],
+    availableIds: organizationIds,
   });
 
-  const hierarchy = hierarchyQuery.data ?? null;
+  const { data: hierarchy = null } = useQuery({
+    queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrgId),
+    enabled: apiEnabled && !!selectedOrgId,
+    queryFn: ({ signal }) => loadHierarchy(apiBaseURL, selectedOrgId, signal),
+  });
 
-  const projects = useMemo(() => normalizeSidebarProjects(hierarchy), [hierarchy]);
+  const projects = useMemo(() => normalizeProjects(hierarchy), [hierarchy]);
+  const routeProject = findBySlugOrId(projects, routeProjectToken);
+  const storedProjectId = findProjectIdForToken(projects, stored.projectToken);
 
-  const routeProject = useMemo(
-    () => findBySlugOrId(projects, routeProjectToken),
-    [projects, routeProjectToken],
-  );
-
-  const storedProjectIdInCurrentOrganization = useMemo(
-    () => findProjectIdForToken(projects, storedProjectId),
-    [projects, storedProjectId],
-  );
-
-  const selectedProjectId = useMemo(
-    () =>
-      selectPreferredID({
-        candidates: [
-          routeProject?.id,
-          storedProjectIdInCurrentOrganization,
-          preferredProjectToken === "" ? projects[0]?.id : "",
-        ],
-        availableIds: projects.map(({ id }) => id),
-      }),
-    [
-      preferredProjectToken,
-      projects,
+  const selectedProjectId = selectPreferredID({
+    candidates: [
       routeProject?.id,
-      storedProjectIdInCurrentOrganization,
+      storedProjectId,
+      preferredProjectToken ? "" : projects[0]?.id,
     ],
-  );
+    availableIds: projects.map(({ id }) => id),
+  });
 
-  const activeProject = useMemo(
-    () =>
-      projects.find(({ id }) => id === selectedProjectId) ??
-      (preferredProjectToken === "" ? projects[0] ?? null : null),
-    [preferredProjectToken, projects, selectedProjectId],
-  );
+  const activeProject =
+    projects.find(({ id }) => id === selectedProjectId) ??
+    (!preferredProjectToken ? projects[0] ?? null : null);
 
-  const activeOrganization = useMemo(
-    () => organizations.find(({ id }) => id === selectedOrganizationId) ?? null,
-    [organizations, selectedOrganizationId],
-  );
+  const activeOrg =
+    organizations.find(({ id }) => id === selectedOrgId) ?? null;
 
   useEffect(() => {
-    if (shouldResolveProjectOrganization && !projectOrganizationQuery.data) {
-      return;
+    if ((!shouldResolveOrg || projectOrgQuery.data) && selectedOrgId) {
+      storeSelectedOrganizationID(selectedOrgId);
     }
+  }, [shouldResolveOrg, projectOrgQuery.data, selectedOrgId]);
 
-    if (selectedOrganizationId !== "") {
-      storeSelectedOrganizationID(selectedOrganizationId);
-    }
-  }, [
-    projectOrganizationQuery.data,
-    selectedOrganizationId,
-    shouldResolveProjectOrganization,
-  ]);
-
-  const scopedLinks = useMemo(() => {
+  const links = useMemo(() => {
     const project = activeProject?.slug;
-    const org = activeOrganization?.slug ?? activeProject?.organizationSlug;
+    const org = activeOrg?.slug ?? activeProject?.organizationSlug;
 
     return {
       dashboard: buildScopedHref("/monitoring", { project }),
       prompts: buildScopedHref("/prompts", { project, tab: "prompts" }),
       responses: buildScopedHref("/prompts", { project, tab: "responses" }),
       pages: buildScopedHref("/pages", { project }),
-
       perception: buildScopedHref("/perception", { project }),
       traffic: buildScopedHref("/traffic", { project }),
       models: buildScopedHref("/models", { project }),
       brands: buildScopedHref("/brands", { project }),
-
       crawler: buildScopedHref("/crawler", { project }),
       contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       errorHub: buildScopedHref("/error-hub", { project }),
       aiAgentReady: buildScopedHref("/ai-agent-ready", { project }),
-
       organizations: buildScopedHref("/organizations", { org }),
+      adminOrganizations: "/admin/organizations",
+      adminPricing: buildScopedHref("/admin/pricing", { org }),
+      adminModels: buildScopedHref("/admin/models", { org }),
       account: "/account",
-
-      addProject: buildCreateProjectOnboardingHref(selectedOrganizationId),
+      addProject: buildCreateProjectOnboardingHref(selectedOrgId),
     };
-  }, [
-    activeProject?.slug,
-    activeProject?.organizationSlug,
-    activeOrganization?.slug,
-    selectedOrganizationId,
-  ]);
-
-  const organizationSettingsLinks = useMemo(() => {
-    const org = activeOrganization?.slug ?? activeProject?.organizationSlug;
-
-    return Object.fromEntries(
-      ORGANIZATION_VIEW_TABS.map((item) => [
-        item.value,
-        buildScopedHref("/organizations", {
-          org,
-          section: item.value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : item.value,
-        }),
-      ]),
-    ) as Record<(typeof ORGANIZATION_VIEW_TABS)[number]["value"], string>;
-  }, [activeOrganization?.slug, activeProject?.organizationSlug]);
-
-  const visibleOrganizationViewTabs = useMemo(
-    () => getOrganizationViewTabsForRoles([activeOrganization?.role ?? "member"]),
-    [activeOrganization?.role],
-  );
-
-  const canManageActiveOrganization = canManageOrganizationPages([
-    activeOrganization?.role ?? "member",
-  ]);
-
-  const activeOrganizationSection =
-    readRouteQueryParam(location.search, "section") || DEFAULT_ORGANIZATION_VIEW_TAB;
+  }, [activeProject, activeOrg, selectedOrgId]);
 
   const isActiveHref = (href: string) => {
-    const hrefPath = href.split("?", 1)[0];
-    const hrefParams = new URLSearchParams(href.split("?")[1] || "");
+    const [path, search = ""] = href.split("?");
+    if (currentPath !== path) return false;
+    if (path !== "/prompts") return true;
 
-    if (currentPath !== hrefPath) return false;
-
-    if (hrefPath === "/prompts") {
-      const currentTab = readRouteQueryParam(location.search, "tab") || "prompts";
-      const hrefTab = hrefParams.get("tab") || "prompts";
-      return currentTab === hrefTab;
-    }
-
-    return true;
+    return (
+      (readRouteQueryParam(location.search, "tab") || "prompts") ===
+      (new URLSearchParams(search).get("tab") || "prompts")
+    );
   };
 
-  const handleSelectProject = (projectId: string) => {
-    const nextProject = projects.find(({ id }) => id === projectId);
+  const item = (
+    href: string,
+    label: string,
+    onClick?: () => void,
+    active = isActiveHref(href),
+  ): NavItem => ({ href, label, active, onClick });
 
-    setSelectedContext({
-      organizationId: nextProject?.organizationId ?? selectedOrganizationId,
-      projectToken: nextProject?.slug ?? projectId,
+  const selectProject = (projectId: string) => {
+    const project = projects.find(({ id }) => id === projectId);
+
+    setStored({
+      organizationId: project?.organizationId ?? selectedOrgId,
+      projectToken: project?.slug ?? projectId,
     });
 
     storeSelectedProjectContext({
-      organizationId: nextProject?.organizationId,
+      organizationId: project?.organizationId,
       projectId,
-      projectToken: nextProject?.slug,
+      projectToken: project?.slug,
     });
 
     navigate(
       buildScopedHref(location.pathname, {
-        project: nextProject?.slug,
+        project: project?.slug,
         org: null,
         createProject: null,
       }),
     );
   };
 
-  const mainNavItems = [
-    // Monitoring
-    {
-      group: "monitoring",
-      href: scopedLinks.dashboard,
-      label: "Dashboard",
-    },
-    {
-      group: "monitoring",
-      href: scopedLinks.prompts,
-      label: "Prompts",
-    },
-    {
-      group: "monitoring",
-      href: scopedLinks.responses,
-      label: "Responses",
-    },
-    {
-      group: "monitoring",
-      href: scopedLinks.pages,
-      label: "Pages",
-    },
+  const activeSection =
+    readRouteQueryParam(location.search, "section") ||
+    DEFAULT_ORGANIZATION_VIEW_TAB;
 
-    // Core
-    {
-      group: "core",
-      href: scopedLinks.perception,
-      label: content.perception,
-    },
-    {
-      group: "core",
-      href: scopedLinks.brands,
-      label: content.brands,
-    },
+  const organizationLinks = Object.fromEntries(
+    ORGANIZATION_VIEW_TABS.map(({ value }) => [
+      value,
+      buildScopedHref("/organizations", {
+        org: activeOrg?.slug ?? activeProject?.organizationSlug,
+        section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
+      }),
+    ]),
+  ) as Record<(typeof ORGANIZATION_VIEW_TABS)[number]["value"], string>;
 
-    {
-      group: "core",
-      href: scopedLinks.models,
-      label: "Modèles",
-    },
+  const canManageOrg = canManageOrganizationPages([
+    activeOrg?.role ?? "member",
+  ]);
 
-    // Optimization
-    {
-      group: "optimization",
-      href: scopedLinks.crawler,
-      label: "Crawler",
-    },
-    {
-      group: "optimization",
-      href: scopedLinks.contentOptimizer,
-      label: "Content Optimizer",
-    },
-    {
-      group: "optimization",
-      href: scopedLinks.errorHub,
-      label: "Error Hub",
-    },
-    {
-      group: "optimization",
-      href: scopedLinks.aiAgentReady,
-      label: "AI Agent Ready",
-    },
+  const orgTabs = getOrganizationViewTabsForRoles([
+    activeOrg?.role ?? "member",
+  ]);
 
+  const mainSections = [
     {
-      group: "traffic",
-      href: scopedLinks.traffic,
-      label: content.traffic,
+      title: content.monitoring,
+      indent: true,
+      items: [
+        item(links.dashboard, content.dashboard),
+        item(links.prompts, content.prompts),
+        item(links.responses, content.responses),
+        item(links.pages, content.pages),
+      ],
     },
+    {
+      items: [item(links.perception, content.perception)],
+    },
+    {
+      title: content.projectSettings,
+      indent: true,
+      items: [
+        item(links.brands, content.brands),
+        item(links.models, content.models),
+      ],
+    },
+    {
+      title: content.optimizeActions,
+      indent: true,
+      items: [
+        item(links.crawler, content.crawler),
+        item(links.contentOptimizer, content.contentOptimizer),
+        item(links.errorHub, content.errorHub),
+        item(links.aiAgentReady, content.aiAgentReady),
+      ],
+    },
+    {
+      items: [item(links.traffic, content.traffic)],
+    },
+    {
+      title: content.settings,
+      indent: true,
+      items: [
+        item(links.organizations, content.organizations, () =>
+          setSettingsOpen(true),
+        ),
+        item(links.account, content.account, () => setSettingsOpen(true)),
+      ],
+    },
+  ];
 
-    // Settings
+  const settingsSections = [
     {
-      group: "settings",
-      href: scopedLinks.organizations,
-      label: content.organisation,
-      opensSettings: true,
+      title: content.admin,
+      items: [
+        item(
+          links.adminOrganizations,
+          content.adminOrganizations,
+          undefined,
+          currentPath === "/admin/organizations",
+        ),
+        item(
+          links.adminPricing,
+          content.adminPricing,
+          undefined,
+          currentPath === "/admin/pricing",
+        ),
+        item(
+          links.adminModels,
+          content.adminModels,
+          undefined,
+          currentPath === "/admin/models",
+        ),
+      ],
     },
     {
-      group: "settings",
-      href: scopedLinks.account,
-      label: content.account,
-      opensSettings: true,
+      title: content.organizations,
+      items: orgTabs.map(({ value, label }) =>
+        item(
+          organizationLinks[value],
+          content[
+          `organizationTab${value[0]?.toUpperCase()}${value.slice(1)}`
+          ] || label,
+          undefined,
+          currentPath === "/organizations" && activeSection === value,
+        ),
+      ),
     },
-  ] as const;
-
-  const showSettingsSidebar = settingsSidebarOpen && settingsPathActive;
+    {
+      title: content.account,
+      items: [
+        item("/account", content.account, undefined, currentPath === "/account"),
+      ],
+    },
+  ];
 
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "sticky top-0 flex h-screen flex-col border-r border-border bg-background transition-[width,min-width] duration-200 ease-in-out",
-          collapsed ? "w-[60px] min-w-[60px]" : "w-[190px] min-w-[190px]",
+          "sticky top-0 flex h-screen flex-col border-r border-border bg-primary transition-[width,min-width] duration-200 ease-in-out",
+          collapsed ? "w-[60px] min-w-[60px]" : "w-[220px] min-w-[220px]",
           className,
         )}
       >
-        <SidebarOrganizationSwitcher
-          collapsed={collapsed}
-          projects={projects}
-          activeProjectId={activeProject?.id ?? ""}
-          onSelectProject={handleSelectProject}
-          addProjectHref={scopedLinks.addProject}
-          canAddProject={canManageActiveOrganization}
-          orgOpen={orgOpen}
-          setOrgOpen={setOrgOpen}
-        />
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div
+            className={cn(
+              "flex h-14 shrink-0 items-center border-b border-border/40 px-3",
+              collapsed ? "justify-center" : "justify-between",
+            )}
+          >
+         {/*    <div className="flex h-8 w-8">
+              <img src="/logo_icon_white.svg" alt="Logo" />
+            </div> */}
 
-        <Separator />
+            {!collapsed && (
+              <span className="ml-2 truncate text-sm font-semibold text-background">
+               <img src="/logo_white.svg" alt="Logo" className="h-10"/>
+              </span>
+            )}
+          </div>
 
-        <nav className="flex-1 overflow-y-auto px-3 py-3">
-          {showSettingsSidebar ? (
-            <div className="space-y-4">
-              <button
-                type="button"
-                onClick={() => setSettingsSidebarOpen(false)}
-                className={cn(
-                  "cursor-pointer flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                  collapsed && "justify-center",
-                )}
-              >
-                <ArrowLeft className="h-4 w-4" />
-                {!collapsed && <span>Retour</span>}
-              </button>
+      
+  <div className="shrink-0 border-b border-border/40 px-3 py-4">
+            <SidebarOrganizationSwitcher
+              collapsed={collapsed}
+              projects={projects}
+              activeProjectId={activeProject?.id ?? ""}
+              onSelectProject={selectProject}
+              addProjectHref={links.addProject}
+              canAddProject={canManageOrg}
+              orgOpen={orgOpen}
+              setOrgOpen={setOrgOpen}
+            />
+          </div>
 
-              <section className="space-y-1.5">
-                {!collapsed && (
-                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-                    Organisation
-                  </div>
-                )}
-
-                <div className="relative space-y-1.5">
-                  {!collapsed && (
-                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-6">
+            {showSettings ? (
+              <div className="space-y-4">
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(false)}
+                  className={cn(
+                    "flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-2 text-sm text-background transition-colors hover:bg-background/90 hover:text-primary",
+                    collapsed && "justify-center",
                   )}
+                  aria-label={content.back}
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  {!collapsed && <span>{content.back}</span>}
+                </button>
 
-                  {visibleOrganizationViewTabs.map((item) => {
-                    const active =
-                      currentPath === "/organizations" &&
-                      activeOrganizationSection === item.value;
-
-                    return (
-                      <SidebarNavItem
-                        key={item.value}
-                        href={organizationSettingsLinks[item.value]}
-                        label={item.label}
-                        active={active}
-                        indent={!collapsed}
-                        collapsed={collapsed}
-                      />
-                    );
-                  })}
-                </div>
-              </section>
-
-              <section className="space-y-1.5">
-                {!collapsed && (
-                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-                    Compte
-                  </div>
-                )}
-
-                <div className="relative space-y-1.5">
-                  {!collapsed && (
-                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
-                  )}
-
-                  <SidebarNavItem
-                    href="/account"
-                    label="Compte"
-                    active={currentPath === "/account"}
-                    indent={!collapsed}
+                {settingsSections.map((section) => (
+                  <NavSection
+                    key={section.title}
+                    {...section}
+                    collapsed={collapsed}
+                    indent
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {mainSections.map((section, index) => (
+                  <NavSection
+                    key={section.title ?? index}
+                    {...section}
                     collapsed={collapsed}
                   />
-                </div>
-              </section>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* Monitoring */}
-              <section className="space-y-1.5">
-                {!collapsed && (
-                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-                    Monitoring
-                  </div>
-                )}
+                ))}
+              </div>
+            )}
+          </nav>
 
-                <div className="relative space-y-1.5">
-                  {!collapsed && (
-                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
-                  )}
 
-                  {mainNavItems
-                    .filter((item) => item.group === "monitoring")
-                    .map((item) => (
-                      <SidebarNavItem
-                        key={item.href}
-                        href={item.href}
-                        label={item.label}
-                        active={isActiveHref(item.href)}
-                        indent={!collapsed}
-                        collapsed={collapsed}
-                      />
-                    ))}
-                </div>
-              </section>
+        </div>
 
-              {/* Core */}
-              <section className="space-y-2 pb-2">
-                {mainNavItems
-                  .filter((item) => item.group === "core")
-                  .map((item) => (
-                    <SidebarNavItem
-                      key={item.href}
-                      href={item.href}
-                      label={item.label}
-                      active={isActiveHref(item.href)}
-                      collapsed={collapsed}
-                    />
-                  ))}
-              </section>
-
-              {/* Optimization */}
-              <section className="space-y-1.5">
-                {!collapsed && (
-                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-                    Optimisation
-                  </div>
-                )}
-
-                <div className="relative space-y-1.5">
-                  {!collapsed && (
-                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
-                  )}
-
-                  {mainNavItems
-                    .filter((item) => item.group === "optimization")
-                    .map((item) => (
-                      <SidebarNavItem
-                        key={item.href}
-                        href={item.href}
-                        label={item.label}
-                        active={isActiveHref(item.href)}
-                        indent={!collapsed}
-                        collapsed={collapsed}
-                      />
-                    ))}
-                </div>
-              </section>
-
-                <section className="space-y-2 pb-2">
-                {mainNavItems
-                  .filter((item) => item.group === "traffic")
-                  .map((item) => (
-                    <SidebarNavItem
-                      key={item.href}
-                      href={item.href}
-                      label={item.label}
-                      active={isActiveHref(item.href)}
-                      collapsed={collapsed}
-                    />
-                  ))}
-              </section>
-
-              {/* Settings */}
-              <section className="space-y-1.5">
-                {!collapsed && (
-                  <div className="px-2 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-                    Settings
-                  </div>
-                )}
-
-                <div className="relative space-y-1.5">
-                  {!collapsed && (
-                    <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-border" />
-                  )}
-
-                  {mainNavItems
-                    .filter((item) => item.group === "settings")
-                    .map((item) => (
-                      <SidebarNavItem
-                        key={item.href}
-                        href={item.href}
-                        label={item.label}
-                        active={isActiveHref(item.href)}
-                        indent={!collapsed}
-                        collapsed={collapsed}
-                        onClick={() => {
-                          if (item.opensSettings) {
-                            setSettingsSidebarOpen(true);
-                          }
-                        }}
-                      />
-                    ))}
-                </div>
-              </section>
-            </div>
-          )}
-        </nav>
-
-        <div className="border-t border-border p-2">
+        <div className="shrink-0 border-t border-background/40 p-2">
           <SidebarPromptPlanProgress
             apiBaseURL={apiBaseURL}
-            organizationId={selectedOrganizationId}
+            organizationId={selectedOrgId}
             projectId={selectedProjectId}
             collapsed={collapsed}
           />
@@ -703,42 +555,21 @@ function SidebarComponent({
             <SidebarLanguageSwitcher collapsed={collapsed} />
           </div>
 
-          <button
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onLogout}
             disabled={busy}
             className={cn(
-              "mb-1 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              collapsed && "justify-center",
-              busy && "cursor-not-allowed opacity-60",
+              "w-full rounded-md bg-background/10 px-2 py-1.5 text-sm text-background/80 hover:bg-background/20 hover:text-background",
+              collapsed ? "justify-center" : "justify-between",
             )}
-            onClick={() => void onLogout?.()}
-            type="button"
           >
-            {collapsed ? (
-              <span className="text-xs font-semibold uppercase tracking-[0.18em]">
-                L
-              </span>
-            ) : (
-              <span>{content.logout || "Déconnexion"}</span>
-            )}
-          </button>
-
-          <button
-            onClick={() => setCollapsed((prev) => !prev)}
-            className={cn(
-              "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-              collapsed && "justify-center",
-            )}
-            type="button"
-          >
-            {collapsed ? (
-              <ChevronsRight className="h-4 w-4" />
-            ) : (
-              <>
-                <ChevronsLeft className="h-4 w-4" />
-                <span>{content.collapse || "Réduire"}</span>
-              </>
-            )}
-          </button>
+            <span className={cn("flex items-center gap-2", collapsed && "justify-center")}>
+              <LogOut className="h-4 w-4" />
+              {!collapsed && <span>{content.logout}</span>}
+            </span>
+          </Button>
         </div>
       </aside>
     </TooltipProvider>

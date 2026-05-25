@@ -13,6 +13,10 @@ import { FilterHeroInsightCard } from "./filter-hero-insight-card";
 import { Template } from "./template";
 import { ModelFilterSection } from "./model-filter-section";
 
+type FiltersPanelProps = {
+  className?: string;
+};
+
 type FiltersPanelViewModel = {
   loading: boolean;
   project: {
@@ -53,7 +57,7 @@ type FiltersPanelViewModel = {
   heroInsight: FilterHeroInsight;
 };
 
-export function FiltersPanel() {
+export function FiltersPanel({ className }: FiltersPanelProps) {
   const {
     loading,
     project,
@@ -91,12 +95,12 @@ export function FiltersPanel() {
   );
 
   return (
-    <div className="flex h-auto flex-col lg:h-full">
+    <div className={cn("flex h-full min-h-0 flex-col", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto p-2 no-scrollbar lg:min-h-0 lg:p-2">
         <div className="flex flex-col gap-5 pb-4">
           <FilterHeroInsightCard insight={heroInsight} />
 
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex items-start justify-between gap-2">
               <h4 className="min-w-0 text-sm font-semibold text-foreground md:text-base lg:text-sm">
                 <SectionTitle>{content.filters}</SectionTitle>
@@ -112,7 +116,7 @@ export function FiltersPanel() {
               </Button>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-4">
               <Label className="text-xs text-muted-foreground md:text-sm lg:text-xs">
                 {content.period}
               </Label>

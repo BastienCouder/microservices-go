@@ -47,6 +47,7 @@ type PromptRun struct {
 type AIResponse struct {
 	ID             string    `json:"id"`
 	RunID          string    `json:"runId"`
+	RunType        string    `json:"runType,omitempty"`
 	PromptRunID    string    `json:"promptRunId"`
 	ModelID        string    `json:"modelId"`
 	RawResponse    string    `json:"rawResponse"`
@@ -124,6 +125,7 @@ type PerceptionError struct {
 	DetectedInModels []string `json:"detectedInModels"`
 	FixType          string   `json:"fixType"`
 	GeneratedContent string   `json:"generatedContent"`
+	GeneratedContentKey string `json:"generatedContentKey,omitempty"`
 	OptimizePriority string   `json:"optimizePriority"`
 	Type             string   `json:"type"`
 }
@@ -139,6 +141,8 @@ type PerceptionData struct {
 type OptimizationError struct {
 	ID               string   `json:"id"`
 	Source           string   `json:"source"`
+	Origin           string   `json:"origin,omitempty"`
+	Resource         string   `json:"resource,omitempty"`
 	Severity         string   `json:"severity"`
 	Title            string   `json:"title"`
 	Issue            string   `json:"issue"`
@@ -148,6 +152,7 @@ type OptimizationError struct {
 	OptimizePriority string   `json:"optimizePriority"`
 	DetectedInModels []string `json:"detectedInModels"`
 	GeneratedContent string   `json:"generatedContent"`
+	GeneratedContentKey string `json:"generatedContentKey,omitempty"`
 	CreatedAt        string   `json:"createdAt,omitempty"`
 }
 
@@ -313,6 +318,10 @@ type persistedState struct {
 	ActionsByProject    map[string][]string                       `json:"actionsByProject"`
 }
 
+type contentOptimizerCrawlScope struct {
+	IncludePatterns []string
+}
+
 type Service struct {
 	mu                  sync.RWMutex
 	now                 func() time.Time
@@ -329,6 +338,7 @@ type Service struct {
 	alertsByProject     map[string][]string
 	brandCanonByProject map[string]*BrandCanon
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
+	contentCrawlScopes  map[string]contentOptimizerCrawlScope
 	optimizeActions     map[string]*OptimizeAction
 	actionsByProject    map[string][]string
 

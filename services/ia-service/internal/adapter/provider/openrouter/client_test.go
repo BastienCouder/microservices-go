@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
@@ -81,6 +83,83 @@ func TestGenerateReturnsProviderErrorMessage(t *testing.T) {
 	}
 }
 
+func TestGenerateRetriesOnRateLimit(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		attempt := calls.Add(1)
+		if attempt < 3 {
+			w.Header().Set("Retry-After", "0")
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte(`{"error":{"message":"rate limited"}}`))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"Acme est visible"}}],"usage":{"total_tokens":9}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", "", "", server.Client())
+
+	result, err := client.Generate(context.Background(), usecase.ProviderGenerateInput{
+		ModelID: "gpt-4o-mini",
+		Prompt:  "Analyse la marque",
+	})
+	if err != nil {
+		t.Fatalf("generate: %v", err)
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("expected 3 attempts, got %d", got)
+	}
+	if result.RawResponse != "Acme est visible" {
+		t.Fatalf("expected successful retry response, got %q", result.RawResponse)
+	}
+}
+
+func TestGenerateStopsAfterRateLimitRetries(t *testing.T) {
+	t.Parallel()
+
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_ = calls.Add(1)
+		w.Header().Set("Retry-After", "0")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"rate limited"}}`))
+	}))
+	defer server.Close()
+
+	client := NewClient(server.URL, "test-key", "", "", server.Client())
+
+	_, err := client.Generate(context.Background(), usecase.ProviderGenerateInput{
+		ModelID: "gpt-4o-mini",
+		Prompt:  "Analyse la marque",
+	})
+	if err == nil {
+		t.Fatalf("expected provider error")
+	}
+	if got := calls.Load(); got != 3 {
+		t.Fatalf("expected 3 attempts before failing, got %d", got)
+	}
+	if !strings.Contains(err.Error(), "rate limited") {
+		t.Fatalf("expected rate limited message, got %v", err)
+	}
+}
+
+func TestParseRetryAfterSeconds(t *testing.T) {
+	t.Parallel()
+
+	if got := parseRetryAfterSeconds("2"); got == nil || got.Seconds() != 2 {
+		t.Fatalf("expected 2 second retry delay, got %#v", got)
+	}
+	if got := parseRetryAfterSeconds(strconv.Itoa(0)); got == nil || got.Seconds() != 0 {
+		t.Fatalf("expected 0 second retry delay, got %#v", got)
+	}
+	if got := parseRetryAfterSeconds("invalid"); got != nil {
+		t.Fatalf("expected nil delay for invalid Retry-After, got %#v", got)
+	}
+}
+
 func TestGenerateUsesProjectAPIKeyWhenProvided(t *testing.T) {
 	t.Parallel()
 
@@ -114,8 +193,8 @@ func TestResolveModelIDSupportsProjectCatalog(t *testing.T) {
 		"gpt-oss-120b-free": "openai/gpt-oss-120b:free",
 		"claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
 		"gemini-2.0-flash":  "google/gemini-2.0-flash-001",
-		"gemma-3-4b-free":   "google/gemma-3-4b-it:free",
-		"gemma-3-27b-free":  "google/gemma-3-27b-it:free",
+		"gemma-3-4b-free":   "google/gemma-3-4b-it",
+		"gemma-3-27b-free":  "google/gemma-3-27b-it",
 		"sonar":             "perplexity/sonar",
 		"sonar-pro":         "perplexity/sonar-pro",
 		"mistral-large":     "mistralai/mistral-large",

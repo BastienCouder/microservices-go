@@ -1,9 +1,14 @@
 "use client";
 
-import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { cn } from "@/shared/utils";
 import { Link } from "react-router-dom";
+
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { cn } from "@/shared/utils";
 
 type SidebarNavItemProps = {
   href: string;
@@ -11,19 +16,55 @@ type SidebarNavItemProps = {
   active: boolean;
   indent?: boolean;
   collapsed?: boolean;
+  className?: string;
   onClick?: () => void;
 };
+
+type SidebarSectionHeaderProps = {
+  label: string;
+  collapsed: boolean;
+};
+const itemClassName = ({
+  active,
+  collapsed,
+  indent,
+  className,
+}: Pick<SidebarNavItemProps, "active" | "collapsed" | "indent" | "className">) =>
+  cn(
+    "relative text-sm  rounded-[5px] transition-colors duration-150",
+    collapsed
+      ? "flex items-center justify-center p-2"
+      : "flex items-center py-1.5",
+    indent ? "flex-1 px-2" : "pl-3 pr-2",
+    active
+      ? "bg-white/14 font-medium text-white"
+      : "font-medium text-white/78 hover:bg-white/10 hover:text-white",
+    className,
+  );
+
+function ActiveMarker({
+  collapsed,
+  indent,
+}: Pick<SidebarNavItemProps, "collapsed" | "indent">) {
+  return (
+    <span
+      className={cn(
+        "absolute bg-background",
+        indent && !collapsed
+          ? "left-[10px] top-0 bottom-0 z-10 w-[3px] rounded-full"
+          : "left-0 top-1 bottom-1 w-[3px] rounded-r-full",
+      )}
+    />
+  );
+}
 
 export function SidebarSectionHeader({
   label,
   collapsed,
-}: {
-  label: string;
-  collapsed: boolean;
-}) {
-  if (collapsed) return <Separator className="my-2" />;
-
-  return (
+}: SidebarSectionHeaderProps) {
+  return collapsed ? (
+    <Separator className="my-2" />
+  ) : (
     <div className="flex items-center px-2 py-1">
       <span className="text-xs font-semibold text-foreground">{label}</span>
     </div>
@@ -34,28 +75,26 @@ export function SidebarNavItem({
   href,
   label,
   active,
-  indent,
-  collapsed,
+  indent = false,
+  collapsed = false,
   className,
   onClick,
-}: SidebarNavItemProps & { className?: string }) {
+}: SidebarNavItemProps) {
+  const link = (
+    <Link
+      to={href}
+      onClick={onClick}
+      className={itemClassName({ active, collapsed, indent, className })}
+    >
+      {/* {active && <ActiveMarker collapsed={collapsed} indent={indent} />} */}
+      {collapsed ? <span>{label.slice(0, 1)}</span> : label}
+    </Link>
+  );
+
   if (collapsed) {
     return (
       <Tooltip>
-        <TooltipTrigger asChild>
-          <Link
-            to={href}
-            className={cn(
-              "relative flex items-center justify-center rounded-[5px] p-2 transition-colors",
-              active ? "bg-primary/8 text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              className,
-            )}
-            onClick={onClick}
-          >
-            {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-            <span className="text-sm">{label.slice(0, 1)}</span>
-          </Link>
-        </TooltipTrigger>
+        <TooltipTrigger asChild>{link}</TooltipTrigger>
         <TooltipContent side="right">{label}</TooltipContent>
       </Tooltip>
     );
@@ -64,35 +103,11 @@ export function SidebarNavItem({
   if (indent) {
     return (
       <div className="relative flex items-center">
-        {active && <span className="absolute left-[10px] top-0 bottom-0 z-10 w-[3px] rounded-full bg-primary" />}
         <div className="w-[22px] shrink-0" />
-        <Link
-          to={href}
-          className={cn(
-            "flex-1 rounded-[5px] px-2 py-1.5 text-sm transition-colors",
-            active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-            className,
-          )}
-          onClick={onClick}
-        >
-          {label}
-        </Link>
+        {link}
       </div>
     );
   }
 
-  return (
-    <Link
-      to={href}
-      className={cn(
-        "group relative flex items-center rounded-[5px] pl-3 py-1.5 text-sm transition-colors",
-        active ? "bg-primary/8 font-medium text-primary" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-        className,
-        )}
-      onClick={onClick}
-    >
-      {active && <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-r-full bg-primary" />}
-      {label}
-    </Link>
-  );
+  return link;
 }

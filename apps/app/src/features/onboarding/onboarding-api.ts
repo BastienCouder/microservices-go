@@ -1,6 +1,6 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
-import { attachStableSlugs } from "@/shared/public-slugs";
+import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 import { storeSelectedOrganizationID } from "@/shared/selection";
 
 type OnboardingCompetitor = {
@@ -30,6 +30,8 @@ type JsonRecord = Record<string, unknown>;
 type OnboardingProjectResult = {
   projectId: string;
   projectSlug: string;
+  organizationId: string;
+  warnings: string[];
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -59,6 +61,19 @@ async function requireGatewayData<T>(
   return response.data;
 }
 
+async function runOptionalGatewayStep<T>(
+  promise: Promise<GatewayResult<T>>,
+  message: string,
+  warnings: string[],
+): Promise<T | null> {
+  const response = await promise;
+  if (!response.ok) {
+    warnings.push(response.error || message);
+    return null;
+  }
+  return response.data;
+}
+
 function deriveDomain(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -79,6 +94,7 @@ export async function createOnboardingProject(
   apiBaseURL: string,
   input: CreateOnboardingProjectInput,
 ): Promise<OnboardingProjectResult> {
+  const warnings: string[] = [];
   let organizationId = input.organizationId.trim();
   const brandName = input.brandName.trim();
   const websiteUrl = input.websiteUrl.trim();
@@ -139,6 +155,16 @@ export async function createOnboardingProject(
   if (!projectId) {
     throw new Error("Le projet a ete cree mais son identifiant est introuvable.");
   }
+  const createdProjectOrganizationId =
+    (isRecord(createdProject)
+      ? getIDString(
+          createdProject.organizationId ?? createdProject.OrganizationID,
+        )
+      : "") || organizationId;
+
+  if (createdProjectOrganizationId) {
+    storeSelectedOrganizationID(createdProjectOrganizationId);
+  }
 
   const competitors = input.competitors
     .map((competitor) => ({
@@ -155,64 +181,64 @@ export async function createOnboardingProject(
   const modelIds = input.modelIds.map((modelId) => modelId.trim()).filter(Boolean);
 
   if (competitors.length > 0) {
-    await requireGatewayData(
+    await runOptionalGatewayStep(
       gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.competitors(projectId), {
         method: "POST",
-        organizationId,
+        organizationId: createdProjectOrganizationId,
         body: JSON.stringify({ competitors }),
       }),
       "Impossible d'ajouter les concurrents.",
+      warnings,
     );
   }
 
   if (prompts.length > 0) {
-    await requireGatewayData(
+    await runOptionalGatewayStep(
       gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.prompts(projectId), {
         method: "POST",
-        organizationId,
+        organizationId: createdProjectOrganizationId,
         body: JSON.stringify({ prompts }),
       }),
       "Impossible d'ajouter les prompts.",
+      warnings,
     );
   }
 
-  if (modelIds.length > 0) {
-    await requireGatewayData(
-      gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(projectId), {
-        method: "PUT",
-        organizationId,
-        body: JSON.stringify({ modelIds }),
-      }),
-      "Impossible d'ajouter les modeles.",
-    );
-  }
+  // Project model assignment is handled after onboarding.
+  // Keeping creation bootstrap minimal avoids blocking the flow on
+  // project-model permission issues while the project itself is already created.
+  void modelIds;
 
-  const projectsPayload = await requireGatewayData(
+  const projectsPayload = await runOptionalGatewayStep(
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.list(), {
       method: "GET",
-      organizationId,
+      organizationId: createdProjectOrganizationId,
     }),
     "Impossible de charger les projets de l'organisation.",
+    warnings,
   );
   const projectsData = unwrapData(projectsPayload);
 
-  const projects = attachStableSlugs(
-    (Array.isArray(projectsData) ? projectsData : [])
-      .filter((project): project is JsonRecord => isRecord(project))
-      .map((project) => ({
-        id: getIDString(project.id ?? project.ID),
-        name: (typeof (project.name ?? project.Name) === "string"
-          ? String(project.name ?? project.Name).trim()
-          : "") || "Projet",
-      }))
-      .filter((project) => project.id !== ""),
-    "project",
-  );
-  const createdProjectSlug =
-    projects.find((project) => project.id === projectId)?.slug ?? "project";
+  const createdProjectSlug = projectsPayload
+    ? attachStableSlugs(
+        (Array.isArray(projectsData) ? projectsData : [])
+          .filter((project): project is JsonRecord => isRecord(project))
+          .map((project) => ({
+            id: getIDString(project.id ?? project.ID),
+            name: (typeof (project.name ?? project.Name) === "string"
+              ? String(project.name ?? project.Name).trim()
+              : "") || "Projet",
+          }))
+          .filter((project) => project.id !== ""),
+        "project",
+      ).find((project) => project.id === projectId)?.slug ??
+      slugifyPublicName(brandName, "project")
+    : slugifyPublicName(brandName, "project");
 
   return {
     projectId,
     projectSlug: createdProjectSlug,
+    organizationId: createdProjectOrganizationId,
+    warnings,
   };
 }

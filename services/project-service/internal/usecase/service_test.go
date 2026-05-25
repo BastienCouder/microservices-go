@@ -298,6 +298,63 @@ func TestReplaceProjectModelsAllowsMoreThanThreeMonthlyChanges(t *testing.T) {
 	}
 }
 
+func TestReplaceProjectModelsPrunesStalePromptScheduleOverrides(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	schedule := PromptSchedule{
+		Mode:     PromptScheduleModePerModel,
+		Cron:     "0 */6 * * *",
+		Timezone: "UTC",
+		ModelCrons: map[string]string{
+			"gemma-3-27b-free": "15 */6 * * *",
+		},
+	}
+	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule}); err != nil {
+		t.Fatalf("update prompt schedule: %v", err)
+	}
+
+	result, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free"})
+	if err != nil {
+		t.Fatalf("replace project models should prune stale schedule overrides: %v", err)
+	}
+
+	if !reflect.DeepEqual(result.ModelIDs, []string{"gpt-oss-120b-free"}) {
+		t.Fatalf("expected modelIds [gpt-oss-120b-free], got %#v", result.ModelIDs)
+	}
+
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected 1 prompt, got %d", len(page.Items))
+	}
+	if len(page.Items[0].Schedule.ModelCrons) != 0 {
+		t.Fatalf("expected stale schedule overrides to be pruned, got %#v", page.Items[0].Schedule.ModelCrons)
+	}
+}
+
 func TestCreateAndUpdateModel(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -374,14 +431,15 @@ func TestUpdateModelInfersMissingIconKeyFromProvider(t *testing.T) {
 }
 
 type fakeGA4OAuthProvider struct {
-	exchangeToken GA4OAuthToken
-	properties    []GA4OAuthProperty
-	listCalls     int
-	setupResult   GA4LLMSetupResult
-	setupErr      error
-	setupCalls    int
-	setupRefresh  string
-	setupProperty string
+	exchangeToken           GA4OAuthToken
+	properties              []GA4OAuthProperty
+	listCalls               int
+	setupResult             GA4LLMSetupResult
+	setupErr                error
+	setupCalls              int
+	setupRefresh            string
+	setupProperty           string
+	setupServiceAccountJSON string
 }
 
 func (p *fakeGA4OAuthProvider) AuthorizationURL(state, redirectURI string) (string, error) {
@@ -406,6 +464,16 @@ func (p *fakeGA4OAuthProvider) ListProperties(_ context.Context, refreshToken st
 func (p *fakeGA4OAuthProvider) SetupLLMTracking(_ context.Context, refreshToken, propertyID string) (GA4LLMSetupResult, error) {
 	p.setupCalls++
 	p.setupRefresh = refreshToken
+	p.setupProperty = propertyID
+	if p.setupErr != nil {
+		return GA4LLMSetupResult{}, p.setupErr
+	}
+	return p.setupResult, nil
+}
+
+func (p *fakeGA4OAuthProvider) SetupLLMTrackingWithServiceAccount(_ context.Context, serviceAccountJSON, propertyID string) (GA4LLMSetupResult, error) {
+	p.setupCalls++
+	p.setupServiceAccountJSON = serviceAccountJSON
 	p.setupProperty = propertyID
 	if p.setupErr != nil {
 		return GA4LLMSetupResult{}, p.setupErr
@@ -536,6 +604,58 @@ func TestSelectProjectGA4OAuthPropertyRunsLLMSetup(t *testing.T) {
 	}
 }
 
+func TestUpdateProjectImpactIntegrationsRunsLLMSetupForServiceAccount(t *testing.T) {
+	svc := NewService()
+	provider := &fakeGA4OAuthProvider{
+		setupResult: GA4LLMSetupResult{
+			SetupStatus: GA4LLMSetupStatusSuccess,
+			CreatedResources: GA4LLMSetupResources{
+				ChannelGroupName:    "properties/123/channelGroups/456",
+				CustomDimensionName: "properties/123/customDimensions/789",
+			},
+		},
+	}
+	svc.ConfigureGA4LLMSetup(provider)
+	ctx := context.Background()
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "GA4 Service Account Project",
+		Domain:         "service-account.test",
+		WebsiteURL:     "https://service-account.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	serviceAccountJSON := `{"client_email":"ga4@example.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\nkey\n-----END PRIVATE KEY-----"}`
+	propertyID := "123456789"
+	updated, err := svc.UpdateProjectImpactIntegrations(ctx, project.ID, 42, UpdateProjectImpactIntegrationsInput{
+		GA4: &UpdateProjectGA4IntegrationInput{
+			PropertyID:         &propertyID,
+			ServiceAccountJSON: &serviceAccountJSON,
+		},
+	})
+	if err != nil {
+		t.Fatalf("update project impact integrations: %v", err)
+	}
+	if provider.setupCalls != 1 {
+		t.Fatalf("expected service account setup to run once, got %d calls", provider.setupCalls)
+	}
+	if provider.setupServiceAccountJSON != serviceAccountJSON {
+		t.Fatalf("expected setup to receive service account json, got %q", provider.setupServiceAccountJSON)
+	}
+	if provider.setupProperty != propertyID {
+		t.Fatalf("expected setup to receive property %q, got %q", propertyID, provider.setupProperty)
+	}
+	if updated.Integration.GA4.AuthMode != "service_account" || !updated.Integration.GA4.IsConnected {
+		t.Fatalf("expected service account integration to stay connected, got %+v", updated.Integration.GA4)
+	}
+	if updated.LLMSetup.CreatedResources.ChannelGroupName != "properties/123/channelGroups/456" {
+		t.Fatalf("expected llm setup resources in response, got %+v", updated.LLMSetup)
+	}
+}
+
 func TestSyncOpenRouterModelsImportsAvailableModels(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -620,6 +740,170 @@ func TestSyncOpenRouterModelsImportsAvailableModels(t *testing.T) {
 	}
 }
 
+func TestLoadNormalizesStaleDefaultModelProviderIDs(t *testing.T) {
+	ctx := context.Background()
+	state := persistedState{
+		Models: map[string]AIModel{
+			"gemma-3-4b-free": {
+				ID:       "gemma-3-4b-free",
+				Label:    "Gemma 3 4B (free)",
+				Provider: "google",
+				Group:    "gemma",
+				ModelID:  "google/gemma-3-4b-it:free",
+				IsActive: true,
+			},
+			"gemma-3-27b-free": {
+				ID:       "gemma-3-27b-free",
+				Label:    "Gemma 3 27B (free)",
+				Provider: "google",
+				Group:    "gemma",
+				ModelID:  "google/gemma-3-27b-it:free",
+				IsActive: true,
+			},
+		},
+		ProjectModels: map[string]map[string]bool{},
+	}
+	payload, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	store := &mutableProjectStore{payload: payload}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{Store: store})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	models, err := svc.ListModels(ctx, false)
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	byID := make(map[string]AIModel, len(models))
+	for _, model := range models {
+		byID[model.ID] = model
+	}
+
+	if got := byID["gemma-3-4b-free"].ModelID; got != "google/gemma-3-4b-it" {
+		t.Fatalf("expected gemma 4b provider model to be normalized, got %q", got)
+	}
+	if got := byID["gemma-3-27b-free"].ModelID; got != "google/gemma-3-27b-it" {
+		t.Fatalf("expected gemma 27b provider model to be normalized, got %q", got)
+	}
+}
+
+func TestLoadMigratesLegacyGemmaModelsToCanonicalImportWhenPresent(t *testing.T) {
+	ctx := context.Background()
+	state := persistedState{
+		Models: map[string]AIModel{
+			"gemma-3-4b-free": {
+				ID:       "gemma-3-4b-free",
+				Label:    "Gemma 3 4B (free)",
+				Provider: "google",
+				Group:    "gemma",
+				ModelID:  "google/gemma-3-4b-it:free",
+				IsActive: true,
+			},
+			"google-gemma-3-4b-it": {
+				ID:       "google-gemma-3-4b-it",
+				Label:    "Gemma 3 4B",
+				Provider: "google",
+				Group:    "gemma",
+				ModelID:  "google/gemma-3-4b-it",
+				IsActive: false,
+			},
+		},
+		Projects: map[string]*Project{
+			"prj-1": {
+				ID:             "prj-1",
+				OrganizationID: 42,
+				CreatedBy:      7,
+				Name:           "Acme",
+				Domain:         "acme.com",
+				WebsiteURL:     "https://acme.com",
+			},
+		},
+		ProjectModels: map[string]map[string]bool{
+			"prj-1": {"gemma-3-4b-free": true},
+		},
+		Prompts: map[string]*Prompt{
+			"prm-1": {
+				ID:        "prm-1",
+				ProjectID: "prj-1",
+				Text:      "Q1",
+				ModelIDs:  []string{"gemma-3-4b-free"},
+				Schedule: PromptSchedule{
+					Mode:       PromptScheduleModePerModel,
+					Cron:       "0 9 * * 1",
+					Timezone:   "UTC",
+					ModelCrons: map[string]string{"gemma-3-4b-free": "15 9 * * 1"},
+				},
+				Status:   PromptStatusActive,
+				IsActive: true,
+			},
+		},
+	}
+	payload, err := json.Marshal(state)
+	if err != nil {
+		t.Fatalf("marshal state: %v", err)
+	}
+	store := &mutableProjectStore{payload: payload}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{Store: store})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	models, err := svc.ListModels(ctx, false)
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	byID := make(map[string]AIModel, len(models))
+	for _, model := range models {
+		byID[model.ID] = model
+	}
+
+	if _, exists := byID["gemma-3-4b-free"]; exists {
+		t.Fatalf("expected legacy gemma model to be removed after migration")
+	}
+	if got := byID["google-gemma-3-4b-it"].ModelID; got != "google/gemma-3-4b-it" {
+		t.Fatalf("expected canonical gemma provider model id to remain canonical, got %q", got)
+	}
+
+	projectModels, err := svc.ListProjectModels(ctx, "prj-1", 42)
+	if err != nil {
+		t.Fatalf("list project models: %v", err)
+	}
+	foundEnabledCanonical := false
+	for _, selection := range projectModels {
+		if selection.ID == "google-gemma-3-4b-it" && selection.IsEnabledForProject {
+			foundEnabledCanonical = true
+		}
+		if selection.ID == "gemma-3-4b-free" && selection.IsEnabledForProject {
+			t.Fatalf("expected legacy gemma model to be removed from project selection")
+		}
+	}
+	if !foundEnabledCanonical {
+		t.Fatalf("expected canonical gemma model to be enabled for project after migration")
+	}
+
+	page, err := svc.ListPrompts(ctx, "prj-1", 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected 1 prompt, got %d", len(page.Items))
+	}
+	if len(page.Items[0].ModelIDs) != 1 || page.Items[0].ModelIDs[0] != "google-gemma-3-4b-it" {
+		t.Fatalf("expected prompt model ids to migrate to canonical gemma model, got %#v", page.Items[0].ModelIDs)
+	}
+	if _, exists := page.Items[0].Schedule.ModelCrons["gemma-3-4b-free"]; exists {
+		t.Fatalf("expected legacy gemma prompt schedule to be removed")
+	}
+	if got := page.Items[0].Schedule.ModelCrons["google-gemma-3-4b-it"]; got != "15 9 * * 1" {
+		t.Fatalf("expected canonical gemma prompt schedule to be preserved, got %q", got)
+	}
+}
+
 func TestFilterOpenRouterModelsUsesSupportedProvidersByDefault(t *testing.T) {
 	models := []openRouterModelPayload{
 		{ID: "openai/gpt-4o", Name: "OpenAI: GPT-4o"},
@@ -692,6 +976,37 @@ func TestFilterOpenRouterModelsCanFilterByVariant(t *testing.T) {
 	}
 }
 
+func TestFilterOpenRouterModelsCanFilterFreeModels(t *testing.T) {
+	models := []openRouterModelPayload{
+		{
+			ID:      "google/gemma-3-4b-it:free",
+			Name:    "Google: Gemma 3 4B (free)",
+			Pricing: map[string]string{"prompt": "0", "completion": "0"},
+		},
+		{
+			ID:      "openai/gpt-oss-20b:free",
+			Name:    "OpenAI: gpt-oss-20b (free)",
+			Pricing: map[string]string{"prompt": "0.000000", "completion": "0.000000"},
+		},
+		{
+			ID:      "anthropic/claude-3.5-sonnet",
+			Name:    "Anthropic: Claude 3.5 Sonnet",
+			Pricing: map[string]string{"prompt": "0.000003", "completion": "0.000015"},
+		},
+	}
+
+	filtered := filterOpenRouterModels(models, SyncOpenRouterModelsInput{OnlyFree: true})
+	if len(filtered) != 2 {
+		t.Fatalf("expected 2 free models, got %d", len(filtered))
+	}
+	if filtered[0].ID != "google/gemma-3-4b-it:free" {
+		t.Fatalf("expected first free model to stay, got %#v", filtered[0])
+	}
+	if filtered[1].ID != "openai/gpt-oss-20b:free" {
+		t.Fatalf("expected second free model to stay, got %#v", filtered[1])
+	}
+}
+
 func TestSyncOpenRouterModelsCanPurgeUnsupportedImportedProviders(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -756,6 +1071,134 @@ func TestSyncOpenRouterModelsCanPurgeUnsupportedImportedProviders(t *testing.T) 
 	}
 	if _, ok := byID["z-ai-glm-4-5"]; !ok {
 		t.Fatalf("expected supported legacy provider alias to be kept")
+	}
+}
+
+func TestSyncOpenRouterModelsCanPurgeMissingImportedModels(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.CreateModel(ctx, CreateAIModelInput{
+		ID:                 "openai-gpt-4o-mini",
+		Label:              "GPT-4o Mini",
+		Provider:           "openai",
+		Group:              "OpenAI",
+		IconKey:            "openai",
+		ModelID:            "openai/gpt-4o-mini",
+		IsActive:           true,
+		SupportsLiveSearch: true,
+	}); err != nil {
+		t.Fatalf("create imported model: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"openai-gpt-4o-mini"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	modelIDs := []string{"openai-gpt-4o-mini"}
+	schedule := PromptSchedule{
+		Mode:       PromptScheduleModePerModel,
+		Cron:       "0 9 * * 1",
+		Timezone:   "UTC",
+		ModelCrons: map[string]string{"openai-gpt-4o-mini": "15 9 * * 1"},
+	}
+	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs, Schedule: &schedule}); err != nil {
+		t.Fatalf("update prompt: %v", err)
+	}
+	if _, err := svc.CreateModel(ctx, CreateAIModelInput{
+		ID:                 "manual-curated-model",
+		Label:              "Manual Curated",
+		Provider:           "openai",
+		Group:              "OpenAI",
+		IconKey:            "openai",
+		ModelID:            "openai/manual-curated-model",
+		IsActive:           false,
+		SupportsLiveSearch: false,
+	}); err != nil {
+		t.Fatalf("create manual model: %v", err)
+	}
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"data": [
+				{
+					"id": "openai/gpt-5",
+					"name": "OpenAI: GPT-5",
+					"context_length": 200000,
+					"pricing": {"prompt": "0.00001"},
+					"supported_parameters": ["tools"]
+				}
+			]
+		}`))
+	}))
+	defer server.Close()
+
+	previousURL := openRouterModelsURL
+	openRouterModelsURL = server.URL
+	defer func() {
+		openRouterModelsURL = previousURL
+	}()
+
+	result, err := svc.SyncOpenRouterModels(ctx, SyncOpenRouterModelsInput{
+		PurgeMissingModels: true,
+	})
+	if err != nil {
+		t.Fatalf("sync openrouter models: %v", err)
+	}
+	if result.Purged != 1 {
+		t.Fatalf("expected 1 purged model, got %d", result.Purged)
+	}
+
+	models, err := svc.ListModels(ctx, false)
+	if err != nil {
+		t.Fatalf("list models: %v", err)
+	}
+	byID := make(map[string]AIModel, len(models))
+	for _, model := range models {
+		byID[model.ID] = model
+	}
+	if _, ok := byID["openai-gpt-4o-mini"]; ok {
+		t.Fatalf("expected missing imported model to be purged")
+	}
+	if _, ok := byID["manual-curated-model"]; !ok {
+		t.Fatalf("expected manual model to be kept")
+	}
+	projectModels, err := svc.ListProjectModels(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("list project models: %v", err)
+	}
+	for _, selection := range projectModels {
+		if selection.IsEnabledForProject {
+			t.Fatalf("expected project model selection to be pruned, got enabled model %#v", selection)
+		}
+	}
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected 1 prompt, got %d", len(page.Items))
+	}
+	updatedPrompt := page.Items[0]
+	if len(updatedPrompt.ModelIDs) != 0 {
+		t.Fatalf("expected prompt model ids to be pruned, got %#v", updatedPrompt.ModelIDs)
+	}
+	if len(updatedPrompt.Schedule.ModelCrons) != 0 {
+		t.Fatalf("expected prompt model schedules to be pruned, got %#v", updatedPrompt.Schedule.ModelCrons)
 	}
 }
 
@@ -1283,6 +1726,56 @@ func TestUpdatePromptRejectsModelOutsideProjectCoverage(t *testing.T) {
 	_, err = svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
 	if !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestUpdatePromptModelIDsPrunesStaleScheduleOverrides(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gemma-3-27b-free", "gpt-oss-120b-free"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Prompt one"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+
+	schedule := PromptSchedule{
+		Mode:     PromptScheduleModePerModel,
+		Cron:     "0 */6 * * *",
+		Timezone: "UTC",
+		ModelCrons: map[string]string{
+			"gemma-3-27b-free": "15 */6 * * *",
+		},
+	}
+	if _, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{Schedule: &schedule}); err != nil {
+		t.Fatalf("update prompt schedule: %v", err)
+	}
+
+	modelIDs := []string{"gpt-oss-120b-free"}
+	updated, err := svc.UpdatePrompt(ctx, prompts[0].ID, 42, UpdatePromptInput{ModelIDs: &modelIDs})
+	if err != nil {
+		t.Fatalf("update prompt models: %v", err)
+	}
+
+	if !reflect.DeepEqual(updated.ModelIDs, []string{"gpt-oss-120b-free"}) {
+		t.Fatalf("expected modelIds [gpt-oss-120b-free], got %#v", updated.ModelIDs)
+	}
+	if len(updated.Schedule.ModelCrons) != 0 {
+		t.Fatalf("expected stale model overrides to be pruned, got %#v", updated.Schedule.ModelCrons)
 	}
 }
 

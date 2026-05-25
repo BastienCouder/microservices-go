@@ -11,7 +11,13 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptItem, PromptRun } from "../../_lib/types";
-import { promptScheduleLabel, promptStageLabel, relativeRunLabel } from "../../_lib/utils";
+import {
+  comparePromptRunsByRecency,
+  promptScheduleLabel,
+  promptStageLabel,
+  relativeRunLabel,
+} from "../../_lib/utils";
+import { RichResponseText } from "./rich-response-text";
 
 type GetModelVisual = (model: string) => ModelVisual;
 
@@ -21,12 +27,14 @@ function PromptDetailsContent({
   getModelVisual,
   onEditPrompt,
   onSeeMoreResponses,
+  onOpenResponse,
 }: {
   prompt: PromptItem;
   mobile: boolean;
   getModelVisual: GetModelVisual;
   onEditPrompt: (prompt: PromptItem) => void;
   onSeeMoreResponses: (prompt: PromptItem) => void;
+  onOpenResponse: (prompt: PromptItem, responseId: string) => void;
 }) {
   const { locale, t } = useScopedI18n("prompts-workspace");
   const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
@@ -54,7 +62,7 @@ function PromptDetailsContent({
   const lastResponses = useMemo(
     () =>
       [...prompt.runs]
-        .sort((a, b) => a.minutesAgo - b.minutesAgo)
+        .sort(comparePromptRunsByRecency)
         .slice(0, 5),
     [prompt.runs],
   );
@@ -131,7 +139,10 @@ function PromptDetailsContent({
 
           <div className="space-y-7">
             <DataRow label={t("overviewMention")} value={`${prompt.mentionRate}%`} />
-            <DataRow label={t("overviewRank")} value={prompt.rank.toFixed(1)} />
+            <DataRow
+              label={t("overviewRank")}
+              value={prompt.rank !== null ? prompt.rank.toFixed(1) : "-"}
+            />
             <DataRow label={t("analysisCadenceTitle")} value={cadenceLabel} />
 
             <div className="flex items-center justify-between border-b border-slate-50 pb-5">
@@ -198,6 +209,7 @@ function PromptDetailsContent({
             emptyLabel="No responses yet"
             title="Last responses"
             onSeeMore={() => onSeeMoreResponses(prompt)}
+            onOpenResponse={(responseId) => onOpenResponse(prompt, responseId)}
           />
         </div>
       </div>
@@ -221,6 +233,7 @@ function LastResponses({
   responses,
   getModelVisual,
   onSeeMore,
+  onOpenResponse,
 }: {
   title: string;
   emptyLabel: string;
@@ -228,6 +241,7 @@ function LastResponses({
   responses: PromptRun[];
   getModelVisual: GetModelVisual;
   onSeeMore: () => void;
+  onOpenResponse: (responseId: string) => void;
 }) {
   if (responses.length === 0) {
     return (
@@ -253,6 +267,7 @@ function LastResponses({
               key={response.id}
               className="group w-full cursor-pointer rounded-md bg-background p-4 text-left transition-all ring-2 ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               aria-label={`${title}: ${modelGroup}`}
+              onClick={() => onOpenResponse(response.id)}
             >
               <div className="mb-2.5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -279,9 +294,13 @@ function LastResponses({
                 </span>
               </div>
 
-              <p className="mb-3 text-xs font-medium leading-relaxed text-foreground/90 transition-colors [overflow-wrap:anywhere] group-hover:text-foreground md:text-sm">
-                &quot;{response.response}&quot;
-              </p>
+              <div className="mb-3 rounded-xl border border-border/50 bg-muted/20 px-3 py-3 transition-colors group-hover:bg-muted/30">
+                <RichResponseText
+                  content={response.response}
+                  compact
+                  className="max-h-48 overflow-hidden [mask-image:linear-gradient(to_bottom,black_80%,transparent)]"
+                />
+              </div>
 
               <div className="flex items-center justify-between border-t border-border/40 pt-3">
                 <div className="flex items-center gap-3">
@@ -332,6 +351,7 @@ export function PromptDetailsSheet({
   getModelVisual,
   onEditPrompt,
   onSeeMoreResponses,
+  onOpenResponse,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -339,6 +359,7 @@ export function PromptDetailsSheet({
   getModelVisual: GetModelVisual;
   onEditPrompt: (prompt: PromptItem) => void;
   onSeeMoreResponses: (prompt: PromptItem) => void;
+  onOpenResponse: (prompt: PromptItem, responseId: string) => void;
 }) {
   const isMobile = useIsMobile();
   const { locale } = useScopedI18n("prompts-workspace");
@@ -359,6 +380,7 @@ export function PromptDetailsSheet({
             getModelVisual={getModelVisual}
             onEditPrompt={onEditPrompt}
             onSeeMoreResponses={onSeeMoreResponses}
+            onOpenResponse={onOpenResponse}
           />
         </DrawerContent>
       </Drawer>
@@ -378,6 +400,7 @@ export function PromptDetailsSheet({
           getModelVisual={getModelVisual}
           onEditPrompt={onEditPrompt}
           onSeeMoreResponses={onSeeMoreResponses}
+          onOpenResponse={onOpenResponse}
         />
       </SheetContent>
     </Sheet>

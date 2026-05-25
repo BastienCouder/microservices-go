@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { ArrowRight, Building2, Check, Code, Terminal, Zap } from "lucide-react";
 import { Button } from "../../../components/ui/button";
@@ -10,19 +10,79 @@ import {
   sectionIntroTextClass,
 } from "./section-styles";
 
-const VOLUMES = [
+type MarketingPricingTier = {
+  prompt_volume: number;
+  label: string;
+  developer_price_cents: number | null;
+  starter_price_cents: number | null;
+  growth_price_cents: number | null;
+  pro_price_cents: number | null;
+};
+
+type PriceValue = number | "custom" | null;
+
+type VolumeConfig = {
+  prompts: number;
+  label: string;
+  dev: PriceValue;
+  starter: PriceValue;
+  growth: PriceValue;
+  pro: PriceValue;
+};
+
+const DEFAULT_VOLUMES: VolumeConfig[] = [
   { prompts: 50, label: "50", dev: 29, starter: 79, growth: 299, pro: 799 },
   { prompts: 100, label: "100", dev: 49, starter: 149, growth: 349, pro: 849 },
   { prompts: 250, label: "250", dev: 99, starter: 249, growth: 499, pro: 999 },
   { prompts: 500, label: "500", dev: 149, starter: 399, growth: 599, pro: 1199 },
   { prompts: 1000, label: "1k", dev: 249, starter: null, growth: 899, pro: 1499 },
   { prompts: 5000, label: "5k+", dev: "custom", starter: null, growth: null, pro: "custom" },
-] as const;
+];
+
+function centsToPrice(value: number | null): PriceValue {
+  return value === null ? null : Math.round(value / 100);
+}
+
+function normalizePricingTier(tier: MarketingPricingTier) {
+  return {
+    prompts: tier.prompt_volume,
+    label: tier.label,
+    dev: centsToPrice(tier.developer_price_cents),
+    starter: centsToPrice(tier.starter_price_cents),
+    growth: centsToPrice(tier.growth_price_cents),
+    pro: centsToPrice(tier.pro_price_cents),
+  };
+}
 
 export function PricingSection() {
   const t = useTranslations("pricing");
+  const [volumes, setVolumes] = useState(() => [...DEFAULT_VOLUMES]);
   const [volumeIndex, setVolumeIndex] = useState(2);
-  const currentVolume = VOLUMES[volumeIndex];
+  const currentVolume = volumes[Math.min(volumeIndex, volumes.length - 1)];
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const gatewayURL = process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000";
+    void fetch(`${gatewayURL.replace(/\/$/, "")}/billing/public/pricing-tiers`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : Promise.reject()))
+      .then((payload: unknown) => {
+        if (!Array.isArray(payload)) return;
+        const nextVolumes = payload
+          .map((item) => normalizePricingTier(item as MarketingPricingTier))
+          .filter((item) => item.prompts > 0)
+          .sort((left, right) => left.prompts - right.prompts);
+        if (nextVolumes.length > 0) {
+          setVolumes(nextVolumes);
+          setVolumeIndex((current) => Math.min(current, nextVolumes.length - 1));
+        }
+      })
+      .catch(() => {
+        // Keep the static marketing fallback if the billing API is unavailable.
+      });
+    return () => controller.abort();
+  }, []);
 
   const plans = useMemo(
     () => [
@@ -142,7 +202,7 @@ export function PricingSection() {
             <input
               type="range"
               min="0"
-              max={VOLUMES.length - 1}
+              max={volumes.length - 1}
               step="1"
               value={volumeIndex}
               onChange={(event) => setVolumeIndex(Number.parseInt(event.target.value, 10))}
@@ -150,7 +210,7 @@ export function PricingSection() {
             />
 
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 mt-4">
-              {VOLUMES.map((volume, index) => {
+              {volumes.map((volume, index) => {
                 const active = index === volumeIndex;
 
                 return (

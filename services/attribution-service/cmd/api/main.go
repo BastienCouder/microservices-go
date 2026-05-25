@@ -67,7 +67,7 @@ func main() {
 		visitProvider := ga4client.NewClientWithOAuth(cfg.GA4.OAuthClientID, cfg.GA4.OAuthClientSecret)
 		visitProvider.SetFakeTrafficEnabled(cfg.GA4.FakeTrafficEnabled)
 		svc.EnableVisitProvider(projectResolver, visitProvider)
-		svc.EnableGeoTrafficProvider(projectResolver, visitProvider)
+		svc.EnableTrafficProvider(projectResolver, visitProvider)
 	}
 	h := httpadapter.NewHandler(svc)
 

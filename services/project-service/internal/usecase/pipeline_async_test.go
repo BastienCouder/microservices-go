@@ -102,6 +102,67 @@ func TestFinalizeProjectEnqueuesOutboxWithoutBlockingPipeline(t *testing.T) {
 	}
 }
 
+func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+		Industry:       "CRM",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	result, err := svc.RunPerceptionAnalysis(ctx, project.ID, 42, 7, RunPerceptionAnalysisInput{})
+	if err != nil {
+		t.Fatalf("run perception: %v", err)
+	}
+	if result.RunID != "run-1" {
+		t.Fatalf("expected run id run-1, got %q", result.RunID)
+	}
+	if analysisSpy.lastStartReq.RunType != PromptKindPerception {
+		t.Fatalf("expected perception run type, got %q", analysisSpy.lastStartReq.RunType)
+	}
+	if len(analysisSpy.lastStartReq.PromptTexts) != 3 {
+		t.Fatalf("expected 3 perception prompts, got %d", len(analysisSpy.lastStartReq.PromptTexts))
+	}
+	if len(analysisSpy.lastStartReq.ModelIDs) == 0 {
+		t.Fatalf("expected all active project models to be selected")
+	}
+	if iaSpy.execCalls != len(analysisSpy.lastStartReq.PromptTexts)*len(analysisSpy.lastStartReq.ModelIDs) {
+		t.Fatalf("expected one IA call per perception prompt/model, got %d", iaSpy.execCalls)
+	}
+
+	page, err := svc.ListPrompts(ctx, project.ID, 42, ListPromptsInput{PageSize: 10})
+	if err != nil {
+		t.Fatalf("list prompts: %v", err)
+	}
+	perceptionPrompts := 0
+	for _, prompt := range page.Items {
+		if prompt.Kind == PromptKindPerception {
+			perceptionPrompts++
+		}
+	}
+	if perceptionPrompts != 3 {
+		t.Fatalf("expected 3 persisted perception prompts, got %d", perceptionPrompts)
+	}
+}
+
 func TestOutboxEventProcessingRunsPipelineOnce(t *testing.T) {
 	ctx := context.Background()
 	analysisSpy := &analysisClientSpy{}
@@ -241,13 +302,16 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 	gotCoverage := map[string][]string{}
 	for _, call := range iaSpy.execInputs {
 		gotCoverage[call.PromptID] = append(gotCoverage[call.PromptID], call.ModelID)
+		if call.PromptMode != PromptModeOrganic {
+			t.Fatalf("expected prompt mode organic by default, got %q", call.PromptMode)
+		}
 	}
 
 	if !reflect.DeepEqual(gotCoverage[prompts[0].ID], []string{"openai/gpt-oss-120b:free"}) {
 		t.Fatalf("expected first prompt coverage [openai/gpt-oss-120b:free], got %#v", gotCoverage[prompts[0].ID])
 	}
-	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"google/gemma-3-27b-it:free"}) {
-		t.Fatalf("expected second prompt coverage [google/gemma-3-27b-it:free], got %#v", gotCoverage[prompts[1].ID])
+	if !reflect.DeepEqual(gotCoverage[prompts[1].ID], []string{"google/gemma-3-27b-it"}) {
+		t.Fatalf("expected second prompt coverage [google/gemma-3-27b-it], got %#v", gotCoverage[prompts[1].ID])
 	}
 }
 
@@ -313,6 +377,230 @@ func TestOutboxEventProcessingPassesProjectProviderAPIKey(t *testing.T) {
 		t.Fatalf("expected project provider api key to be passed, got %q", got.ProviderAPIKey)
 	}
 	if got.ModelID != "openai/gpt-oss-20b:free" {
+		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestOutboxEventProcessingPrefersOpenRouterForGPTOSSWhenBothCredentialsExist(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openai", "sk-project-openai"); err != nil {
+		t.Fatalf("save openai credential: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save openrouter credential: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-20b-free"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1"}); err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	events, err := svc.ListOutboxEventsToPublish(ctx, 10)
+	if err != nil {
+		t.Fatalf("list outbox events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d", len(events))
+	}
+	if err := svc.MarkOutboxEventPublished(ctx, events[0].ID); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if err := svc.ProcessFinalizedProjectOutboxEvent(ctx, events[0].ID); err != nil {
+		t.Fatalf("process outbox event: %v", err)
+	}
+
+	if len(iaSpy.execInputs) == 0 {
+		t.Fatalf("expected ia execution")
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openrouter" {
+		t.Fatalf("expected provider openrouter, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "sk-openrouter" {
+		t.Fatalf("expected openrouter api key, got %q", got.ProviderAPIKey)
+	}
+	if got.ModelID != "openai/gpt-oss-20b:free" {
+		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestOutboxEventProcessingPrefersOpenRouterForLegacyGPTOSSCatalogEntries(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openai", "sk-project-openai"); err != nil {
+		t.Fatalf("save openai credential: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save openrouter credential: %v", err)
+	}
+
+	legacy := svc.models["gpt-oss-120b-free"]
+	legacy.Group = "OpenAI"
+	svc.models["gpt-oss-120b-free"] = legacy
+
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"gpt-oss-120b-free"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1"}); err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	events, err := svc.ListOutboxEventsToPublish(ctx, 10)
+	if err != nil {
+		t.Fatalf("list outbox events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d", len(events))
+	}
+	if err := svc.MarkOutboxEventPublished(ctx, events[0].ID); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if err := svc.ProcessFinalizedProjectOutboxEvent(ctx, events[0].ID); err != nil {
+		t.Fatalf("process outbox event: %v", err)
+	}
+
+	if len(iaSpy.execInputs) == 0 {
+		t.Fatalf("expected ia execution")
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openrouter" {
+		t.Fatalf("expected provider openrouter, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "sk-openrouter" {
+		t.Fatalf("expected openrouter api key, got %q", got.ProviderAPIKey)
+	}
+	if got.ModelID != "openai/gpt-oss-120b:free" {
+		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestOutboxEventProcessingPrefersOpenRouterForImportedCatalogModelSource(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openai", "sk-project-openai"); err != nil {
+		t.Fatalf("save openai credential: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save openrouter credential: %v", err)
+	}
+	if _, err := svc.CreateModel(ctx, CreateAIModelInput{
+		ID:                 "openai-gpt-4o-mini",
+		Label:              "GPT-4o Mini",
+		Provider:           "openai",
+		Group:              "OpenAI",
+		IconKey:            "openai",
+		ModelID:            "openai/gpt-4o-mini",
+		IsActive:           true,
+		SupportsLiveSearch: true,
+	}); err != nil {
+		t.Fatalf("create imported-like model: %v", err)
+	}
+	if _, err := svc.ReplaceProjectModels(ctx, project.ID, 42, []string{"openai-gpt-4o-mini"}); err != nil {
+		t.Fatalf("replace project models: %v", err)
+	}
+	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Q1"}); err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.FinalizeProject(ctx, project.ID, 42); err != nil {
+		t.Fatalf("finalize: %v", err)
+	}
+
+	events, err := svc.ListOutboxEventsToPublish(ctx, 10)
+	if err != nil {
+		t.Fatalf("list outbox events: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected one event, got %d", len(events))
+	}
+	if err := svc.MarkOutboxEventPublished(ctx, events[0].ID); err != nil {
+		t.Fatalf("mark outbox published: %v", err)
+	}
+	if err := svc.ProcessFinalizedProjectOutboxEvent(ctx, events[0].ID); err != nil {
+		t.Fatalf("process outbox event: %v", err)
+	}
+
+	if len(iaSpy.execInputs) == 0 {
+		t.Fatalf("expected ia execution")
+	}
+	got := iaSpy.execInputs[0]
+	if got.ProviderID != "openrouter" {
+		t.Fatalf("expected provider openrouter, got %q", got.ProviderID)
+	}
+	if got.ProviderAPIKey != "sk-openrouter" {
+		t.Fatalf("expected openrouter api key, got %q", got.ProviderAPIKey)
+	}
+	if got.ModelID != "openai/gpt-4o-mini" {
 		t.Fatalf("expected provider model id, got %q", got.ModelID)
 	}
 }

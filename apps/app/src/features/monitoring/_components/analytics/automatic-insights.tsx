@@ -25,7 +25,7 @@ export const AutomaticInsights = memo(function AutomaticInsights({ autoInsights 
           <CardTitle className="text-lg font-semibold">
             <SectionTitle>{content.autoInsightsTitle}</SectionTitle>
           </CardTitle>
-          <CardDescription className="text-xs leading-relaxed md:text-sm">{content.autoInsightsDescription}</CardDescription>
+          <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">{content.autoInsightsDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

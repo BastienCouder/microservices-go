@@ -31,7 +31,7 @@ export function BrandVisibilityChart({
   totalScopedPrompts,
 }: BrandVisibilityChartProps) {
   return (
-    <div className="min-w-0 border-b border-border/50 p-3 xl:col-span-7 xl:border-b-0 xl:border-r">
+    <div className="min-w-0 border-b border-border/50 md:p-3 xl:col-span-7 xl:border-b-0 xl:border-r">
       <ChartContainer
         config={BRAND_VISIBILITY_CHART_CONFIG}
         className="h-[170px] w-full xl:h-[280px]"

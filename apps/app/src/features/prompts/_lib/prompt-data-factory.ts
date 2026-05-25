@@ -1,5 +1,6 @@
 import type { PromptItem, PromptRunRow, PromptSchedule, Stage } from "./types";
 import {
+  comparePromptRunsByRecency,
   defaultPromptSchedule,
   normalizeModelName,
   parseRelativeTimeToMinutes,
@@ -32,6 +33,8 @@ type ProjectPromptInput = {
   id: string;
   text: string;
   intent?: string | null;
+  type?: string | null;
+  kind?: "monitoring" | "perception";
   modelIds?: string[];
   schedule?: Partial<PromptSchedule> | null;
   status?: "active" | "disabled" | "archived";
@@ -74,7 +77,9 @@ function buildHighlights(item: MonitoringPromptInput, score: number, competitor:
   return [
     item.mention ? "Marque mentionnee" : "Marque absente",
     item.rank ? `Classement #${item.rank}` : "Aucun classement disponible",
-    competitor ? `Concurrent principal : ${competitor}` : "Aucun concurrent detecte",
+    competitor && competitor !== "Aucun"
+      ? `Concurrent principal : ${competitor}`
+      : "Aucun concurrent detecte",
     `Score de visibilite ${score}`,
   ];
 }
@@ -157,20 +162,18 @@ export function buildPromptPageItems({
     const schedule = normalizePromptScheduleValue(projectPrompt.schedule);
     const stage = toPromptStage(projectPrompt.intent, stages[index % stages.length] || "Awareness");
     const runsSource = [...(responsesByPromptId.get(projectPrompt.id) ?? [])].sort(
-      (a, b) => parseRelativeTimeToMinutes(a.time) - parseRelativeTimeToMinutes(b.time),
+      (a, b) =>
+        comparePromptRunsByRecency(
+          { createdAt: a.createdAt, minutesAgo: parseRelativeTimeToMinutes(a.time) },
+          { createdAt: b.createdAt, minutesAgo: parseRelativeTimeToMinutes(b.time) },
+        ),
     );
 
     const runs = runsSource.map((item, runIndex) => {
       const model = resolveKnownModel(item, availableModels) as never;
       const minutes = parseRelativeTimeToMinutes(item.time);
       const score = Math.max(0, Math.min(100, item.score ?? 0));
-      const competitorsMentioned = dedupeCompetitors(
-        item.competitorsMentioned.length > 0
-          ? item.competitorsMentioned
-          : competitors[0]?.name
-            ? [competitors[0].name]
-            : [],
-      );
+      const competitorsMentioned = dedupeCompetitors(item.competitorsMentioned);
       const competitor = competitorsMentioned[0] || "Aucun";
 
       return {
@@ -203,7 +206,7 @@ export function buildPromptPageItems({
               rankedRuns.reduce((sum, item) => sum + (item.rank ?? 0), 0) / rankedRuns.length
             ).toFixed(1),
           )
-        : 9.9;
+        : null;
     const avgScore =
       runs.length > 0
         ? Math.round(runs.reduce((sum, item) => sum + item.score, 0) / runs.length)
@@ -211,12 +214,17 @@ export function buildPromptPageItems({
     const lastRunMinutes =
       runs.length > 0 ? Math.min(...runs.map((item) => item.minutesAgo)) : 999999;
     const trend30d = buildTrend30dFromRuns(runs);
-    const promptModels = Array.from(
-      new Set([
-        ...(projectPrompt.modelIds ?? []),
-        ...runs.map((item) => item.model).filter((model) => availableModels.includes(model)),
-      ]),
+    const persistedPromptModels = (projectPrompt.modelIds ?? []).filter((model) =>
+      availableModels.includes(model),
     );
+    const promptModels =
+      persistedPromptModels.length > 0
+        ? persistedPromptModels
+        : Array.from(
+            new Set(
+              runs.map((item) => item.model).filter((model) => availableModels.includes(model)),
+            ),
+          );
     const persona = runsSource.find((item) => item.persona?.trim())?.persona?.trim() || undefined;
 
     return {
@@ -224,6 +232,8 @@ export function buildPromptPageItems({
       sourcePromptId: projectPrompt.id,
       rowMode: "global",
       prompt: projectPrompt.text,
+      type: projectPrompt.type?.trim() || null,
+      kind: projectPrompt.kind === "perception" ? "perception" : "monitoring",
       stage,
       persona,
       models: promptModels,
@@ -257,13 +267,7 @@ export function buildResponseRows({
     const model = resolveKnownModel(item, availableModels) as never;
     const minutesAgo = parseRelativeTimeToMinutes(item.time);
     const score = Math.max(0, Math.min(100, item.score ?? 0));
-    const competitorsMentioned = dedupeCompetitors(
-      item.competitorsMentioned.length > 0
-        ? item.competitorsMentioned
-        : competitors[0]?.name
-          ? [competitors[0].name]
-          : [],
-    );
+    const competitorsMentioned = dedupeCompetitors(item.competitorsMentioned);
     const competitor = competitorsMentioned[0] || "Aucun";
 
     return {

@@ -33,16 +33,26 @@ const SCORE_CARD_ICONS = {
 export function PerceptionClient({ initialData }: PerceptionClientProps) {
   const { locale } = useLocale();
   const viewModel = usePerceptionViewModel(initialData);
-  const periodLabel = getPerceptionPeriodLabel(viewModel.selectedPeriod, locale);
-  const periodBadgeLabel = getPerceptionPeriodBadgeLabel(viewModel.selectedPeriod, locale);
+  const emptyStateLabel = initialData.metadata.emptyStateLabel;
+  const periodLabel = getPerceptionPeriodLabel(
+    viewModel.selectedPeriod,
+    locale,
+  );
+  const periodBadgeLabel = getPerceptionPeriodBadgeLabel(
+    viewModel.selectedPeriod,
+    locale,
+  );
 
   const rightColumn = (
     <div className="px-1 pb-4">
       <TopErrorsPanel
+        emptyLabel={emptyStateLabel}
         errors={viewModel.filteredTopErrors}
         generatedIds={viewModel.generatedIds}
         modelCatalog={viewModel.modelCatalog}
+        projectId={initialData.metadata.projectId}
         savingErrorIds={viewModel.savingErrorIds}
+        totalErrorCount={initialData.topErrors.length}
         onCreateAction={viewModel.handleFix}
         onRemoveAction={viewModel.handleRemoveAction}
       />
@@ -90,10 +100,11 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
         <div className="space-y-4 px-1 pb-4">
           <Card className="shrink-0 overflow-hidden border-border/60 py-4">
             <CardContent className="p-0">
-              <PerceptionDonutVisual
-                points={viewModel.filteredRadar}
-                periodLabel={periodBadgeLabel}
-              />
+          <PerceptionDonutVisual
+            points={viewModel.filteredRadar}
+            periodLabel={periodBadgeLabel}
+            emptyLabel={emptyStateLabel}
+          />
             </CardContent>
           </Card>
 
@@ -101,17 +112,20 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
             axes={viewModel.modelAxisHeatmap.axes}
             rows={viewModel.modelAxisHeatmap.rows}
             periodLabel={periodBadgeLabel}
+            emptyLabel={emptyStateLabel}
           />
 
           <PerceptionTrendChart
             data={viewModel.perceptionTrend.data}
             periodLabel={periodLabel}
             badgeLabel={periodBadgeLabel}
+            emptyLabel={emptyStateLabel}
           />
 
           <PerceptionOptimizeActions
             drafts={viewModel.visibleOptimizeDrafts}
             persistError={viewModel.persistError}
+            emptyLabel={emptyStateLabel}
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -119,7 +133,9 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
               <PerceptionScoreMiniCard
                 key={card.id}
                 {...card}
-                icon={SCORE_CARD_ICONS[card.id as keyof typeof SCORE_CARD_ICONS]}
+                icon={
+                  SCORE_CARD_ICONS[card.id as keyof typeof SCORE_CARD_ICONS]
+                }
               />
             ))}
           </div>

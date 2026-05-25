@@ -49,30 +49,28 @@ export function SidebarOrganizationSwitcher({
   const subtitle = getSubtitle(currentProject, content);
 
   return (
-    <div className={cn("py-3", collapsed ? "px-2" : "px-3")}>
       <Popover open={orgOpen} onOpenChange={setOrgOpen}>
-        <PopoverTrigger asChild className="border">
+        <PopoverTrigger asChild className="bg-background/10 hover:bg-background/20">
           {collapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
                 <button className="flex h-9 w-full items-center justify-center rounded-md transition-colors hover:bg-muted">
                   <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200">
-                    <span className="text-[10px] font-semibold text-primary">{currentProject?.initials || "PR"}</span>
+                    <span className="text-[10px] font-semibold text-background">{currentProject?.initials || "PR"}</span>
                   </div>
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right">{title}</TooltipContent>
             </Tooltip>
           ) : (
-            <button className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-muted">
+            <button className="flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200">
                 <span className="text-[10px] font-semibold text-primary">{currentProject?.initials || "PR"}</span>
               </div>
               <div className="min-w-0 flex-1 text-left">
-                <div className="truncate text-sm font-medium text-foreground">{title}</div>
-                {subtitle ? <div className="truncate text-[11px] text-muted-foreground">{subtitle}</div> : null}
+                <div className="truncate text-sm font-medium text-background">{title}</div>
               </div>
-              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-background" />
             </button>
           )}
         </PopoverTrigger>
@@ -119,6 +117,5 @@ export function SidebarOrganizationSwitcher({
           )}
         </PopoverContent>
       </Popover>
-    </div>
   );
 }

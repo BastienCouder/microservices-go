@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"strings"
 	"time"
@@ -20,19 +21,32 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
+	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
+	if err != nil {
+		return OptimizationErrorBoard{}, err
+	}
 	alerts, err := s.ListAlerts(ctx, projectID, organizationID, false)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
 
-	errors := make([]OptimizationError, 0, len(alerts)+len(perception.TopErrors))
-	monitoringCount := 0
+	crawlerErrors, err := s.listCrawlerOptimizationErrors(ctx, projectID, organizationID)
+	if err != nil {
+		return OptimizationErrorBoard{}, err
+	}
+
+	monitoringResponses := filterNonPerceptionResponses(dashboard.Responses)
+	monitoringDerivedErrors := deriveMonitoringTopErrors(monitoringResponses)
+
+	errors := make([]OptimizationError, 0, len(alerts)+len(monitoringDerivedErrors)+len(perception.TopErrors)+len(crawlerErrors))
+	monitoringAlertCount := 0
 	for _, alert := range alerts {
 		severity := normalizeOptimizationSeverity(alert.Severity)
-		monitoringCount++
+		monitoringAlertCount++
 		errors = append(errors, OptimizationError{
 			ID:               "monitoring:" + alert.ID,
 			Source:           "monitoring",
+			Origin:           "alert",
 			Severity:         severity,
 			Title:            strings.TrimSpace(alert.Title),
 			Issue:            strings.TrimSpace(alert.Description),
@@ -41,9 +55,11 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			FixType:          "prompt_patch",
 			OptimizePriority: severity,
 			GeneratedContent: "Verifier les prompts, les reponses recentes et les sources qui declenchent cette alerte.",
+			GeneratedContentKey: "generatedContentMonitoringAlert",
 			CreatedAt:        alert.CreatedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}
+	errors = append(errors, monitoringDerivedErrors...)
 
 	perceptionCount := 0
 	for _, item := range perception.TopErrors {
@@ -66,6 +82,7 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			GeneratedContent: strings.TrimSpace(item.GeneratedContent),
 		})
 	}
+	errors = append(errors, crawlerErrors...)
 
 	sort.SliceStable(errors, func(i, j int) bool {
 		left := optimizationSeverityRank(errors[i].Severity)
@@ -83,14 +100,394 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 		Errors:  errors,
 		Columns: buildOptimizationErrorColumns(errors),
 		Metadata: map[string]any{
-			"projectId":         projectID,
-			"generatedAt":       time.Now().UTC().Format(time.RFC3339Nano),
-			"totalErrors":       len(errors),
-			"monitoringErrors":  monitoringCount,
-			"perceptionErrors":  perceptionCount,
-			"analyzedResponses": perception.Metadata["analyzedResponses"],
+			"projectId":               projectID,
+			"generatedAt":             time.Now().UTC().Format(time.RFC3339Nano),
+			"totalErrors":             len(errors),
+			"monitoringErrors":        monitoringAlertCount + len(monitoringDerivedErrors),
+			"monitoringAlertErrors":   monitoringAlertCount,
+			"monitoringDerivedErrors": len(monitoringDerivedErrors),
+			"perceptionErrors":        perceptionCount,
+			"crawlerErrors":           len(crawlerErrors),
+			"analyzedResponses":       perception.Metadata["analyzedResponses"],
 		},
 	}, nil
+}
+
+func filterNonPerceptionResponses(responses []AIResponse) []AIResponse {
+	out := make([]AIResponse, 0, len(responses))
+	for _, response := range responses {
+		if strings.TrimSpace(response.RunType) == "perception" {
+			continue
+		}
+		out = append(out, response)
+	}
+	return out
+}
+
+type monitoringModelStats struct {
+	modelID   string
+	total     int
+	mentions  int
+	citations int
+	top       int
+	bottom    int
+	negative  int
+}
+
+func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
+	if len(responses) == 0 {
+		return nil
+	}
+
+	modelStats := make(map[string]*monitoringModelStats)
+	mentions := 0
+	citations := 0
+	top := 0
+	bottom := 0
+	negative := 0
+
+	for _, response := range responses {
+		modelID := strings.TrimSpace(response.ModelID)
+		if modelID == "" {
+			modelID = "unknown-model"
+		}
+		stats := modelStats[modelID]
+		if stats == nil {
+			stats = &monitoringModelStats{modelID: modelID}
+			modelStats[modelID] = stats
+		}
+		stats.total++
+		if response.BrandMentioned {
+			mentions++
+			stats.mentions++
+		}
+		if response.CitationFound {
+			citations++
+			stats.citations++
+		}
+		if response.BrandPosition == "top" {
+			top++
+			stats.top++
+		}
+		if response.BrandPosition == "bottom" {
+			bottom++
+			stats.bottom++
+		}
+		if response.Sentiment == "negative" {
+			negative++
+			stats.negative++
+		}
+	}
+
+	total := float64(len(responses))
+	mentionRate := float64(mentions) / total
+	citationRate := float64(citations) / total
+	topRate := float64(top) / total
+	bottomRate := float64(bottom) / total
+	negativeRate := float64(negative) / total
+
+	errors := make([]OptimizationError, 0, 5)
+	if mentionRate < 0.45 {
+		severity := "medium"
+		if mentionRate < 0.25 {
+			severity = "high"
+		}
+		errors = append(errors, OptimizationError{
+			ID:               "monitoring-derived:visibility_gap",
+			Source:           "monitoring",
+			Origin:           "derived",
+			Severity:         severity,
+			Title:            "La marque ressort trop peu dans les prompts suivis",
+			Issue:            "Le taux de mention reste insuffisant sur les requetes monitoring prioritaires.",
+			Impact:           "La marque risque d'etre absente des recommandations IA sur les moments d'intention cle.",
+			Type:             "monitoring_visibility_gap",
+			FixType:          "prompt_patch",
+			OptimizePriority: severity,
+			DetectedInModels: lowestMentionModels(modelStats, 2),
+			GeneratedContent: "Revoir les prompts coeur de marche, renforcer les pages de positionnement et les preuves citees par les IA.",
+			GeneratedContentKey: "generatedContentMonitoringVisibilityGap",
+		})
+	}
+	if mentionRate >= 0.45 && citationRate < 0.35 {
+		severity := "medium"
+		if citationRate < 0.2 {
+			severity = "high"
+		}
+		errors = append(errors, OptimizationError{
+			ID:               "monitoring-derived:citation_gap",
+			Source:           "monitoring",
+			Origin:           "derived",
+			Severity:         severity,
+			Title:            "La marque est mentionnee mais manque de sources citees",
+			Issue:            "Les IA citent encore trop rarement des preuves ou URLs fiables quand elles parlent de la marque.",
+			Impact:           "La credibilite de la marque reste fragile dans les reponses et comparatifs IA.",
+			Type:             "monitoring_citation_gap",
+			FixType:          "faq_snippet",
+			OptimizePriority: severity,
+			DetectedInModels: lowestCitationModels(modelStats, 2),
+			GeneratedContent: "Ajouter des contenus davantage citables: FAQ, comparatifs, chiffres, preuves produit et pages de reference.",
+			GeneratedContentKey: "generatedContentMonitoringCitationGap",
+		})
+	}
+	if mentionRate >= 0.45 && topRate < 0.25 && bottomRate >= 0.3 {
+		severity := "medium"
+		if bottomRate >= 0.45 {
+			severity = "high"
+		}
+		errors = append(errors, OptimizationError{
+			ID:               "monitoring-derived:ranking_gap",
+			Source:           "monitoring",
+			Origin:           "derived",
+			Severity:         severity,
+			Title:            "La marque perd les positions hautes sur les prompts suivis",
+			Issue:            "Les reponses mentionnent la marque mais la placent trop rarement en tete et trop souvent en bas de classement.",
+			Impact:           "La visibilite IA devient moins competitive sur les prompts a forte intention.",
+			Type:             "monitoring_ranking_gap",
+			FixType:          "website_copy",
+			OptimizePriority: severity,
+			DetectedInModels: worstRankingModels(modelStats, 2),
+			GeneratedContent: "Clarifier la proposition de valeur, les differentiants et les comparatifs concurrentiels sur les pages cle.",
+			GeneratedContentKey: "generatedContentMonitoringRankingGap",
+		})
+	}
+	if negativeRate >= 0.35 {
+		severity := "medium"
+		if negativeRate >= 0.5 {
+			severity = "high"
+		}
+		errors = append(errors, OptimizationError{
+			ID:               "monitoring-derived:negative_shift",
+			Source:           "monitoring",
+			Origin:           "derived",
+			Severity:         severity,
+			Title:            "La tonalite des reponses devient trop negative",
+			Issue:            "Une part trop importante des reponses monitoring parle de la marque avec une tonalite negative.",
+			Impact:           "La desirabilite et la confiance baissent dans les recommandations et comparatifs IA.",
+			Type:             "monitoring_negative_shift",
+			FixType:          "website_copy",
+			OptimizePriority: severity,
+			DetectedInModels: mostNegativeModels(modelStats, 2),
+			GeneratedContent: "Renforcer les contenus de reassurance, les cas clients, les preuves de resultat et les objections traitees.",
+			GeneratedContentKey: "generatedContentMonitoringNegativeShift",
+		})
+	}
+	if hasMonitoringVolatility(modelStats) {
+		errors = append(errors, OptimizationError{
+			ID:               "monitoring-derived:model_volatility",
+			Source:           "monitoring",
+			Origin:           "derived",
+			Severity:         "medium",
+			Title:            "Les modeles racontent des histoires trop differentes sur la marque",
+			Issue:            "Les performances monitoring varient fortement d'un modele a l'autre, signe d'un positionnement encore instable.",
+			Impact:           "La marque peut sembler forte sur certains assistants et faible sur d'autres, ce qui reduit la coherence globale.",
+			Type:             "monitoring_model_volatility",
+			FixType:          "prompt_patch",
+			OptimizePriority: "medium",
+			DetectedInModels: volatilityModels(modelStats, 2),
+			GeneratedContent: "Uniformiser les contenus de positionnement, les cas d'usage et les comparatifs pour reduire l'ecart entre modeles.",
+			GeneratedContentKey: "generatedContentMonitoringModelVolatility",
+		})
+	}
+
+	return errors
+}
+
+func lowestMentionModels(stats map[string]*monitoringModelStats, limit int) []string {
+	return pickMonitoringModels(stats, limit, func(item *monitoringModelStats) float64 {
+		if item.total == 0 {
+			return 1
+		}
+		return float64(item.mentions) / float64(item.total)
+	}, true)
+}
+
+func lowestCitationModels(stats map[string]*monitoringModelStats, limit int) []string {
+	return pickMonitoringModels(stats, limit, func(item *monitoringModelStats) float64 {
+		if item.total == 0 {
+			return 1
+		}
+		return float64(item.citations) / float64(item.total)
+	}, true)
+}
+
+func worstRankingModels(stats map[string]*monitoringModelStats, limit int) []string {
+	return pickMonitoringModels(stats, limit, func(item *monitoringModelStats) float64 {
+		if item.total == 0 {
+			return 0
+		}
+		return float64(item.bottom-item.top) / float64(item.total)
+	}, true)
+}
+
+func mostNegativeModels(stats map[string]*monitoringModelStats, limit int) []string {
+	return pickMonitoringModels(stats, limit, func(item *monitoringModelStats) float64 {
+		if item.total == 0 {
+			return 0
+		}
+		return float64(item.negative) / float64(item.total)
+	}, false)
+}
+
+func volatilityModels(stats map[string]*monitoringModelStats, limit int) []string {
+	return pickMonitoringModels(stats, limit, func(item *monitoringModelStats) float64 {
+		if item.total == 0 {
+			return 0
+		}
+		mentionRate := float64(item.mentions) / float64(item.total)
+		rankingSpread := float64(item.top+item.bottom) / float64(item.total)
+		return (1 - mentionRate) + rankingSpread
+	}, false)
+}
+
+func hasMonitoringVolatility(stats map[string]*monitoringModelStats) bool {
+	if len(stats) < 2 {
+		return false
+	}
+	minMention := 1.0
+	maxMention := 0.0
+	for _, item := range stats {
+		if item.total == 0 {
+			continue
+		}
+		rate := float64(item.mentions) / float64(item.total)
+		if rate < minMention {
+			minMention = rate
+		}
+		if rate > maxMention {
+			maxMention = rate
+		}
+	}
+	return maxMention-minMention >= 0.45
+}
+
+func pickMonitoringModels(
+	stats map[string]*monitoringModelStats,
+	limit int,
+	score func(*monitoringModelStats) float64,
+	ascending bool,
+) []string {
+	type row struct {
+		modelID string
+		score   float64
+	}
+	rows := make([]row, 0, len(stats))
+	for _, item := range stats {
+		if item == nil || item.modelID == "" {
+			continue
+		}
+		rows = append(rows, row{modelID: item.modelID, score: score(item)})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].score == rows[j].score {
+			return rows[i].modelID < rows[j].modelID
+		}
+		if ascending {
+			return rows[i].score < rows[j].score
+		}
+		return rows[i].score > rows[j].score
+	})
+	if limit <= 0 || limit > len(rows) {
+		limit = len(rows)
+	}
+	out := make([]string, 0, limit)
+	for _, item := range rows[:limit] {
+		out = append(out, item.modelID)
+	}
+	return out
+}
+
+func (s *Service) listCrawlerOptimizationErrors(ctx context.Context, projectID string, organizationID int64) ([]OptimizationError, error) {
+	snapshot, err := s.GetLatestContentOptimizerCrawl(ctx, projectID, organizationID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	createdAt := snapshot.UpdatedAt
+	if createdAt.IsZero() {
+		createdAt = snapshot.CreatedAt
+	}
+
+	items := make([]OptimizationError, 0)
+	for _, record := range snapshot.Result.Records {
+		pageURL := strings.TrimSpace(record.URL)
+		for index, issue := range record.Issues {
+			id := strings.TrimSpace(issue.ID)
+			if id == "" {
+				id = contentOptimizerIssueID(pageURL, strings.TrimSpace(issue.FixType))
+				if id == "page" || strings.HasSuffix(id, "-") {
+					id = contentOptimizerIssueID(pageURL, strings.TrimSpace(issue.Category))
+				}
+				if id == "page" || strings.HasSuffix(id, "-") {
+					id = contentOptimizerIssueID(pageURL, "issue")
+				}
+			}
+			if index > 0 && id == "" {
+				id = contentOptimizerIssueID(pageURL, "issue")
+			}
+
+			severity := normalizeOptimizationSeverity(issue.Severity)
+			items = append(items, OptimizationError{
+				ID:               "crawler:" + id,
+				Source:           "crawler",
+				Resource:         pageURL,
+				Severity:         severity,
+				Title:            strings.TrimSpace(issue.Title),
+				Issue:            strings.TrimSpace(issue.Description),
+				Impact:           crawlerOptimizationImpact(pageURL),
+				Type:             crawlerOptimizationType(issue),
+				FixType:          crawlerOptimizationFixType(issue),
+				OptimizePriority: severity,
+				GeneratedContent: strings.TrimSpace(issue.Recommendation),
+				CreatedAt:        formatOptimizationErrorTime(createdAt),
+			})
+		}
+	}
+	return items, nil
+}
+
+func crawlerOptimizationImpact(pageURL string) string {
+	pageURL = strings.TrimSpace(pageURL)
+	if pageURL == "" {
+		return "Point detecte par le crawl de contenu."
+	}
+	return "Point detecte par le crawl de contenu sur " + pageURL + "."
+}
+
+func crawlerOptimizationType(issue ContentOptimizerIssue) string {
+	fixType := strings.TrimSpace(issue.FixType)
+	if fixType != "" {
+		return fixType
+	}
+	category := strings.TrimSpace(issue.Category)
+	if category != "" {
+		return category
+	}
+	return "crawler_issue"
+}
+
+func crawlerOptimizationFixType(issue ContentOptimizerIssue) string {
+	fixType := strings.ToLower(strings.TrimSpace(issue.FixType))
+	category := strings.ToLower(strings.TrimSpace(issue.Category))
+	if strings.Contains(fixType, "schema") {
+		return "schema_update"
+	}
+	if strings.Contains(fixType, "faq") {
+		return "faq_snippet"
+	}
+	if strings.Contains(fixType, "http") || strings.Contains(category, "technical") {
+		return "prompt_patch"
+	}
+	return "website_copy"
+}
+
+func formatOptimizationErrorTime(value time.Time) string {
+	if value.IsZero() {
+		return ""
+	}
+	return value.UTC().Format(time.RFC3339Nano)
 }
 
 func buildOptimizationErrorColumns(errors []OptimizationError) []OptimizationErrorColumn {

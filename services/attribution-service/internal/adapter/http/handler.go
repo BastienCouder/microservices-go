@@ -93,8 +93,8 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.listEvents(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "funnel" && r.Method == http.MethodGet:
 		h.getFunnel(w, r, projectID)
-	case len(parts) == 2 && (parts[1] == "traffic" || parts[1] == "geo") && r.Method == http.MethodGet:
-		h.getGeoTrafficReport(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "traffic" && r.Method == http.MethodGet:
+		h.getTrafficReport(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -287,7 +287,7 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 	writeSuccess(w, http.StatusOK, funnel)
 }
 
-func (h *Handler) getGeoTrafficReport(w http.ResponseWriter, r *http.Request, projectID string) {
+func (h *Handler) getTrafficReport(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
@@ -305,14 +305,14 @@ func (h *Handler) getGeoTrafficReport(w http.ResponseWriter, r *http.Request, pr
 		return
 	}
 
-	report, err := h.svc.GetGeoTrafficReport(
+	report, err := h.svc.GetTrafficReport(
 		r.Context(),
 		projectID,
 		userID,
 		organizationID,
 		from,
 		to,
-		usecase.GeoTrafficFilters{
+		usecase.TrafficFilters{
 			Search: strings.TrimSpace(r.URL.Query().Get("search")),
 			Engine: strings.TrimSpace(r.URL.Query().Get("engine")),
 		},

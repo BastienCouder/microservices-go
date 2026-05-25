@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 )
@@ -14,18 +15,27 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 	if promptID == "" || promptText == "" || modelID == "" {
 		return ExecutePromptResult{}, fmt.Errorf("%w: promptId, promptText and modelId are required", ErrValidation)
 	}
-	if _, ok := s.supportedModels[modelID]; !ok {
+	if !s.isSupportedModel(modelID, strings.TrimSpace(input.ProviderID)) {
 		return ExecutePromptResult{}, fmt.Errorf("%w: %s", ErrUnknownModel, modelID)
 	}
 
 	start := time.Now()
+	log.Printf(
+		"ia_prompt.execute_start prompt_id=%s model_id=%s provider_id=%s mode=%s prompt_chars=%d competitors=%d",
+		promptID,
+		modelID,
+		strings.TrimSpace(input.ProviderID),
+		s.mode,
+		len(promptText),
+		len(input.Competitors),
+	)
 
 	response := strings.TrimSpace(input.MockResponse)
 	tokensUsed := 0
 	if response == "" {
 		switch s.mode {
 		case ExecutionModeProvider:
-			providerPrompt := buildProviderPrompt(promptText, strings.TrimSpace(input.BrandName), input.Competitors)
+			providerPrompt := buildProviderPrompt(input.PromptMode, promptText, strings.TrimSpace(input.BrandName), input.Competitors)
 			if isStructuredProviderPrompt(promptID) {
 				providerPrompt = promptText
 			}
@@ -36,6 +46,15 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 				Prompt:     providerPrompt,
 			})
 			if err != nil {
+				log.Printf(
+					"ia_prompt.execute_failed prompt_id=%s model_id=%s provider_id=%s mode=%s duration_ms=%d error=%v",
+					promptID,
+					modelID,
+					strings.TrimSpace(input.ProviderID),
+					s.mode,
+					time.Since(start).Milliseconds(),
+					err,
+				)
 				return ExecutePromptResult{}, fmt.Errorf("execute prompt with provider: %w", err)
 			}
 			response = strings.TrimSpace(result.RawResponse)
@@ -47,6 +66,14 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		}
 	}
 	if response == "" {
+		log.Printf(
+			"ia_prompt.execute_empty prompt_id=%s model_id=%s provider_id=%s mode=%s duration_ms=%d",
+			promptID,
+			modelID,
+			strings.TrimSpace(input.ProviderID),
+			s.mode,
+			time.Since(start).Milliseconds(),
+		)
 		return ExecutePromptResult{}, fmt.Errorf("%w: empty model response", ErrValidation)
 	}
 
@@ -59,6 +86,21 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		tokensUsed = len(strings.Fields(response))
 	}
 
+	log.Printf(
+		"ia_prompt.execute_completed prompt_id=%s model_id=%s provider_id=%s mode=%s duration_ms=%d tokens=%d response_chars=%d brand_mentioned=%t brand_position=%s citation_found=%t sentiment=%s",
+		promptID,
+		modelID,
+		strings.TrimSpace(input.ProviderID),
+		s.mode,
+		latencyMs,
+		tokensUsed,
+		len(response),
+		analysis.BrandMentioned,
+		analysis.BrandPosition,
+		analysis.CitationFound,
+		analysis.Sentiment,
+	)
+
 	return ExecutePromptResult{
 		PromptID:    promptID,
 		ModelID:     modelID,
@@ -69,6 +111,19 @@ func (s *Service) ExecutePrompt(ctx context.Context, input ExecutePromptInput) (
 		},
 		Analysis: analysis,
 	}, nil
+}
+
+func (s *Service) isSupportedModel(modelID, providerID string) bool {
+	if _, ok := s.supportedModels[modelID]; ok {
+		return true
+	}
+
+	normalizedProviderID := strings.ToLower(strings.TrimSpace(providerID))
+	if normalizedProviderID == "" || normalizedProviderID == "openrouter" {
+		return strings.Contains(strings.TrimSpace(modelID), "/")
+	}
+
+	return false
 }
 
 func isStructuredProviderPrompt(promptID string) bool {

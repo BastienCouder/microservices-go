@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   getContentOptimizerCrawl,
   getLatestContentOptimizerCrawl,
+  getProjectWebsiteURL,
   startContentOptimizerCrawl,
 } from "./content-optimizer-api";
 
@@ -20,6 +21,28 @@ afterEach(() => {
 });
 
 describe("content optimizer api", () => {
+  test("loads the project website URL used for the first crawl", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (input, init) => {
+      calls.push({ url: String(input), init });
+      return jsonResponse(200, {
+        success: true,
+        data: { id: "prj_1", websiteUrl: "https://example.com" },
+      });
+    }) as typeof fetch;
+
+    const websiteURL = await getProjectWebsiteURL("http://api.test", {
+      projectId: "prj_1",
+      organizationId: "42",
+    });
+
+    expect(websiteURL).toBe("https://example.com");
+    expect(calls[0]?.url).toBe("http://api.test/projects/prj_1");
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe(
+      "42",
+    );
+  });
+
   test("starts a Cloudflare crawl through the analysis gateway route", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
@@ -43,7 +66,9 @@ describe("content optimizer api", () => {
     expect(calls[0]?.url).toBe(
       "http://api.test/analysis/projects/prj_1/content-optimizer/crawl",
     );
-    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("42");
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe(
+      "42",
+    );
     expect(calls[0]?.init?.method).toBe("POST");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       url: "https://example.com",
@@ -89,7 +114,10 @@ describe("content optimizer api", () => {
       formats: ["markdown"],
       crawlPurposes: ["search", "ai-input"],
       options: {
-        includePatterns: ["https://example.com/", "https://example.com/pricing"],
+        includePatterns: [
+          "https://example.com/",
+          "https://example.com/pricing",
+        ],
       },
     });
   });
@@ -105,7 +133,9 @@ describe("content optimizer api", () => {
           status: "completed",
           total: 1,
           finished: 1,
-          records: [{ url: "https://example.com", title: "Home", markdown: "# Home" }],
+          records: [
+            { url: "https://example.com", title: "Home", markdown: "# Home" },
+          ],
         },
       });
     }) as typeof fetch;
@@ -122,7 +152,9 @@ describe("content optimizer api", () => {
     expect(calls[0]?.url).toBe(
       "http://api.test/analysis/projects/prj_1/content-optimizer/crawl/crawl-123?limit=100&status=completed",
     );
-    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("42");
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe(
+      "42",
+    );
   });
 
   test("loads latest saved crawl result for a project", async () => {
@@ -157,6 +189,8 @@ describe("content optimizer api", () => {
     expect(calls[0]?.url).toBe(
       "http://api.test/analysis/projects/prj_1/content-optimizer/crawl",
     );
-    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("42");
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe(
+      "42",
+    );
   });
 });

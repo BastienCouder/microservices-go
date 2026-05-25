@@ -2,6 +2,7 @@ import type { DateRange } from "react-day-picker";
 
 import { apiRoutes } from "@/lib/api-config";
 import {
+  buildProjectModelLookup,
   normalizeModelPayloadList,
   toProjectModelMeta,
   type ProjectModelMeta,
@@ -36,6 +37,7 @@ export type MonitoringPrompt = {
   sentiment: "positive" | "neutral" | "negative";
   citationFound: boolean;
   citedUrls: string[];
+  allCitedUrls: string[];
   rank?: number;
   score: number;
   time: string;
@@ -247,23 +249,19 @@ function toPersona(response: JsonObject, promptRunsById: Map<string, JsonObject>
   ).trim();
 }
 
-function scoreFromAnalysis(response: JsonObject): number {
+function scoreFromAnalysis(response: JsonObject, citationFoundOverride?: boolean): number {
   const mention = asBool(getField(response, ["brandMentioned", "BrandMentioned"]));
-  const citation = asBool(getField(response, ["citationFound", "CitationFound"]));
-  const sentiment = asString(getField(response, ["sentiment", "Sentiment"]))
-    .trim()
-    .toLowerCase();
+  const citation =
+    citationFoundOverride ??
+    asBool(getField(response, ["citationFound", "CitationFound"]));
   const position = asString(getField(response, ["brandPosition", "BrandPosition"]))
     .trim()
     .toLowerCase();
 
-  let score = 30;
-  if (mention) score += 35;
-  if (citation) score += 20;
-  if (sentiment === "positive") score += 10;
-  if (sentiment === "neutral") score += 5;
-  if (position === "first" || position === "top" || position === "1") score += 10;
-  if (position === "second" || position === "2") score += 5;
+  let score = 0;
+  if (mention) score += 50;
+  if (citation) score += 30;
+  if (position === "first" || position === "top" || position === "1") score += 20;
 
   return Math.max(0, Math.min(100, score));
 }
@@ -380,6 +378,32 @@ function pickProjectWebsite(project: JsonObject): string {
     asString(getField(project, ["websiteUrl", "WebsiteURL"])).trim() ||
     asString(getField(project, ["domain", "Domain"])).trim()
   );
+}
+
+function parseComparableHost(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  try {
+    const parsed = trimmed.startsWith("http://") || trimmed.startsWith("https://")
+      ? new URL(trimmed)
+      : new URL(`https://${trimmed}`);
+    return normalizeComparableHost(parsed.hostname);
+  } catch {
+    const host = trimmed.replace(/^https?:\/\//i, "").split(/[/?#]/)[0] ?? "";
+    if (!host.includes(".")) return null;
+    return normalizeComparableHost(host);
+  }
+}
+
+function normalizeComparableHost(value: string): string {
+  return value.trim().toLowerCase().replace(/^www\./, "");
+}
+
+function isExactProjectURL(rawUrl: string, projectHost: string | null): boolean {
+  if (!projectHost) return true;
+  const urlHost = parseComparableHost(rawUrl);
+  return urlHost === projectHost;
 }
 
 function pickProjectPersonas(project: JsonObject): string[] {
@@ -573,7 +597,11 @@ export async function loadMonitoringData(
     },
   );
 
-  if (!projectRes.ok && routeProjectId && projectRes.status === 404) {
+  if (
+    !projectRes.ok &&
+    routeProjectId &&
+    [401, 403, 404].includes(projectRes.status)
+  ) {
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",
@@ -629,8 +657,11 @@ export async function loadMonitoringData(
 
   const liveModels = projectModels.filter((model) => model.live);
   const models = options?.includeHistoricalModels ? projectModels : liveModels;
-  const modelById = new Map(projectModels.map((model) => [model.id, model]));
-  const enabledModelIDs = new Set(liveModels.map((model) => model.id));
+  const modelLookup = buildProjectModelLookup(projectModels);
+
+  function resolveProjectModel(value: string): MonitoringModel | undefined {
+    return modelLookup.get(normalizeFilterValue(value));
+  }
 
   const competitors: MonitoringCompetitor[] = competitorsPayload.map((entry) => {
     const row = asObject(entry);
@@ -671,28 +702,33 @@ export async function loadMonitoringData(
     "";
   const projectTagline = pickProjectTagline(project);
   const projectWebsite = pickProjectWebsite(project);
+  const projectHost = parseComparableHost(projectWebsite);
   const projectPersonas = pickProjectPersonas(project);
 
   const responses = asArray(getField(monitoringPayload, ["aiResponses", "responses", "Responses"]))
     .map(asObject)
     .filter((response) => {
+      const runType = asString(getField(response, ["runType", "RunType"])).trim().toLowerCase();
+      if (runType === "perception") {
+        return false;
+      }
       if (options?.includeHistoricalModels) {
         return true;
       }
-      const modelId =
+      const rawModelId =
         asString(getField(response, ["modelId", "ModelID"])) ||
         asString(getField(response, ["model", "Model"]));
-      return enabledModelIDs.has(modelId);
+      return resolveProjectModel(rawModelId)?.live === true;
     });
   const competitorMatchers = competitors
     .map((competitor) => ({ name: competitor.name, matcher: buildPhraseMatcher(competitor.name) }))
     .filter((entry): entry is { name: string; matcher: RegExp } => entry.matcher !== null);
 
   const prompts: MonitoringPrompt[] = responses.map((response) => {
-    const modelId =
+    const rawModelId =
       asString(getField(response, ["modelId", "ModelID"])) ||
       asString(getField(response, ["model", "Model"]));
-    const model = modelById.get(modelId);
+    const model = resolveProjectModel(rawModelId);
 
     const createdAt = asString(getField(response, ["createdAt", "CreatedAt"]));
     const rawResponse = asString(getField(response, ["rawResponse", "RawResponse"]));
@@ -703,13 +739,19 @@ export async function loadMonitoringData(
       .filter(({ matcher }) => matcher.test(normalizedRawResponse))
       .map(({ name }) => name);
 
+    const allCitedUrls = asArray(getField(response, ["citedUrls", "CitedURLs"]))
+      .map((entry) => asString(entry).trim())
+      .filter(Boolean);
+    const citedUrls = allCitedUrls.filter((url) => isExactProjectURL(url, projectHost));
+    const citationFound = citedUrls.length > 0;
+
     return {
       responseId: asString(getField(response, ["id", "ID"])),
       promptId: promptRunPromptIdById.get(promptRunId) || "",
-      modelId: model?.id || modelId || "",
-      modelGroupName: model?.groupName || "",
-      modelDisplayName: model?.displayName || "",
-      modelProviderModelId: model?.providerModelId || "",
+      modelId: model?.id || rawModelId || "",
+      modelGroupName: model?.groupName || model?.displayName || rawModelId || "",
+      modelDisplayName: model?.displayName || rawModelId || "",
+      modelProviderModelId: model?.providerModelId || rawModelId || "",
       modelIconPath: model?.iconPath || "",
       text: promptRunById.get(promptRunId) || rawResponse.slice(0, 160) || "",
       persona: toPersona(response, promptRunMetaById, promptRunId),
@@ -720,10 +762,11 @@ export async function loadMonitoringData(
         if (value === "positive" || value === "negative") return value;
         return "neutral";
       })(),
-      citationFound: asBool(getField(response, ["citationFound", "CitationFound"])),
-      citedUrls: asArray(getField(response, ["citedUrls", "CitedURLs"])).map((entry) => asString(entry).trim()).filter(Boolean),
+      citationFound,
+      citedUrls,
+      allCitedUrls,
       rank: rankFromPosition(response),
-      score: scoreFromAnalysis(response),
+      score: scoreFromAnalysis(response, citationFound),
       time: createdAt ? toRelativeTime(createdAt) : "-",
       createdAt: createdAt || undefined,
       response: rawResponse,
@@ -799,6 +842,7 @@ export async function loadMonitoringData(
     for (const rawUrl of urls) {
       const value = asString(rawUrl).trim();
       if (value === "") continue;
+      if (!isExactProjectURL(value, projectHost)) continue;
       citedPagesCount.set(value, (citedPagesCount.get(value) ?? 0) + 1);
     }
   }

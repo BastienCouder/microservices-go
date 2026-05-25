@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptRunRow } from "../../_lib/types";
+import { RichResponseText } from "./rich-response-text";
 
 type ResponseDetailsSheetProps = {
   response: PromptRunRow | null;
@@ -70,12 +71,12 @@ function ResponseDetailsContent({
               <span className="inline-flex items-center gap-2 rounded-full border border-slate-100 bg-white px-3 py-1.5 text-sm font-medium text-foreground">
                 <img
                   src={visual.icon}
-                  alt={visual.label}
+                  alt={visual.provider || visual.name}
                   className="h-4 w-4 object-contain"
                   decoding="async"
                   loading="lazy"
                 />
-                {visual.label}
+                {visual.name}
               </span>
               <span className="rounded-full bg-muted px-3 py-1.5 text-sm font-medium text-muted-foreground">
                 {response.time}
@@ -115,7 +116,7 @@ function ResponseDetailsContent({
           </div>
 
           <ResponseTextBlock label={t("response")}>
-            <p>{response.response}</p>
+            <RichResponseText content={response.response} />
           </ResponseTextBlock>
 
           <ResponseTextBlock label={t("keyPoints")}>

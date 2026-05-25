@@ -1,5 +1,3 @@
-import { FileText } from "lucide-react";
-
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,12 +12,14 @@ import {
   formatInteger,
   formatPercent,
 } from "../../_lib/report/traffic-report-formatters";
-import type { GeoTrafficPage } from "../../_lib/report/types";
+import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-assets";
+import type { TrafficPage } from "../../_lib/report/types";
 import { PaginationControls } from "./pagination-controls";
 import { SectionTitle } from "@/components/shared/section-title";
 
 type TopPagesTableProps = {
-  pages: GeoTrafficPage[];
+  errorLabel?: string | null;
+  pages: TrafficPage[];
   pagination: {
     page: number;
     totalPages: number;
@@ -29,7 +29,7 @@ type TopPagesTableProps = {
   loading?: boolean;
 };
 
-export function TopPagesTable({ pages, pagination, loading = false }: TopPagesTableProps) {
+export function TopPagesTable({ errorLabel, pages, pagination, loading = false }: TopPagesTableProps) {
   return (
     <section className="rounded-md bg-card p-4 text-card-foreground">
       <div className="mb-4 flex flex-col gap-1">
@@ -52,38 +52,100 @@ export function TopPagesTable({ pages, pagination, loading = false }: TopPagesTa
           ))}
         </div>
       ) : pages.length === 0 ? (
-        <EmptyStateCard label="Aucune page disponible" className="h-28" />
+        <EmptyStateCard label={errorLabel || "Aucune page disponible"} className="h-28" />
       ) : (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Page</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead className="text-right">Visites IA détectées</TableHead>
-              <TableHead className="text-right">Taux engagé</TableHead>
-              <TableHead className="text-right">Conversions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
+        <>
+          <div className="space-y-3 md:hidden">
             {pages.map((page) => (
-              <TableRow key={`${page.path}-${page.source}`}>
-                <TableCell className="max-w-[300px]">
-                  <div className="truncate font-medium">{page.title || page.path || "/"}</div>
-                  <div className="truncate text-xs text-muted-foreground">{page.path || "/"}</div>
-                </TableCell>
-                <TableCell>
-                  <div className="font-medium">{page.engine}</div>
-                  <div className="text-xs text-muted-foreground">{page.source}</div>
-                </TableCell>
-                <TableCell className="text-right font-semibold">
-                  {formatInteger(page.sessions)}
-                </TableCell>
-                <TableCell className="text-right">{formatPercent(page.engagementRate)}</TableCell>
-                <TableCell className="text-right">{formatInteger(page.conversions)}</TableCell>
-              </TableRow>
+              <article
+                key={`${page.path}-${page.source}`}
+                className="rounded-xl border border-border bg-background p-3"
+              >
+                <div className="space-y-1">
+                  <div className="break-words font-medium text-foreground">
+                    {page.title || page.path || "/"}
+                  </div>
+                  <div className="break-all text-xs text-muted-foreground">{page.path || "/"}</div>
+                </div>
+
+                <div className="mt-3 flex min-w-0 items-start gap-2">
+                  <span className="grid size-7 shrink-0 place-items-center rounded-full bg-card shadow-sm ring-1 ring-border">
+                    <img
+                      src={getTrafficEngineIconPath(page.engine)}
+                      alt=""
+                      className="size-4"
+                      loading="lazy"
+                    />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate font-medium">{page.engine}</div>
+                    <div className="break-all text-xs text-muted-foreground">{page.source}</div>
+                  </div>
+                </div>
+
+                <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Visites IA</dt>
+                    <dd className="font-semibold">{formatInteger(page.sessions)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Taux engagé</dt>
+                    <dd>{formatPercent(page.engagementRate)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">Conversions</dt>
+                    <dd>{formatInteger(page.conversions)}</dd>
+                  </div>
+                </dl>
+              </article>
             ))}
-          </TableBody>
-        </Table>
+          </div>
+
+          <div className="hidden overflow-x-auto md:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Page</TableHead>
+                  <TableHead>Source</TableHead>
+                  <TableHead className="text-right">Visites IA détectées</TableHead>
+                  <TableHead className="text-right">Taux engagé</TableHead>
+                  <TableHead className="text-right">Conversions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pages.map((page) => (
+                  <TableRow key={`${page.path}-${page.source}`}>
+                    <TableCell className="max-w-[300px]">
+                      <div className="truncate font-medium">{page.title || page.path || "/"}</div>
+                      <div className="truncate text-xs text-muted-foreground">{page.path || "/"}</div>
+                    </TableCell>
+                    <TableCell className="max-w-[260px]">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="grid size-7 shrink-0 place-items-center rounded-full bg-background shadow-sm ring-1 ring-border">
+                          <img
+                            src={getTrafficEngineIconPath(page.engine)}
+                            alt=""
+                            className="size-4"
+                            loading="lazy"
+                          />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="truncate font-medium">{page.engine}</div>
+                          <div className="truncate text-xs text-muted-foreground">{page.source}</div>
+                        </div>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-semibold">
+                      {formatInteger(page.sessions)}
+                    </TableCell>
+                    <TableCell className="text-right">{formatPercent(page.engagementRate)}</TableCell>
+                    <TableCell className="text-right">{formatInteger(page.conversions)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </>
       )}
 
       {!loading && pages.length > 0 ? <PaginationControls {...pagination} /> : null}

@@ -30,6 +30,7 @@ type ExecutePromptRequest struct {
 	Competitors    []string               `protobuf:"bytes,5,rep,name=competitors,proto3" json:"competitors,omitempty"`
 	ProviderId     string                 `protobuf:"bytes,6,opt,name=provider_id,json=providerId,proto3" json:"provider_id,omitempty"`
 	ProviderApiKey string                 `protobuf:"bytes,7,opt,name=provider_api_key,json=providerApiKey,proto3" json:"provider_api_key,omitempty"`
+	PromptMode     string                 `protobuf:"bytes,8,opt,name=prompt_mode,json=promptMode,proto3" json:"prompt_mode,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -109,6 +110,13 @@ func (x *ExecutePromptRequest) GetProviderId() string {
 func (x *ExecutePromptRequest) GetProviderApiKey() string {
 	if x != nil {
 		return x.ProviderApiKey
+	}
+	return ""
+}
+
+func (x *ExecutePromptRequest) GetPromptMode() string {
+	if x != nil {
+		return x.PromptMode
 	}
 	return ""
 }
@@ -261,7 +269,7 @@ var File_proto_ia_v1_ia_proto protoreflect.FileDescriptor
 
 const file_proto_ia_v1_ia_proto_rawDesc = "" +
 	"\n" +
-	"\x14proto/ia/v1/ia.proto\x12\x05ia.v1\"\xfb\x01\n" +
+	"\x14proto/ia/v1/ia.proto\x12\x05ia.v1\"\x9c\x02\n" +
 	"\x14ExecutePromptRequest\x12\x1b\n" +
 	"\tprompt_id\x18\x01 \x01(\tR\bpromptId\x12\x1f\n" +
 	"\vprompt_text\x18\x02 \x01(\tR\n" +
@@ -272,7 +280,9 @@ const file_proto_ia_v1_ia_proto_rawDesc = "" +
 	"\vcompetitors\x18\x05 \x03(\tR\vcompetitors\x12\x1f\n" +
 	"\vprovider_id\x18\x06 \x01(\tR\n" +
 	"providerId\x12(\n" +
-	"\x10provider_api_key\x18\a \x01(\tR\x0eproviderApiKey\"\xcd\x01\n" +
+	"\x10provider_api_key\x18\a \x01(\tR\x0eproviderApiKey\x12\x1f\n" +
+	"\vprompt_mode\x18\b \x01(\tR\n" +
+	"promptMode\"\xcd\x01\n" +
 	"\x17PromptExecutionAnalysis\x12'\n" +
 	"\x0fbrand_mentioned\x18\x01 \x01(\bR\x0ebrandMentioned\x12%\n" +
 	"\x0ebrand_position\x18\x02 \x01(\tR\rbrandPosition\x12%\n" +

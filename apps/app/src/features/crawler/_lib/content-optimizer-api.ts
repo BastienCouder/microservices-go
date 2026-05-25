@@ -1,3 +1,4 @@
+import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
 
 export type ContentOptimizerCrawlJob = {
@@ -45,6 +46,18 @@ export type ContentOptimizerCrawlSnapshot = {
   updatedAt: string;
 };
 
+export type ContentOptimizerProject = {
+  id?: string;
+  name?: string;
+  websiteUrl?: string;
+  domain?: string;
+};
+
+export type ContentOptimizerProjectSummary = {
+  name: string;
+  websiteUrl: string;
+};
+
 export type StartContentOptimizerCrawlInput = {
   projectId: string;
   organizationId?: string;
@@ -73,11 +86,7 @@ function unwrapGatewayData<T>(response: GatewayResult<unknown>): T {
     throw new Error(response.error);
   }
   const payload = response.data;
-  if (
-    payload &&
-    typeof payload === "object" &&
-    "data" in payload
-  ) {
+  if (payload && typeof payload === "object" && "data" in payload) {
     return (payload as { data: T }).data;
   }
   return payload as T;
@@ -97,6 +106,84 @@ function uniqueTrimmedValues(values: string[] | undefined): string[] {
   return normalized;
 }
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeProjectURL(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function readProjectWebsiteURL(payload: unknown): string {
+  const item = asRecord(payload);
+  return normalizeProjectURL(
+    asString(item.websiteUrl) ||
+      asString(item.WebsiteURL) ||
+      asString(item.domain) ||
+      asString(item.Domain),
+  );
+}
+
+function readProjectName(payload: unknown): string {
+  const item = asRecord(payload);
+  return asString(item.name) || asString(item.Name);
+}
+
+export async function getProjectWebsiteURL(
+  apiBaseURL: string,
+  input: {
+    projectId: string;
+    organizationId?: string;
+  },
+  signal?: AbortSignal,
+): Promise<string> {
+  const response = await gatewayJSON<ContentOptimizerProject>(
+    apiBaseURL,
+    apiRoutes.projects.get(encodePathSegment(input.projectId)),
+    {
+      method: "GET",
+      organizationId: input.organizationId,
+      signal,
+    },
+  );
+
+  return readProjectWebsiteURL(unwrapGatewayData(response));
+}
+
+export async function getProjectSummary(
+  apiBaseURL: string,
+  input: {
+    projectId: string;
+    organizationId?: string;
+  },
+  signal?: AbortSignal,
+): Promise<ContentOptimizerProjectSummary> {
+  const response = await gatewayJSON<ContentOptimizerProject>(
+    apiBaseURL,
+    apiRoutes.projects.get(encodePathSegment(input.projectId)),
+    {
+      method: "GET",
+      organizationId: input.organizationId,
+      signal,
+    },
+  );
+
+  const payload = unwrapGatewayData(response);
+  return {
+    name: readProjectName(payload),
+    websiteUrl: readProjectWebsiteURL(payload),
+  };
+}
+
 export async function startContentOptimizerCrawl(
   apiBaseURL: string,
   input: StartContentOptimizerCrawlInput,
@@ -111,9 +198,7 @@ export async function startContentOptimizerCrawl(
     source: "all",
     formats: ["markdown"],
     crawlPurposes: ["search", "ai-input"],
-    ...(includePatterns.length > 0
-      ? { options: { includePatterns } }
-      : {}),
+    ...(includePatterns.length > 0 ? { options: { includePatterns } } : {}),
   };
 
   const response = await gatewayJSON<ContentOptimizerCrawlJob>(

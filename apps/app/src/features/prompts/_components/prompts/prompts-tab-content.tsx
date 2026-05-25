@@ -16,6 +16,7 @@ import type {
   PromptSort,
   PromptSortDirection,
 } from "../../_lib/types";
+import { resolveBulkPromptIds } from "../../_lib/prompt-mutation-actions";
 import { BulkStatusButton, SortableColumnHeader } from "./prompt-list-parts";
 import {
   PromptMobileCard,
@@ -32,6 +33,7 @@ type PromptsTabContentProps = {
   promptsLoading: boolean;
   hasPersonas: boolean;
   selectedPromptIds: string[];
+  selectedPromptRows: PromptItem[];
   selectedPrompt: PromptItem | null;
   promptSort: PromptSort;
   promptSortDirection: PromptSortDirection;
@@ -47,6 +49,7 @@ type PromptsTabContentProps = {
   setFocusPromptId: (id: string | null) => void;
   setTabResponses: () => void;
   deletePrompt: (id: string) => void;
+  deleteSelectedPrompts: () => void;
   onEditPrompt: (id: string) => void;
   canRunPrompt: (item: PromptItem | null) => boolean;
   runPrompt: (item: PromptItem) => void;
@@ -134,8 +137,20 @@ function PromptMobileLoadingCards() {
 export function PromptsTabContent(props: PromptsTabContentProps) {
   const content = useI18nScope("prompts-workspace");
   const { locale, t } = useScopedI18n("prompts-workspace");
-  const [pendingDeletePrompt, setPendingDeletePrompt] = useState<PromptItem | null>(null);
+  const [pendingDeletePrompts, setPendingDeletePrompts] = useState<PromptItem[]>([]);
   const hasSelectedPrompts = props.selectedPromptIds.length > 0;
+  const selectedDeletePromptIds = resolveBulkPromptIds({
+    promptRowMode: props.promptRowMode,
+    selectedPromptIds: props.selectedPromptIds,
+    filteredPromptRows: props.selectedPromptRows,
+  });
+  const selectedDeletePrompts = Array.from(
+    new Map(
+      props.selectedPromptRows
+        .filter((item) => selectedDeletePromptIds.includes(item.sourcePromptId || item.id))
+        .map((item) => [item.sourcePromptId || item.id, item] as const),
+    ).values(),
+  );
   const promptsColumns: WorkspaceTableColumn[] = [
     {
       id: "select",
@@ -193,77 +208,113 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
           <PanelToolbar
             summary={
               props.promptsDataLoading ? (
-                <Skeleton className="h-9 w-32 rounded-full" />
+                <Skeleton className="hidden h-9 w-32 rounded-full md:flex" />
               ) : (
-                <Badge variant="outline" className="h-9 w-fit shrink-0 justify-center px-3 text-sm">
+                <Badge
+                  variant="outline"
+                  className="hidden h-9 w-fit shrink-0 justify-center px-3 text-sm md:inline-flex"
+                >
                   {t("promptsCount", { count: props.promptTotalItems })}
                 </Badge>
               )
             }
           >
-              <div className="flex flex-wrap items-center gap-2">
-                {hasSelectedPrompts && isMobile ? (
-                  <>
-                    <RunSelectedButton
-                      disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts || props.runningAnyPrompts}
-                      runningSelectedPrompts={props.runningSelectedPrompts}
-                      selectedRunnablePromptCount={props.selectedRunnablePromptCount}
-                      runSelectedPrompts={props.runSelectedPrompts}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkActivate}
-                      toneClassName="text-emerald-600"
-                      disabled={!canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("active")}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkDisable}
-                      toneClassName="text-amber-600"
-                      disabled={!canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("disabled")}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkArchive}
-                      toneClassName="text-rose-600"
-                      disabled={!canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("archived")}
-                    />
-                  </>
+              <div className="flex w-full min-w-0 flex-col gap-2 sm:gap-3">
+                <div className="flex w-full items-center justify-between gap-2 md:hidden">
+                  {props.promptsDataLoading ? (
+                    <Skeleton className="h-9 w-24 shrink-0 rounded-full" />
+                  ) : (
+                    <Badge
+                      variant="outline"
+                      className="h-9 w-fit shrink-0 justify-center px-3 text-sm"
+                    >
+                      {t("promptsCount", { count: props.promptTotalItems })}
+                    </Badge>
+                  )}
+                  <div className="min-w-0 shrink-0 overflow-x-auto">
+                    <PromptRowModeSwitch promptRowMode={props.promptRowMode} setPromptRowMode={props.setPromptRowMode} />
+                  </div>
+                </div>
+                {hasSelectedPrompts || !isMobile ? (
+                  <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                    {hasSelectedPrompts && isMobile ? (
+                      <>
+                        <RunSelectedButton
+                          disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts || props.runningAnyPrompts}
+                          runningSelectedPrompts={props.runningSelectedPrompts}
+                          selectedRunnablePromptCount={props.selectedRunnablePromptCount}
+                          runSelectedPrompts={props.runSelectedPrompts}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkActivate}
+                          toneClassName="text-emerald-600"
+                          disabled={!canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("active")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkDisable}
+                          toneClassName="text-amber-600"
+                          disabled={!canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("disabled")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkArchive}
+                          toneClassName="text-rose-600"
+                          disabled={!canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("archived")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkDelete}
+                          toneClassName="text-rose-700"
+                          disabled={selectedDeletePrompts.length === 0}
+                          onClick={() => setPendingDeletePrompts(selectedDeletePrompts)}
+                        />
+                      </>
+                    ) : null}
+                    {!isMobile ? (
+                      <>
+                        <RunSelectedButton
+                          disabled={
+                            !hasSelectedPrompts ||
+                            !props.canRunSelectedPrompts ||
+                            props.runningSelectedPrompts ||
+                            props.runningAnyPrompts
+                          }
+                          runningSelectedPrompts={props.runningSelectedPrompts}
+                          selectedRunnablePromptCount={props.selectedRunnablePromptCount}
+                          runSelectedPrompts={props.runSelectedPrompts}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkActivate}
+                          toneClassName="text-emerald-600"
+                          disabled={!hasSelectedPrompts || !canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("active")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkDisable}
+                          toneClassName="text-amber-600"
+                          disabled={!hasSelectedPrompts || !canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("disabled")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkArchive}
+                          toneClassName="text-rose-600"
+                          disabled={!hasSelectedPrompts || !canEditGlobalStatus}
+                          onClick={() => props.applyBulkStatus("archived")}
+                        />
+                        <BulkStatusButton
+                          label={content.bulkDelete}
+                          toneClassName="text-rose-700"
+                          disabled={!hasSelectedPrompts || selectedDeletePrompts.length === 0}
+                          onClick={() => setPendingDeletePrompts(selectedDeletePrompts)}
+                        />
+                      </>
+                    ) : null}
+                  </div>
                 ) : null}
-                {!isMobile ? (
-                  <>
-                    <RunSelectedButton
-                      disabled={
-                        !hasSelectedPrompts ||
-                        !props.canRunSelectedPrompts ||
-                        props.runningSelectedPrompts ||
-                        props.runningAnyPrompts
-                      }
-                      runningSelectedPrompts={props.runningSelectedPrompts}
-                      selectedRunnablePromptCount={props.selectedRunnablePromptCount}
-                      runSelectedPrompts={props.runSelectedPrompts}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkActivate}
-                      toneClassName="text-emerald-600"
-                      disabled={!hasSelectedPrompts || !canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("active")}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkDisable}
-                      toneClassName="text-amber-600"
-                      disabled={!hasSelectedPrompts || !canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("disabled")}
-                    />
-                    <BulkStatusButton
-                      label={content.bulkArchive}
-                      toneClassName="text-rose-600"
-                      disabled={!hasSelectedPrompts || !canEditGlobalStatus}
-                      onClick={() => props.applyBulkStatus("archived")}
-                    />
-                  </>
-                ) : null}
-                <PromptRowModeSwitch promptRowMode={props.promptRowMode} setPromptRowMode={props.setPromptRowMode} />
+                <div className="hidden justify-end md:flex">
+                  <PromptRowModeSwitch promptRowMode={props.promptRowMode} setPromptRowMode={props.setPromptRowMode} />
+                </div>
               </div>
           </PanelToolbar>
 
@@ -289,7 +340,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                       setIsPromptDetailsOpen: props.setIsPromptDetailsOpen,
                       setFocusPromptId: props.setFocusPromptId,
                       setTabResponses: props.setTabResponses,
-                      requestDeletePrompt: setPendingDeletePrompt,
+                      requestDeletePrompt: (item) => setPendingDeletePrompts([item]),
                       onEditPrompt: props.onEditPrompt,
                       canRunPrompt: props.canRunPrompt,
                       runPrompt: props.runPrompt,
@@ -327,7 +378,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     setIsPromptDetailsOpen={props.setIsPromptDetailsOpen}
                     setFocusPromptId={props.setFocusPromptId}
                     setTabResponses={props.setTabResponses}
-                    requestDeletePrompt={setPendingDeletePrompt}
+                    requestDeletePrompt={(item) => setPendingDeletePrompts([item])}
                     onEditPrompt={props.onEditPrompt}
                     canRunPrompt={props.canRunPrompt}
                     runPrompt={props.runPrompt}
@@ -384,12 +435,16 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
       </div>
 
       <PromptDeleteDialog
-        pendingDeletePrompt={pendingDeletePrompt}
+        pendingDeletePrompts={pendingDeletePrompts}
         promptsLoading={props.promptsLoading}
-        onOpenChange={(open) => !open && setPendingDeletePrompt(null)}
-        onConfirm={(prompt) => {
-          props.deletePrompt(prompt.sourcePromptId || prompt.id);
-          setPendingDeletePrompt(null);
+        onOpenChange={(open) => !open && setPendingDeletePrompts([])}
+        onConfirm={(prompts) => {
+          if (prompts.length === 1) {
+            props.deletePrompt(prompts[0]!.sourcePromptId || prompts[0]!.id);
+          } else {
+            props.deleteSelectedPrompts();
+          }
+          setPendingDeletePrompts([]);
         }}
       />
     </>

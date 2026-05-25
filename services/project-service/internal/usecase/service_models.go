@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +14,11 @@ import (
 var (
 	openRouterModelsURL = "https://openrouter.ai/api/v1/models"
 	openRouterClient    = &http.Client{Timeout: 20 * time.Second}
+)
+
+const (
+	AIModelSourceManual     = "manual"
+	AIModelSourceOpenRouter = "openrouter"
 )
 
 var defaultOpenRouterProviderIDs = []string{
@@ -54,6 +60,7 @@ type SyncOpenRouterModelsInput struct {
 	SearchQuery               string
 	ActivateImported          bool
 	PurgeUnsupportedProviders bool
+	PurgeMissingModels        bool
 }
 
 type SyncOpenRouterModelsResult struct {
@@ -208,6 +215,7 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 			continue
 		}
 		prompt.ModelIDs = effectivePromptModelIDs(prompt, normalized)
+		prompt.Schedule = prunePromptScheduleModelCrons(prompt.Schedule, prompt.ModelIDs)
 		schedule, err := normalizePromptSchedule(prompt.Schedule, prompt.ModelIDs)
 		if err != nil {
 			s.restoreLocked(backup)
@@ -298,7 +306,9 @@ func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouter
 	result := SyncOpenRouterModelsResult{
 		Models: make([]AIModel, 0, len(candidates)),
 	}
+	seenProviderModelIDs := make(map[string]struct{}, len(candidates))
 	for _, candidate := range candidates {
+		seenProviderModelIDs[strings.TrimSpace(candidate.ID)] = struct{}{}
 		model, created, err := s.openRouterModelToCatalogModelLocked(candidate, input.ActivateImported)
 		if err != nil {
 			return SyncOpenRouterModelsResult{}, err
@@ -313,6 +323,9 @@ func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouter
 	}
 	if input.PurgeUnsupportedProviders {
 		result.Purged = s.purgeUnsupportedOpenRouterModelsLocked()
+	}
+	if input.PurgeMissingModels {
+		result.Purged += s.purgeMissingOpenRouterModelsLocked(seenProviderModelIDs)
 	}
 	result.Imported = len(result.Models)
 
@@ -442,6 +455,7 @@ func (s *Service) UpdateModel(ctx context.Context, modelID string, input UpdateA
 func (s *Service) buildModelLocked(modelID string, mutate func(candidate *AIModel)) (AIModel, error) {
 	candidate := AIModel{ID: strings.TrimSpace(modelID)}
 	mutate(&candidate)
+	candidate.Source = normalizeAIModelSource(candidate)
 	candidate.IconPath = modelIconPath(candidate.IconKey)
 
 	if candidate.ID == "" {
@@ -486,6 +500,30 @@ func modelIconPath(iconKey string) string {
 	return "/models/" + iconKey + ".svg"
 }
 
+func normalizeAIModelSource(model AIModel) string {
+	source := strings.ToLower(strings.TrimSpace(model.Source))
+	switch source {
+	case AIModelSourceOpenRouter, AIModelSourceManual:
+		return source
+	}
+	if isOpenRouterBackedModel(model) {
+		return AIModelSourceOpenRouter
+	}
+	return AIModelSourceManual
+}
+
+func isOpenRouterBackedModel(model AIModel) bool {
+	if isOpenRouterCatalogImport(model) {
+		return true
+	}
+	switch strings.TrimSpace(model.ID) {
+	case "gpt-oss-20b-free", "gpt-oss-120b-free", "gemma-3-4b-free", "gemma-3-27b-free":
+		return true
+	default:
+		return false
+	}
+}
+
 func filterOpenRouterModels(models []openRouterModelPayload, input SyncOpenRouterModelsInput) []openRouterModelPayload {
 	providers := openRouterProviderPrefixes(input.Providers)
 	variant := strings.ToLower(strings.TrimSpace(input.Variant))
@@ -498,7 +536,7 @@ func filterOpenRouterModels(models []openRouterModelPayload, input SyncOpenRoute
 		if model.ID == "" {
 			continue
 		}
-		if input.OnlyFree && strings.TrimSpace(model.Pricing["prompt"]) != "0" {
+		if input.OnlyFree && !openRouterModelIsFree(model) {
 			continue
 		}
 		if input.MinContext > 0 && model.ContextLength < input.MinContext {
@@ -524,6 +562,31 @@ func filterOpenRouterModels(models []openRouterModelPayload, input SyncOpenRoute
 	return filtered
 }
 
+func openRouterModelIsFree(model openRouterModelPayload) bool {
+	if strings.Contains(strings.ToLower(strings.TrimSpace(model.ID)), ":free") {
+		return true
+	}
+
+	prompt, okPrompt := parseOpenRouterPrice(model.Pricing["prompt"])
+	completion, okCompletion := parseOpenRouterPrice(model.Pricing["completion"])
+	if okPrompt && okCompletion && prompt == 0 && completion == 0 {
+		return true
+	}
+	return false
+}
+
+func parseOpenRouterPrice(raw string) (float64, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(raw, 64)
+	if err != nil {
+		return 0, false
+	}
+	return value, true
+}
+
 func openRouterVariantAllowed(model openRouterModelPayload, variant string) bool {
 	switch variant {
 	case "", "all":
@@ -547,16 +610,40 @@ func openRouterLooksInstruct(model openRouterModelPayload) bool {
 }
 
 func (s *Service) purgeUnsupportedOpenRouterModelsLocked() int {
+	return s.purgeModelIDsLocked(s.findUnsupportedOpenRouterModelIDsLocked())
+}
+
+func (s *Service) purgeMissingOpenRouterModelsLocked(seenProviderModelIDs map[string]struct{}) int {
+	purgedModelIDs := make([]string, 0)
+	for modelID, model := range s.models {
+		if !isOpenRouterCatalogImport(model) {
+			continue
+		}
+		if _, ok := seenProviderModelIDs[strings.TrimSpace(model.ModelID)]; ok {
+			continue
+		}
+		purgedModelIDs = append(purgedModelIDs, modelID)
+	}
+	return s.purgeModelIDsLocked(purgedModelIDs)
+}
+
+func (s *Service) findUnsupportedOpenRouterModelIDsLocked() []string {
 	purgedModelIDs := make([]string, 0)
 	for modelID, model := range s.models {
 		if !isUnsupportedOpenRouterCatalogModel(model) {
 			continue
 		}
 		purgedModelIDs = append(purgedModelIDs, modelID)
-		delete(s.models, modelID)
 	}
+	return purgedModelIDs
+}
+
+func (s *Service) purgeModelIDsLocked(purgedModelIDs []string) int {
 	if len(purgedModelIDs) == 0 {
 		return 0
+	}
+	for _, modelID := range purgedModelIDs {
+		delete(s.models, modelID)
 	}
 
 	purged := make(map[string]bool, len(purgedModelIDs))
@@ -582,6 +669,10 @@ func (s *Service) purgeUnsupportedOpenRouterModelsLocked() int {
 			}
 		}
 		prompt.ModelIDs = append([]string(nil), filteredModelIDs...)
+		prompt.Schedule = prunePromptScheduleModelCrons(
+			prompt.Schedule,
+			effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, prompt.ProjectID)),
+		)
 		schedule, err := normalizePromptSchedule(
 			prompt.Schedule,
 			effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, prompt.ProjectID)),
@@ -600,6 +691,14 @@ func isUnsupportedOpenRouterCatalogModel(model AIModel) bool {
 		return false
 	}
 	if _, ok := canonicalOpenRouterProvider(providerID); ok {
+		return false
+	}
+	return model.ID == safeOpenRouterCatalogID(model.ModelID)
+}
+
+func isOpenRouterCatalogImport(model AIModel) bool {
+	providerID := strings.TrimSpace(openRouterProviderFromID(model.ModelID))
+	if providerID == "" {
 		return false
 	}
 	return model.ID == safeOpenRouterCatalogID(model.ModelID)
@@ -724,6 +823,7 @@ func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPay
 		candidate.Group = groupName
 		candidate.IconKey = iconKey
 		candidate.ModelID = modelID
+		candidate.Source = AIModelSourceOpenRouter
 		candidate.IsActive = isActive
 		candidate.SupportsLiveSearch = openRouterSupportsParameter(payload.SupportedParameters, "tools")
 	})

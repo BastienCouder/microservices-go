@@ -23,7 +23,14 @@ func (s *Service) ConfigureGA4OAuth(provider GA4OAuthProvider, stateSecret strin
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.ga4OAuthProvider = provider
+	s.ga4LLMSetupProvider = provider
 	s.ga4OAuthStateKey = strings.TrimSpace(stateSecret)
+}
+
+func (s *Service) ConfigureGA4LLMSetup(provider GA4LLMSetupProvider) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ga4LLMSetupProvider = provider
 }
 
 func (s *Service) StartProjectGA4OAuth(

@@ -7,7 +7,7 @@ import (
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
-const nikeSeedJobID = "seed-crawl-nike"
+const NikeSeedJobID = "seed-crawl-nike"
 
 type NikeCrawler struct {
 	records       []usecase.ContentOptimizerCrawlRecord
@@ -25,7 +25,7 @@ func NewNikeCrawler() *NikeCrawler {
 func (c *NikeCrawler) StartCrawl(_ context.Context, input usecase.ContentOptimizerCrawlStartInput) (usecase.ContentOptimizerCrawlJob, error) {
 	c.activeRecords = c.recordsForInput(input)
 	return usecase.ContentOptimizerCrawlJob{
-		ID:     nikeSeedJobID,
+		ID:     NikeSeedJobID,
 		Status: "running",
 	}, nil
 }
@@ -38,7 +38,7 @@ func (c *NikeCrawler) GetCrawl(_ context.Context, jobID string, input usecase.Co
 
 	id := strings.TrimSpace(jobID)
 	if id == "" {
-		id = nikeSeedJobID
+		id = NikeSeedJobID
 	}
 
 	return usecase.ContentOptimizerCrawlResult{

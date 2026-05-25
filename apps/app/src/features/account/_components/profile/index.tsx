@@ -1,20 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { LogOut, Save, Trash2 } from "lucide-react";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SectionTitle } from "@/components/shared/section-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { SectionTitle } from "@/components/shared/section-title";
 import type { AccountProfileViewData } from "../../_lib/profile/account-profile-view-data";
 import type { AccountProfileUpdateInput } from "../../_lib/profile/use-account-profile-view-model";
 
@@ -152,32 +142,20 @@ export function AccountProfilePanel({
             <LogOut data-icon="inline-start" />
             Deconnexion
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
+          <ConfirmDialog
+            trigger={
               <Button type="button" variant="destructive" className="w-full justify-center" disabled={busy}>
                 <Trash2 data-icon="inline-start" />
                 Supprimer le compte
               </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent size="sm">
-              <AlertDialogHeader>
-                <AlertDialogTitle>Supprimer votre compte ?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Le compte sera desactive et anonymise. Les donnees utiles aux rapports restent conservees.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={busy}>Annuler</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  disabled={busy}
-                  onClick={() => onDeleteAccount()}
-                >
-                  Supprimer
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+            }
+            title="Supprimer votre compte ?"
+            description="Le compte sera desactive et anonymise. Les donnees utiles aux rapports restent conservees."
+            confirmLabel="Supprimer"
+            loading={busy}
+            media={<Trash2 />}
+            onConfirm={() => onDeleteAccount()}
+          />
         </div>
       </section>
     </div>

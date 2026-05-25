@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import {
   getLatestContentOptimizerCrawl,
   getContentOptimizerCrawl,
+  getProjectSummary,
   startContentOptimizerCrawl,
   type ContentOptimizerCrawlRecord,
   type ContentOptimizerCrawlResult,
@@ -61,37 +62,58 @@ export function useContentOptimizerViewModel({
     [routeSearch],
   );
   const organizationId = useMemo(
-    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
+    () =>
+      readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
     [routeSearch],
   );
 
-  const [url, setURL] = useState("");
+  const [projectWebsiteURL, setProjectWebsiteURL] = useState("");
+  const [projectName, setProjectName] = useState("");
   const [phase, setPhase] = useState<CrawlPhase>("idle");
   const [activeJobId, setActiveJobId] = useState("");
-  const [activeJobKind, setActiveJobKind] = useState<ActiveJobKind | null>(null);
-  const [discoveryResult, setDiscoveryResult] = useState<ContentOptimizerCrawlResult | null>(null);
-  const [crawlResult, setCrawlResult] = useState<ContentOptimizerCrawlResult | null>(null);
-  const [selectedURLs, setSelectedURLs] = useState<Set<string>>(() => new Set());
+  const [activeJobKind, setActiveJobKind] = useState<ActiveJobKind | null>(
+    null,
+  );
+  const [discoveryResult, setDiscoveryResult] =
+    useState<ContentOptimizerCrawlResult | null>(null);
+  const [crawlResult, setCrawlResult] =
+    useState<ContentOptimizerCrawlResult | null>(null);
+  const [selectedURLs, setSelectedURLs] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [selectedResultURL, setSelectedResultURL] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [latestLoadedKey, setLatestLoadedKey] = useState("");
   const [loadingLatest, setLoadingLatest] = useState(false);
 
   const discoveredPages = useMemo(
-    () => (discoveryResult?.records ?? []).filter((record) => pageURL(record) !== ""),
+    () =>
+      (discoveryResult?.records ?? []).filter(
+        (record) => pageURL(record) !== "",
+      ),
     [discoveryResult],
   );
   const crawlRecords = crawlResult?.records ?? [];
   const selectedResult =
-    crawlRecords.find((record) => record.url === selectedResultURL) ?? crawlRecords[0] ?? null;
+    crawlRecords.find((record) => record.url === selectedResultURL) ??
+    crawlRecords[0] ??
+    null;
   const selectedCount = selectedURLs.size;
   const discoverProgress = discoveryResult?.total
-    ? Math.round((Math.min(discoveryResult.finished, discoveryResult.total) / discoveryResult.total) * 100)
+    ? Math.round(
+        (Math.min(discoveryResult.finished, discoveryResult.total) /
+          discoveryResult.total) *
+          100,
+      )
     : phase === "discovering"
       ? 8
       : 0;
   const crawlProgress = crawlResult?.total
-    ? Math.round((Math.min(crawlResult.finished, crawlResult.total) / crawlResult.total) * 100)
+    ? Math.round(
+        (Math.min(crawlResult.finished, crawlResult.total) /
+          crawlResult.total) *
+          100,
+      )
     : phase === "crawling"
       ? 8
       : 0;
@@ -101,11 +123,13 @@ export function useContentOptimizerViewModel({
   const canDiscover =
     apiBaseURL.trim() !== "" &&
     projectId.trim() !== "" &&
-    isValidHTTPURL(url.trim()) &&
+    isValidHTTPURL(projectWebsiteURL.trim()) &&
     phase !== "discovering" &&
     phase !== "crawling";
   const canCrawlSelected = phase === "review" && selectedCount > 0;
-  const canReanalyze = canDiscover && (selectedCount > 0 || crawlRecords.length > 0);
+  const canReanalyze =
+    canDiscover &&
+    (selectedCount > 0 || crawlRecords.length > 0 || !crawlResult);
 
   useEffect(() => {
     const loadKey = `${organizationId}|${projectId}`;
@@ -124,13 +148,26 @@ export function useContentOptimizerViewModel({
     async function loadLatest() {
       try {
         setLoadingLatest(true);
-        const latest = await getLatestContentOptimizerCrawl(apiBaseURL, {
+        const projectSummaryPromise = getProjectSummary(apiBaseURL, {
           projectId,
           organizationId,
         });
+        const latestPromise = getLatestContentOptimizerCrawl(apiBaseURL, {
+          projectId,
+          organizationId,
+        });
+        const latest = await latestPromise;
         if (cancelled) return;
         setLatestLoadedKey(loadKey);
         if (!latest) {
+          try {
+            const projectSummary = await projectSummaryPromise;
+            if (cancelled) return;
+            setProjectWebsiteURL(projectSummary.websiteUrl);
+            setProjectName(projectSummary.name);
+          } catch {
+            if (cancelled) return;
+          }
           return;
         }
 
@@ -139,14 +176,26 @@ export function useContentOptimizerViewModel({
         setDiscoveryResult(result);
         setSelectedURLs(new Set(result.records.map(pageURL).filter(Boolean)));
         if (result.records[0]?.url) {
-          setURL((current) => current || result.records[0].url);
           setSelectedResultURL(result.records[0].url);
         }
         setPhase("completed");
+
+        try {
+          const projectSummary = await projectSummaryPromise;
+          if (cancelled) return;
+          setProjectWebsiteURL(projectSummary.websiteUrl);
+          setProjectName(projectSummary.name);
+        } catch {
+          if (cancelled) return;
+        }
       } catch (nextError) {
         if (cancelled) return;
         setLatestLoadedKey(loadKey);
-        setError(nextError instanceof Error ? nextError.message : "Impossible de charger le dernier crawl.");
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Impossible de charger le dernier crawl.",
+        );
       } finally {
         if (!cancelled) {
           setLoadingLatest(false);
@@ -166,7 +215,7 @@ export function useContentOptimizerViewModel({
       startContentOptimizerCrawl(apiBaseURL, {
         projectId,
         organizationId,
-        url,
+        url: projectWebsiteURL,
         limit: 50,
         depth: 3,
         render: false,
@@ -194,19 +243,24 @@ export function useContentOptimizerViewModel({
     },
     onError: (nextError) => {
       setPhase("idle");
-      setError(nextError instanceof Error ? nextError.message : "Impossible d'analyser le site.");
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Impossible d'analyser le site.",
+      );
     },
   });
 
   const crawlMutation = useMutation({
     mutationFn: (options?: CrawlRequestOptions) => {
-      const includePatterns = options?.includePatterns ?? Array.from(selectedURLs);
+      const includePatterns =
+        options?.includePatterns ?? Array.from(selectedURLs);
       const limit = options?.limit ?? Math.max(includePatterns.length, 1);
 
       return startContentOptimizerCrawl(apiBaseURL, {
         projectId,
         organizationId,
-        url,
+        url: projectWebsiteURL,
         limit,
         depth: 1,
         render: false,
@@ -214,7 +268,8 @@ export function useContentOptimizerViewModel({
       });
     },
     onMutate: (options) => {
-      const includePatterns = options?.includePatterns ?? Array.from(selectedURLs);
+      const includePatterns =
+        options?.includePatterns ?? Array.from(selectedURLs);
       const limit = options?.limit ?? Math.max(includePatterns.length, 1);
 
       setError(null);
@@ -238,7 +293,11 @@ export function useContentOptimizerViewModel({
     },
     onError: (nextError) => {
       setPhase("review");
-      setError(nextError instanceof Error ? nextError.message : "Impossible de lancer le crawl.");
+      setError(
+        nextError instanceof Error
+          ? nextError.message
+          : "Impossible de lancer le crawl.",
+      );
     },
   });
 
@@ -247,7 +306,8 @@ export function useContentOptimizerViewModel({
       return;
     }
 
-    const currentResult = activeJobKind === "discover" ? discoveryResult : crawlResult;
+    const currentResult =
+      activeJobKind === "discover" ? discoveryResult : crawlResult;
     if (currentResult && isTerminalStatus(currentResult.status)) {
       return;
     }
@@ -274,7 +334,9 @@ export function useContentOptimizerViewModel({
           if (cancelled) return;
 
           if (activeJobKind === "discover") {
-            const nextURLs = new Set(completed.records.map(pageURL).filter(Boolean));
+            const nextURLs = new Set(
+              completed.records.map(pageURL).filter(Boolean),
+            );
             setDiscoveryResult(completed);
             setSelectedURLs(nextURLs);
             setPhase("review");
@@ -300,7 +362,11 @@ export function useContentOptimizerViewModel({
         }
       } catch (nextError) {
         if (cancelled) return;
-        setError(nextError instanceof Error ? nextError.message : "Impossible de lire le crawl.");
+        setError(
+          nextError instanceof Error
+            ? nextError.message
+            : "Impossible de lire le crawl.",
+        );
         setActiveJobKind(null);
         setPhase(activeJobKind === "discover" ? "idle" : "review");
       }
@@ -365,8 +431,9 @@ export function useContentOptimizerViewModel({
   return {
     projectId,
     organizationId,
-    url,
-    setURL,
+    projectName,
+    projectWebsiteURL,
+    setProjectWebsiteURL,
     phase,
     activeJobId,
     discoveryResult,
@@ -397,4 +464,6 @@ export function useContentOptimizerViewModel({
   };
 }
 
-export type ContentOptimizerViewModel = ReturnType<typeof useContentOptimizerViewModel>;
+export type ContentOptimizerViewModel = ReturnType<
+  typeof useContentOptimizerViewModel
+>;

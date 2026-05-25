@@ -65,7 +65,7 @@ func (c *Client) Generate(ctx context.Context, input usecase.ProviderGenerateInp
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		}{
-			{Role: "system", Content: "You are an assistant specialized in brand visibility analysis. Provide concise factual answers."},
+			{Role: "system", Content: "Answer the user's request naturally, clearly, and factually."},
 			{Role: "user", Content: input.Prompt},
 		},
 	}

@@ -17,18 +17,18 @@ export const SCAN_MODES: Array<{
 }> = [
   {
     id: "all-checks",
-    label: "All Checks",
-    description: "Runs every available Content Site check now, with room for API and commerce checks later.",
+    label: "Tous les checks",
+    description: "Lance tous les contrôles disponibles pour le contenu public, avec de la place pour des checks API et commerce plus tard.",
   },
   {
     id: "content-site",
-    label: "Content Site",
-    description: "Focuses on discoverability, readable content, and AI bot access signals.",
+    label: "Site de contenu",
+    description: "Se concentre sur la découvrabilité, la lisibilité du contenu et les signaux d'accès pour les bots IA.",
   },
   {
     id: "api-application",
     label: "API / Application",
-    description: "Reserved for API, auth, MCP, and commerce readiness checks.",
+    description: "Réservé aux futurs checks de préparation API, auth, MCP et commerce.",
     disabled: true,
   },
 ];
@@ -36,57 +36,57 @@ export const SCAN_MODES: Array<{
 export const CHECK_GROUPS: CheckGroup[] = [
   {
     id: "discoverability",
-    label: "Discoverability",
-    description: "Helps agents find the public entry points and crawl map.",
+    label: "Découvrabilité",
+    description: "Aide les agents à trouver les points d'entrée publics et le plan de crawl.",
     checks: [
       {
         id: "robots_txt",
         label: "robots.txt",
-        description: "Presence, crawl groups, allow/disallow directives.",
+        description: "Présence du fichier, groupes de crawl et directives allow/disallow.",
       },
       {
         id: "sitemap",
         label: "sitemap",
-        description: "robots.txt declaration or fallback /sitemap.xml.",
+        description: "Déclaration dans robots.txt ou fallback sur /sitemap.xml.",
       },
       {
         id: "link_headers",
         label: "link headers",
-        description: "Machine-discoverable docs, APIs, feeds, or well-known resources.",
+        description: "Documentation, API, flux ou ressources bien connues détectables par machine.",
       },
     ],
   },
   {
     id: "content",
-    label: "Content Accessibility",
-    description: "Checks if core content can be retrieved in a clean agent-friendly format.",
+    label: "Accessibilité du contenu",
+    description: "Vérifie si le contenu principal peut être récupéré dans un format propre pour les agents.",
     checks: [
       {
         id: "markdown_negotiation",
         label: "markdown negotiation",
-        description: "Accept: text/markdown support on the home page.",
+        description: "Support de `Accept: text/markdown` sur la page d'accueil.",
       },
     ],
   },
   {
     id: "bot_access",
-    label: "Bot Access Control",
-    description: "Makes access policy and content usage signals explicit.",
+    label: "Contrôle d'accès bots",
+    description: "Rend explicites la politique d'accès et les signaux d'usage du contenu.",
     checks: [
       {
         id: "ai_bot_rules",
         label: "AI bot rules",
-        description: "Known AI crawler groups in robots.txt.",
+        description: "Présence de groupes de crawlers IA connus dans robots.txt.",
       },
       {
         id: "content_signals",
         label: "Content Signals",
-        description: "Content-Signal header or equivalent policy link.",
+        description: "Header `Content-Signal` ou lien équivalent vers la politique de contenu.",
       },
       {
         id: "web_bot_auth",
         label: "Web Bot Auth",
-        description: "Optional signed bot access verification.",
+        description: "Vérification optionnelle d'accès signé pour les bots.",
         disabled: true,
       },
     ],

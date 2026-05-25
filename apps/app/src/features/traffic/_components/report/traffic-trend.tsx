@@ -1,20 +1,25 @@
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useIsMobile } from "@/shared/hooks/use-mobile";
 import {
   formatDateLabel,
   formatInteger,
 } from "../../_lib/report/traffic-report-formatters";
-import type { GeoTrafficDailyPoint } from "../../_lib/report/types";
+import { getTrafficTrendPresentation } from "../../_lib/report/traffic-trend-presentation";
+import type { TrafficDailyPoint } from "../../_lib/report/types";
 import { SectionTitle } from "@/components/shared/section-title";
 
 type TrafficTrendProps = {
-  points: GeoTrafficDailyPoint[];
+  errorLabel?: string | null;
+  points: TrafficDailyPoint[];
   loading?: boolean;
 };
 
-export function TrafficTrend({ points, loading = false }: TrafficTrendProps) {
-  const visiblePoints = points.slice(-14);
+export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTrendProps) {
+  const isMobile = useIsMobile();
+  const presentation = getTrafficTrendPresentation(points, isMobile);
+  const visiblePoints = presentation.points;
   const maxSessions = Math.max(1, ...visiblePoints.map((point) => point.sessions));
   const hasSinglePoint = visiblePoints.length === 1;
 
@@ -27,10 +32,15 @@ export function TrafficTrend({ points, loading = false }: TrafficTrendProps) {
         <p className="text-xs text-muted-foreground">Visites IA détectées agrégées par jour.</p>
       </div>
 
-      <div className="h-36 min-w-0 overflow-hidden rounded-md border border-border bg-background px-3 pb-9 pt-4">
+      <div
+        className={cn(
+          "min-w-0 overflow-hidden rounded-md border border-border bg-background",
+          presentation.chartClassName,
+        )}
+      >
         {loading ? (
-          <div className="flex h-full items-end gap-2">
-            {Array.from({ length: 14 }).map((_, index) => (
+          <div className={cn("flex h-full items-end", presentation.barGapClassName)}>
+            {Array.from({ length: visiblePoints.length || (isMobile ? 7 : 14) }).map((_, index) => (
               <div key={index} className="flex h-full min-w-0 flex-1 items-end">
                 <Skeleton
                   className="w-full rounded-t-md"
@@ -41,40 +51,50 @@ export function TrafficTrend({ points, loading = false }: TrafficTrendProps) {
           </div>
         ) : visiblePoints.length === 0 ? (
           <div className="flex h-full min-w-0 items-center">
-            <EmptyStateCard label="Aucune série disponible" className="h-full min-h-0 w-full" />
+            <EmptyStateCard label={errorLabel || "Aucune série disponible"} className="h-full min-h-0 w-full" />
           </div>
         ) : (
           <div
             className={cn(
-              "flex h-full min-w-0 items-end gap-2",
+              "flex h-full min-w-0 items-end",
+              presentation.barGapClassName,
               hasSinglePoint && "justify-center",
             )}
           >
-            {visiblePoints.map((point) => {
+            {visiblePoints.map((point, index) => {
               const height = Math.max(8, (point.sessions / maxSessions) * 100);
+              const showLabel =
+                hasSinglePoint ||
+                index % presentation.showEveryLabel === 0 ||
+                index === visiblePoints.length - 1;
               return (
                 <div
                   key={point.date}
                   className={cn(
-                    "flex h-full min-w-0 flex-col justify-end gap-2",
+                    "flex h-full min-w-0 flex-col items-center justify-end gap-3",
                     hasSinglePoint ? "w-16 shrink-0" : "flex-1",
                   )}
                 >
-                  <div className="flex h-full items-end">
+                  <div className="flex h-full w-full items-end">
                     <div
-                      className="w-full rounded-t-md bg-primary/85 transition-[height]"
+                      className="w-full rounded-t-md bg-primary transition-[height]"
                       style={{ height: `${height}%` }}
                       title={`${formatInteger(point.sessions)} visites IA détectées`}
                     />
                   </div>
-                  <span
-                    className={cn(
-                      "block truncate text-[10px] leading-none text-muted-foreground",
-                      hasSinglePoint ? "text-center" : "origin-top-left rotate-[-35deg]",
-                    )}
-                  >
-                    {formatDateLabel(point.date)}
-                  </span>
+                  <div className="flex min-h-[28px] w-full items-start justify-center pt-1">
+                    <span
+                      className={cn(
+                        "block max-w-full truncate text-muted-foreground",
+                        hasSinglePoint
+                          ? "w-full text-center text-[10px] leading-tight"
+                          : presentation.labelClassName,
+                        !showLabel && "opacity-0",
+                      )}
+                    >
+                      {showLabel ? formatDateLabel(point.date) : "\u00A0"}
+                    </span>
+                  </div>
                 </div>
               );
             })}

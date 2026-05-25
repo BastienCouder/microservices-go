@@ -11,6 +11,8 @@ import (
 
 type fakeRepo struct {
 	subs            map[int64]*domain.Subscription
+	planSettings    map[string]domain.PlanSettings
+	pricingTiers    map[int]domain.PricingTier
 	processedEvents map[string]bool
 }
 
@@ -32,6 +34,40 @@ func (f *fakeRepo) GetByOrganizationID(_ context.Context, organizationID int64) 
 	return &clone, nil
 }
 
+func (f *fakeRepo) UpdateEntitlements(_ context.Context, organizationID int64, plan string, seats, monthlyQuota int, updatedAt time.Time) error {
+	if f.subs == nil {
+		f.subs = make(map[int64]*domain.Subscription)
+	}
+	sub, ok := f.subs[organizationID]
+	if !ok {
+		sub = &domain.Subscription{
+			OrganizationID: organizationID,
+			BillingCycle:   domain.BillingCycleMonthly,
+			Status:         domain.SubscriptionStatusActive,
+		}
+	}
+	clone := *sub
+	clone.Plan = plan
+	clone.Seats = seats
+	clone.MonthlyQuota = monthlyQuota
+	clone.UpdatedAt = updatedAt
+	f.subs[organizationID] = &clone
+	return nil
+}
+
+func (f *fakeRepo) UpdateDefaultQuotaForPlan(_ context.Context, plan string, previousMonthlyQuota, nextMonthlyQuota int, updatedAt time.Time) error {
+	for organizationID, sub := range f.subs {
+		if sub.Plan != plan || sub.MonthlyQuota != previousMonthlyQuota {
+			continue
+		}
+		clone := *sub
+		clone.MonthlyQuota = nextMonthlyQuota
+		clone.UpdatedAt = updatedAt
+		f.subs[organizationID] = &clone
+	}
+	return nil
+}
+
 func (f *fakeRepo) RecordStripeWebhookEvent(_ context.Context, eventID, _ string, _ time.Time) (bool, error) {
 	if f.processedEvents == nil {
 		f.processedEvents = make(map[string]bool)
@@ -41,6 +77,38 @@ func (f *fakeRepo) RecordStripeWebhookEvent(_ context.Context, eventID, _ string
 	}
 	f.processedEvents[eventID] = true
 	return true, nil
+}
+
+func (f *fakeRepo) ListPlanSettings(_ context.Context) ([]domain.PlanSettings, error) {
+	items := make([]domain.PlanSettings, 0, len(f.planSettings))
+	for _, item := range f.planSettings {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (f *fakeRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanSettings) error {
+	if f.planSettings == nil {
+		f.planSettings = make(map[string]domain.PlanSettings)
+	}
+	f.planSettings[settings.Plan] = settings
+	return nil
+}
+
+func (f *fakeRepo) ListPricingTiers(_ context.Context) ([]domain.PricingTier, error) {
+	items := make([]domain.PricingTier, 0, len(f.pricingTiers))
+	for _, item := range f.pricingTiers {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (f *fakeRepo) UpsertPricingTier(_ context.Context, tier domain.PricingTier) error {
+	if f.pricingTiers == nil {
+		f.pricingTiers = make(map[int]domain.PricingTier)
+	}
+	f.pricingTiers[tier.PromptVolume] = tier
+	return nil
 }
 
 type fakeStripeProvider struct {

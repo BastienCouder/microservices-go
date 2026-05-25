@@ -25,6 +25,12 @@ func NewHandler(svc *usecase.Service, readyCheck func(context.Context) error) *H
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
+	mux.HandleFunc("GET /billing/plans", h.listPlanSettings)
+	mux.HandleFunc("GET /billing/public/plans", h.listPlanSettings)
+	mux.HandleFunc("GET /billing/pricing-tiers", h.listPricingTiers)
+	mux.HandleFunc("GET /billing/public/pricing-tiers", h.listPricingTiers)
+	mux.HandleFunc("POST /billing/plans", h.updatePlanSettings)
+	mux.HandleFunc("POST /billing/pricing-tiers", h.updatePricingTier)
 	mux.HandleFunc("POST /billing/subscriptions", h.upsertSubscription)
 	mux.HandleFunc("GET /billing/quotas/", h.getQuota)
 	mux.HandleFunc("POST /billing/stripe/checkout-session", h.createStripeCheckoutSession)
@@ -49,6 +55,24 @@ type upsertSubscriptionRequest struct {
 	Plan           string `json:"plan"`
 	Seats          int    `json:"seats"`
 	MonthlyQuota   int    `json:"monthly_quota"`
+}
+
+type updatePlanSettingsRequest struct {
+	Plan                    string `json:"plan"`
+	MonthlyPriceCents       int    `json:"monthly_price_cents"`
+	YearlyPriceCents        int    `json:"yearly_price_cents"`
+	MonthlyQuota            int    `json:"monthly_quota"`
+	ModelSelectionLimit     int    `json:"model_selection_limit"`
+	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
+}
+
+type updatePricingTierRequest struct {
+	PromptVolume        int    `json:"prompt_volume"`
+	Label               string `json:"label"`
+	DeveloperPriceCents *int   `json:"developer_price_cents"`
+	StarterPriceCents   *int   `json:"starter_price_cents"`
+	GrowthPriceCents    *int   `json:"growth_price_cents"`
+	ProPriceCents       *int   `json:"pro_price_cents"`
 }
 
 type createStripeCheckoutSessionRequest struct {
@@ -76,6 +100,88 @@ var (
 	errMismatchedOrganizationScope = errors.New("organization scope mismatch")
 )
 
+func (h *Handler) listPlanSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.svc.ListPlanSettings(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
+	if _, err := scopedOrganizationID(r, 0); err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		return
+	}
+
+	var req updatePlanSettingsRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	settings, err := h.svc.UpdatePlanSettings(r.Context(), domain.PlanSettings{
+		Plan:                    req.Plan,
+		MonthlyPriceCents:       req.MonthlyPriceCents,
+		YearlyPriceCents:        req.YearlyPriceCents,
+		MonthlyQuota:            req.MonthlyQuota,
+		ModelSelectionLimit:     req.ModelSelectionLimit,
+		MonthlyModelChangeLimit: req.MonthlyModelChangeLimit,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPlanSettings) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) listPricingTiers(w http.ResponseWriter, r *http.Request) {
+	tiers, err := h.svc.ListPricingTiers(r.Context())
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
+	}
+	writeJSON(w, http.StatusOK, tiers)
+}
+
+func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
+	if _, err := scopedOrganizationID(r, 0); err != nil {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		return
+	}
+
+	var req updatePricingTierRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		return
+	}
+
+	tier, err := h.svc.UpdatePricingTier(r.Context(), domain.PricingTier{
+		PromptVolume:        req.PromptVolume,
+		Label:               strings.TrimSpace(req.Label),
+		DeveloperPriceCents: req.DeveloperPriceCents,
+		StarterPriceCents:   req.StarterPriceCents,
+		GrowthPriceCents:    req.GrowthPriceCents,
+		ProPriceCents:       req.ProPriceCents,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidPricingTier) {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
+	}
+	writeJSON(w, http.StatusOK, tier)
+}
+
 func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 	var req upsertSubscriptionRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
@@ -83,8 +189,20 @@ func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
 		return
 	}
+	organizationID, err := scopedOrganizationID(r, req.OrganizationID)
+	if err != nil {
+		switch {
+		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		case errors.Is(err, errMismatchedOrganizationScope):
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+		default:
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		}
+		return
+	}
 
-	sub, err := h.svc.UpsertSubscription(r.Context(), req.OrganizationID, req.Plan, req.Seats, req.MonthlyQuota)
+	sub, err := h.svc.UpdateSubscriptionEntitlements(r.Context(), organizationID, req.Plan, req.Seats, req.MonthlyQuota)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidSubscription) {
 			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
@@ -116,15 +234,10 @@ func (h *Handler) getQuota(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sub, err := h.svc.GetSubscription(r.Context(), orgID)
-	entitlements := usecase.DefaultOrganizationEntitlements(orgID)
+	entitlements, err := h.svc.GetOrganizationEntitlements(r.Context(), orgID)
 	if err != nil {
-		if !errors.Is(err, domain.ErrSubscriptionMissing) {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
-			return
-		}
-	} else {
-		entitlements = usecase.EntitlementsFromSubscription(sub)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		return
 	}
 
 	writeJSON(w, http.StatusOK, entitlements)

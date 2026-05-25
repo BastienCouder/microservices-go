@@ -64,7 +64,7 @@ func main() {
 	}
 	defer analysisGRPCClient.Close()
 
-	iaGRPCClient, err := iaclient.NewClient(cfg.IAServiceGRPCAddr, cfg.InternalJWTSecret, cfg.InternalJWTIssuer, grpcClientTLS)
+	iaGRPCClient, err := iaclient.NewClientWithOptions(cfg.IAServiceGRPCAddr, cfg.InternalJWTSecret, cfg.InternalJWTIssuer, grpcClientTLS, cfg.IAPromptTimeout)
 	if err != nil {
 		log.Fatalf("init ia grpc client: %v", err)
 	}
@@ -103,12 +103,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)
 	}
-	if cfg.GA4OAuthClientID != "" || cfg.GA4OAuthClientSecret != "" {
-		ga4OAuthClient, err := googleanalyticsclient.NewClient(cfg.GA4OAuthClientID, cfg.GA4OAuthClientSecret)
-		if err != nil {
-			log.Fatalf("init ga4 oauth client: %v", err)
-		}
-		svc.ConfigureGA4OAuth(ga4OAuthClient, cfg.InternalJWTSecret)
+	ga4Client, err := googleanalyticsclient.NewClient(cfg.GA4OAuthClientID, cfg.GA4OAuthClientSecret)
+	if err != nil {
+		log.Fatalf("init ga4 client: %v", err)
+	}
+	svc.ConfigureGA4LLMSetup(ga4Client)
+	if cfg.GA4OAuthClientID != "" && cfg.GA4OAuthClientSecret != "" {
+		svc.ConfigureGA4OAuth(ga4Client, cfg.InternalJWTSecret)
 	}
 
 	backgroundCtx, stopBackground := context.WithCancel(context.Background())

@@ -1,20 +1,10 @@
 import { useMemo } from "react";
 import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SectionTitle } from "@/components/shared/section-title";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import {
   Select,
   SelectContent,
@@ -182,8 +172,8 @@ export function InvitationsPanel({
                     </TableCell>
                     <TableCell>{formatDateTime(invitation.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
+                      <ConfirmDialog
+                        trigger={
                           <Button
                             type="button"
                             size="icon"
@@ -195,26 +185,14 @@ export function InvitationsPanel({
                             <Trash2 />
                             <span className="sr-only">Desactiver l'invitation</span>
                           </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Desactiver cette invitation ?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              L'invitation envoyee a {invitation.email} ne pourra plus etre acceptee.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel disabled={revokeBusy}>Annuler</AlertDialogCancel>
-                            <AlertDialogAction
-                              variant="destructive"
-                              disabled={revokeBusy}
-                              onClick={() => onRevokeInvitation(invitation.id)}
-                            >
-                              Desactiver
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                        }
+                        title="Desactiver cette invitation ?"
+                        description={`L'invitation envoyee a ${invitation.email} ne pourra plus etre acceptee.`}
+                        confirmLabel="Desactiver"
+                        loading={revokeBusy}
+                        media={<Trash2 />}
+                        onConfirm={() => onRevokeInvitation(invitation.id)}
+                      />
                     </TableCell>
                   </TableRow>
                 ))}

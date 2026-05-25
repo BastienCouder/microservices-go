@@ -11,6 +11,7 @@ import {
 import { appQueryKeys } from "@/lib/query-keys";
 
 import { buildPagesPanelViewModel } from "./page-insights";
+import type { PageModelBadge } from "./types";
 
 type UsePagesPanelViewModelInput = {
   apiBaseURL: string;
@@ -23,6 +24,7 @@ export function usePagesPanelViewModel({
 }: UsePagesPanelViewModelInput) {
   const queryContext = useMemo(() => getMonitoringQueryContext(routeSearch), [routeSearch]);
   const [search, setSearch] = useState("");
+  const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
 
   const monitoringQuery = useQuery({
@@ -37,24 +39,70 @@ export function usePagesPanelViewModel({
     [monitoring],
   );
   const pages = panelModel?.pages ?? [];
+  const modelOptions = useMemo(
+    () =>
+      Array.from(
+        pages
+          .flatMap((page) => page.models)
+          .reduce((models, model) => {
+            models.set(model.id, model);
+            return models;
+          }, new Map<string, PageModelBadge>())
+          .values(),
+      )
+        .sort((left, right) => left.label.localeCompare(right.label)),
+    [pages],
+  );
+  const allModelsSelected = selectedModelIds.length === 0;
 
   const filteredPages = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    if (!needle) return pages;
 
-    return pages.filter((page) =>
-      [
-        page.url,
-        page.hostname,
-        page.path,
-        page.models.map((model) => model.label).join(" "),
-        page.personas.join(" "),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle),
+    return pages.filter((page) => {
+      const matchesSearch =
+        !needle ||
+        [
+          page.url,
+          page.hostname,
+          page.path,
+          page.models.map((model) => model.label).join(" "),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle);
+      const matchesModel =
+        allModelsSelected ||
+        page.models.some((model) => selectedModelIds.includes(model.id));
+
+      return matchesSearch && matchesModel;
+    });
+  }, [allModelsSelected, pages, search, selectedModelIds]);
+
+  useEffect(() => {
+    if (allModelsSelected) return;
+
+    const availableModelIds = new Set(modelOptions.map((model) => model.id));
+    const validSelectedModelIds = selectedModelIds.filter((id) =>
+      availableModelIds.has(id),
     );
-  }, [pages, search]);
+
+    if (validSelectedModelIds.length !== selectedModelIds.length) {
+      setSelectedModelIds(validSelectedModelIds);
+    }
+  }, [allModelsSelected, modelOptions, selectedModelIds]);
+
+  function toggleModel(modelId: string) {
+    if (allModelsSelected) {
+      setSelectedModelIds([modelId]);
+      return;
+    }
+
+    setSelectedModelIds((current) =>
+      current.includes(modelId)
+        ? current.filter((id) => id !== modelId)
+        : [...current, modelId],
+    );
+  }
 
   useEffect(() => {
     if (filteredPages.length === 0) {
@@ -77,6 +125,10 @@ export function usePagesPanelViewModel({
     projectName: monitoring?.project.name ?? "",
     search,
     setSearch,
+    selectedModelIds,
+    allModelsSelected,
+    modelOptions,
+    toggleModel,
     selectedPage,
     selectedPageUrl,
     setSelectedPageUrl,

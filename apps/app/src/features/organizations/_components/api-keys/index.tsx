@@ -1,21 +1,11 @@
 import { useState } from "react";
 import { Copy, Plus, Trash2, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { SectionTitle } from "@/components/shared/section-title";
 import type { OrganizationAPIKey } from "../../_lib/shared/types";
 
 type ApiKeysPanelProps = {
@@ -80,33 +70,20 @@ export function ApiKeysPanel({
                         Creee le {formatDateTime(apiKey.createdAt)}
                       </p>
                     </div>
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
+                    <ConfirmDialog
+                      trigger={
                         <Button type="button" variant="destructive" size="sm" disabled={revokeBusy}>
                           <Trash2 data-icon="inline-start" />
                           Supprimer
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Supprimer cette API key ?</AlertDialogTitle>
-                          <AlertDialogDescription>
-                            Cette action est definitive. Les integrations qui utilisent cette key ne
-                            pourront plus appeler l'API.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel disabled={revokeBusy}>Annuler</AlertDialogCancel>
-                          <AlertDialogAction
-                            variant="destructive"
-                            disabled={revokeBusy}
-                            onClick={() => onRevokeAPIKey(apiKey.id)}
-                          >
-                            Supprimer
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      }
+                      title="Supprimer cette API key ?"
+                      description="Cette action est definitive. Les integrations qui utilisent cette key ne pourront plus appeler l'API."
+                      confirmLabel="Supprimer"
+                      loading={revokeBusy}
+                      media={<Trash2 />}
+                      onConfirm={() => onRevokeAPIKey(apiKey.id)}
+                    />
                   </div>
 
                   {oneTimeSecret ? (
@@ -147,7 +124,7 @@ export function ApiKeysPanel({
 
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle>Nouvelle key</SectionTitle>
+          <SectionTitle showIndicator={false}>Nouvelle key</SectionTitle>
         </div>
         <form
           className="grid gap-4 p-4"

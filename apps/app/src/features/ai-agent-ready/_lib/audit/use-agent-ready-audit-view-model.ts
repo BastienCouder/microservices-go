@@ -1,10 +1,17 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import {
+  readOrganizationIdFromSearch,
+  readProjectIdFromSearch,
+  readSelectedOrganizationID,
+  readSelectedProjectToken,
+} from "@/shared/selection";
 
 import {
   DEFAULT_AUDIT_CHECKS,
-  SCAN_MODES,
 } from "./audit-config";
 import {
+  getAgentReadyProjectSummary,
   isValidScanURL,
   pollAgentReadyScan,
   startAgentReadyScan,
@@ -13,58 +20,97 @@ import type {
   AuditCheckID,
   AuditScanResult,
   BackendScanMode,
-  ScanMode,
 } from "../shared/types";
 
 type UseAgentReadyAuditViewModelInput = {
   apiBaseURL: string;
+  routeSearch: string;
 };
 
 export function useAgentReadyAuditViewModel({
   apiBaseURL,
+  routeSearch,
 }: UseAgentReadyAuditViewModelInput) {
-  const [url, setURL] = useState("");
-  const [mode, setMode] = useState<ScanMode>("content-site");
-  const [selectedChecks, setSelectedChecks] = useState<AuditCheckID[]>(
-    DEFAULT_AUDIT_CHECKS,
+  const projectId = useMemo(
+    () => readProjectIdFromSearch(routeSearch) || readSelectedProjectToken(),
+    [routeSearch],
   );
-  const [customizeOpen, setCustomizeOpen] = useState(true);
+  const organizationId = useMemo(
+    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
+    [routeSearch],
+  );
+
+  const [url, setURL] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [loadingProject, setLoadingProject] = useState(false);
+  const [selectedChecks] = useState<AuditCheckID[]>(DEFAULT_AUDIT_CHECKS);
   const [result, setResult] = useState<AuditScanResult | null>(null);
   const [error, setError] = useState("");
   const [isScanning, setIsScanning] = useState(false);
+  const [hasLoadedProject, setHasLoadedProject] = useState(false);
 
   const urlError = useMemo(() => {
-    if (url.trim() === "") return "";
+    if (loadingProject || url.trim() === "") return "";
     return isValidScanURL(url) ? "" : "Enter a valid http or https URL.";
-  }, [url]);
+  }, [loadingProject, url]);
+
+  useEffect(() => {
+    if (
+      apiBaseURL.trim() === "" ||
+      projectId.trim() === "" ||
+      organizationId.trim() === "" ||
+      hasLoadedProject
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadProjectSummary() {
+      try {
+        setLoadingProject(true);
+        const project = await getAgentReadyProjectSummary(
+          apiBaseURL,
+          { projectId, organizationId },
+        );
+        if (cancelled) return;
+        setProjectName(project.name);
+        setURL(project.websiteUrl);
+        setHasLoadedProject(true);
+      } catch (loadError) {
+        if (cancelled) return;
+        setError(
+          loadError instanceof Error
+            ? loadError.message
+            : "Unable to load the project URL.",
+        );
+        setHasLoadedProject(true);
+      } finally {
+        if (!cancelled) {
+          setLoadingProject(false);
+        }
+      }
+    }
+
+    void loadProjectSummary();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseURL, hasLoadedProject, organizationId, projectId]);
 
   const canScan =
     apiBaseURL.trim() !== "" &&
+    projectId.trim() !== "" &&
     isValidScanURL(url) &&
-    selectedChecks.length > 0 &&
+    !loadingProject &&
     !isScanning;
 
   const backendMode: BackendScanMode = "content-site";
-  const activeModeDescription =
-    SCAN_MODES.find((item) => item.id === mode)?.description ?? SCAN_MODES[1].description;
-
-  const toggleCheck = (checkID: AuditCheckID) => {
-    setSelectedChecks((current) =>
-      current.includes(checkID)
-        ? current.filter((item) => item !== checkID)
-        : [...current, checkID],
-    );
-  };
-
-  const selectMode = (nextMode: ScanMode) => {
-    if (nextMode === "api-application") return;
-    setMode(nextMode);
-    setSelectedChecks(DEFAULT_AUDIT_CHECKS);
-  };
 
   const runScan = async () => {
     if (!canScan) {
-      setError(urlError || "Select at least one check before scanning.");
+      setError(urlError || "Project URL unavailable for this scan.");
       return;
     }
 
@@ -90,21 +136,15 @@ export function useAgentReadyAuditViewModel({
   };
 
   return {
-    activeModeDescription,
     canScan,
-    customizeOpen,
     error,
+    loadingProject,
     isScanning,
-    mode,
+    projectName,
     result,
     selectedChecks,
     url,
     urlError,
     runScan,
-    selectMode,
-    setCustomizeOpen,
-    setResult,
-    setURL,
-    toggleCheck,
   };
 }

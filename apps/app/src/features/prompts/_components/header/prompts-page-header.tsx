@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/shared/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
-import { Plus } from "lucide-react";
+import { Loader2, Plus, Sparkles } from "lucide-react";
 
 type PromptsPageHeaderProps = {
   activeCount: number;
   activeCountLoading?: boolean;
   isDemo: boolean;
+  generatingPrompts?: boolean;
   onNewPrompt: () => void;
   onAutoGenerate: () => void;
   onImportCsv: () => void;
@@ -20,6 +21,7 @@ export function PromptsPageHeader({
   activeCount,
   activeCountLoading = false,
   isDemo,
+  generatingPrompts = false,
   onNewPrompt,
   onAutoGenerate,
   onImportCsv,
@@ -32,6 +34,7 @@ export function PromptsPageHeader({
       title={content.promptsAndResponsesTitle}
       baseline={content.promptsAndResponsesBaseline}
       actionsVariant="classic"
+      className="mb-3 md:mb-4"
       meta={
         <>
           {activeCountLoading ? (
@@ -42,14 +45,32 @@ export function PromptsPageHeader({
           {isDemo ? <Badge className="bg-amber-100 text-amber-800">{content.demoMode}</Badge> : null}
         </>
       }
+      actionsClassName="grid grid-cols-2 gap-2 translate-y-3 sm:flex md:translate-y-5"
       actions={
         <>
-          <Button onClick={onNewPrompt} className="gap-2">
-            <Plus className="mr-2 h-4 w-4" />
-            {content.newPrompt}
+          <Button
+            aria-label={content.newPrompt}
+            onClick={onNewPrompt}
+            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
+          >
+            <Plus className="h-4 w-4" />
+            <span className="hidden sm:inline">{content.newPrompt}</span>
           </Button>
-          <Button variant="outline" onClick={onAutoGenerate} className="gap-2">
-            {content.autoGenerate}
+          <Button
+            aria-label={content.autoGenerate}
+            variant="outline"
+            onClick={onAutoGenerate}
+            disabled={generatingPrompts}
+            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
+          >
+            {generatingPrompts ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+             null
+            )}
+            <span className="truncate">
+              {generatingPrompts ? content.launching : content.autoGenerate}
+            </span>
           </Button>
         </>
       }

@@ -201,6 +201,104 @@ func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	}
 }
 
+func TestGetContentOptimizerCrawlKeepsUnselectedPagesFromLatestCrawl(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{ID: "crawl-selected", Status: "running"},
+	}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{ContentCrawler: crawler})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	if err := svc.saveLatestContentOptimizerCrawl(ctx, "project-1", 42, "crawl-initial", ContentOptimizerCrawlResult{
+		ID:       "crawl-initial",
+		Status:   "completed",
+		Total:    2,
+		Finished: 2,
+		Records: []ContentOptimizerCrawlRecord{
+			{
+				URL:    "https://example.com/pricing",
+				Status: "completed",
+				Title:  "Pricing old",
+				Issues: []ContentOptimizerIssue{{
+					ID:          "pricing-old-issue",
+					Severity:    "medium",
+					Title:       "Old pricing issue",
+					Description: "The old pricing page issue should be replaced.",
+					FixType:     "add_schema_markup",
+				}},
+			},
+			{
+				URL:    "https://example.com/docs",
+				Status: "completed",
+				Title:  "Docs",
+				Issues: []ContentOptimizerIssue{{
+					ID:          "docs-issue",
+					Severity:    "high",
+					Title:       "Docs issue",
+					Description: "The docs page was not selected in the next crawl.",
+					FixType:     "expand_content",
+				}},
+			},
+		},
+	}); err != nil {
+		t.Fatalf("seed latest crawl: %v", err)
+	}
+
+	job, err := svc.StartContentOptimizerCrawl(ctx, "project-1", 42, ContentOptimizerCrawlStartInput{
+		URL:   "https://example.com",
+		Limit: 1,
+		Options: ContentOptimizerCrawlOptions{
+			IncludePatterns: []string{"https://example.com/pricing"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("start selected crawl: %v", err)
+	}
+
+	crawler.result = ContentOptimizerCrawlResult{
+		ID:       job.ID,
+		Status:   "completed",
+		Total:    1,
+		Finished: 1,
+		Records: []ContentOptimizerCrawlRecord{{
+			URL:    "https://example.com/pricing",
+			Status: "completed",
+			Title:  "Pricing new",
+			Issues: []ContentOptimizerIssue{{
+				ID:          "pricing-new-issue",
+				Severity:    "low",
+				Title:       "New pricing issue",
+				Description: "The selected pricing page issue should be refreshed.",
+				FixType:     "add_faq",
+			}},
+		}},
+	}
+	if _, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, job.ID, ContentOptimizerCrawlResultInput{Limit: 1000}); err != nil {
+		t.Fatalf("get selected crawl: %v", err)
+	}
+
+	latest, err := svc.GetLatestContentOptimizerCrawl(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get latest crawl: %v", err)
+	}
+	if len(latest.Result.Records) != 2 {
+		t.Fatalf("expected selected crawl to keep unselected page, got %#v", latest.Result.Records)
+	}
+
+	recordsByURL := map[string]ContentOptimizerCrawlRecord{}
+	for _, record := range latest.Result.Records {
+		recordsByURL[record.URL] = record
+	}
+	if recordsByURL["https://example.com/pricing"].Title != "Pricing new" {
+		t.Fatalf("expected selected page to be refreshed, got %#v", recordsByURL["https://example.com/pricing"])
+	}
+	if recordsByURL["https://example.com/docs"].Title != "Docs" {
+		t.Fatalf("expected unselected page to be kept, got %#v", recordsByURL["https://example.com/docs"])
+	}
+}
+
 func TestGetContentOptimizerCrawlAnalyzesSEOAndGEOIssues(t *testing.T) {
 	ctx := context.Background()
 	crawler := &recordingContentCrawler{

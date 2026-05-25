@@ -7,12 +7,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
 )
 
 const defaultBaseURL = "https://openrouter.ai/api/v1"
+
+const (
+	maxRateLimitRetries  = 2
+	defaultRetryDelayMs  = 500
+	maxProviderBodyBytes = 4 << 20
+)
 
 var modelAliases = map[string]string{
 	"gpt-4o-mini":       "openai/gpt-4o-mini",
@@ -21,8 +29,8 @@ var modelAliases = map[string]string{
 	"gpt-oss-120b-free": "openai/gpt-oss-120b:free",
 	"claude-3-5-sonnet": "anthropic/claude-3.5-sonnet",
 	"gemini-2.0-flash":  "google/gemini-2.0-flash-001",
-	"gemma-3-4b-free":   "google/gemma-3-4b-it:free",
-	"gemma-3-27b-free":  "google/gemma-3-27b-it:free",
+	"gemma-3-4b-free":   "google/gemma-3-4b-it",
+	"gemma-3-27b-free":  "google/gemma-3-27b-it",
 	"sonar":             "perplexity/sonar",
 	"sonar-pro":         "perplexity/sonar-pro",
 	"mistral-large":     "mistralai/mistral-large",
@@ -90,7 +98,7 @@ func (c *Client) Generate(ctx context.Context, input usecase.ProviderGenerateInp
 			Role    string `json:"role"`
 			Content string `json:"content"`
 		}{
-			{Role: "system", Content: "You are an assistant specialized in brand visibility analysis. Provide concise factual answers."},
+			{Role: "system", Content: "Answer the user's request naturally, clearly, and factually."},
 			{Role: "user", Content: input.Prompt},
 		},
 	}
@@ -100,54 +108,90 @@ func (c *Client) Generate(ctx context.Context, input usecase.ProviderGenerateInp
 		return usecase.ProviderResult{}, fmt.Errorf("encode provider request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(payload))
-	if err != nil {
-		return usecase.ProviderResult{}, fmt.Errorf("create provider request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	if c.httpReferer != "" {
-		req.Header.Set("HTTP-Referer", c.httpReferer)
-	}
-	if c.appName != "" {
-		req.Header.Set("X-Title", c.appName)
-	}
-
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return usecase.ProviderResult{}, fmt.Errorf("perform provider request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
-	if err != nil {
-		return usecase.ProviderResult{}, fmt.Errorf("read provider response: %w", err)
-	}
-
-	var parsed chatCompletionResponse
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return usecase.ProviderResult{}, fmt.Errorf("decode provider response: %w", err)
-	}
-
-	if resp.StatusCode >= 400 {
-		if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
-			return usecase.ProviderResult{}, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, parsed.Error.Message)
+	for attempt := 0; attempt <= maxRateLimitRetries; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/chat/completions", bytes.NewReader(payload))
+		if err != nil {
+			return usecase.ProviderResult{}, fmt.Errorf("create provider request: %w", err)
 		}
-		return usecase.ProviderResult{}, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
-	}
-	if len(parsed.Choices) == 0 {
-		return usecase.ProviderResult{}, fmt.Errorf("provider returned no choices")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Authorization", "Bearer "+apiKey)
+		if c.httpReferer != "" {
+			req.Header.Set("HTTP-Referer", c.httpReferer)
+		}
+		if c.appName != "" {
+			req.Header.Set("X-Title", c.appName)
+		}
+
+		resp, err := c.http.Do(req)
+		if err != nil {
+			return usecase.ProviderResult{}, fmt.Errorf("perform provider request: %w", err)
+		}
+
+		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxProviderBodyBytes))
+		resp.Body.Close()
+		if readErr != nil {
+			return usecase.ProviderResult{}, fmt.Errorf("read provider response: %w", readErr)
+		}
+
+		var parsed chatCompletionResponse
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return usecase.ProviderResult{}, fmt.Errorf("decode provider response: %w", err)
+		}
+
+		if resp.StatusCode == http.StatusTooManyRequests && attempt < maxRateLimitRetries {
+			retryDelay := time.Duration(defaultRetryDelayMs) * time.Millisecond
+			if headerDelay := parseRetryAfterSeconds(resp.Header.Get("Retry-After")); headerDelay != nil {
+				retryDelay = *headerDelay
+			}
+			if err := sleepWithContext(ctx, retryDelay); err != nil {
+				return usecase.ProviderResult{}, err
+			}
+			continue
+		}
+
+		if resp.StatusCode >= 400 {
+			if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
+				return usecase.ProviderResult{}, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, parsed.Error.Message)
+			}
+			return usecase.ProviderResult{}, fmt.Errorf("provider returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+		}
+		if len(parsed.Choices) == 0 {
+			return usecase.ProviderResult{}, fmt.Errorf("provider returned no choices")
+		}
+
+		content := strings.TrimSpace(parsed.Choices[0].Message.Content)
+		if content == "" {
+			return usecase.ProviderResult{}, fmt.Errorf("provider returned empty content")
+		}
+
+		return usecase.ProviderResult{
+			RawResponse: content,
+			TokensUsed:  parsed.Usage.TotalTokens,
+		}, nil
 	}
 
-	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
-	if content == "" {
-		return usecase.ProviderResult{}, fmt.Errorf("provider returned empty content")
-	}
+	return usecase.ProviderResult{}, fmt.Errorf("provider returned too many rate limits")
+}
 
-	return usecase.ProviderResult{
-		RawResponse: content,
-		TokensUsed:  parsed.Usage.TotalTokens,
-	}, nil
+func parseRetryAfterSeconds(value string) *time.Duration {
+	seconds, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil || seconds < 0 {
+		return nil
+	}
+	delay := time.Duration(seconds) * time.Second
+	return &delay
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func resolveModelID(modelID string) string {

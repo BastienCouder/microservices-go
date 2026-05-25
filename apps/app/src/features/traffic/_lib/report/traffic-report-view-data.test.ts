@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 import { buildTrafficReportViewData } from "./traffic-report-view-data";
-import type { GeoTrafficDailyPoint, GeoTrafficPage, GeoTrafficSource } from "./types";
+import type { TrafficDailyPoint, TrafficPage, TrafficSource } from "./types";
 
-function buildSources(count: number): GeoTrafficSource[] {
+function buildSources(count: number): TrafficSource[] {
   return Array.from({ length: count }, (_, index) => ({
     source: index % 2 === 0 ? `chatgpt-${index}.com` : `perplexity-${index}.ai`,
     medium: "referral",
@@ -17,11 +17,11 @@ function buildSources(count: number): GeoTrafficSource[] {
     avgSessionSeconds: 80,
     conversions: index,
     pageViews: 1200 - index,
-    shareOfGeoSessions: 1,
+    shareOfTrafficSessions: 1,
   }));
 }
 
-function buildPages(count: number): GeoTrafficPage[] {
+function buildPages(count: number): TrafficPage[] {
   return Array.from({ length: count }, (_, index) => ({
     path: index % 2 === 0 ? `/guide/chatgpt-${index}` : `/docs/perplexity-${index}`,
     title: index % 2 === 0 ? `ChatGPT guide ${index}` : `Perplexity docs ${index}`,
@@ -35,7 +35,7 @@ function buildPages(count: number): GeoTrafficPage[] {
   }));
 }
 
-function buildTimeseries(count: number): GeoTrafficDailyPoint[] {
+function buildTimeseries(count: number): TrafficDailyPoint[] {
   return Array.from({ length: count }, (_, index) => ({
     date: `2026-04-${String((index % 28) + 1).padStart(2, "0")}`,
     sessions: index + 1,
@@ -128,5 +128,34 @@ describe("buildTrafficReportViewData", () => {
 
     expect(view.topPages.totalItems).toBe(1);
     expect(view.topPages.items[0]?.path).toBe("/blog/application-cahier");
+  });
+
+  test("keeps every detected AI engine available in the traffic filter", () => {
+    const engines = ["ChatGPT", "Qwen", "Z.ai", "Poe", "Kimi", "Doubao", "Meta AI"];
+    const view = buildTrafficReportViewData({
+      sources: engines.map((engine, index) => ({
+        source: `${engine.toLowerCase().replaceAll(" ", "-")}.example`,
+        medium: "referral",
+        sourceMedium: "referral",
+        landingPage: "",
+        engine,
+        sessions: 10 - index,
+        engagedSessions: 8 - index,
+        engagementRate: 80,
+        bounceRate: 20,
+        avgSessionSeconds: 60,
+        conversions: 0,
+        pageViews: 20 - index,
+        shareOfTrafficSessions: 1,
+      })),
+      topPages: [],
+      timeseries: [],
+      filters: {
+        sourcePage: 1,
+        topPagesPage: 1,
+      },
+    });
+
+    expect(view.availableEngines).toEqual(["ChatGPT", "Doubao", "Kimi", "Meta AI", "Poe", "Qwen", "Z.ai"]);
   });
 });

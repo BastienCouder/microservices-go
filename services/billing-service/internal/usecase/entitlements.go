@@ -1,6 +1,12 @@
 package usecase
 
-import "github.com/bastiencouder/microservices-go/services/billing-service/internal/domain"
+import (
+	"context"
+	"errors"
+	"fmt"
+
+	"github.com/bastiencouder/microservices-go/services/billing-service/internal/domain"
+)
 
 type OrganizationEntitlements struct {
 	OrganizationID          int64  `json:"organization_id"`
@@ -14,16 +20,16 @@ type OrganizationEntitlements struct {
 }
 
 func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitlements {
-	plan := domain.PlanStarter
+	settings := defaultPlanSettingsByPlan()[domain.PlanStarter]
 	return OrganizationEntitlements{
 		OrganizationID:          organizationID,
-		Plan:                    plan,
+		Plan:                    settings.Plan,
 		SubscriptionStatus:      "",
 		IsPaid:                  false,
-		MonthlyQuota:            defaultMonthlyQuotaForPlan(plan),
+		MonthlyQuota:            settings.MonthlyQuota,
 		Seats:                   1,
-		ModelSelectionLimit:     ModelSelectionLimitForPlan(plan),
-		MonthlyModelChangeLimit: MonthlyModelChangeLimitForPlan(plan),
+		ModelSelectionLimit:     settings.ModelSelectionLimit,
+		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
 	}
 }
 
@@ -31,6 +37,7 @@ func EntitlementsFromSubscription(sub *domain.Subscription) OrganizationEntitlem
 	if sub == nil {
 		return DefaultOrganizationEntitlements(0)
 	}
+	settings := defaultPlanSettingsByPlan()[domain.NormalizePlan(sub.Plan)]
 	return OrganizationEntitlements{
 		OrganizationID:          sub.OrganizationID,
 		Plan:                    domain.NormalizePlan(sub.Plan),
@@ -38,9 +45,36 @@ func EntitlementsFromSubscription(sub *domain.Subscription) OrganizationEntitlem
 		IsPaid:                  isPaidSubscriptionStatus(sub.Status),
 		MonthlyQuota:            sub.MonthlyQuota,
 		Seats:                   sub.Seats,
-		ModelSelectionLimit:     ModelSelectionLimitForPlan(sub.Plan),
-		MonthlyModelChangeLimit: MonthlyModelChangeLimitForPlan(sub.Plan),
+		ModelSelectionLimit:     settings.ModelSelectionLimit,
+		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
 	}
+}
+
+func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationID int64) (OrganizationEntitlements, error) {
+	entitlements := DefaultOrganizationEntitlements(organizationID)
+	sub, err := s.GetSubscription(ctx, organizationID)
+	if err != nil {
+		if errors.Is(err, domain.ErrSubscriptionMissing) {
+			settings, settingsErr := s.planSettingsForPlan(ctx, entitlements.Plan)
+			if settingsErr != nil {
+				return entitlements, settingsErr
+			}
+			entitlements.MonthlyQuota = settings.MonthlyQuota
+			entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
+			entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
+			return entitlements, nil
+		}
+		return entitlements, err
+	}
+
+	entitlements = EntitlementsFromSubscription(sub)
+	settings, err := s.planSettingsForPlan(ctx, sub.Plan)
+	if err != nil {
+		return entitlements, fmt.Errorf("load plan settings for entitlements: %w", err)
+	}
+	entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
+	entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
+	return entitlements, nil
 }
 
 func isPaidSubscriptionStatus(status string) bool {
@@ -48,16 +82,17 @@ func isPaidSubscriptionStatus(status string) bool {
 }
 
 func ModelSelectionLimitForPlan(plan string) int {
-	switch domain.NormalizePlan(plan) {
-	case domain.PlanStarter:
-		return 3
-	case domain.PlanGrowth:
-		return 6
-	default:
+	settings, ok := defaultPlanSettingsByPlan()[domain.NormalizePlan(plan)]
+	if !ok {
 		return 0
 	}
+	return settings.ModelSelectionLimit
 }
 
-func MonthlyModelChangeLimitForPlan(_ string) int {
-	return 0
+func MonthlyModelChangeLimitForPlan(plan string) int {
+	settings, ok := defaultPlanSettingsByPlan()[domain.NormalizePlan(plan)]
+	if !ok {
+		return 0
+	}
+	return settings.MonthlyModelChangeLimit
 }

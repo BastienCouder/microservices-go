@@ -1,7 +1,6 @@
-import {
-  PerceptionLoadingState,
-  PerceptionUnavailableState,
-} from "../_components";
+import { useMemo } from "react";
+import { createEmptyPerceptionViewData } from "@/lib/perception-data";
+import { PerceptionLoadingState } from "../_components";
 import { usePerceptionData } from "../core/use-perception-data";
 import { PerceptionClient } from "./client";
 
@@ -14,15 +13,12 @@ export function PerceptionTemplate({
   apiBaseURL,
   routeSearch,
 }: PerceptionTemplateProps) {
-  const { data, error, loading, reload } = usePerceptionData(apiBaseURL, routeSearch);
+  const { data, error, loading } = usePerceptionData(apiBaseURL, routeSearch);
+  const emptyData = useMemo(() => createEmptyPerceptionViewData(routeSearch, error), [error, routeSearch]);
 
   if (loading && !data) {
     return <PerceptionLoadingState />;
   }
 
-  if (!data) {
-    return <PerceptionUnavailableState error={error} />;
-  }
-
-  return <PerceptionClient initialData={data} />;
+  return <PerceptionClient initialData={data ?? emptyData} />;
 }

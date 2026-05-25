@@ -14,6 +14,7 @@ export {
   getPerceptionHeatmapGradeLabel,
   getPerceptionPeriodBadgeLabel,
   getPerceptionPeriodLabel,
+  resolvePerceptionGeneratedContent,
   getPerceptionSeverityLabel,
 } from "./perception-i18n";
 export {

@@ -16,6 +16,7 @@ message ExecutePromptRequest {
   repeated string competitors = 5;
   string provider_id = 6;
   string provider_api_key = 7;
+  string prompt_mode = 8;
 }
 
 message PromptExecutionAnalysis {

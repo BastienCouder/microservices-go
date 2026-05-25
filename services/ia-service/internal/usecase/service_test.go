@@ -80,6 +80,34 @@ func TestExecutePromptProviderMode(t *testing.T) {
 	if provider.input.APIKey != "sk-project" {
 		t.Fatalf("expected provider api key to be forwarded")
 	}
+	if provider.input.Prompt != "Meilleur CRM" {
+		t.Fatalf("expected organic mode to forward raw prompt text, got %q", provider.input.Prompt)
+	}
+}
+
+func TestExecutePromptProviderModeSupportsGuidedPromptWrapping(t *testing.T) {
+	provider := &stubProvider{result: ProviderResult{RawResponse: "Acme est recommande https://acme.com", TokensUsed: 123}}
+	svc, err := NewServiceWithDependencies(Dependencies{Mode: ExecutionModeProvider, Provider: provider})
+	if err != nil {
+		t.Fatalf("new service with provider: %v", err)
+	}
+
+	_, err = svc.ExecutePrompt(context.Background(), ExecutePromptInput{
+		PromptID:       "prompt-1",
+		PromptText:     "Meilleur CRM",
+		ModelID:        "gpt-oss-20b-free",
+		ProviderID:     "openrouter",
+		ProviderAPIKey: "sk-project",
+		PromptMode:     PromptModeGuided,
+		BrandName:      "Acme",
+		Competitors:    []string{"HubSpot"},
+	})
+	if err != nil {
+		t.Fatalf("execute prompt in provider mode: %v", err)
+	}
+	if provider.input.Prompt == "Meilleur CRM" {
+		t.Fatalf("expected guided mode to wrap prompt with brand context")
+	}
 }
 
 func TestExecutePromptProviderModeKeepsContentOptimizerAuditPromptStructured(t *testing.T) {
@@ -115,7 +143,9 @@ func TestExecutePromptSupportsProjectCatalogModels(t *testing.T) {
 		"claude-3-5-sonnet",
 		"gemini-2.0-flash",
 		"gemma-3-4b-free",
+		"google/gemma-3-4b-it",
 		"gemma-3-27b-free",
+		"google/gemma-3-27b-it",
 		"sonar",
 		"sonar-pro",
 		"mistral-large",
@@ -170,5 +200,34 @@ func TestExecutePromptRejectsUnknownModel(t *testing.T) {
 	})
 	if !errors.Is(err, ErrUnknownModel) {
 		t.Fatalf("expected unknown model error, got %v", err)
+	}
+}
+
+func TestExecutePromptAllowsUnknownOpenRouterCatalogModel(t *testing.T) {
+	provider := &stubProvider{result: ProviderResult{RawResponse: "Acme est visible", TokensUsed: 12}}
+	svc, err := NewServiceWithDependencies(Dependencies{Mode: ExecutionModeProvider, Provider: provider})
+	if err != nil {
+		t.Fatalf("new service with provider: %v", err)
+	}
+
+	result, err := svc.ExecutePrompt(context.Background(), ExecutePromptInput{
+		PromptID:       "prompt-1",
+		PromptText:     "Test",
+		ModelID:        "google/gemma-4-26b-a4b-it:free",
+		ProviderID:     "openrouter",
+		ProviderAPIKey: "sk-project",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("execute prompt: %v", err)
+	}
+	if !provider.called {
+		t.Fatalf("expected provider to be called")
+	}
+	if provider.input.ModelID != "google/gemma-4-26b-a4b-it:free" {
+		t.Fatalf("expected model id to be forwarded unchanged, got %q", provider.input.ModelID)
+	}
+	if result.ModelID != "google/gemma-4-26b-a4b-it:free" {
+		t.Fatalf("expected result model id to match input, got %q", result.ModelID)
 	}
 }

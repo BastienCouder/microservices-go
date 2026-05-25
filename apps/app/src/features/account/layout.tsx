@@ -26,6 +26,7 @@ export function AccountLayout({
         title="Compte utilisateur"
         baseline="Nom, prenom et email du compte connecte."
         actionsVariant="classic"
+        className="hidden md:block"
       />
       <div className="min-h-0 flex-1 overflow-auto pr-1">
         <AccountProfilePanel

@@ -56,6 +56,7 @@ export const apiRoutes = {
       const query = params.toString();
       return `/projects/${projectId}/prompts${query ? `?${query}` : ""}`;
     },
+    generatePrompts: (projectId: string) => `/projects/${projectId}/prompts/generate`,
   },
   prompts: {
     update: (promptId: string) => `/prompts/${promptId}`,
@@ -80,6 +81,11 @@ export const apiRoutes = {
   },
   billing: {
     quota: (organizationId: string) => `/billing/quotas/${organizationId}`,
+    plans: () => "/billing/plans",
+    publicPlans: () => "/billing/public/plans",
+    pricingTiers: () => "/billing/pricing-tiers",
+    publicPricingTiers: () => "/billing/public/pricing-tiers",
+    subscriptions: () => "/billing/subscriptions",
     stripeCheckoutSession: () => "/billing/stripe/checkout-session",
   },
   analysis: {
@@ -104,13 +110,6 @@ export const apiRoutes = {
       if (options?.to) params.set("to", options.to);
       if (options?.search) params.set("search", options.search);
       if (options?.engine && options.engine !== "all") params.set("engine", options.engine);
-      const query = params.toString();
-      return `/attribution/projects/${projectId}/traffic${query ? `?${query}` : ""}`;
-    },
-    geo: (projectId: string, options?: { from?: string; to?: string }) => {
-      const params = new URLSearchParams();
-      if (options?.from) params.set("from", options.from);
-      if (options?.to) params.set("to", options.to);
       const query = params.toString();
       return `/attribution/projects/${projectId}/traffic${query ? `?${query}` : ""}`;
     },

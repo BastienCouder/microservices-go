@@ -7,15 +7,16 @@ import {
 } from "@/shared/public-slugs";
 import { readRouteQueryParam } from "@/shared/selection";
 import type {
-  GeoPeriod,
-  GeoPropertyQuota,
-  GeoTrafficDailyPoint,
-  GeoTrafficPage,
-  GeoTrafficReport,
-  GeoTrafficSource,
-  GeoTrafficSummary,
+  TrafficPeriod,
+  TrafficPropertyQuota,
+  TrafficDailyPoint,
+  TrafficPage,
+  TrafficReport,
+  TrafficSource,
+  TrafficSummary,
   CompleteTrafficGA4OAuthInput,
   CompleteTrafficGA4OAuthResult,
+  SaveTrafficGA4IntegrationResult,
   SaveTrafficGA4IntegrationInput,
   SelectTrafficGA4OAuthPropertyInput,
   SelectTrafficGA4OAuthPropertyResult,
@@ -184,7 +185,7 @@ function isGA4NotConfiguredError(status: number, error: string): boolean {
   );
 }
 
-export function normalizeTrafficPeriod(value: string | null | undefined): GeoPeriod {
+export function normalizeTrafficPeriod(value: string | null | undefined): TrafficPeriod {
   const normalized = value?.trim();
   return normalized === "7d" || normalized === "90d" ? normalized : "30d";
 }
@@ -192,7 +193,7 @@ export function normalizeTrafficPeriod(value: string | null | undefined): GeoPer
 export function getTrafficQueryContext(routeSearch: string): {
   projectId: string | null;
   organizationId: string | null;
-  period: GeoPeriod;
+  period: TrafficPeriod;
 } {
   const projectId = (
     readRouteQueryParam(routeSearch, "projectId") ||
@@ -208,39 +209,60 @@ export function getTrafficQueryContext(routeSearch: string): {
   return { projectId: projectId || null, organizationId: organizationId || null, period };
 }
 
-function periodDays(period: GeoPeriod): number {
+function periodDays(period: TrafficPeriod): number {
   if (period === "7d") return 7;
   if (period === "90d") return 90;
   return 30;
 }
 
-function getPeriodWindow(period: GeoPeriod, now: Date): { from: Date; to: Date } {
+function getPeriodWindow(period: TrafficPeriod, now: Date): { from: Date; to: Date } {
   const to = new Date(now);
   const from = new Date(now);
   from.setDate(from.getDate() - periodDays(period));
   return { from, to };
 }
 
-function normalizeSummary(value: unknown): GeoTrafficSummary {
+function normalizeSummary(value: unknown): TrafficSummary {
   const row = asObject(value);
   return {
-    totalGeoSessions: asNumber(getField(row, ["totalGeoSessions", "TotalGeoSessions"])),
-    totalSessions: asNumber(getField(row, ["totalSessions", "TotalSessions"])),
-    geoShareOfTotal: asNumber(getField(row, ["geoShareOfTotal", "GeoShareOfTotal"])),
-    geoEngagedSessions: asNumber(getField(row, ["geoEngagedSessions", "GeoEngagedSessions"])),
-    geoEngagementRate: asNumber(getField(row, ["geoEngagementRate", "GeoEngagementRate"])),
-    geoAvgSessionSeconds: asNumber(
-      getField(row, ["geoAvgSessionSeconds", "GeoAvgSessionSeconds"]),
+    totalTrafficSessions: asNumber(
+      getField(row, ["totalTrafficSessions", "totalGeoSessions", "TotalTrafficSessions", "TotalGeoSessions"]),
     ),
-    geoBounceRate: asNumber(getField(row, ["geoBounceRate", "GeoBounceRate"])),
-    geoConversions: asNumber(getField(row, ["geoConversions", "GeoConversions"])),
-    geoConversionRate: asNumber(getField(row, ["geoConversionRate", "GeoConversionRate"])),
-    geoPageViews: asNumber(getField(row, ["geoPageViews", "GeoPageViews"])),
+    totalSessions: asNumber(getField(row, ["totalSessions", "TotalSessions"])),
+    trafficShareOfTotal: asNumber(
+      getField(row, ["trafficShareOfTotal", "geoShareOfTotal", "TrafficShareOfTotal", "GeoShareOfTotal"]),
+    ),
+    trafficEngagedSessions: asNumber(
+      getField(row, ["trafficEngagedSessions", "geoEngagedSessions", "TrafficEngagedSessions", "GeoEngagedSessions"]),
+    ),
+    trafficEngagementRate: asNumber(
+      getField(row, ["trafficEngagementRate", "geoEngagementRate", "TrafficEngagementRate", "GeoEngagementRate"]),
+    ),
+    trafficAvgSessionSeconds: asNumber(
+      getField(row, [
+        "trafficAvgSessionSeconds",
+        "geoAvgSessionSeconds",
+        "TrafficAvgSessionSeconds",
+        "GeoAvgSessionSeconds",
+      ]),
+    ),
+    trafficBounceRate: asNumber(
+      getField(row, ["trafficBounceRate", "geoBounceRate", "TrafficBounceRate", "GeoBounceRate"]),
+    ),
+    trafficConversions: asNumber(
+      getField(row, ["trafficConversions", "geoConversions", "TrafficConversions", "GeoConversions"]),
+    ),
+    trafficConversionRate: asNumber(
+      getField(row, ["trafficConversionRate", "geoConversionRate", "TrafficConversionRate", "GeoConversionRate"]),
+    ),
+    trafficPageViews: asNumber(
+      getField(row, ["trafficPageViews", "geoPageViews", "TrafficPageViews", "GeoPageViews"]),
+    ),
     topEngine: asString(getField(row, ["topEngine", "TopEngine"])).trim(),
   };
 }
 
-function normalizeSource(value: unknown): GeoTrafficSource {
+function normalizeSource(value: unknown): TrafficSource {
   const row = asObject(value);
   return {
     source: asString(getField(row, ["source", "Source"])).trim(),
@@ -255,11 +277,13 @@ function normalizeSource(value: unknown): GeoTrafficSource {
     avgSessionSeconds: asNumber(getField(row, ["avgSessionSeconds", "AvgSessionSeconds"])),
     conversions: asNumber(getField(row, ["conversions", "Conversions"])),
     pageViews: asNumber(getField(row, ["pageViews", "PageViews"])),
-    shareOfGeoSessions: asNumber(getField(row, ["shareOfGeoSessions", "ShareOfGeoSessions"])),
+    shareOfTrafficSessions: asNumber(
+      getField(row, ["shareOfTrafficSessions", "shareOfGeoSessions", "ShareOfTrafficSessions", "ShareOfGeoSessions"]),
+    ),
   };
 }
 
-function normalizePage(value: unknown): GeoTrafficPage {
+function normalizePage(value: unknown): TrafficPage {
   const row = asObject(value);
   return {
     path: asString(getField(row, ["path", "Path"])).trim(),
@@ -274,7 +298,7 @@ function normalizePage(value: unknown): GeoTrafficPage {
   };
 }
 
-function normalizeDailyPoint(value: unknown): GeoTrafficDailyPoint {
+function normalizeDailyPoint(value: unknown): TrafficDailyPoint {
   const row = asObject(value);
   return {
     date: asString(getField(row, ["date", "Date"])).trim(),
@@ -284,7 +308,7 @@ function normalizeDailyPoint(value: unknown): GeoTrafficDailyPoint {
   };
 }
 
-function normalizeQuota(value: unknown): GeoPropertyQuota | null {
+function normalizeQuota(value: unknown): TrafficPropertyQuota | null {
   const quota = asObject(value);
   if (Object.keys(quota).length === 0) {
     return null;
@@ -305,12 +329,12 @@ function normalizeQuota(value: unknown): GeoPropertyQuota | null {
   };
 }
 
-function normalizeTrafficDataSource(value: unknown): GeoTrafficReport["dataSource"] {
+function normalizeTrafficDataSource(value: unknown): TrafficReport["dataSource"] {
   const normalized = asString(value).trim();
   return normalized === "ga4" || normalized === "fake" ? normalized : "";
 }
 
-export function normalizeTrafficReport(value: unknown): GeoTrafficReport {
+export function normalizeTrafficReport(value: unknown): TrafficReport {
   const payload = asObject(unwrapSuccessEnvelope(value));
   const dateRange = asObject(getField(payload, ["dateRange", "DateRange"]));
   return {
@@ -578,7 +602,7 @@ export async function saveTrafficGA4Integration(
   apiBaseURL: string,
   input: SaveTrafficGA4IntegrationInput,
   signal?: AbortSignal,
-): Promise<TrafficImpactIntegrations> {
+): Promise<SaveTrafficGA4IntegrationResult> {
   const projectId = input.projectId.trim();
   const organizationId = input.organizationId.trim();
   const propertyId = input.propertyId.trim();
@@ -608,9 +632,13 @@ export async function saveTrafficGA4Integration(
     },
   );
 
-  return normalizeTrafficImpactIntegrations(
-    unwrapRequiredEnvelope(response, "integrations"),
-  );
+  const payload = asObject(unwrapRequiredEnvelope(response, "integrations"));
+  return {
+    integration: normalizeTrafficImpactIntegrations(
+      getField(payload, ["integration", "Integration"]),
+    ),
+    llmSetup: normalizeTrafficGA4LLMSetup(getField(payload, ["llmSetup", "LLMSetup"])),
+  };
 }
 
 export async function disconnectTrafficGA4Integration(

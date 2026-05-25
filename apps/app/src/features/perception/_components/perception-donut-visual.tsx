@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import type { PerceptionViewData } from "@/lib/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
@@ -16,9 +17,11 @@ type RankedPoint = PerceptionViewData["radar"][number] & {
 export function PerceptionDonutVisual({
   points,
   periodLabel,
+  emptyLabel,
 }: {
   points: PerceptionViewData["radar"];
   periodLabel: string;
+  emptyLabel?: string | null;
 }) {
   const { locale, t } = useScopedI18n("perception");
   const rankedPoints = useMemo<RankedPoint[]>(() => {
@@ -44,9 +47,17 @@ export function PerceptionDonutVisual({
 
   if (rankedPoints.length === 0) {
     return (
-      <div className="rounded-[28px] border border-border/60 bg-background px-5 py-6">
-        <SectionTitle>{t("donutTitle")}</SectionTitle>
-        <p className="mt-2 text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+      <div className="px-5 py-3">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0 flex-1">
+            <SectionTitle>{t("donutTitle")}</SectionTitle>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+          </div>
+          <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
+            {periodLabel}
+          </Badge>
+        </div>
+        <EmptyStateCard label={emptyLabel || t("donutEmpty")} className="mt-3 h-[220px] text-sm" />
       </div>
     );
   }

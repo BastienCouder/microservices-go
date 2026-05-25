@@ -8,10 +8,13 @@ import {
 import { gatewayJSON } from "@/shared/api/gateway";
 import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
 
-export type OptimizationErrorSource = "monitoring" | "perception";
+export type OptimizationErrorSource = "monitoring" | "perception" | "crawler";
+export type OptimizationErrorOrigin = "alert" | "derived";
 
 export type OptimizationError = PerceptionError & {
   source: OptimizationErrorSource;
+  origin?: OptimizationErrorOrigin;
+  resource?: string;
   createdAt?: string;
 };
 
@@ -31,6 +34,7 @@ export type OptimizationErrorsBoard = {
     totalErrors: number;
     monitoringErrors: number;
     perceptionErrors: number;
+    crawlerErrors: number;
     analyzedResponses?: number;
   };
 };
@@ -110,9 +114,18 @@ function normalizeSeverity(value: unknown): PerceptionSeverity {
 }
 
 function normalizeSource(value: unknown): OptimizationErrorSource {
-  return asString(value).trim().toLowerCase() === "monitoring"
-    ? "monitoring"
-    : "perception";
+  const normalized = asString(value).trim().toLowerCase();
+  if (normalized === "monitoring") return "monitoring";
+  if (normalized === "crawler") return "crawler";
+  return "perception";
+}
+
+function normalizeOrigin(value: unknown): OptimizationErrorOrigin | undefined {
+  const normalized = asString(value).trim().toLowerCase();
+  if (normalized === "alert" || normalized === "derived") {
+    return normalized;
+  }
+  return undefined;
 }
 
 function normalizePriority(value: unknown, severity: PerceptionSeverity): PerceptionError["optimizePriority"] {
@@ -144,6 +157,8 @@ function normalizeOptimizationError(value: unknown): OptimizationError {
   return {
     id: asString(getField(item, ["id", "ID"])) || type,
     source: normalizeSource(getField(item, ["source", "Source"])),
+    origin: normalizeOrigin(getField(item, ["origin", "Origin"])),
+    resource: asString(getField(item, ["resource", "Resource"])) || undefined,
     severity,
     title: asString(getField(item, ["title", "Title"])) || "Erreur detectee",
     issue: asString(getField(item, ["issue", "Issue"])),
@@ -153,6 +168,9 @@ function normalizeOptimizationError(value: unknown): OptimizationError {
       .filter(Boolean),
     fixType: normalizeFixType(getField(item, ["fixType", "FixType"])),
     generatedContent: asString(getField(item, ["generatedContent", "GeneratedContent"])),
+    generatedContentKey:
+      asString(getField(item, ["generatedContentKey", "GeneratedContentKey"])) ||
+      undefined,
     optimizePriority: normalizePriority(getField(item, ["optimizePriority", "OptimizePriority"]), severity),
     type,
     createdAt: asString(getField(item, ["createdAt", "CreatedAt"])) || undefined,
@@ -185,6 +203,7 @@ function normalizeBoard(value: unknown): OptimizationErrorsBoard {
       totalErrors: asNumber(getField(metadata, ["totalErrors", "TotalErrors"])) || errors.length,
       monitoringErrors: asNumber(getField(metadata, ["monitoringErrors", "MonitoringErrors"])),
       perceptionErrors: asNumber(getField(metadata, ["perceptionErrors", "PerceptionErrors"])),
+      crawlerErrors: asNumber(getField(metadata, ["crawlerErrors", "CrawlerErrors"])),
       analyzedResponses: asNumber(getField(metadata, ["analyzedResponses", "AnalyzedResponses"])) || undefined,
     },
   };
@@ -322,7 +341,7 @@ export async function loadOptimizationErrors(
     },
   );
 
-  if (!result.ok && result.status === 404) {
+  if (!result.ok && [401, 403, 404].includes(result.status)) {
     const resolvedProjectId = await resolveProjectSlug(apiBaseURL, projectId, options?.signal);
     if (resolvedProjectId && resolvedProjectId !== projectId) {
       projectId = resolvedProjectId;

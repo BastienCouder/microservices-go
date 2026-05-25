@@ -7,7 +7,20 @@ import (
 	"strings"
 )
 
-func buildProviderPrompt(promptText, brandName string, competitors []string) string {
+func normalizePromptMode(mode PromptMode) PromptMode {
+	switch strings.ToLower(strings.TrimSpace(string(mode))) {
+	case string(PromptModeGuided):
+		return PromptModeGuided
+	default:
+		return PromptModeOrganic
+	}
+}
+
+func buildProviderPrompt(mode PromptMode, promptText, brandName string, competitors []string) string {
+	if normalizePromptMode(mode) == PromptModeOrganic {
+		return strings.TrimSpace(promptText)
+	}
+
 	builder := strings.Builder{}
 	builder.WriteString("Prompt utilisateur: ")
 	builder.WriteString(promptText)

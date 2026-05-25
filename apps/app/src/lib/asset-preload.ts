@@ -1,10 +1,15 @@
 export const MODEL_SVG_ICON_PATHS = [
   "/models/openai.svg",
   "/models/perplexity.svg",
-  "/models/claude.svg",
-  "/models/gemini.svg",
+  "/models/anthropic.svg",
+  "/models/google.svg",
   "/models/mistral.svg",
   "/models/copilot.svg",
+  "/models/deepseek.svg",
+  "/models/grok.svg",
+  "/models/qwen-color.svg",
+  "/models/zai.svg",
+  "/models/meta.svg",
 ] as const;
 
 export function preloadModelSvgIcons() {

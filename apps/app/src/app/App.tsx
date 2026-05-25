@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
+import { AppToaster } from "@/components/ui/toaster";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
@@ -11,9 +12,15 @@ import { redirectToWebAuth } from "@/shared/auth/web-auth";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { loadUserOrganizationSummaries } from "@/shared/organizations";
 import {
+  applyResolvedProjectContextSearch,
+  findResolvedProjectContext,
+  loadProjectContextHierarchies,
+} from "@/shared/project-context";
+import {
   readProjectIdFromSearch,
   resolveSelectedContextSearch,
   SELECTED_CONTEXT_CHANGE_EVENT,
+  storeSelectedProjectContext,
   storeLastSelectedProjectToken,
 } from "@/shared/selection";
 import {
@@ -68,12 +75,17 @@ export default function App() {
   const isOnboardingRoute = location.pathname === "/onboarding" || location.pathname.startsWith("/onboarding/");
   const isInvitationRoute = location.pathname === "/invitations" || location.pathname.startsWith("/invitations/");
   const isBillingRoute = location.pathname === "/billing" || location.pathname.startsWith("/billing/");
-  const routeSearch = useMemo(
+  const bypassResolvedContext = isOnboardingRoute || isInvitationRoute || isBillingRoute;
+  const baseRouteSearch = useMemo(
     () =>
-      isOnboardingRoute || isInvitationRoute || isBillingRoute
+      bypassResolvedContext
         ? location.search
         : resolveSelectedContextSearch(location.search),
-    [isBillingRoute, isInvitationRoute, isOnboardingRoute, location.search, selectionVersion],
+    [bypassResolvedContext, location.search, selectionVersion],
+  );
+  const routeProjectToken = useMemo(
+    () => (bypassResolvedContext ? "" : readProjectIdFromSearch(baseRouteSearch)),
+    [baseRouteSearch, bypassResolvedContext],
   );
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
 
@@ -86,6 +98,38 @@ export default function App() {
     queryFn: ({ signal }) => loadUserOrganizationSummaries(apiBaseURL, signal),
   });
   const organizations = organizationsQuery.data ?? [];
+  const shouldResolveRouteProjectContext =
+    apiBaseURL.trim() !== "" &&
+    !busy &&
+    user !== null &&
+    !bypassResolvedContext &&
+    routeProjectToken !== "" &&
+    organizations.length > 0;
+  const routeProjectContextQuery = useQuery({
+    queryKey: [
+      "route-project-context",
+      apiBaseURL,
+      routeProjectToken,
+      organizations.map((organization) => organization.id).join(","),
+    ] as const,
+    enabled: shouldResolveRouteProjectContext,
+    queryFn: async ({ signal }) => {
+      const hierarchies = await loadProjectContextHierarchies(
+        apiBaseURL,
+        organizations,
+        signal,
+      );
+      return findResolvedProjectContext(hierarchies, routeProjectToken);
+    },
+  });
+  const resolvedProjectContext = routeProjectContextQuery.data ?? null;
+  const routeSearch = useMemo(
+    () =>
+      bypassResolvedContext
+        ? baseRouteSearch
+        : applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext),
+    [baseRouteSearch, bypassResolvedContext, resolvedProjectContext],
+  );
   const billingOrganizationId = organizations[0]?.id ?? "";
   const billingQuery = useQuery({
     queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganizationId),
@@ -159,23 +203,34 @@ export default function App() {
   useEffect(() => {
     if (isOnboardingRoute || isInvitationRoute) return;
 
-    const routeProjectToken = readProjectIdFromSearch(location.search);
-
     if (routeProjectToken) {
       storeLastSelectedProjectToken(routeProjectToken);
     }
-  }, [isInvitationRoute, isOnboardingRoute, location.search]);
+  }, [isInvitationRoute, isOnboardingRoute, routeProjectToken]);
+
+  useEffect(() => {
+    if (!resolvedProjectContext) return;
+
+    storeSelectedProjectContext({
+      organizationId: resolvedProjectContext.organizationId,
+      projectId: resolvedProjectContext.projectId,
+      projectToken: resolvedProjectContext.projectSlug,
+    });
+  }, [resolvedProjectContext]);
 
   if (!apiBaseURL) {
     return (
-      <main className="app-root">
-        <section className="card">
-          <h1>Configuration manquante</h1>
-          <p>
-            La variable <code>VITE_API_BASE_URL</code> est requise pour appeler l&apos;API Gateway.
-          </p>
-        </section>
-      </main>
+      <>
+        <main className="app-root">
+          <section className="card">
+            <h1>Configuration manquante</h1>
+            <p>
+              La variable <code>VITE_API_BASE_URL</code> est requise pour appeler l&apos;API Gateway.
+            </p>
+          </section>
+        </main>
+        <AppToaster />
+      </>
     );
   }
 
@@ -199,34 +254,48 @@ export default function App() {
     return null;
   }
 
+  if (
+    shouldResolveRouteProjectContext &&
+    routeProjectContextQuery.isLoading &&
+    routeProjectContextQuery.data === undefined
+  ) {
+    return null;
+  }
+
   if (mustRedirectToOnboarding) {
     return <Navigate replace to="/onboarding" />;
   }
 
   if (isOnboardingRoute || isInvitationRoute || isBillingRoute) {
     return (
-      <AppRouter
-        apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
-        user={user}
-        busy={busy}
-        onLogout={logout}
-        onRefresh={refresh}
-      />
+      <>
+        <AppRouter
+          apiBaseURL={apiBaseURL}
+          routeSearch={routeSearch}
+          user={user}
+          busy={busy}
+          onLogout={logout}
+          onRefresh={refresh}
+        />
+        <AppToaster />
+      </>
     );
   }
 
   return (
-    <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
-      <AppRouter
-        apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
-        user={user}
-        busy={busy}
-        onLogout={logout}
-        onRefresh={refresh}
-      />
-    </AppLayout>
+    <>
+      <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
+        <AppRouter
+          apiBaseURL={apiBaseURL}
+          routeSearch={routeSearch}
+          user={user}
+          busy={busy}
+          onLogout={logout}
+          onRefresh={refresh}
+        />
+      </AppLayout>
+      <AppToaster />
+    </>
   );
 }
 

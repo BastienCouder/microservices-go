@@ -84,7 +84,7 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 				return
 			}
 
-			allowed, err := h.checkPermission(r.Context(), userID, orgID, "admin", "users")
+			allowed, _, err := h.checkPermission(r.Context(), userID, orgID, "admin", "users")
 			if err != nil {
 				writeJSONError(w, http.StatusBadGateway, "permission service unavailable")
 				return
@@ -110,7 +110,7 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			}
 			action := actionFromMethod(r2.Method)
 			resource := resourceFromPath(r2.URL.Path, defaultResource)
-			allowed, err := h.checkPermission(r.Context(), userID, orgID, action, resource)
+			allowed, reason, err := h.checkPermission(r.Context(), userID, orgID, action, resource)
 			if err != nil {
 				writeJSONError(w, http.StatusBadGateway, "permission service unavailable")
 				auditSecurityEvent("permission_check", map[string]any{
@@ -134,6 +134,11 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 					"path":            r2.URL.Path,
 				})
 				return
+			}
+			if reason == "role grants full access" {
+				r2.Header.Set("X-Organization-Full-Access", "true")
+			} else {
+				r2.Header.Del("X-Organization-Full-Access")
 			}
 			claims.Organization = orgID
 			auditSecurityEvent("permission_check", map[string]any{

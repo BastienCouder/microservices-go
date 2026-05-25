@@ -9,6 +9,7 @@ function makePrompt(overrides?: Partial<PromptItem>): PromptItem {
     sourcePromptId: "prompt-1",
     rowMode: "global",
     prompt: "How visible is the brand?",
+    kind: "monitoring",
     stage: "Awareness",
     models: ["anthropic-claude-opus-4-6", "deepseek-deepseek-chat"],
     schedule: {
@@ -24,7 +25,7 @@ function makePrompt(overrides?: Partial<PromptItem>): PromptItem {
     effectiveScheduleLabel: "",
     effectiveScheduleSource: "global",
     mentionRate: 0,
-    rank: 9.9,
+    rank: null,
     sov: 0,
     lastRunMinutes: 999999,
     trend30d: [],

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  buildProviderLabel,
   buildProjectModelLookup,
   toProjectModelVisual,
   type ProjectModelMeta,
@@ -18,6 +19,99 @@ import type {
   PromptSort,
   PromptSortDirection,
 } from "./types";
+
+const PROVIDER_VISUALS = [
+  {
+    keys: ["openai", "chatgpt", "gpt", "o1", "o3", "o4"],
+    provider: "OpenAI",
+    icon: "/models/openai.svg",
+  },
+  {
+    keys: ["google", "gemini", "gemma"],
+    provider: "Google",
+    icon: "/models/google.svg",
+  },
+  {
+    keys: ["anthropic", "claude"],
+    provider: "Anthropic",
+    icon: "/models/anthropic.svg",
+  },
+  {
+    keys: ["perplexity"],
+    provider: "Perplexity",
+    icon: "/models/perplexity.svg",
+  },
+  {
+    keys: ["mistral"],
+    provider: "Mistral",
+    icon: "/models/mistral.svg",
+  },
+  {
+    keys: ["microsoft", "copilot"],
+    provider: "Microsoft",
+    icon: "/models/copilot.svg",
+  },
+  {
+    keys: ["xai", "grok"],
+    provider: "xAI",
+    icon: "/models/xai.svg",
+  },
+  {
+    keys: ["deepseek"],
+    provider: "DeepSeek",
+    icon: "/models/deepseek.svg",
+  },
+  {
+    keys: ["qwen"],
+    provider: "Qwen",
+    icon: "/models/qwen.svg",
+  },
+  {
+    keys: ["meta", "llama"],
+    provider: "Meta",
+    icon: "/models/meta.svg",
+  },
+  {
+    keys: ["groq"],
+    provider: "Groq",
+    icon: "/models/groq.svg",
+  },
+  {
+    keys: ["openrouter"],
+    provider: "OpenRouter",
+    icon: "/models/openrouter.svg",
+  },
+  {
+    keys: ["z.ai", "zai"],
+    provider: "Z.ai",
+    icon: "/models/zai.svg",
+  },
+] as const;
+
+function getProviderModelName(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+
+  const pathParts = trimmed.split("/").filter(Boolean);
+  const lastPathPart = pathParts.at(-1) ?? trimmed;
+
+  return lastPathPart.trim();
+}
+
+function findProviderVisual(...values: string[]) {
+  const haystack = values
+    .map((value) => normalizeModelName(value))
+    .filter(Boolean)
+    .join(" ");
+
+  if (!haystack) return null;
+
+  return (
+    PROVIDER_VISUALS.find(({ keys }) =>
+      keys.some((key) => haystack.includes(key)),
+    ) ?? null
+  );
+}
 
 type MonitoringDataShape = {
   project: {
@@ -68,15 +162,44 @@ export function usePromptsSourceData({
       ),
     [projectModels],
   );
+  const modelLookup = useMemo(() => buildProjectModelLookup(projectModels), [projectModels]);
 
-  const getModelVisual = (model: string): ModelVisual =>
-    modelMeta.get(normalizeModelName(model)) || {
-      icon: "/models/openai.svg",
-      description: "Modele IA",
-      label: model,
-      provider: "OpenAI",
-      name: model,
+  const getModelVisual = (model: string): ModelVisual => {
+    const normalizedModel = normalizeModelName(model);
+    const exactVisual = modelMeta.get(normalizedModel);
+    if (exactVisual) return exactVisual;
+
+    const partialMatch = Array.from(modelLookup.values()).find((candidate) => {
+      const keys = [
+        candidate.id,
+        candidate.displayName,
+        candidate.groupName,
+        candidate.providerModelId,
+      ].map((value) => normalizeModelName(value));
+
+      return keys.some(
+        (key) =>
+          key !== "" &&
+          (key.includes(normalizedModel) || normalizedModel.includes(key)),
+      );
+    });
+
+    if (partialMatch) {
+      return toProjectModelVisual(partialMatch);
+    }
+
+    const providerVisual = findProviderVisual(model);
+    const provider = providerVisual?.provider ?? "AI provider";
+    const name = getProviderModelName(model) || model || "Modele IA";
+
+    return {
+      icon: providerVisual?.icon ?? "/models/openai.svg",
+      description: model || "Modele IA",
+      label: name,
+      provider: providerVisual?.provider ?? buildProviderLabel(provider),
+      name,
     };
+  };
 
   const responseAvailableModels = useMemo(
     () =>
@@ -140,7 +263,9 @@ export function usePromptsSourceData({
   const serverPromptItems = useMemo(
     () =>
       buildPromptPageItems({
-        projectPrompts: promptsCatalogQuery.data ?? [],
+        projectPrompts: (promptsCatalogQuery.data ?? []).filter(
+          (prompt) => prompt.kind === "monitoring",
+        ),
         recentPrompts: monitoringData.recent_prompts.filter((item) =>
           activeModelKeys.has(normalizeModelName(item.modelId || item.modelProviderModelId || "")),
         ) as never,

@@ -1,7 +1,13 @@
 import { ArrowRight, Check, Gift, Handshake, Loader2, RefreshCw } from "lucide-react";
+import { useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  pushErrorToast,
+  pushSuccessToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import { cn } from "@/shared/utils";
 import type { CheckoutPlan } from "../../_lib/pricing/billing-gate-api";
 import { useBillingGateViewModel } from "../../_lib/pricing/use-billing-gate-view-model";
@@ -14,6 +20,23 @@ type PricingPanelProps = {
 
 export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPanelProps) {
   const viewModel = useBillingGateViewModel({ apiBaseURL, routeSearch, userEmail });
+
+  useEffect(() => {
+    if (viewModel.checkoutNotice) {
+      const checkoutStatus = new URLSearchParams(routeSearch).get("checkout");
+      if (checkoutStatus === "success") {
+        pushSuccessToast(viewModel.checkoutNotice);
+        return;
+      }
+      pushWarningToast(viewModel.checkoutNotice);
+    }
+  }, [routeSearch, viewModel.checkoutNotice]);
+
+  useEffect(() => {
+    if (viewModel.error) {
+      pushErrorToast(new Error(viewModel.error), viewModel.error);
+    }
+  }, [viewModel.error]);
 
   const handleCheckout = (plan: CheckoutPlan) => {
     viewModel.startCheckout(plan);
@@ -53,18 +76,6 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
 
       <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
         <section className="space-y-5">
-          {viewModel.checkoutNotice ? (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-primary">
-              {viewModel.checkoutNotice}
-            </div>
-          ) : null}
-
-          {viewModel.error ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
-              {viewModel.error}
-            </div>
-          ) : null}
-
           {!viewModel.hasOrganizations ? (
             <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
               <label className="text-sm font-medium text-foreground" htmlFor="organization-name">

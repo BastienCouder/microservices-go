@@ -13,7 +13,9 @@ import (
 )
 
 type memoryRepo struct {
-	subs map[int64]*domain.Subscription
+	subs         map[int64]*domain.Subscription
+	planSettings map[string]domain.PlanSettings
+	pricingTiers map[int]domain.PricingTier
 }
 
 func (m *memoryRepo) Upsert(_ context.Context, subscription *domain.Subscription) error {
@@ -34,8 +36,74 @@ func (m *memoryRepo) GetByOrganizationID(_ context.Context, organizationID int64
 	return &cloned, nil
 }
 
+func (m *memoryRepo) UpdateEntitlements(_ context.Context, organizationID int64, plan string, seats, monthlyQuota int, updatedAt time.Time) error {
+	if m.subs == nil {
+		m.subs = make(map[int64]*domain.Subscription)
+	}
+	sub, ok := m.subs[organizationID]
+	if !ok {
+		sub = &domain.Subscription{
+			OrganizationID: organizationID,
+			BillingCycle:   domain.BillingCycleMonthly,
+			Status:         domain.SubscriptionStatusActive,
+		}
+	}
+	cloned := *sub
+	cloned.Plan = plan
+	cloned.Seats = seats
+	cloned.MonthlyQuota = monthlyQuota
+	cloned.UpdatedAt = updatedAt
+	m.subs[organizationID] = &cloned
+	return nil
+}
+
+func (m *memoryRepo) UpdateDefaultQuotaForPlan(_ context.Context, plan string, previousMonthlyQuota, nextMonthlyQuota int, updatedAt time.Time) error {
+	for organizationID, sub := range m.subs {
+		if sub.Plan != plan || sub.MonthlyQuota != previousMonthlyQuota {
+			continue
+		}
+		cloned := *sub
+		cloned.MonthlyQuota = nextMonthlyQuota
+		cloned.UpdatedAt = updatedAt
+		m.subs[organizationID] = &cloned
+	}
+	return nil
+}
+
 func (m *memoryRepo) RecordStripeWebhookEvent(_ context.Context, _, _ string, _ time.Time) (bool, error) {
 	return true, nil
+}
+
+func (m *memoryRepo) ListPlanSettings(_ context.Context) ([]domain.PlanSettings, error) {
+	items := make([]domain.PlanSettings, 0, len(m.planSettings))
+	for _, item := range m.planSettings {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (m *memoryRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanSettings) error {
+	if m.planSettings == nil {
+		m.planSettings = make(map[string]domain.PlanSettings)
+	}
+	m.planSettings[settings.Plan] = settings
+	return nil
+}
+
+func (m *memoryRepo) ListPricingTiers(_ context.Context) ([]domain.PricingTier, error) {
+	items := make([]domain.PricingTier, 0, len(m.pricingTiers))
+	for _, item := range m.pricingTiers {
+		items = append(items, item)
+	}
+	return items, nil
+}
+
+func (m *memoryRepo) UpsertPricingTier(_ context.Context, tier domain.PricingTier) error {
+	if m.pricingTiers == nil {
+		m.pricingTiers = make(map[int]domain.PricingTier)
+	}
+	m.pricingTiers[tier.PromptVolume] = tier
+	return nil
 }
 
 type noopStripeProvider struct{}
@@ -81,6 +149,86 @@ func TestCreateStripeCheckoutSessionRejectsOrganizationScopeMismatch(t *testing.
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestUpsertSubscriptionRejectsOrganizationScopeMismatch(t *testing.T) {
+	repo := &memoryRepo{}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/subscriptions", strings.NewReader(`{
+		"organization_id": 99,
+		"plan": "growth",
+		"seats": 2,
+		"monthly_quota": 250
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	if repo.subs[99] != nil {
+		t.Fatalf("scope mismatch should not persist subscription: %+v", repo.subs[99])
+	}
+}
+
+func TestUpsertSubscriptionPreservesStripeManagedFields(t *testing.T) {
+	repo := &memoryRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID:       7,
+				Plan:                 domain.PlanStarter,
+				Seats:                1,
+				MonthlyQuota:         50,
+				StripeCustomerID:     "cus_7",
+				StripeSubscriptionID: "sub_7",
+				StripePriceID:        "price_starter_m",
+				BillingCycle:         domain.BillingCycleYearly,
+				Status:               domain.SubscriptionStatusPastDue,
+				CancelAtPeriodEnd:    true,
+				CorrectionCredits:    3,
+				UpdatedAt:            time.Now().UTC().Add(-time.Hour),
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/subscriptions", strings.NewReader(`{
+		"organization_id": 7,
+		"plan": "growth",
+		"seats": 2,
+		"monthly_quota": 250
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	stored := repo.subs[7]
+	if stored.Plan != domain.PlanGrowth || stored.MonthlyQuota != 250 || stored.Seats != 2 {
+		t.Fatalf("expected admin fields updated, got %+v", stored)
+	}
+	if stored.StripeCustomerID != "cus_7" ||
+		stored.StripeSubscriptionID != "sub_7" ||
+		stored.StripePriceID != "price_starter_m" ||
+		stored.BillingCycle != domain.BillingCycleYearly ||
+		stored.Status != domain.SubscriptionStatusPastDue ||
+		!stored.CancelAtPeriodEnd ||
+		stored.CorrectionCredits != 3 {
+		t.Fatalf("expected stripe-managed fields preserved, got %+v", stored)
 	}
 }
 
@@ -192,5 +340,62 @@ func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
 	}
 	if !strings.Contains(body, `"is_paid":true`) {
 		t.Fatalf("expected paid flag in payload, got %s", body)
+	}
+}
+
+func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
+	repo := &memoryRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID: 7,
+				Plan:           domain.PlanPro,
+				Seats:          3,
+				MonthlyQuota:   1000000,
+				BillingCycle:   domain.BillingCycleMonthly,
+				Status:         domain.SubscriptionStatusActive,
+				UpdatedAt:      time.Now().UTC(),
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	updateReq := httptest.NewRequest(http.MethodPost, "/billing/plans", strings.NewReader(`{
+		"plan": "pro",
+		"monthly_price_cents": 49900,
+		"yearly_price_cents": 39900,
+		"monthly_quota": 1500,
+		"model_selection_limit": 12,
+		"monthly_model_change_limit": 4
+	}`))
+	updateReq.Header.Set("Content-Type", "application/json")
+	updateReq.Header.Set("X-Organization-ID", "7")
+	updateRec := httptest.NewRecorder()
+	mux.ServeHTTP(updateRec, updateReq)
+	if updateRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", updateRec.Code, updateRec.Body.String())
+	}
+
+	quotaReq := httptest.NewRequest(http.MethodGet, "/billing/quotas/7", nil)
+	quotaReq.Header.Set("X-Organization-ID", "7")
+	quotaRec := httptest.NewRecorder()
+	mux.ServeHTTP(quotaRec, quotaReq)
+	if quotaRec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", quotaRec.Code, quotaRec.Body.String())
+	}
+	body := quotaRec.Body.String()
+	if !strings.Contains(body, `"model_selection_limit":12`) {
+		t.Fatalf("expected updated model limit, got %s", body)
+	}
+	if !strings.Contains(body, `"monthly_model_change_limit":4`) {
+		t.Fatalf("expected updated model change limit, got %s", body)
+	}
+	if !strings.Contains(body, `"monthly_quota":1500`) {
+		t.Fatalf("expected default plan quota propagated, got %s", body)
+	}
+	if !strings.Contains(updateRec.Body.String(), `"monthly_quota":1500`) {
+		t.Fatalf("expected updated plan quota in response, got %s", updateRec.Body.String())
 	}
 }

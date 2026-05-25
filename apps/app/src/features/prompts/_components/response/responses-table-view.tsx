@@ -1,15 +1,12 @@
-import { useState } from "react";
-import { ChevronDown, Table2, Timer, Workflow } from "lucide-react";
+import { Table2, Workflow } from "lucide-react";
 import { TableVirtuoso, Virtuoso } from "react-virtuoso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableCell, TableHead } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { PanelToolbar } from "../shared/panel-toolbar";
 import type { ModelVisual, PromptRunRow, ResponseView } from "../../_lib/types";
-import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import {
   EmptyResponsesState,
@@ -95,10 +92,6 @@ type ResponsesViewProps = {
   setNoMentionOnly: (value: boolean) => void;
   showHistorical: boolean;
   setShowHistorical: (value: boolean) => void;
-  selectedCompetitors: string[];
-  toggleCompetitor: (value: string) => void;
-  clearCompetitors: () => void;
-  availableCompetitors: string[];
   loading?: boolean;
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;
@@ -114,14 +107,7 @@ type ResponsesViewProps = {
 
 export function ResponsesContent(props: ResponsesViewProps) {
   const content = useI18nScope("prompts-workspace");
-  const [competitorFilterOpen, setCompetitorFilterOpen] = useState(false);
   const handleEndReached = () => props.hasMoreResponses && props.loadMoreResponses();
-  const selectedCompetitorLabel =
-    props.selectedCompetitors.length === 0
-      ? content.allCompetitors
-      : props.selectedCompetitors.length === 1
-        ? props.selectedCompetitors[0]!
-        : `${props.selectedCompetitors.length} ${content.competitorsSelected}`;
   const responsesColumns: ResponseColumn[] = [
     { id: "time", label: content.time },
     { id: "ai", label: content.ai },
@@ -158,111 +144,6 @@ export function ResponsesContent(props: ResponsesViewProps) {
               active={props.showHistorical}
               onToggle={() => props.setShowHistorical(!props.showHistorical)}
             />
-            <Popover open={competitorFilterOpen} onOpenChange={setCompetitorFilterOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-9 w-full justify-between rounded-full border-border/80 bg-background px-4 text-sm sm:w-auto sm:min-w-[240px] sm:max-w-[360px]"
-                  title={selectedCompetitorLabel}
-                >
-                  <div className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
-                    <span className="shrink-0 text-sm font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                      {content.competitors}
-                    </span>
-                    <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
-                    {props.loading ? (
-                      <Skeleton className="h-4 w-24 rounded-full" />
-                    ) : (
-                      <span className="truncate text-sm font-medium text-foreground">
-                        {selectedCompetitorLabel}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-[560px] max-w-[92vw] p-0">
-                <FloatingPanelHeader
-                  title={content.topCompetitorsTitle}
-                  description={content.topCompetitorsDescription}
-                />
-                <div className="grid grid-cols-1 gap-2 px-4 pb-4 pt-1 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      props.clearCompetitors();
-                    }}
-                    className={cn(
-                      "cursor-pointer relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
-                      props.selectedCompetitors.length === 0
-                        ? "border-primary/30 bg-primary/10"
-                        : "border-border/70 bg-background hover:bg-muted/30",
-                    )}
-                  >
-                    <div className="min-w-0 flex-1">
-                      <div
-                        className={cn(
-                          "truncate text-sm font-semibold leading-tight",
-                          props.selectedCompetitors.length === 0 ? "text-primary" : "text-foreground",
-                        )}
-                      >
-                        {content.allCompetitors}
-                      </div>
-                    </div>
-                    <div
-                      className={cn(
-                        "ml-auto mt-1 h-2.5 w-2.5 rounded-full",
-                        props.selectedCompetitors.length === 0 ? "bg-primary" : "bg-muted-foreground/30",
-                      )}
-                    />
-                  </button>
-                  {props.loading ? (
-                    Array.from({ length: 4 }).map((_, index) => (
-                      <div
-                        key={index}
-                        className="relative flex items-start gap-2 rounded-2xl border border-border/70 p-3"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <Skeleton className="h-4 w-32" />
-                        </div>
-                        <Skeleton className="ml-auto mt-1 h-2.5 w-2.5 rounded-full" />
-                      </div>
-                    ))
-                  ) : (
-                    props.availableCompetitors.map((item) => {
-                      const highlighted = props.selectedCompetitors.includes(item);
-
-                      return (
-                        <button
-                          key={item}
-                          type="button"
-                          onClick={() => {
-                            props.toggleCompetitor(item);
-                          }}
-                          className={cn(
-                            "cursor-pointer relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
-                            highlighted
-                              ? "border-primary/30 bg-primary/10"
-                              : "border-border/70 bg-background hover:bg-muted/30",
-                          )}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <div className={cn("truncate text-sm font-semibold leading-tight", highlighted ? "text-primary" : "text-foreground")}>{item}</div>
-                          </div>
-                          <div
-                            className={cn(
-                              "ml-auto mt-1 h-2.5 w-2.5 rounded-full",
-                              highlighted ? "bg-primary" : "bg-muted-foreground/30",
-                            )}
-                          />
-                        </button>
-                      );
-                    })
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
           </div>
 
             <div className="flex h-10 w-full gap-1 rounded-full border p-1 sm:w-auto">
@@ -313,7 +194,6 @@ export function ResponsesContent(props: ResponsesViewProps) {
                   <>
                     <TableCell className={cellClassName} onClick={openResponse}>
                       <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
-                        <Timer className="h-4 w-4 text-muted-foreground" />
                         {item.time}
                       </span>
                     </TableCell>
@@ -321,7 +201,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
                       <div className="flex flex-wrap items-center gap-1.5">
                         <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
                           <img src={modelVisual.icon} alt={item.model} className="h-4 w-4" decoding="async" />
-                          {modelVisual.label}
+                          {modelVisual.name}
                         </span>
                         {item.isHistorical ? <Badge variant="outline" className="text-sm font-normal">{content.history}</Badge> : null}
                       </div>
@@ -378,14 +258,13 @@ export function ResponsesContent(props: ResponsesViewProps) {
                   >
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 font-medium">
-                        <Timer className="h-4 w-4 text-muted-foreground" />
                         <span>{item.time} ·</span>
                         <span className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-sm">
                           <img src={modelVisual.icon} alt={item.model} className="h-4 w-4" decoding="async" />
-                          {modelVisual.label}  
+                          {modelVisual.name}
                         </span>
-                        {item.model !== modelVisual.label && (
-                          <span className="text-sm text-muted-foreground">{item.model}</span>
+                        {modelVisual.provider && modelVisual.provider !== modelVisual.name && (
+                          <span className="text-sm text-muted-foreground">{modelVisual.provider}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2">

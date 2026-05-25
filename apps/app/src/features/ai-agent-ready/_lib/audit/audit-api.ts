@@ -1,3 +1,4 @@
+import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON } from "@/shared/api/gateway";
 
 import type {
@@ -15,6 +16,41 @@ type PollOptions = {
 const DEFAULT_POLL_DELAY_MS = 800;
 const DEFAULT_MAX_ATTEMPTS = 20;
 
+type ProjectSummary = {
+  name: string;
+  websiteUrl: string;
+};
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeProjectURL(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+function readProjectWebsiteURL(payload: unknown): string {
+  const item = asRecord(payload);
+  return normalizeProjectURL(
+    asString(item.websiteUrl) ||
+      asString(item.WebsiteURL) ||
+      asString(item.domain) ||
+      asString(item.Domain),
+  );
+}
+
+function readProjectName(payload: unknown): string {
+  const item = asRecord(payload);
+  return asString(item.name) || asString(item.Name);
+}
+
 export function isValidScanURL(value: string): boolean {
   try {
     const parsed = new URL(value.trim());
@@ -25,6 +61,39 @@ export function isValidScanURL(value: string): boolean {
   } catch {
     return false;
   }
+}
+
+export async function getAgentReadyProjectSummary(
+  apiBaseURL: string,
+  input: {
+    projectId: string;
+    organizationId?: string;
+  },
+  signal?: AbortSignal,
+): Promise<ProjectSummary> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.projects.get(encodeURIComponent(input.projectId.trim())),
+    {
+      method: "GET",
+      organizationId: input.organizationId,
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+
+  const payload =
+    response.data && typeof response.data === "object" && "data" in response.data
+      ? (response.data as { data: unknown }).data
+      : response.data;
+
+  return {
+    name: readProjectName(payload),
+    websiteUrl: readProjectWebsiteURL(payload),
+  };
 }
 
 export async function startAgentReadyScan(

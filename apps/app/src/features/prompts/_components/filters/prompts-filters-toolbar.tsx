@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { DatePickerWithRange } from "@/components/shared/date-range-picker";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
+import { CompetitorsFilterPopover } from "./competitors-filter-popover";
 import { ModelsFilterPopover } from "./models-filter-popover";
 
 type ModelVisual = {
@@ -42,6 +43,11 @@ type PromptsFiltersToolbarProps = {
   modelsLoading?: boolean;
   getModelVisual: (model: string) => ModelVisual;
   toggleModel: (model: string) => void;
+  selectedCompetitors: string[];
+  toggleCompetitor: (value: string) => void;
+  clearCompetitors: () => void;
+  availableCompetitors: string[];
+  competitorsLoading?: boolean;
 };
 
 export function PromptsFiltersToolbar({
@@ -64,9 +70,15 @@ export function PromptsFiltersToolbar({
   modelsLoading = false,
   getModelVisual,
   toggleModel,
+  selectedCompetitors,
+  toggleCompetitor,
+  clearCompetitors,
+  availableCompetitors,
+  competitorsLoading = false,
 }: PromptsFiltersToolbarProps) {
   const content = useI18nScope("prompts-workspace");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
   const showResponsesPeriodFilter = currentTab === "responses";
 
   const filtersContent = (
@@ -102,6 +114,18 @@ export function PromptsFiltersToolbar({
         getModelVisual={getModelVisual}
         toggleModel={toggleModel}
       />
+
+      {currentTab === "responses" ? (
+        <CompetitorsFilterPopover
+          open={competitorsPopoverOpen}
+          onOpenChange={setCompetitorsPopoverOpen}
+          selectedCompetitors={selectedCompetitors}
+          toggleCompetitor={toggleCompetitor}
+          clearCompetitors={clearCompetitors}
+          availableCompetitors={availableCompetitors}
+          loading={competitorsLoading}
+        />
+      ) : null}
 
       <Button
         type="button"

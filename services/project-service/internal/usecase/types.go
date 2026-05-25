@@ -18,6 +18,9 @@ const (
 	PromptStatusDisabled = "disabled"
 	PromptStatusArchived = "archived"
 
+	PromptKindMonitoring = "monitoring"
+	PromptKindPerception = "perception"
+
 	PromptScheduleModeGlobal   = "global"
 	PromptScheduleModePerModel = "per_model"
 	DefaultPromptCron          = "0 */6 * * *"
@@ -143,6 +146,7 @@ type Prompt struct {
 	ProjectID string         `json:"projectId"`
 	Text      string         `json:"text"`
 	Intent    string         `json:"intent,omitempty"`
+	Kind      string         `json:"kind"`
 	ModelIDs  []string       `json:"modelIds,omitempty"`
 	Schedule  PromptSchedule `json:"schedule"`
 	Status    string         `json:"status"`
@@ -197,6 +201,7 @@ type AIModel struct {
 	IconKey            string `json:"-"`
 	IconPath           string `json:"iconPath"`
 	ModelID            string `json:"providerModelId"`
+	Source             string `json:"source,omitempty"`
 	IsActive           bool   `json:"isActive"`
 	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
 }
@@ -273,11 +278,16 @@ type GA4OAuthToken struct {
 	RefreshToken string
 }
 
+type GA4LLMSetupProvider interface {
+	SetupLLMTracking(ctx context.Context, refreshToken, propertyID string) (GA4LLMSetupResult, error)
+	SetupLLMTrackingWithServiceAccount(ctx context.Context, serviceAccountJSON, propertyID string) (GA4LLMSetupResult, error)
+}
+
 type GA4OAuthProvider interface {
 	AuthorizationURL(state, redirectURI string) (string, error)
 	ExchangeCode(ctx context.Context, code, redirectURI string) (GA4OAuthToken, error)
 	ListProperties(ctx context.Context, refreshToken string) ([]GA4OAuthProperty, error)
-	SetupLLMTracking(ctx context.Context, refreshToken, propertyID string) (GA4LLMSetupResult, error)
+	GA4LLMSetupProvider
 }
 
 const (
@@ -300,6 +310,11 @@ type GA4LLMSetupResources struct {
 type GA4LLMSetupError struct {
 	Resource string `json:"resource"`
 	Message  string `json:"message"`
+}
+
+type UpdateProjectImpactIntegrationsResult struct {
+	Integration ProjectImpactIntegrationsView `json:"integration"`
+	LLMSetup    GA4LLMSetupResult             `json:"llmSetup,omitempty"`
 }
 
 type StartProjectGA4OAuthInput struct {
@@ -346,6 +361,7 @@ type UpdateProjectIngestionIntegrationInput struct {
 type UpdatePromptInput struct {
 	Text     *string
 	Intent   *string
+	Kind     *string
 	ModelIDs *[]string
 	Schedule *PromptSchedule
 	Status   *string
@@ -443,6 +459,11 @@ type RunManualAnalysisInput struct {
 	RunType     string
 }
 
+type RunPerceptionAnalysisInput struct {
+	RequestID string
+	Force     bool
+}
+
 type AnalysisRecordResponseInput struct {
 	PromptRunID    string
 	ModelID        string
@@ -454,12 +475,20 @@ type AnalysisRecordResponseInput struct {
 	Sentiment      string
 }
 
+type PromptMode string
+
+const (
+	PromptModeOrganic PromptMode = "organic"
+	PromptModeGuided  PromptMode = "guided"
+)
+
 type IAExecutePromptInput struct {
 	PromptID       string
 	PromptText     string
 	ModelID        string
 	ProviderID     string
 	ProviderAPIKey string
+	PromptMode     PromptMode
 	BrandName      string
 	Competitors    []string
 }

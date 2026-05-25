@@ -10,6 +10,7 @@ export const prompts = pgTable("prompts", {
 
     text: text("text").notNull(), // Le prompt
     intent: text("intent").default("organic"), // organic | informational | commercial | transactional | branded
+    kind: text("kind").default("monitoring").notNull(), // monitoring | perception
     language: text("language").default("fr"),
     country: text("country").default("FR"),
 

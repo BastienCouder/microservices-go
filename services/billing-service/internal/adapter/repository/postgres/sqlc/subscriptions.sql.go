@@ -51,6 +51,95 @@ func (q *Queries) GetSubscriptionByOrganizationID(ctx context.Context, organizat
 	return i, err
 }
 
+const listBillingPlanSettings = `-- name: ListBillingPlanSettings :many
+SELECT
+  plan,
+  monthly_price_cents,
+  yearly_price_cents,
+  monthly_quota,
+  model_selection_limit,
+  monthly_model_change_limit,
+  updated_at
+FROM billing_plan_settings
+ORDER BY
+  CASE plan
+    WHEN 'starter' THEN 1
+    WHEN 'growth' THEN 2
+    WHEN 'pro' THEN 3
+    ELSE 99
+  END,
+  plan
+`
+
+func (q *Queries) ListBillingPlanSettings(ctx context.Context) ([]BillingPlanSetting, error) {
+	rows, err := q.db.Query(ctx, listBillingPlanSettings)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BillingPlanSetting
+	for rows.Next() {
+		var i BillingPlanSetting
+		if err := rows.Scan(
+			&i.Plan,
+			&i.MonthlyPriceCents,
+			&i.YearlyPriceCents,
+			&i.MonthlyQuota,
+			&i.ModelSelectionLimit,
+			&i.MonthlyModelChangeLimit,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listBillingPricingTiers = `-- name: ListBillingPricingTiers :many
+SELECT
+  prompt_volume,
+  label,
+  developer_price_cents,
+  starter_price_cents,
+  growth_price_cents,
+  pro_price_cents,
+  updated_at
+FROM billing_pricing_tiers
+ORDER BY prompt_volume
+`
+
+func (q *Queries) ListBillingPricingTiers(ctx context.Context) ([]BillingPricingTier, error) {
+	rows, err := q.db.Query(ctx, listBillingPricingTiers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []BillingPricingTier
+	for rows.Next() {
+		var i BillingPricingTier
+		if err := rows.Scan(
+			&i.PromptVolume,
+			&i.Label,
+			&i.DeveloperPriceCents,
+			&i.StarterPriceCents,
+			&i.GrowthPriceCents,
+			&i.ProPriceCents,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const recordStripeWebhookEvent = `-- name: RecordStripeWebhookEvent :execrows
 INSERT INTO billing_stripe_webhook_events (event_id, event_type, processed_at)
 VALUES ($1, $2, $3)
@@ -69,6 +158,156 @@ func (q *Queries) RecordStripeWebhookEvent(ctx context.Context, arg RecordStripe
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const updateDefaultQuotaForPlan = `-- name: UpdateDefaultQuotaForPlan :exec
+UPDATE billing_subscriptions
+SET
+  monthly_quota = $3,
+  updated_at = $4
+WHERE plan = $1
+  AND monthly_quota = $2
+`
+
+type UpdateDefaultQuotaForPlanParams struct {
+	Plan                 string
+	PreviousMonthlyQuota int32
+	NextMonthlyQuota     int32
+	UpdatedAt            pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateDefaultQuotaForPlan(ctx context.Context, arg UpdateDefaultQuotaForPlanParams) error {
+	_, err := q.db.Exec(ctx, updateDefaultQuotaForPlan,
+		arg.Plan,
+		arg.PreviousMonthlyQuota,
+		arg.NextMonthlyQuota,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const updateSubscriptionEntitlements = `-- name: UpdateSubscriptionEntitlements :exec
+INSERT INTO billing_subscriptions (
+  organization_id,
+  plan,
+  seats,
+  monthly_quota,
+  updated_at
+)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT (organization_id)
+DO UPDATE SET
+  plan = EXCLUDED.plan,
+  seats = EXCLUDED.seats,
+  monthly_quota = EXCLUDED.monthly_quota,
+  updated_at = EXCLUDED.updated_at
+`
+
+type UpdateSubscriptionEntitlementsParams struct {
+	OrganizationID int64
+	Plan           string
+	Seats          int32
+	MonthlyQuota   int32
+	UpdatedAt      pgtype.Timestamptz
+}
+
+func (q *Queries) UpdateSubscriptionEntitlements(ctx context.Context, arg UpdateSubscriptionEntitlementsParams) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionEntitlements,
+		arg.OrganizationID,
+		arg.Plan,
+		arg.Seats,
+		arg.MonthlyQuota,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const upsertBillingPlanSettings = `-- name: UpsertBillingPlanSettings :exec
+INSERT INTO billing_plan_settings (
+  plan,
+  monthly_price_cents,
+  yearly_price_cents,
+  monthly_quota,
+  model_selection_limit,
+  monthly_model_change_limit,
+  updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (plan)
+DO UPDATE SET
+  monthly_price_cents = EXCLUDED.monthly_price_cents,
+  yearly_price_cents = EXCLUDED.yearly_price_cents,
+  monthly_quota = EXCLUDED.monthly_quota,
+  model_selection_limit = EXCLUDED.model_selection_limit,
+  monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
+  updated_at = EXCLUDED.updated_at
+`
+
+type UpsertBillingPlanSettingsParams struct {
+	Plan                    string
+	MonthlyPriceCents       int32
+	YearlyPriceCents        int32
+	MonthlyQuota            int32
+	ModelSelectionLimit     int32
+	MonthlyModelChangeLimit int32
+	UpdatedAt               pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertBillingPlanSettings(ctx context.Context, arg UpsertBillingPlanSettingsParams) error {
+	_, err := q.db.Exec(ctx, upsertBillingPlanSettings,
+		arg.Plan,
+		arg.MonthlyPriceCents,
+		arg.YearlyPriceCents,
+		arg.MonthlyQuota,
+		arg.ModelSelectionLimit,
+		arg.MonthlyModelChangeLimit,
+		arg.UpdatedAt,
+	)
+	return err
+}
+
+const upsertBillingPricingTier = `-- name: UpsertBillingPricingTier :exec
+INSERT INTO billing_pricing_tiers (
+  prompt_volume,
+  label,
+  developer_price_cents,
+  starter_price_cents,
+  growth_price_cents,
+  pro_price_cents,
+  updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+ON CONFLICT (prompt_volume)
+DO UPDATE SET
+  label = EXCLUDED.label,
+  developer_price_cents = EXCLUDED.developer_price_cents,
+  starter_price_cents = EXCLUDED.starter_price_cents,
+  growth_price_cents = EXCLUDED.growth_price_cents,
+  pro_price_cents = EXCLUDED.pro_price_cents,
+  updated_at = EXCLUDED.updated_at
+`
+
+type UpsertBillingPricingTierParams struct {
+	PromptVolume        int32
+	Label               string
+	DeveloperPriceCents pgtype.Int4
+	StarterPriceCents   pgtype.Int4
+	GrowthPriceCents    pgtype.Int4
+	ProPriceCents       pgtype.Int4
+	UpdatedAt           pgtype.Timestamptz
+}
+
+func (q *Queries) UpsertBillingPricingTier(ctx context.Context, arg UpsertBillingPricingTierParams) error {
+	_, err := q.db.Exec(ctx, upsertBillingPricingTier,
+		arg.PromptVolume,
+		arg.Label,
+		arg.DeveloperPriceCents,
+		arg.StarterPriceCents,
+		arg.GrowthPriceCents,
+		arg.ProPriceCents,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const upsertSubscription = `-- name: UpsertSubscription :exec

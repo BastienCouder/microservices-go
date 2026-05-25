@@ -19,6 +19,7 @@ import {
   getOptimizationActionMatchIds,
   toCanonicalPerceptionSourceErrorId,
 } from "./optimization-action-ids";
+import { resolvePerceptionGeneratedContent } from "./perception-i18n";
 
 type OptimizeDraft = {
   id: string;
@@ -84,7 +85,7 @@ function mergeDrafts(
 }
 
 export function usePerceptionViewModel(initialData: PerceptionViewData) {
-  const { t } = useScopedI18n("perception");
+  const { locale, t } = useScopedI18n("perception");
   const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -265,6 +266,12 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
       return;
     }
 
+    const localizedGeneratedContent = resolvePerceptionGeneratedContent(
+      error.generatedContent,
+      error.generatedContentKey,
+      locale,
+    );
+
     if (!initialData.metadata.projectId) {
       setOptimizeDrafts((current) =>
         current.some((draft) => draft.id === error.id)
@@ -277,7 +284,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
                 title: error.title,
                 issue: error.issue,
                 impact: error.impact,
-                generatedContent: error.generatedContent,
+                generatedContent: localizedGeneratedContent,
                 status: "processing",
               },
               ...current,
@@ -296,7 +303,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
           title: error.title,
           issue: error.issue,
           impact: error.impact,
-          generatedContent: error.generatedContent,
+          generatedContent: localizedGeneratedContent,
           status: "processing",
           sourceErrorId: toCanonicalPerceptionSourceErrorId(error.id),
           metadata: {
@@ -321,7 +328,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
                 title: error.title,
                 issue: error.issue,
                 impact: error.impact,
-                generatedContent: error.generatedContent,
+                generatedContent: localizedGeneratedContent,
                 status: result.status || "processing",
               },
               ...current,

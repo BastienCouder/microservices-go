@@ -50,42 +50,42 @@ func (handlerProjectResolver) GetProject(_ context.Context, projectID string, or
 		OrganizationID: organizationID,
 		GA4: usecase.ProjectGA4Integration{
 			PropertyID:         "123456789",
-			ServiceAccountJSON: `{"client_email":"geo@example.iam.gserviceaccount.com","private_key":"key"}`,
+			ServiceAccountJSON: `{"client_email":"traffic@example.iam.gserviceaccount.com","private_key":"key"}`,
 		},
 	}, nil
 }
 
-type handlerGeoProvider struct{}
+type handlerTrafficProvider struct{}
 
-func (handlerGeoProvider) GetGeoTrafficReport(_ context.Context, project usecase.ProjectMetadata, from, to time.Time, _ usecase.GeoTrafficFilters) (usecase.GeoTrafficReport, error) {
-	return usecase.GeoTrafficReport{
+func (handlerTrafficProvider) GetTrafficReport(_ context.Context, project usecase.ProjectMetadata, from, to time.Time, _ usecase.TrafficFilters) (usecase.TrafficReport, error) {
+	return usecase.TrafficReport{
 		ProjectID:  project.ID,
 		PropertyID: project.GA4.PropertyID,
-		DateRange: usecase.GeoTrafficDateRange{
+		DateRange: usecase.TrafficDateRange{
 			StartDate: from.UTC().Format("2006-01-02"),
 			EndDate:   to.UTC().Format("2006-01-02"),
 		},
-		Summary: usecase.GeoTrafficSummary{
-			TotalGeoSessions: 12,
-			TotalSessions:    120,
-			GeoShareOfTotal:  10,
-			TopEngine:        "ChatGPT",
+		Summary: usecase.TrafficSummary{
+			TotalTrafficSessions: 12,
+			TotalSessions:        120,
+			TrafficShareOfTotal:  10,
+			TopEngine:            "ChatGPT",
 		},
-		BySource: []usecase.GeoTrafficSource{
+		BySource: []usecase.TrafficSource{
 			{Source: "chatgpt.com", Engine: "ChatGPT", Sessions: 12},
 		},
 	}, nil
 }
 
-type handlerFailingGeoProvider struct{}
+type handlerFailingTrafficProvider struct{}
 
-func (handlerFailingGeoProvider) GetGeoTrafficReport(_ context.Context, _ usecase.ProjectMetadata, _, _ time.Time, _ usecase.GeoTrafficFilters) (usecase.GeoTrafficReport, error) {
-	return usecase.GeoTrafficReport{}, errors.New("ga4 runReport error (403): missing permission")
+func (handlerFailingTrafficProvider) GetTrafficReport(_ context.Context, _ usecase.ProjectMetadata, _, _ time.Time, _ usecase.TrafficFilters) (usecase.TrafficReport, error) {
+	return usecase.TrafficReport{}, errors.New("ga4 runReport error (403): missing permission")
 }
 
 func TestGetTrafficReportRoute(t *testing.T) {
 	svc := usecase.NewService(handlerTestRepo{}, handlerAllowVerifier{})
-	svc.EnableGeoTrafficProvider(handlerProjectResolver{}, handlerGeoProvider{})
+	svc.EnableTrafficProvider(handlerProjectResolver{}, handlerTrafficProvider{})
 	handler := NewHandler(svc)
 	mux := http.NewServeMux()
 	handler.Register(mux)
@@ -104,8 +104,8 @@ func TestGetTrafficReportRoute(t *testing.T) {
 	var response struct {
 		Success bool `json:"success"`
 		Data    struct {
-			ProjectID string                    `json:"projectId"`
-			Summary   usecase.GeoTrafficSummary `json:"summary"`
+			ProjectID string                 `json:"projectId"`
+			Summary   usecase.TrafficSummary `json:"summary"`
 		} `json:"data"`
 	}
 	if err := json.NewDecoder(rec.Body).Decode(&response); err != nil {
@@ -114,14 +114,14 @@ func TestGetTrafficReportRoute(t *testing.T) {
 	if !response.Success || response.Data.ProjectID != "project-1" {
 		t.Fatalf("unexpected response: %+v", response)
 	}
-	if response.Data.Summary.TotalGeoSessions != 12 {
+	if response.Data.Summary.TotalTrafficSessions != 12 {
 		t.Fatalf("unexpected summary: %+v", response.Data.Summary)
 	}
 }
 
 func TestGetTrafficReportRouteReturnsUserFriendlyGA4DependencyError(t *testing.T) {
 	svc := usecase.NewService(handlerTestRepo{}, handlerAllowVerifier{})
-	svc.EnableGeoTrafficProvider(handlerProjectResolver{}, handlerFailingGeoProvider{})
+	svc.EnableTrafficProvider(handlerProjectResolver{}, handlerFailingTrafficProvider{})
 	handler := NewHandler(svc)
 	mux := http.NewServeMux()
 	handler.Register(mux)
@@ -160,14 +160,14 @@ func TestUserFacingDependencyErrorMentionsDisabledAnalyticsDataAPI(t *testing.T)
 	}
 }
 
-func TestGetGeoTrafficReportCompatibilityRoute(t *testing.T) {
+func TestGetTrafficReportCompatibilityRoute(t *testing.T) {
 	svc := usecase.NewService(handlerTestRepo{}, handlerAllowVerifier{})
-	svc.EnableGeoTrafficProvider(handlerProjectResolver{}, handlerGeoProvider{})
+	svc.EnableTrafficProvider(handlerProjectResolver{}, handlerTrafficProvider{})
 	handler := NewHandler(svc)
 	mux := http.NewServeMux()
 	handler.Register(mux)
 
-	req := httptest.NewRequest(http.MethodGet, "/attribution/projects/project-1/geo?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z", nil)
+	req := httptest.NewRequest(http.MethodGet, "/attribution/projects/project-1/traffic?from=2026-03-01T00:00:00Z&to=2026-03-31T23:59:59Z", nil)
 	req.Header.Set("X-Authenticated-User-ID", "user-1")
 	req.Header.Set("X-Organization-ID", "42")
 	rec := httptest.NewRecorder()
@@ -175,6 +175,6 @@ func TestGetGeoTrafficReportCompatibilityRoute(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected geo compatibility route to return 200, got %d: %s", rec.Code, rec.Body.String())
+		t.Fatalf("expected traffic compatibility route to return 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

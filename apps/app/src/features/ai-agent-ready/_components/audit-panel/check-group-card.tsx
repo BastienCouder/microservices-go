@@ -1,3 +1,4 @@
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AuditCheckID, CheckGroup } from "../../_lib/shared/types";
 import { CheckToggle } from "./check-toggle";
 
@@ -13,12 +14,12 @@ export function CheckGroupCard({
   onToggle,
 }: CheckGroupCardProps) {
   return (
-    <article className="rounded-[18px] border border-[#eadfd3] bg-[#fffaf5] p-5 shadow-[0_10px_28px_rgba(58,36,24,0.04)] transition duration-150 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(58,36,24,0.07)]">
-      <div>
-        <h3 className="text-base font-extrabold text-[#3a2418]">{group.label}</h3>
-        <p className="mt-2 text-sm leading-6 text-[#866d5d]">{group.description}</p>
-      </div>
-      <div className="mt-5 space-y-3">
+    <Card className="border-border/60 bg-background/70">
+      <CardHeader>
+        <CardTitle className="text-base">{group.label}</CardTitle>
+        <CardDescription>{group.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
         {group.checks.map((check) => (
           <CheckToggle
             key={check.id}
@@ -27,7 +28,7 @@ export function CheckGroupCard({
             onToggle={onToggle}
           />
         ))}
-      </div>
-    </article>
+      </CardContent>
+    </Card>
   );
 }

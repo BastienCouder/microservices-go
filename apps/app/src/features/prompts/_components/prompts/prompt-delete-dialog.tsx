@@ -1,54 +1,37 @@
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogMedia,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Trash2 } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import type { PromptItem } from "../../_lib/types";
 
 export function PromptDeleteDialog({
-  pendingDeletePrompt,
+  pendingDeletePrompts,
   promptsLoading,
   onOpenChange,
   onConfirm,
 }: {
-  pendingDeletePrompt: PromptItem | null;
+  pendingDeletePrompts: PromptItem[];
   promptsLoading: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (prompt: PromptItem) => void;
+  onConfirm: (prompts: PromptItem[]) => void;
 }) {
+  const promptCount = pendingDeletePrompts.length;
+  const isBulkDelete = promptCount > 1;
+
   return (
-    <AlertDialog open={pendingDeletePrompt !== null} onOpenChange={onOpenChange}>
-      <AlertDialogContent size="sm">
-        <AlertDialogHeader>
-          <AlertDialogMedia>
-            <Trash2 />
-          </AlertDialogMedia>
-          <AlertDialogTitle>Supprimer ce prompt ?</AlertDialogTitle>
-          <AlertDialogDescription>Ce prompt sera supprime definitivement.</AlertDialogDescription>
-          {pendingDeletePrompt ? (
-            <div className="mt-2 max-h-28 w-full overflow-auto rounded-xl border border-border/70 bg-muted/20 p-3 text-left text-sm leading-6 break-words [overflow-wrap:anywhere]">
-              {pendingDeletePrompt.prompt}
-            </div>
-          ) : null}
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel disabled={promptsLoading}>Annuler</AlertDialogCancel>
-          <AlertDialogAction
-            variant="destructive"
-            disabled={!pendingDeletePrompt || promptsLoading}
-            onClick={() => pendingDeletePrompt && onConfirm(pendingDeletePrompt)}
-          >
-            Supprimer
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <ConfirmDialog
+      open={promptCount > 0}
+      onOpenChange={onOpenChange}
+      title={isBulkDelete ? "Supprimer ces prompts ?" : "Supprimer ce prompt ?"}
+      description={
+        isBulkDelete
+          ? "Ces prompts seront supprimes definitivement."
+          : "Ce prompt sera supprime definitivement."
+      }
+      confirmLabel="Supprimer"
+      loading={promptsLoading}
+      media={<Trash2 />}
+      previewItems={pendingDeletePrompts.map((prompt) => prompt.prompt)}
+      previewOverflowLabel={(remainingCount) => `+${remainingCount} autres prompts`}
+      onConfirm={() => promptCount > 0 && onConfirm(pendingDeletePrompts)}
+    />
   );
 }

@@ -24,6 +24,7 @@ import {
 import type {
   InvitationDraft,
   OrganizationAPIKey,
+  OrganizationProject,
   OrganizationResources,
   ProjectSettingsInput,
   ProjectMemberDraft,
@@ -49,6 +50,14 @@ function buildOrganizationError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+export function resolveProjectOrganizationId(
+  projects: OrganizationProject[],
+  selectedOrganizationId: string,
+  projectId: string,
+): string {
+  return projects.find((project) => project.id === projectId)?.organizationId || selectedOrganizationId;
+}
+
 export function useOrganizationMutations({
   apiBaseURL,
   selectedOrganizationId,
@@ -66,6 +75,8 @@ export function useOrganizationMutations({
 }: OrganizationMutationsInput) {
   const getMemberRoles = (userId: string): string[] =>
     resources.members.find((member) => member.userId === userId)?.roles ?? [];
+  const getProjectOrganizationId = (projectId: string): string =>
+    resolveProjectOrganizationId(resources.projects, selectedOrganizationId, projectId);
   const getPolicyForUser = (userId: string) =>
     getMemberActionPolicy({
       actorRoles: currentUserRoles,
@@ -82,10 +93,11 @@ export function useOrganizationMutations({
       input: ProjectSettingsInput;
     }) => {
       const name = input.name.trim();
-      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
       if (!projectId) throw new Error("Selectionne un projet.");
       if (!name) throw new Error("Le nom du projet est obligatoire.");
-      await updateOrganizationProject(apiBaseURL, selectedOrganizationId, projectId, {
+      const organizationId = getProjectOrganizationId(projectId);
+      if (!organizationId) throw new Error("Selectionne une organisation.");
+      await updateOrganizationProject(apiBaseURL, organizationId, projectId, {
         name,
       });
     },
@@ -102,9 +114,10 @@ export function useOrganizationMutations({
 
   const deleteProjectMutation = useMutation({
     mutationFn: async (projectId: string) => {
-      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
       if (!projectId) throw new Error("Selectionne un projet.");
-      await deleteOrganizationProject(apiBaseURL, selectedOrganizationId, projectId);
+      const organizationId = getProjectOrganizationId(projectId);
+      if (!organizationId) throw new Error("Selectionne une organisation.");
+      await deleteOrganizationProject(apiBaseURL, organizationId, projectId);
       return projectId;
     },
     onSuccess: async () => {
@@ -123,10 +136,11 @@ export function useOrganizationMutations({
       const draft = projectMemberDrafts[projectId] ?? { userId: "", role: "viewer" };
       const userId = draft.userId.trim();
       const role = draft.role.trim() || "viewer";
-      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
       if (!projectId) throw new Error("Selectionne un projet.");
       if (!userId) throw new Error("Selectionne un membre.");
-      await assignOrganizationProjectMember(apiBaseURL, selectedOrganizationId, projectId, { userId, role });
+      const organizationId = getProjectOrganizationId(projectId);
+      if (!organizationId) throw new Error("Selectionne une organisation.");
+      await assignOrganizationProjectMember(apiBaseURL, organizationId, projectId, { userId, role });
       return projectId;
     },
     onSuccess: async (projectId) => {
@@ -143,7 +157,6 @@ export function useOrganizationMutations({
 
   const removeProjectMemberMutation = useMutation({
     mutationFn: async ({ projectId, userId }: { projectId: string; userId: string }) => {
-      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
       if (!projectId || !userId) throw new Error("Selectionne un membre de projet.");
       if (!getPolicyForUser(userId).canEditProjects) throw new Error("Action interdite pour ce membre.");
       const targetRoles = getMemberRoles(userId);
@@ -168,7 +181,9 @@ export function useOrganizationMutations({
         }),
       );
       if (guardMessage) throw new Error(guardMessage);
-      await removeOrganizationProjectMember(apiBaseURL, selectedOrganizationId, projectId, userId);
+      const organizationId = getProjectOrganizationId(projectId);
+      if (!organizationId) throw new Error("Selectionne une organisation.");
+      await removeOrganizationProjectMember(apiBaseURL, organizationId, projectId, userId);
     },
     onSuccess: async () => {
       setNotice("Membre retire du projet.");
@@ -216,7 +231,7 @@ export function useOrganizationMutations({
       const projectIdsToRemove = currentProjectIds.filter((projectId) => !nextProjectIdSet.has(projectId));
       await Promise.all(
         projectIdsToAdd.map((projectId) =>
-          assignOrganizationProjectMember(apiBaseURL, selectedOrganizationId, projectId, {
+          assignOrganizationProjectMember(apiBaseURL, getProjectOrganizationId(projectId), projectId, {
             userId,
             role: "viewer",
           }),
@@ -224,7 +239,7 @@ export function useOrganizationMutations({
       );
       await Promise.all(
         projectIdsToRemove.map((projectId) =>
-          removeOrganizationProjectMember(apiBaseURL, selectedOrganizationId, projectId, userId),
+          removeOrganizationProjectMember(apiBaseURL, getProjectOrganizationId(projectId), projectId, userId),
         ),
       );
     },

@@ -4,6 +4,7 @@ import { Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
 import { cn } from "@/lib/utils";
+import { RichResponseText } from "@/features/prompts/_components/details/rich-response-text";
 
 import {
   getScoreToneClass,
@@ -142,10 +143,8 @@ export function ActivityPromptDetailContent({
             <div className="text-xs font-bold text-primary">
               {content.detailedAnalysis}
             </div>
-            <div className="rounded-md bg-background">
-              <p className="text-sm font-medium leading-7 text-foreground/90 [overflow-wrap:anywhere]">
-                &quot;{selectedPrompt.response || noDataLabel}&quot;
-              </p>
+            <div className="rounded-xl border border-border/50 bg-background px-4 py-4">
+              <RichResponseText content={selectedPrompt.response || noDataLabel} />
             </div>
           </section>
 

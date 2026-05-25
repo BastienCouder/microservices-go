@@ -142,7 +142,11 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
     params.set("project", selectedProjectId);
   }
 
-  if (selectedOrganizationId && !readOrganizationIdFromSearch(routeSearch)) {
+  if (
+    selectedOrganizationId &&
+    !routeProjectId &&
+    !readOrganizationIdFromSearch(routeSearch)
+  ) {
     params.set("organizationId", selectedOrganizationId);
   }
 

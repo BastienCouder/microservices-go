@@ -26,6 +26,7 @@ func (s *Server) ExecutePrompt(ctx context.Context, req *iav1.ExecutePromptReque
 		ModelID:        req.GetModelId(),
 		ProviderID:     req.GetProviderId(),
 		ProviderAPIKey: req.GetProviderApiKey(),
+		PromptMode:     usecase.PromptMode(req.GetPromptMode()),
 		BrandName:      req.GetBrandName(),
 		Competitors:    req.GetCompetitors(),
 	})

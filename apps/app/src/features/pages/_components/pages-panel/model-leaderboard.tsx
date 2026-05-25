@@ -9,11 +9,12 @@ import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import type { ModelLeader } from "../../_lib/pages-panel/types";
 
 type ModelLeaderboardProps = {
+  errorLabel?: string | null;
   models: ModelLeader[];
   loading?: boolean;
 };
 
-export function ModelLeaderboard({ models, loading = false }: ModelLeaderboardProps) {
+export function ModelLeaderboard({ errorLabel, models, loading = false }: ModelLeaderboardProps) {
   return (
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
@@ -45,7 +46,7 @@ export function ModelLeaderboard({ models, loading = false }: ModelLeaderboardPr
           </div>
         ) : models.length === 0 ? (
           <EmptyStateCard
-            label="Aucun LLM ne cite encore une page du site."
+            label={errorLabel || "Aucun LLM ne cite encore une page du site."}
             className="h-[150px]"
           />
         ) : (

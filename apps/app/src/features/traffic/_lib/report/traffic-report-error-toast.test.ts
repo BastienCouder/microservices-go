@@ -20,4 +20,14 @@ describe("shouldToastTrafficReportError", () => {
       }),
     ).toBe(true);
   });
+
+  test("does not show a toast while the page is loading or saving", () => {
+    expect(
+      shouldToastTrafficReportError({
+        error: "Connexion GA4 enregistrée. Le rapport est momentanément indisponible.",
+        isConnected: true,
+        isBusy: true,
+      }),
+    ).toBe(false);
+  });
 });

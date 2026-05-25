@@ -17,39 +17,115 @@ import (
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 )
 
-var geoSourceEngines = map[string]string{
-	"chat.openai.com":       "ChatGPT",
-	"chatgpt.com":           "ChatGPT",
-	"gemini.google.com":     "Gemini",
-	"bard.google.com":       "Gemini",
-	"perplexity.ai":         "Perplexity",
-	"copilot.microsoft.com": "Microsoft Copilot",
-	"claude.ai":             "Claude",
-	"anthropic.com":         "Claude",
-	"grok.x.ai":             "Grok",
-	"chat.deepseek.com":     "DeepSeek",
-	"you.com":               "You.com",
-	"phind.com":             "Phind",
-	"chat.mistral.ai":       "Mistral",
+var trafficSourceEngines = map[string]string{
+	"chat.openai.com":         "ChatGPT",
+	"chatgpt.com":             "ChatGPT",
+	"openai.com":              "ChatGPT",
+	"chat-gpt.org":            "ChatGPT",
+	"gemini.google.com":       "Gemini",
+	"bard.google.com":         "Gemini",
+	"perplexity.ai":           "Perplexity",
+	"copilot.microsoft.com":   "Microsoft Copilot",
+	"edgeservices.bing.com":   "Microsoft Copilot",
+	"edgepilot.microsoft.com": "Microsoft Copilot",
+	"claude.ai":               "Claude",
+	"anthropic.com":           "Claude",
+	"grok.x.ai":               "Grok",
+	"x.ai":                    "Grok",
+	"chat.deepseek.com":       "DeepSeek",
+	"deepseek.com":            "DeepSeek",
+	"you.com":                 "You.com",
+	"phind.com":               "Phind",
+	"chat.mistral.ai":         "Mistral",
+	"mistral.ai":              "Mistral",
+	"qwen.ai":                 "Qwen",
+	"chat.qwen.ai":            "Qwen",
+	"tongyi.aliyun.com":       "Qwen",
+	"alibaba.com":             "Qwen",
+	"z.ai":                    "Z.ai",
+	"chat.z.ai":               "Z.ai",
+	"poe.com":                 "Poe",
+	"kimi.com":                "Kimi",
+	"kimi.moonshot.cn":        "Kimi",
+	"moonshot.ai":             "Kimi",
+	"doubao.com":              "Doubao",
+	"meta.ai":                 "Meta AI",
+	"llama.meta.com":          "Meta AI",
+	"nimble.ai":               "Nimble",
+	"iask.ai":                 "iAsk",
+	"writesonic.com":          "Writesonic",
+	"copy.ai":                 "Copy.ai",
 }
 
-var geoDetectionPatterns = []struct {
+type trafficDetectionPattern struct {
 	pattern string
 	engine  string
-}{
+}
+
+var trafficDetectionPatterns = []trafficDetectionPattern{
 	{pattern: "openai", engine: "ChatGPT"},
 	{pattern: "chatgpt", engine: "ChatGPT"},
+	{pattern: "chat-gpt", engine: "ChatGPT"},
 	{pattern: "perplexity", engine: "Perplexity"},
 	{pattern: "gemini", engine: "Gemini"},
 	{pattern: "bard", engine: "Gemini"},
 	{pattern: "copilot.microsoft", engine: "Microsoft Copilot"},
+	{pattern: "edgeservices", engine: "Microsoft Copilot"},
+	{pattern: "edgepilot", engine: "Microsoft Copilot"},
 	{pattern: "claude", engine: "Claude"},
 	{pattern: "anthropic", engine: "Claude"},
 	{pattern: "grok", engine: "Grok"},
 	{pattern: "deepseek", engine: "DeepSeek"},
+	{pattern: "qwen", engine: "Qwen"},
+	{pattern: "alibaba", engine: "Qwen"},
+	{pattern: "z.ai", engine: "Z.ai"},
 	{pattern: "you.com", engine: "You.com"},
 	{pattern: "phind", engine: "Phind"},
 	{pattern: "mistral", engine: "Mistral"},
+	{pattern: "poe", engine: "Poe"},
+	{pattern: "kimi", engine: "Kimi"},
+	{pattern: "moonshot", engine: "Kimi"},
+	{pattern: "doubao", engine: "Doubao"},
+	{pattern: "meta.ai", engine: "Meta AI"},
+	{pattern: "llama", engine: "Meta AI"},
+	{pattern: "nimble.ai", engine: "Nimble"},
+	{pattern: "iask.ai", engine: "iAsk"},
+	{pattern: "writesonic.com", engine: "Writesonic"},
+	{pattern: "copy.ai", engine: "Copy.ai"},
+}
+
+var aiTrafficRegexFragments = []string{
+	"chatgpt",
+	"perplexity",
+	"claude\\.ai",
+	"copilot\\.microsoft\\.com",
+	"copilot",
+	"openai",
+	"openai\\.com",
+	"gemini\\.google\\.com",
+	"edgeservices",
+	"edgepilot",
+	"nimble\\.ai",
+	"iask\\.ai",
+	"writesonic\\.com",
+	"copy\\.ai",
+	"chat-gpt\\.org",
+	"anthropic",
+	"bard",
+	"grok",
+	"deepseek",
+	"mistral",
+	"qwen",
+	"alibaba",
+	"z\\.ai",
+	"you\\.com",
+	"phind",
+	"poe",
+	"kimi",
+	"moonshot",
+	"doubao",
+	"meta\\.ai",
+	"llama",
 }
 
 var privatePagePathPrefixes = []string{"/admin"}
@@ -78,21 +154,21 @@ type ga4QuotaStatus struct {
 	Remaining int64 `json:"remaining"`
 }
 
-func (c *Client) GetGeoTrafficReport(
+func (c *Client) GetTrafficReport(
 	ctx context.Context,
 	project usecase.ProjectMetadata,
 	from,
 	to time.Time,
-	filters usecase.GeoTrafficFilters,
-) (usecase.GeoTrafficReport, error) {
+	filters usecase.TrafficFilters,
+) (usecase.TrafficReport, error) {
 	propertyID := strings.TrimSpace(project.GA4.PropertyID)
 	if propertyID == "" {
-		return usecase.GeoTrafficReport{}, fmt.Errorf("ga4 property id is required")
+		return usecase.TrafficReport{}, fmt.Errorf("ga4 property id is required")
 	}
 
 	accessToken, err := c.getProjectAccessToken(ctx, project)
 	if err != nil {
-		return usecase.GeoTrafficReport{}, err
+		return usecase.TrafficReport{}, err
 	}
 
 	from = from.UTC()
@@ -111,31 +187,31 @@ func (c *Client) GetGeoTrafficReport(
 	)
 	totalResponse, err := c.runReport(ctx, accessToken, propertyID, buildTotalTrafficRequest(from, to))
 	if err != nil {
-		return usecase.GeoTrafficReport{}, err
+		return usecase.TrafficReport{}, err
 	}
-	sourceResponse, err := c.runReport(ctx, accessToken, propertyID, buildGeoSourceRequest(from, to, filters))
+	sourceResponse, err := c.runReport(ctx, accessToken, propertyID, buildTrafficSourceRequest(from, to, filters))
 	if err != nil {
-		return usecase.GeoTrafficReport{}, err
+		return usecase.TrafficReport{}, err
 	}
-	pageResponse, err := c.runReport(ctx, accessToken, propertyID, buildGeoTopPagesRequest(from, to, filters))
+	pageResponse, err := c.runReport(ctx, accessToken, propertyID, buildTrafficTopPagesRequest(from, to, filters))
 	if err != nil {
-		return usecase.GeoTrafficReport{}, err
+		return usecase.TrafficReport{}, err
 	}
-	timeseriesResponse, err := c.runReport(ctx, accessToken, propertyID, buildGeoTimeseriesRequest(from, to, filters))
+	timeseriesResponse, err := c.runReport(ctx, accessToken, propertyID, buildTrafficTimeseriesRequest(from, to, filters))
 	if err != nil {
-		return usecase.GeoTrafficReport{}, err
+		return usecase.TrafficReport{}, err
 	}
 
-	bySource := parseGeoSourceRows(sourceResponse.Rows)
-	topPages := parseGeoTopPageRows(pageResponse.Rows)
-	timeseries := parseGeoTimeseriesRows(timeseriesResponse.Rows)
-	summary := buildGeoTrafficSummary(parseFirstMetricInt(totalResponse.Rows), bySource)
+	bySource := parseTrafficSourceRows(sourceResponse.Rows)
+	topPages := parseTrafficTopPageRows(pageResponse.Rows)
+	timeseries := parseTrafficTimeseriesRows(timeseriesResponse.Rows)
+	summary := buildTrafficSummary(parseFirstMetricInt(totalResponse.Rows), bySource)
 
-	report := usecase.GeoTrafficReport{
+	report := usecase.TrafficReport{
 		ProjectID:  strings.TrimSpace(project.ID),
 		PropertyID: propertyID,
-		DataSource: usecase.GeoTrafficDataSourceGA4,
-		DateRange: usecase.GeoTrafficDateRange{
+		DataSource: usecase.TrafficDataSourceGA4,
+		DateRange: usecase.TrafficDateRange{
 			StartDate: from.Format("2006-01-02"),
 			EndDate:   to.Format("2006-01-02"),
 		},
@@ -147,13 +223,13 @@ func (c *Client) GetGeoTrafficReport(
 		PropertyQuota: convertPropertyQuota(sourceResponse.PropertyQuota),
 	}
 	logGA4TrafficAPIData(project, from, to, filters, totalResponse, sourceResponse, pageResponse, timeseriesResponse, report)
-	if c.fakeTrafficEnabled && shouldUseFakeGeoTrafficReport(report) {
+	if c.fakeTrafficEnabled && shouldUseFakeTrafficReport(report) {
 		log.Printf(
-			"ga4 traffic api returned no GEO rows; using fake traffic data project=%s property=%s",
+			"ga4 traffic api returned no traffic rows; using fake traffic data project=%s property=%s",
 			strings.TrimSpace(project.ID),
 			propertyID,
 		)
-		report = buildFakeGeoTrafficReport(report, from, to)
+		report = buildFakeTrafficReport(report, from, to)
 	}
 	return report, nil
 }
@@ -204,7 +280,7 @@ func buildTotalTrafficRequest(from, to time.Time) map[string]any {
 	}
 }
 
-func buildGeoSourceRequest(from, to time.Time, filters usecase.GeoTrafficFilters) map[string]any {
+func buildTrafficSourceRequest(from, to time.Time, filters usecase.TrafficFilters) map[string]any {
 	return map[string]any{
 		"dateRanges": []map[string]string{dateRangePayload(from, to)},
 		"dimensions": []map[string]string{
@@ -222,7 +298,7 @@ func buildGeoSourceRequest(from, to time.Time, filters usecase.GeoTrafficFilters
 			{"name": "keyEvents"},
 			{"name": "screenPageViews"},
 		},
-		"dimensionFilter": buildGeoDimensionFilter(filters),
+		"dimensionFilter": buildTrafficDimensionFilter(filters),
 		"orderBys": []map[string]any{
 			{"metric": map[string]string{"metricName": "sessions"}, "desc": true},
 		},
@@ -231,7 +307,7 @@ func buildGeoSourceRequest(from, to time.Time, filters usecase.GeoTrafficFilters
 	}
 }
 
-func buildGeoTopPagesRequest(from, to time.Time, filters usecase.GeoTrafficFilters) map[string]any {
+func buildTrafficTopPagesRequest(from, to time.Time, filters usecase.TrafficFilters) map[string]any {
 	return map[string]any{
 		"dateRanges": []map[string]string{dateRangePayload(from, to)},
 		"dimensions": []map[string]string{
@@ -246,7 +322,7 @@ func buildGeoTopPagesRequest(from, to time.Time, filters usecase.GeoTrafficFilte
 			{"name": "keyEvents"},
 			{"name": "screenPageViews"},
 		},
-		"dimensionFilter": buildGeoDimensionFilter(filters),
+		"dimensionFilter": buildTrafficDimensionFilter(filters),
 		"orderBys": []map[string]any{
 			{"metric": map[string]string{"metricName": "sessions"}, "desc": true},
 		},
@@ -254,7 +330,7 @@ func buildGeoTopPagesRequest(from, to time.Time, filters usecase.GeoTrafficFilte
 	}
 }
 
-func buildGeoTimeseriesRequest(from, to time.Time, filters usecase.GeoTrafficFilters) map[string]any {
+func buildTrafficTimeseriesRequest(from, to time.Time, filters usecase.TrafficFilters) map[string]any {
 	return map[string]any{
 		"dateRanges": []map[string]string{dateRangePayload(from, to)},
 		"dimensions": []map[string]string{
@@ -267,7 +343,7 @@ func buildGeoTimeseriesRequest(from, to time.Time, filters usecase.GeoTrafficFil
 			{"name": "engagedSessions"},
 			{"name": "keyEvents"},
 		},
-		"dimensionFilter": buildGeoDimensionFilter(filters),
+		"dimensionFilter": buildTrafficDimensionFilter(filters),
 		"orderBys": []map[string]any{
 			{"dimension": map[string]string{"dimensionName": "date"}},
 		},
@@ -282,9 +358,9 @@ func dateRangePayload(from, to time.Time) map[string]string {
 	}
 }
 
-func buildGeoDimensionFilter(filters usecase.GeoTrafficFilters) map[string]any {
+func buildTrafficDimensionFilter(filters usecase.TrafficFilters) map[string]any {
 	expressions := []map[string]any{
-		buildGeoOnlyDimensionFilter(filters.Engine),
+		buildTrafficOnlyDimensionFilter(filters.Engine),
 		buildPublicPageDimensionFilter(),
 	}
 	return map[string]any{
@@ -301,28 +377,29 @@ func appendTrafficDimensionFilters(expressions []map[string]any, search string) 
 	return expressions
 }
 
-func buildGeoOnlyDimensionFilter(engineFilter string) map[string]any {
-	patterns := geoDetectionPatterns
+func buildTrafficOnlyDimensionFilter(engineFilter string) map[string]any {
+	regex := buildAITrafficRegex(aiTrafficRegexFragments)
 	if strings.TrimSpace(engineFilter) != "" && strings.TrimSpace(engineFilter) != "all" {
-		patterns = geoDetectionPatternsForEngine(engineFilter)
+		patterns := trafficDetectionPatternsForEngine(engineFilter)
 		if len(patterns) == 0 {
-			patterns = geoDetectionPatterns
+			regex = buildAITrafficRegex(aiTrafficRegexFragments)
+		} else {
+			regex = buildAITrafficRegex(trafficDetectionRegexFragments(patterns))
 		}
 	}
-	expressions := make([]map[string]any, 0, len(patterns)*2)
-	for _, item := range patterns {
-		for _, fieldName := range []string{"sessionSource", "pageReferrer"} {
-			expressions = append(expressions, map[string]any{
-				"filter": map[string]any{
-					"fieldName": fieldName,
-					"stringFilter": map[string]any{
-						"matchType":     "CONTAINS",
-						"value":         item.pattern,
-						"caseSensitive": false,
-					},
+	fields := []string{"sessionSourceMedium", "sessionSource"}
+	expressions := make([]map[string]any, 0, len(fields))
+	for _, fieldName := range fields {
+		expressions = append(expressions, map[string]any{
+			"filter": map[string]any{
+				"fieldName": fieldName,
+				"stringFilter": map[string]any{
+					"matchType":     "FULL_REGEXP",
+					"value":         regex,
+					"caseSensitive": false,
 				},
-			})
-		}
+			},
+		})
 	}
 	return map[string]any{
 		"orGroup": map[string]any{
@@ -357,16 +434,58 @@ func buildPublicPageDimensionFilter() map[string]any {
 	}
 }
 
-func geoDetectionPatternsForEngine(engineFilter string) []struct {
-	pattern string
-	engine  string
-} {
+func buildAITrafficRegex(fragments []string) string {
+	parts := make([]string, 0, len(fragments))
+	seen := make(map[string]struct{}, len(fragments))
+	for _, fragment := range fragments {
+		fragment = strings.TrimSpace(fragment)
+		if fragment == "" {
+			continue
+		}
+		if _, ok := seen[fragment]; ok {
+			continue
+		}
+		seen[fragment] = struct{}{}
+		parts = append(parts, ".*"+fragment+".*")
+	}
+	if len(parts) == 0 {
+		parts = []string{".*chatgpt.*"}
+	}
+	return "(?i)(" + strings.Join(parts, "|") + ")"
+}
+
+func trafficDetectionRegexFragments(patterns []trafficDetectionPattern) []string {
+	fragments := make([]string, 0, len(patterns))
+	for _, item := range patterns {
+		fragments = append(fragments, regexpEscapeForGA4(item.pattern))
+	}
+	return fragments
+}
+
+func regexpEscapeForGA4(value string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		`.`, `\.`,
+		`+`, `\+`,
+		`*`, `\*`,
+		`?`, `\?`,
+		`(`, `\(`,
+		`)`, `\)`,
+		`[`, `\[`,
+		`]`, `\]`,
+		`{`, `\{`,
+		`}`, `\}`,
+		`^`, `\^`,
+		`$`, `\$`,
+		`|`, `\|`,
+	)
+	return replacer.Replace(value)
+}
+
+func trafficDetectionPatternsForEngine(engineFilter string) []trafficDetectionPattern {
 	normalized := strings.ToLower(strings.TrimSpace(engineFilter))
-	out := make([]struct {
-		pattern string
-		engine  string
-	}, 0)
-	for _, item := range geoDetectionPatterns {
+	out := make([]trafficDetectionPattern, 0)
+	for _, item := range trafficDetectionPatterns {
 		if strings.ToLower(item.engine) == normalized {
 			out = append(out, item)
 		}
@@ -397,15 +516,15 @@ func buildSearchDimensionFilter(search string) map[string]any {
 	}
 }
 
-func classifyGeoEngine(source string) (string, bool) {
-	normalized := normalizeGeoSource(source)
+func classifyTrafficEngine(source string) (string, bool) {
+	normalized := normalizeTrafficSource(source)
 	if normalized == "" {
 		return "", false
 	}
-	if engine, ok := geoSourceEngines[normalized]; ok {
+	if engine, ok := trafficSourceEngines[normalized]; ok {
 		return engine, true
 	}
-	for _, item := range geoDetectionPatterns {
+	for _, item := range trafficDetectionPatterns {
 		if strings.Contains(normalized, item.pattern) {
 			return item.engine, true
 		}
@@ -413,7 +532,7 @@ func classifyGeoEngine(source string) (string, bool) {
 	return "", false
 }
 
-func normalizeGeoSource(source string) string {
+func normalizeTrafficSource(source string) string {
 	normalized := strings.ToLower(strings.TrimSpace(source))
 	if normalized == "" {
 		return ""
@@ -426,9 +545,9 @@ func normalizeGeoSource(source string) string {
 	return normalized
 }
 
-func geoSourceFromRow(row ga4RunReportRow, sourceIndex, mediumIndex, sourceMediumIndex, referrerIndex int) (string, string, string, string, bool) {
+func trafficSourceFromRow(row ga4RunReportRow, sourceIndex, mediumIndex, sourceMediumIndex, _ int) (string, string, string, string, bool) {
 	source := dimensionValue(row, sourceIndex)
-	if engine, ok := classifyGeoEngine(source); ok {
+	if engine, ok := classifyTrafficEngine(source); ok {
 		medium := dimensionValue(row, mediumIndex)
 		sourceMedium := dimensionValue(row, sourceMediumIndex)
 		if sourceMedium == "" && source != "" && medium != "" {
@@ -436,23 +555,13 @@ func geoSourceFromRow(row ga4RunReportRow, sourceIndex, mediumIndex, sourceMediu
 		}
 		return source, medium, sourceMedium, engine, true
 	}
-
-	referrer := dimensionValue(row, referrerIndex)
-	engine, ok := classifyGeoEngine(referrer)
-	if !ok {
-		return "", "", "", "", false
-	}
-	referrerSource := normalizeGeoSource(referrer)
-	if referrerSource == "" {
-		referrerSource = strings.TrimSpace(referrer)
-	}
-	return referrerSource, "referral", referrerSource + " / referral", engine, true
+	return "", "", "", "", false
 }
 
-func parseGeoSourceRows(rows []ga4RunReportRow) []usecase.GeoTrafficSource {
-	bySource := make(map[string]*usecase.GeoTrafficSource)
+func parseTrafficSourceRows(rows []ga4RunReportRow) []usecase.TrafficSource {
+	bySource := make(map[string]*usecase.TrafficSource)
 	for _, row := range rows {
-		source, medium, sourceMedium, engine, ok := geoSourceFromRow(row, 0, 1, 2, 3)
+		source, medium, sourceMedium, engine, ok := trafficSourceFromRow(row, 0, 1, 2, 3)
 		if !ok {
 			continue
 		}
@@ -466,7 +575,7 @@ func parseGeoSourceRows(rows []ga4RunReportRow) []usecase.GeoTrafficSource {
 		key := strings.ToLower(strings.TrimSpace(source)) + "\x00" + strings.ToLower(strings.TrimSpace(medium)) + "\x00" + engine
 		current := bySource[key]
 		if current == nil {
-			current = &usecase.GeoTrafficSource{
+			current = &usecase.TrafficSource{
 				Source:       source,
 				Medium:       medium,
 				SourceMedium: sourceMedium,
@@ -474,7 +583,7 @@ func parseGeoSourceRows(rows []ga4RunReportRow) []usecase.GeoTrafficSource {
 			}
 			bySource[key] = current
 		}
-		mergeGeoSourceMetrics(
+		mergeTrafficSourceMetrics(
 			current,
 			sessions,
 			engagedSessions,
@@ -485,15 +594,15 @@ func parseGeoSourceRows(rows []ga4RunReportRow) []usecase.GeoTrafficSource {
 			metricInt(row, 6),
 		)
 	}
-	out := make([]usecase.GeoTrafficSource, 0, len(bySource))
+	out := make([]usecase.TrafficSource, 0, len(bySource))
 	total := int64(0)
 	for _, item := range bySource {
-		finalizeGeoSourceRates(item)
+		finalizeTrafficSourceRates(item)
 		out = append(out, *item)
 		total += item.Sessions
 	}
 	for i := range out {
-		out[i].ShareOfGeoSessions = round2(percentFloat(out[i].Sessions, total))
+		out[i].ShareOfTrafficSessions = round2(percentFloat(out[i].Sessions, total))
 	}
 	sort.Slice(out, func(i, j int) bool {
 		if out[i].Sessions == out[j].Sessions {
@@ -504,8 +613,8 @@ func parseGeoSourceRows(rows []ga4RunReportRow) []usecase.GeoTrafficSource {
 	return out
 }
 
-func mergeGeoSourceMetrics(
-	current *usecase.GeoTrafficSource,
+func mergeTrafficSourceMetrics(
+	current *usecase.TrafficSource,
 	sessions,
 	engagedSessions int64,
 	engagementRate,
@@ -524,7 +633,7 @@ func mergeGeoSourceMetrics(
 	current.BounceRate = weightedAverage(current.BounceRate, previousSessions, bounceRate, sessions)
 }
 
-func finalizeGeoSourceRates(source *usecase.GeoTrafficSource) {
+func finalizeTrafficSourceRates(source *usecase.TrafficSource) {
 	source.AvgSessionSeconds = round2(source.AvgSessionSeconds)
 	source.EngagementRate = round2(source.EngagementRate)
 	source.BounceRate = round2(source.BounceRate)
@@ -538,10 +647,10 @@ func weightedAverage(current float64, currentWeight int64, next float64, nextWei
 	return ((current * float64(currentWeight)) + (next * float64(nextWeight))) / float64(totalWeight)
 }
 
-func parseGeoTopPageRows(rows []ga4RunReportRow) []usecase.GeoTrafficPage {
-	byPage := make(map[string]*usecase.GeoTrafficPage)
+func parseTrafficTopPageRows(rows []ga4RunReportRow) []usecase.TrafficPage {
+	byPage := make(map[string]*usecase.TrafficPage)
 	for _, row := range rows {
-		source, _, _, engine, ok := geoSourceFromRow(row, 2, -1, -1, 3)
+		source, _, _, engine, ok := trafficSourceFromRow(row, 2, -1, -1, 3)
 		if !ok {
 			continue
 		}
@@ -555,7 +664,7 @@ func parseGeoTopPageRows(rows []ga4RunReportRow) []usecase.GeoTrafficPage {
 		key := path + "\x00" + strings.ToLower(strings.TrimSpace(source)) + "\x00" + engine
 		current := byPage[key]
 		if current == nil {
-			current = &usecase.GeoTrafficPage{
+			current = &usecase.TrafficPage{
 				Path:   path,
 				Title:  title,
 				Source: source,
@@ -571,7 +680,7 @@ func parseGeoTopPageRows(rows []ga4RunReportRow) []usecase.GeoTrafficPage {
 		current.Conversions = round2(current.Conversions + metricFloat(row, 2))
 		current.PageViews += metricInt(row, 3)
 	}
-	out := make([]usecase.GeoTrafficPage, 0, len(byPage))
+	out := make([]usecase.TrafficPage, 0, len(byPage))
 	for _, page := range byPage {
 		page.EngagementRate = round2(percentFloat(page.EngagedSessions, page.Sessions))
 		out = append(out, *page)
@@ -588,27 +697,27 @@ func parseGeoTopPageRows(rows []ga4RunReportRow) []usecase.GeoTrafficPage {
 	return out
 }
 
-func parseGeoTimeseriesRows(rows []ga4RunReportRow) []usecase.GeoTrafficDailyPoint {
-	byDate := make(map[string]*usecase.GeoTrafficDailyPoint)
+func parseTrafficTimeseriesRows(rows []ga4RunReportRow) []usecase.TrafficDailyPoint {
+	byDate := make(map[string]*usecase.TrafficDailyPoint)
 	for _, row := range rows {
 		date := formatGA4Date(dimensionValue(row, 0))
 		if date == "" {
 			continue
 		}
-		_, _, _, _, ok := geoSourceFromRow(row, 1, -1, -1, 2)
+		_, _, _, _, ok := trafficSourceFromRow(row, 1, -1, -1, 2)
 		if !ok {
 			continue
 		}
 		current := byDate[date]
 		if current == nil {
-			current = &usecase.GeoTrafficDailyPoint{Date: date}
+			current = &usecase.TrafficDailyPoint{Date: date}
 			byDate[date] = current
 		}
 		current.Sessions += metricInt(row, 0)
 		current.EngagedSessions += metricInt(row, 1)
 		current.Conversions = round2(current.Conversions + metricFloat(row, 2))
 	}
-	out := make([]usecase.GeoTrafficDailyPoint, 0, len(byDate))
+	out := make([]usecase.TrafficDailyPoint, 0, len(byDate))
 	for _, item := range byDate {
 		out = append(out, *item)
 	}
@@ -618,8 +727,8 @@ func parseGeoTimeseriesRows(rows []ga4RunReportRow) []usecase.GeoTrafficDailyPoi
 	return out
 }
 
-func buildGeoTrafficSummary(totalSessions int64, sources []usecase.GeoTrafficSource) usecase.GeoTrafficSummary {
-	var geoSessions int64
+func buildTrafficSummary(totalSessions int64, sources []usecase.TrafficSource) usecase.TrafficSummary {
+	var trafficSessions int64
 	var engagedSessions int64
 	var pageViews int64
 	var conversions float64
@@ -628,7 +737,7 @@ func buildGeoTrafficSummary(totalSessions int64, sources []usecase.GeoTrafficSou
 	byEngine := make(map[string]int64)
 
 	for _, source := range sources {
-		geoSessions += source.Sessions
+		trafficSessions += source.Sessions
 		engagedSessions += source.EngagedSessions
 		pageViews += source.PageViews
 		conversions += source.Conversions
@@ -648,36 +757,36 @@ func buildGeoTrafficSummary(totalSessions int64, sources []usecase.GeoTrafficSou
 
 	avgDuration := 0.0
 	bounceRate := 0.0
-	if geoSessions > 0 {
-		avgDuration = weightedDuration / float64(geoSessions)
-		bounceRate = weightedBounce / float64(geoSessions)
+	if trafficSessions > 0 {
+		avgDuration = weightedDuration / float64(trafficSessions)
+		bounceRate = weightedBounce / float64(trafficSessions)
 	}
 
-	return usecase.GeoTrafficSummary{
-		TotalGeoSessions:     geoSessions,
-		TotalSessions:        totalSessions,
-		GeoShareOfTotal:      round2(percentFloat(geoSessions, totalSessions)),
-		GeoEngagedSessions:   engagedSessions,
-		GeoEngagementRate:    round2(percentFloat(engagedSessions, geoSessions)),
-		GeoAvgSessionSeconds: round2(avgDuration),
-		GeoBounceRate:        round2(bounceRate),
-		GeoConversions:       round2(conversions),
-		GeoConversionRate:    round2(percentFloatFloat(conversions, geoSessions)),
-		GeoPageViews:         pageViews,
-		TopEngine:            topEngine,
+	return usecase.TrafficSummary{
+		TotalTrafficSessions:     trafficSessions,
+		TotalSessions:            totalSessions,
+		TrafficShareOfTotal:      round2(percentFloat(trafficSessions, totalSessions)),
+		TrafficEngagedSessions:   engagedSessions,
+		TrafficEngagementRate:    round2(percentFloat(engagedSessions, trafficSessions)),
+		TrafficAvgSessionSeconds: round2(avgDuration),
+		TrafficBounceRate:        round2(bounceRate),
+		TrafficConversions:       round2(conversions),
+		TrafficConversionRate:    round2(percentFloatFloat(conversions, trafficSessions)),
+		TrafficPageViews:         pageViews,
+		TopEngine:                topEngine,
 	}
 }
 
-func convertPropertyQuota(quota *ga4PropertyQuota) *usecase.GeoPropertyQuota {
+func convertPropertyQuota(quota *ga4PropertyQuota) *usecase.TrafficPropertyQuota {
 	if quota == nil {
 		return nil
 	}
-	return &usecase.GeoPropertyQuota{
-		TokensPerDay: usecase.GeoQuotaStatus{
+	return &usecase.TrafficPropertyQuota{
+		TokensPerDay: usecase.TrafficQuotaStatus{
 			Consumed:  quota.TokensPerDay.Consumed,
 			Remaining: quota.TokensPerDay.Remaining,
 		},
-		ServerErrorsPerProjectPerHour: usecase.GeoQuotaStatus{
+		ServerErrorsPerProjectPerHour: usecase.TrafficQuotaStatus{
 			Consumed:  quota.ServerErrorsPerProjectPerHour.Consumed,
 			Remaining: quota.ServerErrorsPerProjectPerHour.Remaining,
 		},
@@ -700,32 +809,32 @@ type ga4TrafficLogRawRow struct {
 }
 
 type ga4TrafficLogPreview struct {
-	ProjectID                string                         `json:"projectId"`
-	PropertyID               string                         `json:"propertyId"`
-	DateRange                ga4TrafficLogDateRange         `json:"dateRange"`
-	Filters                  ga4TrafficLogFilters           `json:"filters,omitempty"`
-	RawRows                  map[string]int                 `json:"rawRows"`
-	RawTotalRowsPreview      []ga4TrafficLogRawRow          `json:"rawTotalRowsPreview"`
-	RawSourceRowsPreview     []ga4TrafficLogRawRow          `json:"rawSourceRowsPreview"`
-	RawTopPageRowsPreview    []ga4TrafficLogRawRow          `json:"rawTopPageRowsPreview"`
-	RawTimeseriesRowsPreview []ga4TrafficLogRawRow          `json:"rawTimeseriesRowsPreview"`
-	Summary                  usecase.GeoTrafficSummary      `json:"summary"`
-	BySourcePreview          []usecase.GeoTrafficSource     `json:"bySourcePreview"`
-	TopPagesPreview          []usecase.GeoTrafficPage       `json:"topPagesPreview"`
-	TimeseriesCount          int                            `json:"timeseriesCount"`
-	TimeseriesHead           []usecase.GeoTrafficDailyPoint `json:"timeseriesHead"`
+	ProjectID                string                      `json:"projectId"`
+	PropertyID               string                      `json:"propertyId"`
+	DateRange                ga4TrafficLogDateRange      `json:"dateRange"`
+	Filters                  ga4TrafficLogFilters        `json:"filters,omitempty"`
+	RawRows                  map[string]int              `json:"rawRows"`
+	RawTotalRowsPreview      []ga4TrafficLogRawRow       `json:"rawTotalRowsPreview"`
+	RawSourceRowsPreview     []ga4TrafficLogRawRow       `json:"rawSourceRowsPreview"`
+	RawTopPageRowsPreview    []ga4TrafficLogRawRow       `json:"rawTopPageRowsPreview"`
+	RawTimeseriesRowsPreview []ga4TrafficLogRawRow       `json:"rawTimeseriesRowsPreview"`
+	Summary                  usecase.TrafficSummary      `json:"summary"`
+	BySourcePreview          []usecase.TrafficSource     `json:"bySourcePreview"`
+	TopPagesPreview          []usecase.TrafficPage       `json:"topPagesPreview"`
+	TimeseriesCount          int                         `json:"timeseriesCount"`
+	TimeseriesHead           []usecase.TrafficDailyPoint `json:"timeseriesHead"`
 }
 
 func logGA4TrafficAPIData(
 	project usecase.ProjectMetadata,
 	from,
 	to time.Time,
-	filters usecase.GeoTrafficFilters,
+	filters usecase.TrafficFilters,
 	totalResponse,
 	sourceResponse,
 	pageResponse,
 	timeseriesResponse ga4RunReportResponse,
-	report usecase.GeoTrafficReport,
+	report usecase.TrafficReport,
 ) {
 	preview := buildGA4TrafficLogPreview(
 		project,
@@ -750,12 +859,12 @@ func buildGA4TrafficLogPreview(
 	project usecase.ProjectMetadata,
 	from,
 	to time.Time,
-	filters usecase.GeoTrafficFilters,
+	filters usecase.TrafficFilters,
 	totalResponse,
 	sourceResponse,
 	pageResponse,
 	timeseriesResponse ga4RunReportResponse,
-	report usecase.GeoTrafficReport,
+	report usecase.TrafficReport,
 ) ga4TrafficLogPreview {
 	return ga4TrafficLogPreview{
 		ProjectID:  strings.TrimSpace(project.ID),
@@ -779,20 +888,20 @@ func buildGA4TrafficLogPreview(
 		RawTopPageRowsPreview:    firstGA4RawRows(pageResponse.Rows, 10),
 		RawTimeseriesRowsPreview: firstGA4RawRows(timeseriesResponse.Rows, 10),
 		Summary:                  report.Summary,
-		BySourcePreview:          firstGeoSources(report.BySource, 5),
-		TopPagesPreview:          firstGeoPages(report.TopPages, 5),
+		BySourcePreview:          firstTrafficSources(report.BySource, 5),
+		TopPagesPreview:          firstTrafficPages(report.TopPages, 5),
 		TimeseriesCount:          len(report.Timeseries),
-		TimeseriesHead:           firstGeoDailyPoints(report.Timeseries, 5),
+		TimeseriesHead:           firstTrafficDailyPoints(report.Timeseries, 5),
 	}
 }
 
-func shouldUseFakeGeoTrafficReport(report usecase.GeoTrafficReport) bool {
+func shouldUseFakeTrafficReport(report usecase.TrafficReport) bool {
 	return len(report.BySource) == 0 && len(report.TopPages) == 0 && len(report.Timeseries) == 0
 }
 
-func buildFakeGeoTrafficReport(base usecase.GeoTrafficReport, from, to time.Time) usecase.GeoTrafficReport {
+func buildFakeTrafficReport(base usecase.TrafficReport, from, to time.Time) usecase.TrafficReport {
 	report := base
-	report.DataSource = usecase.GeoTrafficDataSourceFake
+	report.DataSource = usecase.TrafficDataSourceFake
 	if report.DateRange.StartDate == "" {
 		report.DateRange.StartDate = from.UTC().Format("2006-01-02")
 	}
@@ -803,7 +912,7 @@ func buildFakeGeoTrafficReport(base usecase.GeoTrafficReport, from, to time.Time
 		report.GeneratedAt = time.Now().UTC().Format(time.RFC3339)
 	}
 
-	report.BySource = []usecase.GeoTrafficSource{
+	report.BySource = []usecase.TrafficSource{
 		{
 			Source:            "chatgpt.com",
 			Medium:            "referral",
@@ -869,32 +978,71 @@ func buildFakeGeoTrafficReport(base usecase.GeoTrafficReport, from, to time.Time
 			Conversions:       1,
 			PageViews:         29,
 		},
+		{
+			Source:            "chat.qwen.ai",
+			Medium:            "referral",
+			SourceMedium:      "chat.qwen.ai / referral",
+			Engine:            "Qwen",
+			Sessions:          9,
+			EngagedSessions:   7,
+			EngagementRate:    77.78,
+			BounceRate:        22.22,
+			AvgSessionSeconds: 69,
+			Conversions:       1,
+			PageViews:         21,
+		},
+		{
+			Source:            "z.ai",
+			Medium:            "referral",
+			SourceMedium:      "z.ai / referral",
+			Engine:            "Z.ai",
+			Sessions:          7,
+			EngagedSessions:   5,
+			EngagementRate:    71.43,
+			BounceRate:        28.57,
+			AvgSessionSeconds: 58,
+			Conversions:       0,
+			PageViews:         16,
+		},
+		{
+			Source:            "poe.com",
+			Medium:            "referral",
+			SourceMedium:      "poe.com / referral",
+			Engine:            "Poe",
+			Sessions:          6,
+			EngagedSessions:   5,
+			EngagementRate:    83.33,
+			BounceRate:        16.67,
+			AvgSessionSeconds: 74,
+			Conversions:       0,
+			PageViews:         13,
+		},
 	}
-	geoSessions := int64(0)
+	trafficSessions := int64(0)
 	for _, source := range report.BySource {
-		geoSessions += source.Sessions
+		trafficSessions += source.Sessions
 	}
 	for i := range report.BySource {
-		report.BySource[i].ShareOfGeoSessions = round2(percentFloat(report.BySource[i].Sessions, geoSessions))
+		report.BySource[i].ShareOfTrafficSessions = round2(percentFloat(report.BySource[i].Sessions, trafficSessions))
 	}
 
 	totalSessions := report.Summary.TotalSessions
-	if totalSessions < geoSessions {
-		totalSessions = geoSessions * 8
+	if totalSessions < trafficSessions {
+		totalSessions = trafficSessions * 8
 	}
-	report.Summary = buildGeoTrafficSummary(totalSessions, report.BySource)
-	report.TopPages = []usecase.GeoTrafficPage{
+	report.Summary = buildTrafficSummary(totalSessions, report.BySource)
+	report.TopPages = []usecase.TrafficPage{
 		{Path: "/", Title: "Home", Source: "chatgpt.com", Engine: "ChatGPT", Sessions: 38, EngagedSessions: 31, EngagementRate: 81.58, Conversions: 4, PageViews: 97},
 		{Path: "/pricing", Title: "Pricing", Source: "perplexity.ai", Engine: "Perplexity", Sessions: 24, EngagedSessions: 19, EngagementRate: 79.17, Conversions: 3, PageViews: 58},
 		{Path: "/blog/ai-search", Title: "AI Search Guide", Source: "chatgpt.com", Engine: "ChatGPT", Sessions: 21, EngagedSessions: 16, EngagementRate: 76.19, Conversions: 1, PageViews: 49},
 		{Path: "/features", Title: "Features", Source: "gemini.google.com", Engine: "Gemini", Sessions: 17, EngagedSessions: 12, EngagementRate: 70.59, Conversions: 1, PageViews: 40},
 		{Path: "/contact", Title: "Contact", Source: "claude.ai", Engine: "Claude", Sessions: 11, EngagedSessions: 9, EngagementRate: 81.82, Conversions: 2, PageViews: 24},
 	}
-	report.Timeseries = buildFakeGeoTimeseries(from, to)
+	report.Timeseries = buildFakeTrafficTimeseries(from, to)
 	return report
 }
 
-func buildFakeGeoTimeseries(from, to time.Time) []usecase.GeoTrafficDailyPoint {
+func buildFakeTrafficTimeseries(from, to time.Time) []usecase.TrafficDailyPoint {
 	from = from.UTC()
 	to = to.UTC()
 	if from.IsZero() || to.IsZero() || to.Before(from) {
@@ -913,7 +1061,7 @@ func buildFakeGeoTimeseries(from, to time.Time) []usecase.GeoTrafficDailyPoint {
 	if points > 1 {
 		step = int(math.Max(1, math.Floor(float64(days-1)/float64(points-1))))
 	}
-	out := make([]usecase.GeoTrafficDailyPoint, 0, points)
+	out := make([]usecase.TrafficDailyPoint, 0, points)
 	for i := 0; i < points; i++ {
 		day := from.AddDate(0, 0, i*step)
 		if day.After(to) || i == points-1 {
@@ -921,7 +1069,7 @@ func buildFakeGeoTimeseries(from, to time.Time) []usecase.GeoTrafficDailyPoint {
 		}
 		sessions := int64(7 + ((i * 5) % 19))
 		engaged := int64(math.Round(float64(sessions) * 0.76))
-		out = append(out, usecase.GeoTrafficDailyPoint{
+		out = append(out, usecase.TrafficDailyPoint{
 			Date:            day.Format("2006-01-02"),
 			Sessions:        sessions,
 			EngagedSessions: engaged,
@@ -931,21 +1079,21 @@ func buildFakeGeoTimeseries(from, to time.Time) []usecase.GeoTrafficDailyPoint {
 	return out
 }
 
-func firstGeoSources(items []usecase.GeoTrafficSource, limit int) []usecase.GeoTrafficSource {
+func firstTrafficSources(items []usecase.TrafficSource, limit int) []usecase.TrafficSource {
 	if len(items) <= limit {
 		return items
 	}
 	return items[:limit]
 }
 
-func firstGeoPages(items []usecase.GeoTrafficPage, limit int) []usecase.GeoTrafficPage {
+func firstTrafficPages(items []usecase.TrafficPage, limit int) []usecase.TrafficPage {
 	if len(items) <= limit {
 		return items
 	}
 	return items[:limit]
 }
 
-func firstGeoDailyPoints(items []usecase.GeoTrafficDailyPoint, limit int) []usecase.GeoTrafficDailyPoint {
+func firstTrafficDailyPoints(items []usecase.TrafficDailyPoint, limit int) []usecase.TrafficDailyPoint {
 	if len(items) <= limit {
 		return items
 	}

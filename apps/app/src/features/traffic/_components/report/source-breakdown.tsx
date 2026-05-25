@@ -3,12 +3,14 @@ import { ExternalLink } from "lucide-react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-assets";
 import { formatInteger, formatPercent } from "../../_lib/report/traffic-report-formatters";
-import type { GeoTrafficSource } from "../../_lib/report/types";
+import type { TrafficSource } from "../../_lib/report/types";
 import { PaginationControls } from "./pagination-controls";
 
 type SourceBreakdownProps = {
-  sources: GeoTrafficSource[];
+  errorLabel?: string | null;
+  sources: TrafficSource[];
   pagination: {
     page: number;
     totalPages: number;
@@ -18,7 +20,7 @@ type SourceBreakdownProps = {
   loading?: boolean;
 };
 
-export function SourceBreakdown({ sources, pagination, loading = false }: SourceBreakdownProps) {
+export function SourceBreakdown({ errorLabel, sources, pagination, loading = false }: SourceBreakdownProps) {
   const maxSessions = Math.max(1, ...sources.map((source) => source.sessions));
 
   return (
@@ -42,22 +44,34 @@ export function SourceBreakdown({ sources, pagination, loading = false }: Source
             </div>
           ))
         ) : sources.length === 0 ? (
-          <EmptyStateCard label="Aucune source disponible" className="h-28" />
+          <EmptyStateCard label={errorLabel || "Aucune source disponible"} className="h-28" />
         ) : (
           sources.map((source) => {
             const width = Math.max(6, (source.sessions / maxSessions) * 100);
             return (
               <div key={`${source.source}-${source.medium}`} className="space-y-1.5">
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <span className="truncate font-medium text-foreground">{source.engine}</span>
-                    <span className="truncate text-xs text-muted-foreground">{source.source}</span>
+                <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <span className="grid size-7 shrink-0 place-items-center rounded-full bg-background shadow-sm ring-1 ring-border">
+                      <img
+                        src={getTrafficEngineIconPath(source.engine)}
+                        alt=""
+                        className="size-4"
+                        loading="lazy"
+                      />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate font-medium text-foreground">{source.engine}</span>
+                        <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      </div>
+                      <div className="break-all text-xs text-muted-foreground sm:truncate">{source.source}</div>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right">
+                  <div className="shrink-0 text-left sm:text-right">
                     <div className="font-semibold">{formatInteger(source.sessions)}</div>
                     <div className="text-[11px] text-muted-foreground">
-                      {formatPercent(source.shareOfGeoSessions)}
+                      {formatPercent(source.shareOfTrafficSessions)}
                     </div>
                   </div>
                 </div>

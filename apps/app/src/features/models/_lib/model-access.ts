@@ -54,6 +54,7 @@ export type OpenRouterModelSyncInput = {
   searchQuery?: string;
   activateImported?: boolean;
   purgeUnsupportedProviders?: boolean;
+  purgeMissingModels?: boolean;
 };
 
 export type OpenRouterModelSyncResult = {

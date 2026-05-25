@@ -26,8 +26,8 @@ import {
 } from "./traffic-report-formatters";
 import { buildTrafficReportViewData } from "./traffic-report-view-data";
 import type {
-  GeoPeriod,
-  GeoTrafficReport,
+  TrafficPeriod,
+  TrafficReport,
   TrafficGA4LLMSetupResult,
   TrafficGA4OAuthProperty,
 } from "./types";
@@ -56,14 +56,16 @@ export type TrafficKpiItem = {
 export function shouldToastTrafficReportError({
   error,
   isConnected,
+  isBusy = false,
 }: {
   error: string | null;
   isConnected: boolean;
+  isBusy?: boolean;
 }): boolean {
-  return Boolean(error) && isConnected;
+  return Boolean(error) && isConnected && !isBusy;
 }
 
-function withPeriod(routeSearch: string, period: GeoPeriod): string {
+function withPeriod(routeSearch: string, period: TrafficPeriod): string {
   const normalized = routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch;
   const params = new URLSearchParams(normalized);
   params.set("period", period);
@@ -154,7 +156,7 @@ function ga4LLMSetupToastDescription(setup: TrafficGA4LLMSetupResult | null): st
     return "Le tracking LLM GA4 sera disponible après sélection d'une propriété.";
   }
   if (setup.setupStatus === "success") {
-    return "Channel group AI / LLM et dimension llm_source configurés.";
+    return "Channel group Default + AI et canal AI configurés.";
   }
   if (setup.setupStatus === "partial_success") {
     return "Une partie du tracking LLM GA4 a été configurée. Vérifie les détails dans la carte GA4.";
@@ -162,34 +164,34 @@ function ga4LLMSetupToastDescription(setup: TrafficGA4LLMSetupResult | null): st
   return "Le tracking LLM GA4 n'a pas pu être configuré automatiquement.";
 }
 
-function buildKpis(report: GeoTrafficReport | null): TrafficKpiItem[] {
+function buildKpis(report: TrafficReport | null): TrafficKpiItem[] {
   const summary = report?.summary;
   return [
     {
       title: "Visites IA détectées",
-      value: formatInteger(summary?.totalGeoSessions ?? 0),
-      sub: `${formatPercent(summary?.geoShareOfTotal ?? 0)} de toutes les visites GA4`,
+      value: formatInteger(summary?.totalTrafficSessions ?? 0),
+      sub: `${formatPercent(summary?.trafficShareOfTotal ?? 0)} de toutes les visites GA4`,
       description: "Sessions GA4 dont la source ou le référent permet d'identifier un moteur génératif, par exemple ChatGPT ou Perplexity.",
       tone: "primary",
     },
     {
       title: "Taux d'engagement",
-      value: formatPercent(summary?.geoEngagementRate ?? 0),
-      sub: `${formatInteger(summary?.geoEngagedSessions ?? 0)} sessions engagées`,
+      value: formatPercent(summary?.trafficEngagementRate ?? 0),
+      sub: `${formatInteger(summary?.trafficEngagedSessions ?? 0)} sessions engagées`,
       description: "Part des visites IA détectées considérées comme engagées par GA4: durée significative, conversion ou au moins deux pages vues.",
       tone: "default",
     },
     {
       title: "Conversions",
-      value: formatInteger(summary?.geoConversions ?? 0),
-      sub: `${formatPercent(summary?.geoConversionRate ?? 0)} de conversion`,
+      value: formatInteger(summary?.trafficConversions ?? 0),
+      sub: `${formatPercent(summary?.trafficConversionRate ?? 0)} de conversion`,
       description: "Événements marqués comme conversions ou key events dans GA4 pendant ces visites IA détectées.",
       tone: "default",
     },
     {
       title: "Durée moyenne des visites",
-      value: formatDuration(summary?.geoAvgSessionSeconds ?? 0),
-      sub: `${formatPercent(summary?.geoBounceRate ?? 0)} rebond`,
+      value: formatDuration(summary?.trafficAvgSessionSeconds ?? 0),
+      sub: `${formatPercent(summary?.trafficBounceRate ?? 0)} rebond`,
       description: "Durée moyenne d'une visite IA détectée, calculée depuis la métrique GA4 de durée moyenne de session.",
       tone: "default",
     },
@@ -204,7 +206,7 @@ export function useTrafficReportPanelViewModel({
     () => getTrafficQueryContext(routeSearch).period,
     [routeSearch],
   );
-  const [period, setPeriod] = useState<GeoPeriod>(initialPeriod);
+  const [period, setPeriod] = useState<TrafficPeriod>(initialPeriod);
   const [propertyId, setPropertyId] = useState("");
   const [serviceAccountJSON, setServiceAccountJSON] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
@@ -307,7 +309,7 @@ export function useTrafficReportPanelViewModel({
     },
     [report?.bySource, report?.timeseries, report?.topPages, sourcePage, topPagesPage],
   );
-  const hasData = (report?.summary.totalGeoSessions ?? 0) > 0;
+  const hasData = (report?.summary.totalTrafficSessions ?? 0) > 0;
   const isConnected = integration?.ga4.isConnected === true;
   const hasOAuthToken = integration?.ga4.hasOAuthToken === true;
   const authMode = integration?.ga4.authMode ?? "";
@@ -445,18 +447,23 @@ export function useTrafficReportPanelViewModel({
       showFormError("Renseigne le Property ID et le JSON du service account.");
       return;
     }
+    setLLMSetup(null);
     setSaving(true);
     setFormError(null);
     try {
-      await saveTrafficGA4Integration(apiBaseURL, {
+      const response = await saveTrafficGA4Integration(apiBaseURL, {
         projectId: result.projectId,
         organizationId: result.organizationId,
         propertyId,
         serviceAccountJSON,
       });
+      setLLMSetup(response.llmSetup);
       setServiceAccountJSON("");
       await query.refetch();
-      pushSuccessToast("Google Analytics connecté.");
+      pushSuccessToast(
+        "Google Analytics connecté.",
+        ga4LLMSetupToastDescription(response.llmSetup),
+      );
     } catch (err) {
       showCaughtFormError(err, "Impossible de connecter GA4 pour ce projet.");
     } finally {
@@ -474,6 +481,7 @@ export function useTrafficReportPanelViewModel({
       showFormError("Impossible de préparer la redirection Google Analytics.");
       return;
     }
+    setLLMSetup(null);
     setSaving(true);
     setFormError(null);
     try {
@@ -511,6 +519,7 @@ export function useTrafficReportPanelViewModel({
       showFormError("Sélectionne une propriété GA4.");
       return;
     }
+    setLLMSetup(null);
     setSaving(true);
     setFormError(null);
     try {

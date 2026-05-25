@@ -41,10 +41,14 @@ func (s *handlerAnalysisClientSpy) RecordResponse(_ context.Context, _ string, _
 
 type handlerIAClientSpy struct {
 	execCalls int
+	result    usecase.IAExecutePromptResult
 }
 
 func (s *handlerIAClientSpy) ExecutePrompt(_ context.Context, _ usecase.IAExecutePromptInput) (usecase.IAExecutePromptResult, error) {
 	s.execCalls++
+	if strings.TrimSpace(s.result.RawResponse) != "" {
+		return s.result, nil
+	}
 	var result usecase.IAExecutePromptResult
 	result.RawResponse = "Acme est recommande https://acme.test"
 	result.Analysis.BrandMentioned = true
@@ -71,6 +75,10 @@ func (p handlerTestGA4OAuthProvider) ListProperties(_ context.Context, _ string)
 }
 
 func (p handlerTestGA4OAuthProvider) SetupLLMTracking(_ context.Context, _, _ string) (usecase.GA4LLMSetupResult, error) {
+	return usecase.GA4LLMSetupResult{SetupStatus: usecase.GA4LLMSetupStatusSuccess}, nil
+}
+
+func (p handlerTestGA4OAuthProvider) SetupLLMTrackingWithServiceAccount(_ context.Context, _, _ string) (usecase.GA4LLMSetupResult, error) {
 	return usecase.GA4LLMSetupResult{SetupStatus: usecase.GA4LLMSetupStatusSuccess}, nil
 }
 
@@ -220,6 +228,64 @@ func TestManualAnalysisRunRouteExecutesPrompt(t *testing.T) {
 	}
 	if analysisSpy.startCalls != 1 || iaSpy.execCalls != 1 || analysisSpy.recordCalls != 1 {
 		t.Fatalf("expected full manual pipeline, got start=%d ia=%d record=%d", analysisSpy.startCalls, iaSpy.execCalls, analysisSpy.recordCalls)
+	}
+}
+
+func TestGeneratePromptsRouteCreatesTenPrompts(t *testing.T) {
+	ctx := context.Background()
+	iaSpy := &handlerIAClientSpy{}
+	svc, err := usecase.NewServiceWithDependencies(ctx, usecase.Dependencies{
+		IAClient: iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	project, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Prompt Generator",
+		Domain:         "generator.test",
+		WebsiteURL:     "https://generator.test",
+		BrandName:      "Generator",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
+
+	iaSpy.execCalls = 0
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/projects/"+project.ID+"/prompts/generate", nil)
+	req.Header.Set("X-Organization-ID", "42")
+	rec := httptest.NewRecorder()
+
+	iaSpy.result.RawResponse = `{"prompts":[
+		"Prompt 1","Prompt 2","Prompt 3","Prompt 4","Prompt 5",
+		"Prompt 6","Prompt 7","Prompt 8","Prompt 9","Prompt 10"
+	]}`
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("expected POST 201, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var response struct {
+		Success bool             `json:"success"`
+		Data    []usecase.Prompt `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if !response.Success {
+		t.Fatalf("expected success response")
+	}
+	if len(response.Data) != 10 {
+		t.Fatalf("expected 10 generated prompts, got %d", len(response.Data))
 	}
 }
 
@@ -494,6 +560,49 @@ func TestProjectScopedUserCannotReadUnassignedProjectQueryRoute(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("expected unassigned project credentials GET 403, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestOrganizationFullAccessBypassesProjectScopeGuard(t *testing.T) {
+	svc := usecase.NewService()
+	ctx := context.Background()
+	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Assigned",
+		Domain:         "assigned-admin.test",
+		WebsiteURL:     "https://assigned-admin.test",
+	})
+	if err != nil {
+		t.Fatalf("create assigned project: %v", err)
+	}
+	other, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Other",
+		Domain:         "other-admin.test",
+		WebsiteURL:     "https://other-admin.test",
+	})
+	if err != nil {
+		t.Fatalf("create other project: %v", err)
+	}
+	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
+		t.Fatalf("assign project member: %v", err)
+	}
+
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/projects/"+other.ID, nil)
+	req.Header.Set("X-Organization-ID", "42")
+	req.Header.Set("X-Authenticated-User-ID", "99")
+	req.Header.Set("X-Organization-Full-Access", "true")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected full access DELETE 204, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

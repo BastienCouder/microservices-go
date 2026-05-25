@@ -10,7 +10,7 @@ export function OrganizationSummaryPanel({
   resources: OrganizationResources;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
         title="Organisation"
         value={organization.name}

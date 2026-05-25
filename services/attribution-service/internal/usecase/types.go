@@ -21,8 +21,8 @@ const (
 )
 
 const (
-	GeoTrafficDataSourceGA4  = "ga4"
-	GeoTrafficDataSourceFake = "fake"
+	TrafficDataSourceGA4  = "ga4"
+	TrafficDataSourceFake = "fake"
 )
 
 type Event struct {
@@ -72,47 +72,47 @@ type FunnelData struct {
 	VisitsSource      string         `json:"visitsSource,omitempty"`
 }
 
-type GeoTrafficDateRange struct {
+type TrafficDateRange struct {
 	StartDate string `json:"startDate"`
 	EndDate   string `json:"endDate"`
 }
 
-type GeoTrafficFilters struct {
+type TrafficFilters struct {
 	Search string `json:"search,omitempty"`
 	Engine string `json:"engine,omitempty"`
 }
 
-type GeoTrafficSummary struct {
-	TotalGeoSessions     int64   `json:"totalGeoSessions"`
-	TotalSessions        int64   `json:"totalSessions"`
-	GeoShareOfTotal      float64 `json:"geoShareOfTotal"`
-	GeoEngagedSessions   int64   `json:"geoEngagedSessions"`
-	GeoEngagementRate    float64 `json:"geoEngagementRate"`
-	GeoAvgSessionSeconds float64 `json:"geoAvgSessionSeconds"`
-	GeoBounceRate        float64 `json:"geoBounceRate"`
-	GeoConversions       float64 `json:"geoConversions"`
-	GeoConversionRate    float64 `json:"geoConversionRate"`
-	GeoPageViews         int64   `json:"geoPageViews"`
-	TopEngine            string  `json:"topEngine"`
+type TrafficSummary struct {
+	TotalTrafficSessions     int64   `json:"totalTrafficSessions"`
+	TotalSessions            int64   `json:"totalSessions"`
+	TrafficShareOfTotal      float64 `json:"trafficShareOfTotal"`
+	TrafficEngagedSessions   int64   `json:"trafficEngagedSessions"`
+	TrafficEngagementRate    float64 `json:"trafficEngagementRate"`
+	TrafficAvgSessionSeconds float64 `json:"trafficAvgSessionSeconds"`
+	TrafficBounceRate        float64 `json:"trafficBounceRate"`
+	TrafficConversions       float64 `json:"trafficConversions"`
+	TrafficConversionRate    float64 `json:"trafficConversionRate"`
+	TrafficPageViews         int64   `json:"trafficPageViews"`
+	TopEngine                string  `json:"topEngine"`
 }
 
-type GeoTrafficSource struct {
-	Source             string  `json:"source"`
-	Medium             string  `json:"medium"`
-	SourceMedium       string  `json:"sourceMedium,omitempty"`
-	LandingPage        string  `json:"landingPage,omitempty"`
-	Engine             string  `json:"engine"`
-	Sessions           int64   `json:"sessions"`
-	EngagedSessions    int64   `json:"engagedSessions"`
-	EngagementRate     float64 `json:"engagementRate"`
-	BounceRate         float64 `json:"bounceRate"`
-	AvgSessionSeconds  float64 `json:"avgSessionSeconds"`
-	Conversions        float64 `json:"conversions"`
-	PageViews          int64   `json:"pageViews"`
-	ShareOfGeoSessions float64 `json:"shareOfGeoSessions"`
+type TrafficSource struct {
+	Source                 string  `json:"source"`
+	Medium                 string  `json:"medium"`
+	SourceMedium           string  `json:"sourceMedium,omitempty"`
+	LandingPage            string  `json:"landingPage,omitempty"`
+	Engine                 string  `json:"engine"`
+	Sessions               int64   `json:"sessions"`
+	EngagedSessions        int64   `json:"engagedSessions"`
+	EngagementRate         float64 `json:"engagementRate"`
+	BounceRate             float64 `json:"bounceRate"`
+	AvgSessionSeconds      float64 `json:"avgSessionSeconds"`
+	Conversions            float64 `json:"conversions"`
+	PageViews              int64   `json:"pageViews"`
+	ShareOfTrafficSessions float64 `json:"shareOfTrafficSessions"`
 }
 
-type GeoTrafficPage struct {
+type TrafficPage struct {
 	Path            string  `json:"path"`
 	Title           string  `json:"title"`
 	Source          string  `json:"source"`
@@ -124,34 +124,34 @@ type GeoTrafficPage struct {
 	PageViews       int64   `json:"pageViews"`
 }
 
-type GeoTrafficDailyPoint struct {
+type TrafficDailyPoint struct {
 	Date            string  `json:"date"`
 	Sessions        int64   `json:"sessions"`
 	EngagedSessions int64   `json:"engagedSessions"`
 	Conversions     float64 `json:"conversions"`
 }
 
-type GeoQuotaStatus struct {
+type TrafficQuotaStatus struct {
 	Consumed  int64 `json:"consumed"`
 	Remaining int64 `json:"remaining"`
 }
 
-type GeoPropertyQuota struct {
-	TokensPerDay                  GeoQuotaStatus `json:"tokensPerDay"`
-	ServerErrorsPerProjectPerHour GeoQuotaStatus `json:"serverErrorsPerProjectPerHour"`
+type TrafficPropertyQuota struct {
+	TokensPerDay                  TrafficQuotaStatus `json:"tokensPerDay"`
+	ServerErrorsPerProjectPerHour TrafficQuotaStatus `json:"serverErrorsPerProjectPerHour"`
 }
 
-type GeoTrafficReport struct {
-	ProjectID     string                 `json:"projectId"`
-	PropertyID    string                 `json:"propertyId"`
-	DataSource    string                 `json:"dataSource"`
-	DateRange     GeoTrafficDateRange    `json:"dateRange"`
-	GeneratedAt   string                 `json:"generatedAt"`
-	Summary       GeoTrafficSummary      `json:"summary"`
-	BySource      []GeoTrafficSource     `json:"bySource"`
-	TopPages      []GeoTrafficPage       `json:"topPages"`
-	Timeseries    []GeoTrafficDailyPoint `json:"timeseries"`
-	PropertyQuota *GeoPropertyQuota      `json:"propertyQuota,omitempty"`
+type TrafficReport struct {
+	ProjectID     string                `json:"projectId"`
+	PropertyID    string                `json:"propertyId"`
+	DataSource    string                `json:"dataSource"`
+	DateRange     TrafficDateRange      `json:"dateRange"`
+	GeneratedAt   string                `json:"generatedAt"`
+	Summary       TrafficSummary        `json:"summary"`
+	BySource      []TrafficSource       `json:"bySource"`
+	TopPages      []TrafficPage         `json:"topPages"`
+	Timeseries    []TrafficDailyPoint   `json:"timeseries"`
+	PropertyQuota *TrafficPropertyQuota `json:"propertyQuota,omitempty"`
 }
 
 type FunnelSource struct {
@@ -225,15 +225,15 @@ type VisitProvider interface {
 	ListVisitsBySource(ctx context.Context, project ProjectMetadata, from, to time.Time) ([]FunnelSource, error)
 }
 
-type GeoTrafficProvider interface {
-	GetGeoTrafficReport(ctx context.Context, project ProjectMetadata, from, to time.Time, filters GeoTrafficFilters) (GeoTrafficReport, error)
+type TrafficProvider interface {
+	GetTrafficReport(ctx context.Context, project ProjectMetadata, from, to time.Time, filters TrafficFilters) (TrafficReport, error)
 }
 
 type Service struct {
-	repo               Repository
-	projectVerifier    ProjectAccessVerifier
-	projectResolver    ProjectMetadataResolver
-	visitProvider      VisitProvider
-	geoTrafficProvider GeoTrafficProvider
-	now                func() time.Time
+	repo            Repository
+	projectVerifier ProjectAccessVerifier
+	projectResolver ProjectMetadataResolver
+	visitProvider   VisitProvider
+	trafficProvider TrafficProvider
+	now             func() time.Time
 }

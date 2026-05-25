@@ -10,11 +10,12 @@ import (
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
 )
 
-func (h *Handler) checkPermission(ctx context.Context, userID, organizationID int64, action, resource string) (bool, error) {
+func (h *Handler) checkPermission(ctx context.Context, userID, organizationID int64, action, resource string) (bool, string, error) {
 	if h.permissionGRPC == nil {
-		return false, errors.New("permission grpc client is not configured")
+		return false, "", errors.New("permission grpc client is not configured")
 	}
 	var allowed bool
+	var reason string
 	err := h.executeDependencyCall(ctx, h.permissionBreaker, h.permissionBulkhead, 2, 40*time.Millisecond, 600*time.Millisecond, func(attemptCtx context.Context) (bool, bool, error) {
 		internalToken, tokenErr := signInternalJWT(
 			h.internalJWTSecret,
@@ -43,12 +44,13 @@ func (h *Handler) checkPermission(ctx context.Context, userID, organizationID in
 			return true, true, err
 		}
 		allowed = resp.GetAllowed()
+		reason = resp.GetReason()
 		return false, true, nil
 	})
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
-	return allowed, nil
+	return allowed, reason, nil
 }
 
 func shouldEnforcePermission(r *http.Request) bool {

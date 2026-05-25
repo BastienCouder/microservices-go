@@ -45,7 +45,7 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 		seats = 1
 	}
 
-	priceID, monthlyQuota, err := s.resolvePlanPricing(plan, cycle)
+	priceID, monthlyQuota, err := s.resolvePlanPricing(ctx, plan, cycle)
 	if err != nil {
 		return CreateStripeCheckoutSessionOutput{}, err
 	}
@@ -198,42 +198,46 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 	return nil
 }
 
-func (s *Service) resolvePlanPricing(plan, cycle string) (string, int, error) {
+func (s *Service) resolvePlanPricing(ctx context.Context, plan, cycle string) (string, int, error) {
 	catalog := s.stripeCatalog
+	settings, settingsErr := s.planSettingsForPlan(ctx, plan)
+	if settingsErr != nil {
+		return "", 0, settingsErr
+	}
 	switch plan {
 	case domain.PlanStarter:
 		if cycle == domain.BillingCycleYearly {
 			if strings.TrimSpace(catalog.StarterYearlyPriceID) == "" {
 				return "", 0, fmt.Errorf("%w: yearly starter price is not configured", ErrStripeUnsupportedCycle)
 			}
-			return strings.TrimSpace(catalog.StarterYearlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+			return strings.TrimSpace(catalog.StarterYearlyPriceID), settings.MonthlyQuota, nil
 		}
 		if strings.TrimSpace(catalog.StarterMonthlyPriceID) == "" {
 			return "", 0, fmt.Errorf("%w: monthly starter price is not configured", ErrStripeUnsupportedPlan)
 		}
-		return strings.TrimSpace(catalog.StarterMonthlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+		return strings.TrimSpace(catalog.StarterMonthlyPriceID), settings.MonthlyQuota, nil
 	case domain.PlanGrowth:
 		if cycle == domain.BillingCycleYearly {
 			if strings.TrimSpace(catalog.GrowthYearlyPriceID) == "" {
 				return "", 0, fmt.Errorf("%w: yearly growth price is not configured", ErrStripeUnsupportedCycle)
 			}
-			return strings.TrimSpace(catalog.GrowthYearlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+			return strings.TrimSpace(catalog.GrowthYearlyPriceID), settings.MonthlyQuota, nil
 		}
 		if strings.TrimSpace(catalog.GrowthMonthlyPriceID) == "" {
 			return "", 0, fmt.Errorf("%w: monthly growth price is not configured", ErrStripeUnsupportedPlan)
 		}
-		return strings.TrimSpace(catalog.GrowthMonthlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+		return strings.TrimSpace(catalog.GrowthMonthlyPriceID), settings.MonthlyQuota, nil
 	case domain.PlanPro:
 		if cycle == domain.BillingCycleYearly {
 			if strings.TrimSpace(catalog.ProYearlyPriceID) == "" {
 				return "", 0, fmt.Errorf("%w: yearly pro price is not configured", ErrStripeUnsupportedCycle)
 			}
-			return strings.TrimSpace(catalog.ProYearlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+			return strings.TrimSpace(catalog.ProYearlyPriceID), settings.MonthlyQuota, nil
 		}
 		if strings.TrimSpace(catalog.ProMonthlyPriceID) == "" {
 			return "", 0, fmt.Errorf("%w: monthly pro price is not configured", ErrStripeUnsupportedPlan)
 		}
-		return strings.TrimSpace(catalog.ProMonthlyPriceID), defaultMonthlyQuotaForPlan(plan), nil
+		return strings.TrimSpace(catalog.ProMonthlyPriceID), settings.MonthlyQuota, nil
 	default:
 		return "", 0, fmt.Errorf("%w: %s", ErrStripeUnsupportedPlan, plan)
 	}
@@ -336,6 +340,8 @@ func isStripeSupportedPlan(plan string) bool {
 
 func defaultMonthlyQuotaForPlan(plan string) int {
 	switch domain.NormalizePlan(plan) {
+	case domain.PlanDeveloper:
+		return defaultPlanSettingsByPlan()[domain.PlanDeveloper].MonthlyQuota
 	case domain.PlanStarter:
 		return 50
 	case domain.PlanGrowth:

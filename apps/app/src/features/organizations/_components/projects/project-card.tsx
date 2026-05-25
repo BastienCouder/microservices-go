@@ -1,19 +1,9 @@
 import { memo, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Search, Trash2, UserPlus, Users, X } from "lucide-react";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogClose,
@@ -175,8 +165,8 @@ export const ProjectCard = memo(function ProjectCard({
               </div>
               <DialogFooter>
                 {canDeleteProject ? (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
+                  <ConfirmDialog
+                    trigger={
                       <Button
                         type="button"
                         variant="destructive"
@@ -186,29 +176,17 @@ export const ProjectCard = memo(function ProjectCard({
                         <Trash2 data-icon="inline-start" />
                         Supprimer
                       </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Supprimer ce projet ?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Cette action supprimera le projet et ses donnees associees.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={deleteProjectBusy}>Annuler</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          disabled={deleteProjectBusy}
-                          onClick={() => {
-                            onDeleteProject(project.id);
-                            setSettingsOpen(false);
-                          }}
-                        >
-                          Supprimer
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                    }
+                    title="Supprimer ce projet ?"
+                    description="Cette action supprimera le projet et ses donnees associees."
+                    confirmLabel="Supprimer"
+                    loading={deleteProjectBusy}
+                    media={<Trash2 />}
+                    onConfirm={() => {
+                      onDeleteProject(project.id);
+                      setSettingsOpen(false);
+                    }}
+                  />
                 ) : null}
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={updateProjectBusy}>

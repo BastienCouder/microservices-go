@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -15,6 +17,7 @@ type Config struct {
 	BillingServiceURL        string
 	AnalysisServiceGRPCAddr  string
 	IAServiceGRPCAddr        string
+	IAPromptTimeout          time.Duration
 	AttributionServiceURL    string
 	SecretEncryptionKey      string
 	RabbitMQURL              string
@@ -52,6 +55,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	iaServiceGRPCAddr, err := requiredEnv("IA_SERVICE_GRPC_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	iaPromptTimeoutMS, err := optionalPositiveIntEnv("PROJECT_IA_PROMPT_TIMEOUT_MS", 30000)
 	if err != nil {
 		return Config{}, err
 	}
@@ -113,6 +120,7 @@ func Load() (Config, error) {
 		BillingServiceURL:        optionalEnv("BILLING_SERVICE_URL"),
 		AnalysisServiceGRPCAddr:  analysisServiceGRPCAddr,
 		IAServiceGRPCAddr:        iaServiceGRPCAddr,
+		IAPromptTimeout:          time.Duration(iaPromptTimeoutMS) * time.Millisecond,
 		AttributionServiceURL:    optionalEnv("ATTRIBUTION_SERVICE_URL"),
 		SecretEncryptionKey:      secretEncryptionKey,
 		RabbitMQURL:              rabbitMQURL,
@@ -233,4 +241,16 @@ func optionalBoolEnv(key string, defaultValue bool) (bool, error) {
 	default:
 		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
 	}
+}
+
+func optionalPositiveIntEnv(key string, defaultValue int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid environment variable %s: must be a positive integer", key)
+	}
+	return parsed, nil
 }

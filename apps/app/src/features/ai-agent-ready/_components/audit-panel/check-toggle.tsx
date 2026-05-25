@@ -15,15 +15,17 @@ export function CheckToggle({ check, checked, onToggle }: CheckToggleProps) {
   return (
     <label
       className={cn(
-        "flex gap-3 rounded-[14px] border border-[#eadfd3] bg-[#fffdf9] p-3 transition duration-150",
-        "hover:border-[#f26a21]/40 hover:bg-[#fff8f0]",
-        check.disabled && "cursor-not-allowed opacity-55 hover:border-[#eadfd3] hover:bg-[#fffdf9]",
+        "flex gap-3 rounded-xl border p-3 transition duration-150",
+        checked
+          ? "border-primary/30 bg-primary/5"
+          : "border-border/70 bg-background hover:border-primary/30 hover:bg-primary/5",
+        check.disabled && "cursor-not-allowed opacity-55 hover:border-border/70 hover:bg-background",
       )}
     >
       <Checkbox
         checked={checked}
         disabled={check.disabled}
-        className="mt-1 border-[#d8d1ca] data-checked:border-[#f26a21] data-checked:bg-[#f26a21]"
+        className="mt-1"
         aria-label={check.label}
         onCheckedChange={() => {
           if (isRealCheck && !check.disabled) {
@@ -32,8 +34,8 @@ export function CheckToggle({ check, checked, onToggle }: CheckToggleProps) {
         }}
       />
       <span className="min-w-0">
-        <span className="block text-sm font-bold text-[#3a2418]">{check.label}</span>
-        <span className="mt-1 block text-sm leading-5 text-[#866d5d]">
+        <span className="block text-sm font-semibold text-foreground">{check.label}</span>
+        <span className="mt-1 block text-sm leading-5 text-muted-foreground">
           {check.description}
         </span>
       </span>

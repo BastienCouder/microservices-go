@@ -35,6 +35,37 @@ export function parseRelativeTimeToMinutes(value: string) {
   return numeric;
 }
 
+function toTimestamp(value?: string) {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? null : timestamp;
+}
+
+export function comparePromptRunsByRecency(
+  a: { createdAt?: string; minutesAgo: number },
+  b: { createdAt?: string; minutesAgo: number },
+) {
+  const aTimestamp = toTimestamp(a.createdAt);
+  const bTimestamp = toTimestamp(b.createdAt);
+
+  if (aTimestamp !== null && bTimestamp !== null && aTimestamp !== bTimestamp) {
+    return bTimestamp - aTimestamp;
+  }
+
+  if (a.minutesAgo !== b.minutesAgo) {
+    return a.minutesAgo - b.minutesAgo;
+  }
+
+  if (aTimestamp !== null && bTimestamp !== null) {
+    return bTimestamp - aTimestamp;
+  }
+
+  if (aTimestamp !== null) return -1;
+  if (bTimestamp !== null) return 1;
+
+  return 0;
+}
+
 export function truncate(value: string, max = 36) {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1)}…`;

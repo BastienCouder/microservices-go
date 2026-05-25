@@ -7,5 +7,9 @@ describe("optimization errors data loader", () => {
     expect(source.includes("loadPerceptionData")).toBe(false);
     expect(source.includes("derivePerceptionTopErrorsFromResponses")).toBe(false);
     expect(source.includes("mergePerceptionTopErrorsIntoOptimizationBoard")).toBe(false);
+    expect(source.includes('"crawler"')).toBe(true);
+    expect(source.includes('"alert"')).toBe(true);
+    expect(source.includes('"derived"')).toBe(true);
+    expect(source.includes("crawlerErrors")).toBe(true);
   });
 });

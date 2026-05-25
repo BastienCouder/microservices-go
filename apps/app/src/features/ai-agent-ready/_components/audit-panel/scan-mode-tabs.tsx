@@ -29,11 +29,11 @@ export function ScanModeTabs({ modes, value, onChange }: ScanModeTabsProps) {
             aria-selected={active}
             disabled={mode.disabled}
             className={cn(
-              "shrink-0 rounded-full border px-4 py-2 text-sm font-bold transition duration-150",
+              "shrink-0 rounded-lg border px-4 py-2 text-sm font-medium transition duration-150",
               active
-                ? "border-[#f26a21] bg-[#f26a21] text-white shadow-[0_10px_22px_rgba(242,106,33,0.18)]"
-                : "border-[#eadfd3] bg-[#fffdf9] text-[#3a2418] hover:border-[#f26a21]/50 hover:bg-[#fff3e8]",
-              mode.disabled && "cursor-not-allowed opacity-45 hover:border-[#eadfd3] hover:bg-[#fffdf9]",
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border/70 bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground",
+              mode.disabled && "cursor-not-allowed opacity-45 hover:border-border/70 hover:bg-background hover:text-muted-foreground",
             )}
             onClick={() => onChange(mode.id)}
           >

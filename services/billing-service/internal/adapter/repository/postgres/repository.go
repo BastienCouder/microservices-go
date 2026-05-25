@@ -45,6 +45,33 @@ func (r *Repository) Upsert(ctx context.Context, subscription *domain.Subscripti
 	return nil
 }
 
+func (r *Repository) UpdateEntitlements(ctx context.Context, organizationID int64, plan string, seats, monthlyQuota int, updatedAt time.Time) error {
+	err := r.queries.UpdateSubscriptionEntitlements(ctx, sqlc.UpdateSubscriptionEntitlementsParams{
+		OrganizationID: organizationID,
+		Plan:           plan,
+		Seats:          int32(seats),
+		MonthlyQuota:   int32(monthlyQuota),
+		UpdatedAt:      toPgTimestamptz(updatedAt),
+	})
+	if err != nil {
+		return fmt.Errorf("update subscription entitlements: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) UpdateDefaultQuotaForPlan(ctx context.Context, plan string, previousMonthlyQuota, nextMonthlyQuota int, updatedAt time.Time) error {
+	err := r.queries.UpdateDefaultQuotaForPlan(ctx, sqlc.UpdateDefaultQuotaForPlanParams{
+		Plan:                 plan,
+		PreviousMonthlyQuota: int32(previousMonthlyQuota),
+		NextMonthlyQuota:     int32(nextMonthlyQuota),
+		UpdatedAt:            toPgTimestamptz(updatedAt),
+	})
+	if err != nil {
+		return fmt.Errorf("update default quota for plan: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) GetByOrganizationID(ctx context.Context, organizationID int64) (*domain.Subscription, error) {
 	sub, err := r.queries.GetSubscriptionByOrganizationID(ctx, organizationID)
 	if err != nil {
@@ -69,6 +96,78 @@ func (r *Repository) GetByOrganizationID(ctx context.Context, organizationID int
 		CorrectionCredits:    int(sub.CorrectionCredits),
 		UpdatedAt:            fromPgTimestamptz(sub.UpdatedAt),
 	}, nil
+}
+
+func (r *Repository) ListPlanSettings(ctx context.Context) ([]domain.PlanSettings, error) {
+	items, err := r.queries.ListBillingPlanSettings(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list billing plan settings: %w", err)
+	}
+	settings := make([]domain.PlanSettings, 0, len(items))
+	for _, item := range items {
+		settings = append(settings, domain.PlanSettings{
+			Plan:                    item.Plan,
+			MonthlyPriceCents:       int(item.MonthlyPriceCents),
+			YearlyPriceCents:        int(item.YearlyPriceCents),
+			MonthlyQuota:            int(item.MonthlyQuota),
+			ModelSelectionLimit:     int(item.ModelSelectionLimit),
+			MonthlyModelChangeLimit: int(item.MonthlyModelChangeLimit),
+			UpdatedAt:               fromPgTimestamptz(item.UpdatedAt),
+		})
+	}
+	return settings, nil
+}
+
+func (r *Repository) UpsertPlanSettings(ctx context.Context, settings domain.PlanSettings) error {
+	err := r.queries.UpsertBillingPlanSettings(ctx, sqlc.UpsertBillingPlanSettingsParams{
+		Plan:                    settings.Plan,
+		MonthlyPriceCents:       int32(settings.MonthlyPriceCents),
+		YearlyPriceCents:        int32(settings.YearlyPriceCents),
+		MonthlyQuota:            int32(settings.MonthlyQuota),
+		ModelSelectionLimit:     int32(settings.ModelSelectionLimit),
+		MonthlyModelChangeLimit: int32(settings.MonthlyModelChangeLimit),
+		UpdatedAt:               toPgTimestamptz(settings.UpdatedAt),
+	})
+	if err != nil {
+		return fmt.Errorf("upsert billing plan settings: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListPricingTiers(ctx context.Context) ([]domain.PricingTier, error) {
+	items, err := r.queries.ListBillingPricingTiers(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list billing pricing tiers: %w", err)
+	}
+	tiers := make([]domain.PricingTier, 0, len(items))
+	for _, item := range items {
+		tiers = append(tiers, domain.PricingTier{
+			PromptVolume:        int(item.PromptVolume),
+			Label:               item.Label,
+			DeveloperPriceCents: fromPgNullableInt4(item.DeveloperPriceCents),
+			StarterPriceCents:   fromPgNullableInt4(item.StarterPriceCents),
+			GrowthPriceCents:    fromPgNullableInt4(item.GrowthPriceCents),
+			ProPriceCents:       fromPgNullableInt4(item.ProPriceCents),
+			UpdatedAt:           fromPgTimestamptz(item.UpdatedAt),
+		})
+	}
+	return tiers, nil
+}
+
+func (r *Repository) UpsertPricingTier(ctx context.Context, tier domain.PricingTier) error {
+	err := r.queries.UpsertBillingPricingTier(ctx, sqlc.UpsertBillingPricingTierParams{
+		PromptVolume:        int32(tier.PromptVolume),
+		Label:               tier.Label,
+		DeveloperPriceCents: toPgNullableInt4(tier.DeveloperPriceCents),
+		StarterPriceCents:   toPgNullableInt4(tier.StarterPriceCents),
+		GrowthPriceCents:    toPgNullableInt4(tier.GrowthPriceCents),
+		ProPriceCents:       toPgNullableInt4(tier.ProPriceCents),
+		UpdatedAt:           toPgTimestamptz(tier.UpdatedAt),
+	})
+	if err != nil {
+		return fmt.Errorf("upsert billing pricing tier: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) RecordStripeWebhookEvent(ctx context.Context, eventID, eventType string, processedAt time.Time) (bool, error) {
@@ -106,5 +205,20 @@ func fromPgNullableTimestamptz(value pgtype.Timestamptz) *time.Time {
 		return nil
 	}
 	v := value.Time
+	return &v
+}
+
+func toPgNullableInt4(value *int) pgtype.Int4 {
+	if value == nil {
+		return pgtype.Int4{}
+	}
+	return pgtype.Int4{Int32: int32(*value), Valid: true}
+}
+
+func fromPgNullableInt4(value pgtype.Int4) *int {
+	if !value.Valid {
+		return nil
+	}
+	v := int(value.Int32)
 	return &v
 }

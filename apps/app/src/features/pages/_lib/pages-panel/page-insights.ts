@@ -157,6 +157,9 @@ function buildPageInsights(monitoring: MonitoringData, projectHosts: Set<string>
       existing.samples.push({
         id: `${prompt.responseId || prompt.promptId}-${url}`,
         prompt: prompt.text.trim() || "Prompt sans libelle",
+        response: prompt.response.trim() || "Réponse sans contenu",
+        promptId: prompt.promptId.trim(),
+        responseId: prompt.responseId.trim(),
         model: modelBadge,
         persona: prompt.persona.trim(),
         time: prompt.time,
@@ -357,9 +360,7 @@ function inferProjectHosts(monitoring: MonitoringData): Set<string> {
 
 function isOwnedHost(hostname: string, projectHosts: Set<string>): boolean {
   if (projectHosts.size === 0) return true;
-  return Array.from(projectHosts).some(
-    (projectHost) => hostname === projectHost || hostname.endsWith(`.${projectHost}`),
-  );
+  return projectHosts.has(hostname);
 }
 
 function parsePossibleHost(value: string): string | null {
@@ -377,8 +378,9 @@ function parsePossibleHost(value: string): string | null {
 
 function countCitationsByUrl(prompt: MonitoringPrompt): Map<string, number> {
   const counts = new Map<string, number>();
+  const citedUrls = prompt.allCitedUrls.length > 0 ? prompt.allCitedUrls : prompt.citedUrls;
 
-  for (const rawUrl of prompt.citedUrls) {
+  for (const rawUrl of citedUrls) {
     const url = rawUrl.trim();
     if (!url) continue;
     counts.set(url, (counts.get(url) ?? 0) + 1);

@@ -284,7 +284,7 @@ func (s *StateStore) loadProjectMembers(ctx context.Context, state *persistedSta
 
 func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, project_id, text, intent, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at
+		SELECT id, project_id, text, intent, kind, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at
 		FROM prompts
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -297,6 +297,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 		var (
 			item             usecase.Prompt
 			intent           *string
+			kind             *string
 			scheduleMode     *string
 			scheduleCron     *string
 			scheduleTimezone *string
@@ -307,6 +308,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 			&item.ProjectID,
 			&item.Text,
 			&intent,
+			&kind,
 			&scheduleMode,
 			&scheduleCron,
 			&scheduleTimezone,
@@ -318,6 +320,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 			return fmt.Errorf("scan prompt: %w", err)
 		}
 		item.Intent = stringValue(intent)
+		item.Kind = stringValue(kind)
 		item.Schedule = usecase.PromptSchedule{
 			Mode:       stringValue(scheduleMode),
 			Cron:       stringValue(scheduleCron),
@@ -751,9 +754,9 @@ func insertPrompts(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.P
 	for _, promptID := range sortedPromptIDs(prompts) {
 		prompt := prompts[promptID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO prompts (id, project_id, text, intent, language, country, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, 'fr', 'FR', $5, $6, $7, $8, $9, $10, $11)
-		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), nullIfEmptyOrFallback(prompt.Schedule.Mode, usecase.PromptScheduleModeGlobal), nullIfEmptyOrFallback(prompt.Schedule.Cron, usecase.DefaultPromptCron), nullIfEmptyOrFallback(prompt.Schedule.Timezone, usecase.DefaultPromptTimezone), nullIfEmptyOrFallback(prompt.Status, usecase.PromptStatusActive), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
+			INSERT INTO prompts (id, project_id, text, intent, kind, language, country, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, 'fr', 'FR', $6, $7, $8, $9, $10, $11, $12)
+		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), nullIfEmptyOrFallback(prompt.Kind, usecase.PromptKindMonitoring), nullIfEmptyOrFallback(prompt.Schedule.Mode, usecase.PromptScheduleModeGlobal), nullIfEmptyOrFallback(prompt.Schedule.Cron, usecase.DefaultPromptCron), nullIfEmptyOrFallback(prompt.Schedule.Timezone, usecase.DefaultPromptTimezone), nullIfEmptyOrFallback(prompt.Status, usecase.PromptStatusActive), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
 			return fmt.Errorf("insert prompt %s: %w", prompt.ID, err)
 		}
 	}

@@ -23,7 +23,6 @@ import (
 	cloudflarecrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/cloudflarecrawl"
 	iaclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/ia"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
-	seedcrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/seedcrawl"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
 	analysisstate "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/state/postgres"
@@ -75,12 +74,7 @@ func main() {
 			log.Fatalf("init cloudflare crawl client: %v", err)
 		}
 	} else {
-		if cfg.CloudflareAccountID != "" || cfg.CloudflareAPIToken != "" {
-			log.Printf("content optimizer using seed crawl data: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are both required for live crawling")
-		} else {
-			log.Printf("content optimizer using seed crawl data")
-		}
-		contentCrawler = seedcrawl.NewNikeCrawler()
+		log.Printf("content optimizer live crawl disabled: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are both required")
 	}
 
 	var contentIssueAnalyzer usecase.ContentIssueAnalyzer

@@ -88,5 +88,11 @@ export function usePromptsWorkspacePanelViewModel({
       state.setTab("responses");
       state.setFocusPromptId(promptId);
     },
+    showPromptResponse: (promptId: string, responseId: string) => {
+      state.setIsPromptDetailsOpen(false);
+      state.setTab("responses");
+      state.setFocusPromptId(promptId);
+      state.setSelectedResponseId(responseId);
+    },
   };
 }

@@ -48,7 +48,11 @@ func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 	out := make([]AIResponse, 0, len(ids))
 	for _, id := range ids {
 		if item, ok := s.responses[id]; ok {
-			out = append(out, copyResponse(item))
+			response := copyResponse(item)
+			if run := s.runs[runID]; run != nil {
+				response.RunType = run.RunType
+			}
+			out = append(out, response)
 		}
 	}
 	sort.Slice(out, func(i, j int) bool {
@@ -68,7 +72,11 @@ func (s *Service) responsesForProjectLocked(projectID string) []AIResponse {
 		ids := s.responsesByRun[runID]
 		for _, id := range ids {
 			if item, ok := s.responses[id]; ok {
-				out = append(out, copyResponse(item))
+				response := copyResponse(item)
+				if run := s.runs[runID]; run != nil {
+					response.RunType = run.RunType
+				}
+				out = append(out, response)
 			}
 		}
 	}

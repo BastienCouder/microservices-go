@@ -38,7 +38,7 @@ export function BrandVisibilityPanel() {
             <CardTitle className="flex items-center gap-2 text-lg font-semibold">
               <SectionTitle>{content.brandVisibilityTitle}</SectionTitle>
             </CardTitle>
-            <CardDescription className="pr-1 text-xs leading-relaxed md:text-sm">
+            <CardDescription className="hidden md:block  pr-1 text-xs leading-relaxed md:text-sm">
               {content.brandVisibilityDescription}
             </CardDescription>
           </div>

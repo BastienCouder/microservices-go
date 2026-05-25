@@ -1,20 +1,33 @@
-import { pushToast } from "./toast-store";
+import { toast } from "sonner";
 
 export function getErrorToastTitle(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  return error instanceof Error && error.message.trim() !== ""
+    ? error.message
+    : fallback;
+}
+
+function normalizeToastId(id: string | number): string {
+  return String(id);
 }
 
 export function pushSuccessToast(title: string, description?: string): string {
-  return pushToast({
-    title,
-    description,
-    variant: "success",
-  });
+  return normalizeToastId(toast.success(title, { description }));
 }
 
-export function pushErrorToast(error: unknown, fallback: string): string {
-  return pushToast({
-    title: getErrorToastTitle(error, fallback),
-    variant: "error",
-  });
+export function pushInfoToast(title: string, description?: string): string {
+  return normalizeToastId(toast.info(title, { description }));
+}
+
+export function pushWarningToast(title: string, description?: string): string {
+  return normalizeToastId(toast.warning(title, { description }));
+}
+
+export function pushErrorToast(
+  error: unknown,
+  fallback: string,
+  description?: string,
+): string {
+  return normalizeToastId(
+    toast.error(getErrorToastTitle(error, fallback), { description }),
+  );
 }

@@ -1,16 +1,27 @@
-import { Loader2, ShieldCheck, Sparkles } from "lucide-react";
+import { CircleHelp, Loader2, Search } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 
-import { UrlInput } from "./url-input";
+import { CHECK_GROUPS } from "../../_lib/audit/audit-config";
 
 type ScanHeroProps = {
   url: string;
   urlError: string;
   canScan: boolean;
   isScanning: boolean;
-  onURLChange: (value: string) => void;
-  onScan: () => void;
+  loadingProject?: boolean;
+  projectName?: string;
+  onAnalyze: () => void;
 };
 
 export function ScanHero({
@@ -18,57 +29,107 @@ export function ScanHero({
   urlError,
   canScan,
   isScanning,
-  onURLChange,
-  onScan,
+  loadingProject = false,
+  projectName = "",
+  onAnalyze,
 }: ScanHeroProps) {
+  const title = projectName
+    ? `Analyser le site ${projectName}`
+    : "Analyser le site du projet";
+
   return (
-    <section className="rounded-[24px] border border-[#eadfd3] bg-[#fffaf5] p-5 shadow-[0_18px_50px_rgba(58,36,24,0.06)] md:p-7">
-      <div className="flex max-w-3xl flex-col gap-4">
-        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[#eadfd3] bg-[#fffdf9] px-3 py-1.5 text-sm font-semibold text-[#866d5d]">
-          <Sparkles className="size-4 text-[#f26a21]" aria-hidden="true" />
-          AI Agent Ready audit
-        </span>
-        <div className="space-y-3">
-          <h1 className="max-w-2xl text-3xl font-bold leading-tight text-[#3a2418] md:text-4xl">
-            Analyze if your content is agent-ready
-          </h1>
-          <p className="max-w-2xl text-base leading-7 text-[#866d5d]">
-            Scan your public content surface for discoverability, Markdown access,
-            crawler policy, and concrete fixes agents can understand.
+    <Card className="border-border/60">
+      <CardContent className="space-y-4 pt-5">
+        <div className="space-y-1">
+          <h1 className="text-lg font-semibold text-foreground">{title}</h1>
+          <p className="text-sm text-muted-foreground">
+            Audit rapide du site public pour vérifier ce qu&apos;un agent peut trouver et exploiter.
           </p>
         </div>
-      </div>
 
-      <form
-        className="mt-7 flex flex-col gap-3 md:flex-row"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onScan();
-        }}
-      >
-        <UrlInput
-          value={url}
-          error={urlError}
-          disabled={isScanning}
-          onChange={onURLChange}
-        />
-        <Button
-          type="submit"
-          disabled={!canScan}
-          className="h-14 rounded-[14px] bg-[#f26a21] px-6 text-base font-bold text-white shadow-[0_12px_28px_rgba(242,106,33,0.24)] ring-[#f26a21]/20 hover:bg-[#dd5d19] md:min-w-[150px]"
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="h-auto justify-start p-0 text-muted-foreground"
+            >
+              <CircleHelp className="size-4" aria-hidden="true" />
+              Voir ce qui sera analysé
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Ce que l&apos;audit vérifie</DialogTitle>
+              <DialogDescription>
+                Les contrôles lancés sont en lecture seule et se concentrent sur les points qui comptent pour les agents.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {CHECK_GROUPS.map((group) => (
+                <div key={group.id} className="space-y-2">
+                  <div className="text-sm font-semibold text-foreground">{group.label}</div>
+                  <ul className="space-y-1 text-sm text-muted-foreground">
+                    {group.checks
+                      .filter((check) => !check.disabled)
+                      .map((check) => (
+                        <li key={check.id} className="flex gap-2">
+                          <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                          <span>
+                            <span className="font-medium text-foreground">{check.label}</span>
+                            {" - "}
+                            {check.description}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <form
+          className="flex flex-col gap-3 lg:flex-row"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onAnalyze();
+          }}
         >
-          {isScanning ? (
-            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <ShieldCheck className="size-4" aria-hidden="true" />
-          )}
-          {isScanning ? "Scanning" : "Scan"}
-        </Button>
-      </form>
-
-      <p className="mt-4 text-sm font-medium text-[#866d5d]">
-        Uses read-only HTTP checks. No authentication or page changes required.
-      </p>
-    </section>
+          <div className="min-w-0 flex-1 space-y-2">
+            <div className="relative">
+              <Search
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <Input
+                value={url}
+                placeholder="https://example.com"
+                className="h-11 rounded-xl border-border/70 bg-background pl-9"
+                readOnly
+              />
+            </div>
+            {loadingProject ? (
+              <p className="text-sm text-muted-foreground">Chargement de l&apos;URL du projet...</p>
+            ) : null}
+            {!loadingProject && urlError ? (
+              <p className="text-sm font-medium text-destructive">{urlError}</p>
+            ) : null}
+            {!loadingProject && !url && !urlError ? (
+              <p className="text-sm text-muted-foreground">
+                Aucune URL de projet disponible pour lancer l&apos;audit.
+              </p>
+            ) : null}
+          </div>
+          <Button type="submit" disabled={!canScan} className="min-w-44 self-end">
+            {isScanning ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {isScanning ? "Analyse en cours" : "Analyser le site"}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }

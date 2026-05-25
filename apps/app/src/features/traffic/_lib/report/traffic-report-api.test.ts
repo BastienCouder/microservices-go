@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import {
   completeTrafficGA4OAuth,
   loadTrafficPageData,
+  normalizeTrafficReport,
   selectTrafficGA4OAuthProperty,
   saveTrafficGA4Integration,
   startTrafficGA4OAuth,
@@ -39,6 +40,42 @@ afterEach(() => {
 });
 
 describe("loadTrafficPageData", () => {
+  test("normalizes legacy geo metric fields while traffic API rollout is mixed", () => {
+    const report = normalizeTrafficReport({
+      summary: {
+        totalGeoSessions: 42,
+        totalSessions: 420,
+        geoShareOfTotal: 10,
+        geoEngagedSessions: 30,
+        geoEngagementRate: 71.43,
+        geoAvgSessionSeconds: 88,
+        geoBounceRate: 28.57,
+        geoConversions: 6,
+        geoConversionRate: 14.29,
+        geoPageViews: 120,
+      },
+      bySource: [
+        {
+          source: "perplexity.ai",
+          engine: "Perplexity",
+          sessions: 42,
+          shareOfGeoSessions: 100,
+        },
+      ],
+    });
+
+    expect(report.summary.totalTrafficSessions).toBe(42);
+    expect(report.summary.trafficShareOfTotal).toBe(10);
+    expect(report.summary.trafficEngagedSessions).toBe(30);
+    expect(report.summary.trafficEngagementRate).toBe(71.43);
+    expect(report.summary.trafficAvgSessionSeconds).toBe(88);
+    expect(report.summary.trafficBounceRate).toBe(28.57);
+    expect(report.summary.trafficConversions).toBe(6);
+    expect(report.summary.trafficConversionRate).toBe(14.29);
+    expect(report.summary.trafficPageViews).toBe(120);
+    expect(report.bySource[0]?.shareOfTrafficSessions).toBe(100);
+  });
+
   test("resolves a project slug and calls the traffic endpoint only when GA4 is connected", async () => {
     const calls = mockFetchSequence([
       jsonResponse(200, {
@@ -75,9 +112,9 @@ describe("loadTrafficPageData", () => {
           propertyId: "123456789",
           dateRange: { startDate: "2026-03-02", endDate: "2026-04-01" },
           summary: {
-            totalGeoSessions: 12,
+            totalTrafficSessions: 12,
             totalSessions: 120,
-            geoShareOfTotal: 10,
+            trafficShareOfTotal: 10,
             topEngine: "ChatGPT",
           },
           bySource: [{ source: "chatgpt.com", engine: "ChatGPT", sessions: 12 }],
@@ -94,7 +131,7 @@ describe("loadTrafficPageData", () => {
     expect(result.projectId).toBe("prj_1");
     expect(result.projectName).toBe("Acme");
     expect(result.integration.ga4.isConnected).toBe(true);
-    expect(result.report.summary.totalGeoSessions).toBe(12);
+    expect(result.report.summary.totalTrafficSessions).toBe(12);
     expect(calls[0]?.url).toBe("http://api.test/projects");
     expect(calls.some((call) => call.url.includes("/projects/site-france"))).toBe(false);
     expect(calls[3]?.url.includes("/attribution/projects/prj_1/traffic")).toBe(true);
@@ -225,7 +262,7 @@ describe("loadTrafficPageData", () => {
 
     expect(result.projectId).toBe("prj_1");
     expect(result.integration.ga4.isConnected).toBe(true);
-    expect(result.report.summary.totalGeoSessions).toBe(0);
+    expect(result.report.summary.totalTrafficSessions).toBe(0);
     expect(result.reportError).toBe("Google Analytics est momentanément indisponible.");
     expect(calls).toHaveLength(4);
     expect(calls[3]?.url.includes("/attribution/projects/prj_1/traffic")).toBe(true);
@@ -260,7 +297,7 @@ describe("loadTrafficPageData", () => {
           projectId: "prj_1",
           propertyId: "123456789",
           dataSource: "ga4",
-          summary: { totalGeoSessions: 0, totalSessions: 120 },
+          summary: { totalTrafficSessions: 0, totalSessions: 120 },
           bySource: [],
           topPages: [],
           timeseries: [],
@@ -346,7 +383,7 @@ describe("loadTrafficPageData", () => {
 
     expect(result.projectId).toBe("prj_1");
     expect(result.integration.ga4.isConnected).toBe(false);
-    expect(result.report.summary.totalGeoSessions).toBe(0);
+    expect(result.report.summary.totalTrafficSessions).toBe(0);
     expect(calls).toHaveLength(3);
   });
 
@@ -382,7 +419,7 @@ describe("loadTrafficPageData", () => {
 
     expect(result.projectId).toBe("prj_1");
     expect(result.integration.ga4.isConnected).toBe(false);
-    expect(result.report.summary.totalGeoSessions).toBe(0);
+    expect(result.report.summary.totalTrafficSessions).toBe(0);
     expect(result.reportError).toBe(null);
     expect(calls).toHaveLength(4);
   });
@@ -423,9 +460,9 @@ describe("loadTrafficPageData", () => {
           dateRange: { startDate: "2026-03-29", endDate: "2026-04-28" },
           generatedAt: "2026-04-28T12:00:00Z",
           summary: {
-            totalGeoSessions: 183,
+            totalTrafficSessions: 183,
             totalSessions: 1464,
-            geoShareOfTotal: 12.5,
+            trafficShareOfTotal: 12.5,
             topEngine: "ChatGPT",
           },
           bySource: [
@@ -449,7 +486,7 @@ describe("loadTrafficPageData", () => {
 
     expect(consoleCalls).toHaveLength(0);
     expect(result.report.dataSource).toBe("");
-    expect(result.report.summary.totalGeoSessions).toBe(0);
+    expect(result.report.summary.totalTrafficSessions).toBe(0);
     expect(result.report.bySource).toHaveLength(0);
     expect(result.report.topPages).toHaveLength(0);
     expect(result.report.timeseries).toHaveLength(0);
@@ -490,7 +527,7 @@ describe("loadTrafficPageData", () => {
           propertyId: "123456789",
           dataSource: "ga4",
           summary: {
-            totalGeoSessions: 183,
+            totalTrafficSessions: 183,
             totalSessions: 1464,
             topEngine: "ChatGPT",
           },
@@ -520,11 +557,21 @@ describe("saveTrafficGA4Integration", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          projectId: "prj_1",
-          ga4: {
-            propertyId: "123456789",
-            hasServiceAccount: true,
-            isConnected: true,
+          integration: {
+            projectId: "prj_1",
+            ga4: {
+              propertyId: "123456789",
+              hasServiceAccount: true,
+              isConnected: true,
+            },
+          },
+          llmSetup: {
+            setupStatus: "success",
+            createdResources: {
+              channelGroupName: "properties/123/channelGroups/456",
+              customDimensionName: "properties/123/customDimensions/789",
+            },
+            errors: [],
           },
         },
       }),
@@ -534,10 +581,13 @@ describe("saveTrafficGA4Integration", () => {
       projectId: "prj_1",
       organizationId: "42",
       propertyId: "123456789",
-      serviceAccountJSON: "{\"client_email\":\"geo@example.com\"}",
+      serviceAccountJSON: "{\"client_email\":\"traffic@example.com\"}",
     });
 
-    expect(result.ga4.isConnected).toBe(true);
+    expect(result.integration.ga4.isConnected).toBe(true);
+    expect(result.llmSetup?.createdResources.customDimensionName).toBe(
+      "properties/123/customDimensions/789",
+    );
     expect(calls[0]?.url.includes("/projects/prj_1/impact-integrations")).toBe(true);
     expect(calls[0]?.init?.method).toBe("PATCH");
     expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("42");
@@ -545,7 +595,7 @@ describe("saveTrafficGA4Integration", () => {
       JSON.stringify({
         ga4: {
           propertyId: "123456789",
-          serviceAccountJSON: "{\"client_email\":\"geo@example.com\"}",
+          serviceAccountJSON: "{\"client_email\":\"traffic@example.com\"}",
         },
       }),
     );

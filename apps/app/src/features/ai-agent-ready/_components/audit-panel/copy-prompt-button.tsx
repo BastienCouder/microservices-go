@@ -22,15 +22,9 @@ export function CopyPromptButton({ prompt }: CopyPromptButtonProps) {
   };
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      className="rounded-[14px] border-[#eadfd3] bg-[#fffdf9] text-[#3a2418] hover:bg-[#fff3e8]"
-      onClick={handleCopy}
-    >
+    <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
       {copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
-      {copied ? "Copied" : "Copy prompt"}
+      {copied ? "Copié" : "Copier le prompt"}
     </Button>
   );
 }

@@ -1,7 +1,8 @@
-import { CheckCircle2, CircleAlert, CircleX, Link2 } from "lucide-react";
+import { CheckCircle2, CircleAlert, CircleX } from "lucide-react";
+
+import { Card, CardContent } from "@/components/ui/card";
 
 import type { AuditScanResult } from "../../_lib/shared/types";
-import { CategoryScorePill } from "./category-score-pill";
 import { ScoreGauge } from "./score-gauge";
 
 type ScoreSummaryCardProps = {
@@ -9,59 +10,54 @@ type ScoreSummaryCardProps = {
 };
 
 export function ScoreSummaryCard({ result }: ScoreSummaryCardProps) {
-  const completed = result.summary.passed + result.summary.failed + result.summary.warning;
+  const levelLabel =
+    result.level === "Ready"
+      ? "Prêt"
+      : result.level === "Partially Ready"
+        ? "Partiellement prêt"
+        : "Non prêt";
 
   return (
-    <section className="rounded-[24px] border border-[#eadfd3] bg-[#fffaf5] p-5 shadow-[0_18px_50px_rgba(58,36,24,0.06)] md:p-7">
-      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_240px] lg:items-center">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#866d5d]">
-            <Link2 className="size-4 text-[#f26a21]" aria-hidden="true" />
-            <span className="truncate">{result.url}</span>
-          </div>
-          <div className="mt-5 flex flex-wrap items-end gap-3">
-            <h2 className="text-3xl font-extrabold text-[#3a2418]">{result.level}</h2>
-            <span className="rounded-full bg-[#f26a21]/10 px-3 py-1 text-sm font-bold text-[#a84510]">
-              {completed}/{result.checks.length} checks reviewed
-            </span>
-          </div>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#866d5d]">
-            {result.summary.failed > 0
-              ? "Focus on failed checks first. They block agents from finding or reusing your content reliably."
-              : "The core content surface is in good shape. Keep policy and discovery signals current."}
-          </p>
+    <Card className="border-border/60">
+      <CardContent className="pt-4">
+        <div className="grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)] xl:items-center">
+          <ScoreGauge score={result.score} />
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            <Counter
-              icon={CheckCircle2}
-              label="Passed"
-              value={result.summary.passed}
-              className="text-[#1fa35b]"
-            />
-            <Counter
-              icon={CircleAlert}
-              label="Warnings"
-              value={result.summary.warning}
-              className="text-[#f3a43b]"
-            />
-            <Counter
-              icon={CircleX}
-              label="Failed"
-              value={result.summary.failed}
-              className="text-[#df4c4c]"
-            />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="text-2xl font-semibold text-foreground">{levelLabel}</h2>
+              <span className="text-sm text-muted-foreground">Score global</span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              {result.summary.failed > 0
+                ? "Les points ci-dessous sont ceux à traiter en priorité pour éviter que les agents ratent ou exploitent mal le site."
+                : "Aucun point bloquant détecté sur les contrôles lancés."}
+            </p>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              <Counter
+                icon={CheckCircle2}
+                label="Validés"
+                value={result.summary.passed}
+                className="text-green-700"
+              />
+              <Counter
+                icon={CircleAlert}
+                label="Alertes"
+                value={result.summary.warning}
+                className="text-amber-700"
+              />
+              <Counter
+                icon={CircleX}
+                label="Bloquants"
+                value={result.summary.failed}
+                className="text-destructive"
+              />
+            </div>
           </div>
         </div>
-
-        <ScoreGauge score={result.score} />
-      </div>
-
-      <div className="mt-7 grid gap-3 md:grid-cols-3">
-        {result.categories.map((category) => (
-          <CategoryScorePill key={category.id} category={category} />
-        ))}
-      </div>
-    </section>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -77,12 +73,12 @@ function Counter({
   className: string;
 }) {
   return (
-    <div className="rounded-[18px] border border-[#eadfd3] bg-[#fffdf9] p-4">
-      <div className="flex items-center gap-2 text-sm font-bold text-[#866d5d]">
+    <div className="rounded-xl border border-border/60 bg-muted/15 p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
         <Icon className={className} aria-hidden="true" />
         {label}
       </div>
-      <div className="mt-2 text-2xl font-extrabold text-[#3a2418]">{value}</div>
+      <div className="mt-2 text-2xl font-semibold text-foreground">{value}</div>
     </div>
   );
 }

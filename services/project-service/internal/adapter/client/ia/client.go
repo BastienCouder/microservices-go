@@ -90,18 +90,26 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 type Client struct {
-	conn      *grpc.ClientConn
-	client    iav1.IAServiceClient
-	jwtSecret string
-	jwtIssuer string
-	breaker   *circuitBreaker
-	bulkhead  *bulkhead
+	conn           *grpc.ClientConn
+	client         iav1.IAServiceClient
+	jwtSecret      string
+	jwtIssuer      string
+	attemptTimeout time.Duration
+	breaker        *circuitBreaker
+	bulkhead       *bulkhead
 }
 
 func NewClient(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConfig) (*Client, error) {
+	return NewClientWithOptions(target, jwtSecret, jwtIssuer, tlsConfig, 30*time.Second)
+}
+
+func NewClientWithOptions(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConfig, attemptTimeout time.Duration) (*Client, error) {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil, fmt.Errorf("ia grpc target is required")
+	}
+	if attemptTimeout <= 0 {
+		attemptTimeout = 30 * time.Second
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -121,12 +129,13 @@ func NewClient(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConf
 	}
 
 	return &Client{
-		conn:      conn,
-		client:    iav1.NewIAServiceClient(conn),
-		jwtSecret: jwtSecret,
-		jwtIssuer: jwtIssuer,
-		breaker:   newCircuitBreaker(5, 30*time.Second),
-		bulkhead:  newBulkhead(128),
+		conn:           conn,
+		client:         iav1.NewIAServiceClient(conn),
+		jwtSecret:      jwtSecret,
+		jwtIssuer:      jwtIssuer,
+		attemptTimeout: attemptTimeout,
+		breaker:        newCircuitBreaker(5, 30*time.Second),
+		bulkhead:       newBulkhead(128),
 	}, nil
 }
 
@@ -144,7 +153,7 @@ func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromp
 	}
 
 	var grpcResp *iav1.ExecutePromptResponse
-	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
+	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, c.attemptTimeout, func(attemptCtx context.Context) (bool, error) {
 		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
 		resp, callErr := c.client.ExecutePrompt(callCtx, &iav1.ExecutePromptRequest{
 			PromptId:       input.PromptID,
@@ -154,6 +163,7 @@ func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromp
 			Competitors:    input.Competitors,
 			ProviderId:     input.ProviderID,
 			ProviderApiKey: input.ProviderAPIKey,
+			PromptMode:     string(input.PromptMode),
 		})
 		if callErr != nil {
 			return isTransientGRPCError(callErr), callErr

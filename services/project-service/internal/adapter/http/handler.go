@@ -192,8 +192,12 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.finalizeProject(w, r, projectID)
 	case len(parts) == 3 && parts[1] == "analysis" && parts[2] == "run" && r.Method == http.MethodPost:
 		h.runManualAnalysis(w, r, projectID)
+	case len(parts) == 4 && parts[1] == "analysis" && parts[2] == "perception" && parts[3] == "run" && r.Method == http.MethodPost:
+		h.runPerceptionAnalysis(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodPost:
 		h.addPrompts(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "prompts" && parts[2] == "generate" && r.Method == http.MethodPost:
+		h.generatePrompts(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodGet:
 		h.listPrompts(w, r, projectID)
 	case len(parts) == 3 && parts[1] == "prompts" && parts[2] == "status" && r.Method == http.MethodPatch:
@@ -240,6 +244,9 @@ func isProjectMembersRoute(parts []string) bool {
 }
 
 func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) bool {
+	if hasOrganizationFullAccess(r) {
+		return true
+	}
 	userID, ok := authenticatedUserID(r)
 	if !ok {
 		return true
@@ -652,6 +659,11 @@ type runManualAnalysisRequest struct {
 	RunType     string                       `json:"runType"`
 }
 
+type runPerceptionAnalysisRequest struct {
+	RequestID string `json:"requestId"`
+	Force     bool   `json:"force"`
+}
+
 func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
 	createdBy, ok := authenticatedUserID(r)
 	if !ok {
@@ -683,8 +695,38 @@ func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, proj
 	writeSuccess(w, http.StatusCreated, result)
 }
 
+func (h *Handler) runPerceptionAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
+	createdBy, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req runPerceptionAnalysisRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := h.svc.RunPerceptionAnalysis(r.Context(), projectID, organizationID, createdBy, usecase.RunPerceptionAnalysisInput{
+		RequestID: req.RequestID,
+		Force:     req.Force,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusCreated, result)
+}
+
 type addPromptsRequest struct {
 	Prompts []string `json:"prompts"`
+	Kind    string   `json:"kind"`
 }
 
 func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -699,7 +741,7 @@ func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID s
 		return
 	}
 
-	prompts, err := h.svc.AddPrompts(r.Context(), projectID, organizationID, req.Prompts)
+	prompts, err := h.svc.AddPromptsWithKind(r.Context(), projectID, organizationID, req.Prompts, req.Kind)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -727,9 +769,26 @@ func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID 
 	writeSuccess(w, http.StatusOK, prompts)
 }
 
+func (h *Handler) generatePrompts(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	prompts, err := h.svc.GenerateMonitoringPrompts(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+
+	writeSuccess(w, http.StatusCreated, prompts)
+}
+
 type updatePromptRequest struct {
 	Text     *string                 `json:"text"`
 	Intent   *string                 `json:"intent"`
+	Kind     *string                 `json:"kind"`
 	ModelIDs *[]string               `json:"modelIds"`
 	Schedule *usecase.PromptSchedule `json:"schedule"`
 	Status   *string                 `json:"status"`
@@ -753,6 +812,7 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, organizationID, usecase.UpdatePromptInput{
 		Text:     req.Text,
 		Intent:   req.Intent,
+		Kind:     req.Kind,
 		ModelIDs: req.ModelIDs,
 		Schedule: req.Schedule,
 		Status:   req.Status,
@@ -1029,6 +1089,7 @@ type syncOpenRouterModelsRequest struct {
 	SearchQuery               string   `json:"searchQuery"`
 	ActivateImported          bool     `json:"activateImported"`
 	PurgeUnsupportedProviders bool     `json:"purgeUnsupportedProviders"`
+	PurgeMissingModels        bool     `json:"purgeMissingModels"`
 }
 
 func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
@@ -1047,6 +1108,7 @@ func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
 		SearchQuery:               req.SearchQuery,
 		ActivateImported:          req.ActivateImported,
 		PurgeUnsupportedProviders: req.PurgeUnsupportedProviders,
+		PurgeMissingModels:        req.PurgeMissingModels,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -1225,6 +1287,19 @@ func authenticatedOrganizationID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+func hasOrganizationFullAccess(r *http.Request) bool {
+	value := strings.TrimSpace(r.Header.Get("X-Organization-Full-Access"))
+	if value == "" {
+		value = strings.TrimSpace(r.Header.Get("x-organization-full-access"))
+	}
+	switch strings.ToLower(value) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {

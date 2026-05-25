@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  getAgentReadyProjectSummary,
   isValidScanURL,
   pollAgentReadyScan,
   startAgentReadyScan,
@@ -25,6 +26,24 @@ describe("agent ready audit api", () => {
     expect(isValidScanURL("http://example.com/path")).toBe(true);
     expect(isValidScanURL("example.com")).toBe(false);
     expect(isValidScanURL("ftp://example.com")).toBe(false);
+  });
+
+  test("loads the project summary used to prefill the audit url", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (input, init) => {
+      calls.push({ url: String(input), init });
+      return jsonResponse(200, {
+        data: { id: "prj_1", name: "Acme", websiteUrl: "example.com" },
+      });
+    }) as typeof fetch;
+
+    const result = await getAgentReadyProjectSummary("http://api.test", {
+      projectId: "prj_1",
+      organizationId: "42",
+    });
+
+    expect(result).toEqual({ name: "Acme", websiteUrl: "https://example.com" });
+    expect(calls[0]?.url).toBe("http://api.test/projects/prj_1");
   });
 
   test("starts a content-site scan through the gateway route", async () => {

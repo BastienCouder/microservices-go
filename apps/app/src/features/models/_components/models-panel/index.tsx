@@ -5,19 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/shared/page-header";
-import { pushErrorToast } from "@/components/ui/toast-actions";
+import { pushErrorToast, pushWarningToast } from "@/components/ui/toast-actions";
 
 import { ProviderApiKeysPanel } from "../provider-keys/provider-api-keys-panel";
 import {
   PROVIDER_API_KEY_TEXTS,
   useModelsPanelViewModel,
 } from "../../_lib/models-panel/use-models-panel-view-model";
-import { DeveloperPlanHeroBanner } from "./developer-plan-hero-banner";
 import { ModelCatalogGrid } from "./model-catalog-grid";
 import { ModelsToolbar } from "./models-toolbar";
 import {
   CatalogTemplate,
-  DeveloperPlanHeroBannerTemplate,
   ProviderApiKeysPanelTemplate,
 } from "./template";
 
@@ -28,12 +26,21 @@ type ModelsPanelProps = {
 
 export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
   const viewModel = useModelsPanelViewModel({ apiBaseURL, routeSearch });
+  const missingProviderLabels = viewModel.missingProviderLabels.join(", ");
 
   useEffect(() => {
     if (viewModel.displayError) {
       pushErrorToast(new Error(viewModel.displayError), viewModel.displayError);
     }
   }, [viewModel.displayError]);
+
+  useEffect(() => {
+    if (viewModel.developerPlanMissingKeys) {
+      pushWarningToast(
+        `Ajoutez une cle API pour ${missingProviderLabels} avant d'enregistrer ces modeles.`,
+      );
+    }
+  }, [missingProviderLabels, viewModel.developerPlanMissingKeys]);
 
   if (viewModel.redirectHref) {
     return <Navigate to={viewModel.redirectHref} replace />;
@@ -45,6 +52,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
         title="Modeles"
         baseline="Choisissez directement les modeles actifs pour le projet."
         actionsVariant="classic"
+        className="rounded-md rounded-bl-none rounded-br-none"
         meta={
           <>
             {viewModel.loading ? (
@@ -68,17 +76,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
         }
       />
 
-      <div className="flex flex-1 flex-col rounded-md bg-background">
-      {/*   {viewModel.loadingPlan ? (
-          <div className="border-b px-4 py-4 md:px-4">
-            <DeveloperPlanHeroBannerTemplate />
-          </div>
-        ) : viewModel.showDeveloperUpgradeBanner ? (
-         /*  <div className="border-b px-4 py-4 md:px-4">
-            <DeveloperPlanHeroBanner currentPlanLabel={viewModel.planLabel} />
-          </div>
-        ) : null} */}
-
+      <div className="flex flex-1 flex-col rounded-md rounded-tr-none rounded-tl-none md:rounded-md bg-background">
         {viewModel.isDeveloperPlan ? (
           <div className="border-b px-4 py-4 md:px-6">
             {viewModel.loadingProviderCredentials || viewModel.loadingCatalog ? (
@@ -95,14 +93,6 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
                 texts={PROVIDER_API_KEY_TEXTS}
               />
             )}
-
-            {viewModel.developerPlanMissingKeys ? (
-              <p className="mt-3 text-sm text-destructive">
-                Ajoutez une cle API pour{" "}
-                {viewModel.missingProviderLabels.join(", ")} avant
-                d&apos;enregistrer ces modeles.
-              </p>
-            ) : null}
           </div>
         ) : null}
 
@@ -121,7 +111,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
           {!viewModel.organizationId ? (
             <EmptyStateCard label="Selectionne d'abord une organisation." />
           ) : viewModel.loading ? <CatalogTemplate /> : viewModel.filteredCatalog.length === 0 ? (
-            <EmptyStateCard label="Aucun modele disponible." />
+            <EmptyStateCard label={viewModel.displayError || "Aucun modele disponible."} />
           ) : (<>
             <ModelCatalogGrid
               models={viewModel.filteredCatalog}

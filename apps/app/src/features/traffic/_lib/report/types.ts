@@ -1,25 +1,25 @@
-export type GeoPeriod = "7d" | "30d" | "90d";
+export type TrafficPeriod = "7d" | "30d" | "90d";
 
-export type GeoTrafficDateRange = {
+export type TrafficDateRange = {
   startDate: string;
   endDate: string;
 };
 
-export type GeoTrafficSummary = {
-  totalGeoSessions: number;
+export type TrafficSummary = {
+  totalTrafficSessions: number;
   totalSessions: number;
-  geoShareOfTotal: number;
-  geoEngagedSessions: number;
-  geoEngagementRate: number;
-  geoAvgSessionSeconds: number;
-  geoBounceRate: number;
-  geoConversions: number;
-  geoConversionRate: number;
-  geoPageViews: number;
+  trafficShareOfTotal: number;
+  trafficEngagedSessions: number;
+  trafficEngagementRate: number;
+  trafficAvgSessionSeconds: number;
+  trafficBounceRate: number;
+  trafficConversions: number;
+  trafficConversionRate: number;
+  trafficPageViews: number;
   topEngine: string;
 };
 
-export type GeoTrafficSource = {
+export type TrafficSource = {
   source: string;
   medium: string;
   sourceMedium: string;
@@ -32,10 +32,10 @@ export type GeoTrafficSource = {
   avgSessionSeconds: number;
   conversions: number;
   pageViews: number;
-  shareOfGeoSessions: number;
+  shareOfTrafficSessions: number;
 };
 
-export type GeoTrafficPage = {
+export type TrafficPage = {
   path: string;
   title: string;
   source: string;
@@ -47,34 +47,34 @@ export type GeoTrafficPage = {
   pageViews: number;
 };
 
-export type GeoTrafficDailyPoint = {
+export type TrafficDailyPoint = {
   date: string;
   sessions: number;
   engagedSessions: number;
   conversions: number;
 };
 
-export type GeoQuotaStatus = {
+export type TrafficQuotaStatus = {
   consumed: number;
   remaining: number;
 };
 
-export type GeoPropertyQuota = {
-  tokensPerDay: GeoQuotaStatus;
-  serverErrorsPerProjectPerHour: GeoQuotaStatus;
+export type TrafficPropertyQuota = {
+  tokensPerDay: TrafficQuotaStatus;
+  serverErrorsPerProjectPerHour: TrafficQuotaStatus;
 };
 
-export type GeoTrafficReport = {
+export type TrafficReport = {
   projectId: string;
   propertyId: string;
   dataSource: "ga4" | "fake" | "";
-  dateRange: GeoTrafficDateRange;
+  dateRange: TrafficDateRange;
   generatedAt: string;
-  summary: GeoTrafficSummary;
-  bySource: GeoTrafficSource[];
-  topPages: GeoTrafficPage[];
-  timeseries: GeoTrafficDailyPoint[];
-  propertyQuota: GeoPropertyQuota | null;
+  summary: TrafficSummary;
+  bySource: TrafficSource[];
+  topPages: TrafficPage[];
+  timeseries: TrafficDailyPoint[];
+  propertyQuota: TrafficPropertyQuota | null;
 };
 
 export type TrafficGA4Integration = {
@@ -93,12 +93,12 @@ export type TrafficImpactIntegrations = {
 };
 
 export type TrafficPageData = {
-  report: GeoTrafficReport;
+  report: TrafficReport;
   integration: TrafficImpactIntegrations;
   projectId: string | null;
   projectName: string;
   organizationId: string;
-  period: GeoPeriod;
+  period: TrafficPeriod;
   reportError: string | null;
 };
 
@@ -107,6 +107,11 @@ export type SaveTrafficGA4IntegrationInput = {
   organizationId: string;
   propertyId: string;
   serviceAccountJSON: string;
+};
+
+export type SaveTrafficGA4IntegrationResult = {
+  integration: TrafficImpactIntegrations;
+  llmSetup: TrafficGA4LLMSetupResult | null;
 };
 
 export type TrafficGA4OAuthProperty = {

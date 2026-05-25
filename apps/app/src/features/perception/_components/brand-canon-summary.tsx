@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import type { BrandCanon } from "@/lib/perception-data";
 import { cn } from "@/lib/utils";
@@ -64,7 +65,7 @@ export function BrandCanonSummary({
                     </Badge>
                   ))
                 ) : (
-                  <span className="text-sm text-muted-foreground">{t("summaryEmpty")}</span>
+                  <EmptyStateCard label={t("summaryEmpty")} className="h-10 w-full justify-start text-left text-sm" />
                 )}
               </div>
             </div>
@@ -85,7 +86,7 @@ export function BrandCanonSummary({
                     </div>
                   ))
                 ) : (
-                  <span className="text-sm text-muted-foreground">{t("summaryEmpty")}</span>
+                  <EmptyStateCard label={t("summaryEmpty")} className="h-10 w-full justify-start text-left text-sm" />
                 )}
               </div>
             </div>
@@ -106,7 +107,7 @@ export function BrandCanonSummary({
                   ))}
                 </div>
               ) : (
-                <span className="text-sm text-muted-foreground">{t("summaryEmpty")}</span>
+                <EmptyStateCard label={t("summaryEmpty")} className="h-10 justify-start text-left text-sm" />
               )}
             </div>
           </div>

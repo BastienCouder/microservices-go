@@ -72,6 +72,7 @@ export type PerceptionError = {
   detectedInModels: string[];
   fixType: "prompt_patch" | "website_copy" | "schema_update" | "faq_snippet";
   generatedContent: string;
+  generatedContentKey?: string;
   optimizePriority: OptimizePriority;
   type: string;
 };
@@ -148,9 +149,87 @@ export type PerceptionViewData = {
     modelCatalog: PerceptionModelOption[];
     generatedAt: string;
     latestRunId?: string;
+    emptyStateLabel?: string;
     runtimeMode: RuntimeMode;
   };
 };
+
+const EMPTY_BRAND_CANON: BrandCanon = {
+  brandName: "",
+  category: "",
+  positioning: "",
+  audience: [],
+  useCases: [],
+  pricing: {
+    amount: 0,
+    currency: "",
+    period: "",
+    note: "",
+  },
+  features: [],
+};
+
+export function createEmptyPerceptionViewData(routeSearch = "", emptyStateLabel?: string | null): PerceptionViewData {
+  const generatedAt = new Date().toISOString();
+  const normalizedEmptyStateLabel = emptyStateLabel?.trim() || undefined;
+
+  return {
+    source: "fallback",
+    brandCanon: {
+      ...EMPTY_BRAND_CANON,
+      audience: [],
+      useCases: [],
+      pricing: { ...EMPTY_BRAND_CANON.pricing },
+      features: [],
+    },
+    competitors: [],
+    radar: [],
+    scores: {
+      positioningAccuracy: 0,
+      factualAccuracy: 0,
+      sentimentScore: 0,
+    },
+    topErrors: [],
+    modelAxisHeatmap: {
+      axes: [],
+      rows: [],
+    },
+    trend: {
+      all: {
+        periodLabel: PERCEPTION_PERIOD_LABELS.all,
+        data: [],
+      },
+      "7d": {
+        periodLabel: PERCEPTION_PERIOD_LABELS["7d"],
+        data: [],
+      },
+      "30d": {
+        periodLabel: PERCEPTION_PERIOD_LABELS["30d"],
+        data: [],
+      },
+      "90d": {
+        periodLabel: PERCEPTION_PERIOD_LABELS["90d"],
+        data: [],
+      },
+      "last-run": {
+        periodLabel: PERCEPTION_PERIOD_LABELS["last-run"],
+        data: [],
+      },
+    },
+    responses: [],
+    metadata: {
+      projectId: null,
+      windowLabel: "",
+      analyzedResponses: 0,
+      models: [],
+      projectModels: [],
+      modelCatalog: [],
+      generatedAt,
+      emptyStateLabel: normalizedEmptyStateLabel,
+      runtimeMode: resolveRuntimeMode(routeSearch),
+    },
+  };
+}
 
 type PerceptionApiPayload = {
   brandCanon?: Partial<BrandCanon> & {
@@ -862,6 +941,7 @@ function normalizeBackendTopErrors(payload: PerceptionApiPayload): PerceptionErr
       fixType: normalizeFixType(error.fixType),
       optimizePriority: normalizeOptimizePriority(error.optimizePriority, severity),
       generatedContent: error.generatedContent || "",
+      generatedContentKey: error.generatedContentKey || undefined,
     };
   });
 }
@@ -1132,7 +1212,7 @@ export async function loadPerceptionData(
     },
   );
 
-  if (!projectRes.ok && projectId && projectRes.status === 404) {
+  if (!projectRes.ok && projectId && [401, 403, 404].includes(projectRes.status)) {
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",

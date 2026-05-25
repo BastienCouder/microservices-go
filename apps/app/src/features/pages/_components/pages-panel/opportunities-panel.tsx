@@ -9,9 +9,11 @@ import { cn } from "@/lib/utils";
 import type { PagesOpportunity } from "../../_lib/pages-panel/types";
 
 export function OpportunitiesPanel({
+  errorLabel,
   opportunities,
   loading = false,
 }: {
+  errorLabel?: string | null;
   opportunities: PagesOpportunity[];
   loading?: boolean;
 }) {
@@ -49,7 +51,7 @@ export function OpportunitiesPanel({
           </div>
         ) : opportunities.length === 0 ? (
           <EmptyStateCard
-            label="Les opportunités apparaîtront dès que des citations seront disponibles."
+            label={errorLabel || "Les opportunités apparaîtront dès que des citations seront disponibles."}
             className="h-[150px]"
           />
         ) : (

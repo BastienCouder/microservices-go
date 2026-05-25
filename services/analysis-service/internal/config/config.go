@@ -83,6 +83,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	cloudflareAccountID, err := optionalValueFromEnv("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID_FILE")
+	if err != nil {
+		return Config{}, err
+	}
 	cloudflareAPIToken, err := optionalPasswordFromEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_TOKEN_FILE")
 	if err != nil {
 		return Config{}, err
@@ -107,7 +111,7 @@ func Load() (Config, error) {
 		RedisAddr:                      redisAddr,
 		RedisPassword:                  redisPassword,
 		DashboardCacheTTL:              dashboardCacheTTL,
-		CloudflareAccountID:            optionalEnv("CLOUDFLARE_ACCOUNT_ID"),
+		CloudflareAccountID:            cloudflareAccountID,
 		CloudflareAPIToken:             cloudflareAPIToken,
 		IAServiceURL:                   optionalEnv("IA_SERVICE_URL"),
 		ContentIssueAnalyzerModelID:    optionalEnv("CONTENT_ISSUE_ANALYZER_MODEL_ID"),
@@ -182,6 +186,21 @@ func optionalPasswordFromEnv(passwordKey, fileKey string) (string, error) {
 	raw, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("read password file %s: %w", filePath, err)
+	}
+	return strings.TrimSpace(string(raw)), nil
+}
+
+func optionalValueFromEnv(key, fileKey string) (string, error) {
+	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+		return value, nil
+	}
+	filePath := strings.TrimSpace(os.Getenv(fileKey))
+	if filePath == "" {
+		return "", nil
+	}
+	raw, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("read value file %s: %w", filePath, err)
 	}
 	return strings.TrimSpace(string(raw)), nil
 }

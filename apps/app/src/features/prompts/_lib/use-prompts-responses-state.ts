@@ -21,6 +21,12 @@ import {
   getPromptSelectionKey,
   RESPONSES_BATCH_SIZE,
 } from "./prompt-normalizers";
+import { resolveBulkPromptIds } from "./prompt-mutation-actions";
+import {
+  isPromptRunProgressComplete,
+  isPromptRunProgressExpired,
+  type PromptRunProgressEntry,
+} from "./prompt-run-progress";
 import { DEFAULT_PROMPT_PERIOD, rankTone, statusBadgeClassName, truncate } from "./utils";
 import { usePromptsDerivedState } from "./use-prompts-derived-state";
 import { usePromptsMutations } from "./use-prompts-mutations";
@@ -72,6 +78,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     loading: monitoringLoading,
     mode,
     projectId,
+    refresh: refreshMonitoringData,
   } = useMonitoringData();
   const [organizationId, setOrganizationId] = useState(() =>
     readOrganizationId(routeSearch),
@@ -108,6 +115,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const [editingPromptModelsId, setEditingPromptModelsId] = useState<string | null>(null);
   const [editingPromptScheduleId, setEditingPromptScheduleId] = useState<string | null>(null);
   const [runningPromptRowIds, setRunningPromptRowIds] = useState<string[]>([]);
+  const [pendingPromptRuns, setPendingPromptRuns] = useState<PromptRunProgressEntry[]>([]);
 
   useEffect(() => {
     setOrganizationId(readOrganizationId(routeSearch));
@@ -160,6 +168,35 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       return kept.length > 0 ? kept : source.responseAvailableModels;
     });
   }, [source.responseAvailableModels]);
+
+  useEffect(() => {
+    if (pendingPromptRuns.length === 0) {
+      setRunningPromptRowIds([]);
+      return;
+    }
+
+    const next = pendingPromptRuns.filter((entry) => {
+      if (isPromptRunProgressExpired(entry)) return false;
+      return !isPromptRunProgressComplete(entry, monitoringData.recent_prompts as never);
+    });
+
+    if (next.length !== pendingPromptRuns.length) {
+      setPendingPromptRuns(next);
+    }
+    setRunningPromptRowIds(next.map((entry) => entry.rowId));
+  }, [monitoringData.recent_prompts, pendingPromptRuns]);
+
+  useEffect(() => {
+    if (pendingPromptRuns.length === 0) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      void refreshMonitoringData();
+    }, 4000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [pendingPromptRuns.length, refreshMonitoringData]);
 
   const promptQuotaQuery = useQuery({
     queryKey: appQueryKeys.promptQuota(apiBaseURL, organizationId, source.activeProjectId),
@@ -247,6 +284,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     promptSortDirection,
     promptAvailableModels: source.promptAvailableModels,
     availablePersonas: source.availablePersonas,
+    recentPrompts: monitoringData.recent_prompts,
     manualPrompts,
     persistedPromptIds: source.persistedPromptIds,
     setManualPrompts,
@@ -255,9 +293,13 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     setEditingPromptModelsId,
     setEditingPromptScheduleId,
     setHiddenPromptIds,
+    setPendingPromptRuns,
     setSelectedPromptIds,
     setSelectedPromptId,
     setRunningPromptRowIds,
+    refreshMonitoringData,
+    refetchPromptsCatalog: source.promptsCatalogQuery.refetch,
+    refetchPromptQuota: promptQuotaQuery.refetch,
   });
   const promptsCatalogInitialLoading =
     source.promptsCatalogQuery.isLoading ||
@@ -306,6 +348,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     prompts: derived.prompts,
     editorPrompts: derived.editorPrompts,
     filteredPrompts: derived.filteredPrompts,
+    selectedPromptRows: derived.selectedPromptRows,
     filteredResponses: derived.visibleResponses,
     filteredResponsesTotal: derived.filteredResponses.length,
     hasMoreResponses: derived.visibleResponses.length < derived.filteredResponses.length,
@@ -350,13 +393,21 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       mutations.applyBulkStatus(status, promptRowMode, selectedPromptIds, derived.prompts),
     setFocusPromptId,
     deletePrompt: (id: string) => mutations.deletePrompt(id, selectedPromptId),
+    deleteSelectedPrompts: () =>
+      mutations.deleteSelectedPrompts(
+        resolveBulkPromptIds({
+          promptRowMode,
+          selectedPromptIds,
+          filteredPromptRows: derived.prompts,
+        }),
+      ),
     canRunPrompt: mutations.canRunPrompt,
     runPrompt,
     runSelectedPrompts,
     canRunSelectedPrompts: runnableSelectedPrompts.length > 0,
     selectedRunnablePromptCount: runnableSelectedPrompts.length,
     runningSelectedPrompts,
-    runningAnyPrompts: mutations.runPromptsMutation.isPending,
+    runningAnyPrompts: mutations.runPromptsMutation.isPending || pendingPromptRuns.length > 0,
     isPromptRunning: (prompt: { id: string } | null | undefined) =>
       Boolean(prompt && runningPromptRowIds.includes(prompt.id)),
     viewMode,
@@ -392,6 +443,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     updatePromptSchedule: mutations.updatePromptSchedule,
     updatingPromptSchedule: mutations.updatePromptScheduleMutation.isPending,
     addAutoGeneratedPrompts: mutations.addAutoGeneratedPrompts,
+    generatingPrompts: mutations.generatingPrompts,
     addImportedPrompts: mutations.addImportedPrompts,
     getModelVisual: source.getModelVisual,
     promptPlanUsage,

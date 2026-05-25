@@ -101,7 +101,21 @@ func (s *Service) StartContentOptimizerCrawl(
 		return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: content crawler is not configured", ErrDependencyUnavailable)
 	}
 
-	return s.contentCrawler.StartCrawl(ctx, normalized)
+	job, err := s.contentCrawler.StartCrawl(ctx, normalized)
+	if err != nil {
+		return ContentOptimizerCrawlJob{}, err
+	}
+	if isScopedContentOptimizerCrawl(normalized) && strings.TrimSpace(job.ID) != "" {
+		s.mu.Lock()
+		if s.contentCrawlScopes == nil {
+			s.contentCrawlScopes = make(map[string]contentOptimizerCrawlScope)
+		}
+		s.contentCrawlScopes[contentOptimizerCrawlJobScopeKey(projectID, organizationID, job.ID)] = contentOptimizerCrawlScope{
+			IncludePatterns: append([]string(nil), normalized.Options.IncludePatterns...),
+		}
+		s.mu.Unlock()
+	}
+	return job, nil
 }
 
 func (s *Service) GetContentOptimizerCrawl(
@@ -186,6 +200,13 @@ func (s *Service) saveLatestContentOptimizerCrawl(
 	if current, ok := s.contentCrawls[key]; ok && current != nil && !current.CreatedAt.IsZero() {
 		createdAt = current.CreatedAt
 	}
+	scopeKey := contentOptimizerCrawlJobScopeKey(projectID, organizationID, jobID)
+	scope, hasScope := s.contentCrawlScopes[scopeKey]
+	if hasScope && shouldMergeScopedContentOptimizerCrawl(scope) {
+		if current, ok := s.contentCrawls[key]; ok && current != nil {
+			result = mergeContentOptimizerCrawlResults(current.Result, result)
+		}
+	}
 	s.contentCrawls[key] = &ContentOptimizerCrawlSnapshot{
 		ProjectID:      strings.TrimSpace(projectID),
 		OrganizationID: organizationID,
@@ -198,6 +219,7 @@ func (s *Service) saveLatestContentOptimizerCrawl(
 		s.restoreLocked(backup)
 		return err
 	}
+	delete(s.contentCrawlScopes, scopeKey)
 	return nil
 }
 
@@ -325,6 +347,66 @@ func shouldSaveContentOptimizerCrawlResult(input ContentOptimizerCrawlResultInpu
 
 func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 	return fmt.Sprintf("%d|%s", organizationID, strings.TrimSpace(projectID))
+}
+
+func contentOptimizerCrawlJobScopeKey(projectID string, organizationID int64, jobID string) string {
+	return fmt.Sprintf("%s|%s", contentOptimizerCrawlKey(projectID, organizationID), strings.TrimSpace(jobID))
+}
+
+func isScopedContentOptimizerCrawl(input ContentOptimizerCrawlStartInput) bool {
+	return len(input.Options.IncludePatterns) > 0
+}
+
+func shouldMergeScopedContentOptimizerCrawl(scope contentOptimizerCrawlScope) bool {
+	return len(scope.IncludePatterns) > 0
+}
+
+func mergeContentOptimizerCrawlResults(previous ContentOptimizerCrawlResult, next ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
+	merged := copyContentOptimizerCrawlResult(next)
+	nextByURL := make(map[string]ContentOptimizerCrawlRecord, len(next.Records))
+	for _, record := range next.Records {
+		urlKey := strings.TrimSpace(record.URL)
+		if urlKey == "" {
+			continue
+		}
+		nextByURL[urlKey] = record
+	}
+
+	records := make([]ContentOptimizerCrawlRecord, 0, len(previous.Records)+len(next.Records))
+	seen := make(map[string]struct{}, len(previous.Records)+len(next.Records))
+	for _, record := range previous.Records {
+		urlKey := strings.TrimSpace(record.URL)
+		if urlKey == "" {
+			records = append(records, record)
+			continue
+		}
+		if replacement, ok := nextByURL[urlKey]; ok {
+			records = append(records, replacement)
+		} else {
+			records = append(records, record)
+		}
+		seen[urlKey] = struct{}{}
+	}
+	for _, record := range next.Records {
+		urlKey := strings.TrimSpace(record.URL)
+		if urlKey == "" {
+			records = append(records, record)
+			continue
+		}
+		if _, ok := seen[urlKey]; ok {
+			continue
+		}
+		records = append(records, record)
+		seen[urlKey] = struct{}{}
+	}
+	merged.Records = records
+	if len(records) > merged.Total {
+		merged.Total = len(records)
+	}
+	if len(records) > merged.Finished {
+		merged.Finished = len(records)
+	}
+	return merged
 }
 
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {

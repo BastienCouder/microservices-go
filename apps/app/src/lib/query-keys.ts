@@ -29,8 +29,6 @@ export const appQueryKeys = {
       search,
       engine,
     ] as const,
-  geo: (apiBaseURL: string, projectId: string | null, period: string) =>
-    ["traffic", apiBaseURL, projectId ?? "__default__", period] as const,
   optimizeActions: (apiBaseURL: string, projectId: string | null) =>
     ["optimize-actions", apiBaseURL, projectId ?? "__default__"] as const,
   modelsCatalog: (
@@ -40,6 +38,10 @@ export const appQueryKeys = {
   ) => ["models", "catalog", apiBaseURL, organizationId, scope] as const,
   billingQuota: (apiBaseURL: string, organizationId: string) =>
     ["billing", "quota", apiBaseURL, organizationId] as const,
+  billingPlans: (apiBaseURL: string, organizationId: string) =>
+    ["billing", "plans", apiBaseURL, organizationId] as const,
+  billingPricingTiers: (apiBaseURL: string, organizationId: string) =>
+    ["billing", "pricing-tiers", apiBaseURL, organizationId] as const,
   projectModels: (apiBaseURL: string, organizationId: string, projectId: string) =>
     ["models", "project", apiBaseURL, organizationId, projectId] as const,
   llmProviderCredentials: (

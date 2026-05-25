@@ -70,14 +70,14 @@ describe("selection storage", () => {
     );
   });
 
-  test("keeps explicit route project scope and adds stored organization context", () => {
+  test("keeps explicit route project scope without injecting a stale stored organization context", () => {
     installMockWindow();
 
     storeSelectedOrganizationID("org-1");
     storeSelectedProjectID("project-1");
 
     expect(resolveSelectedContextSearch("?project=acme")).toBe(
-      "?project=acme&organizationId=org-1",
+      "?project=acme",
     );
   });
 

@@ -21,6 +21,15 @@ func normalizePromptStatus(raw string) (string, bool) {
 	}
 }
 
+func normalizePromptKind(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case PromptKindPerception:
+		return PromptKindPerception
+	default:
+		return PromptKindMonitoring
+	}
+}
+
 func applyPromptStatus(prompt *Prompt, status string) {
 	prompt.Status = status
 	prompt.IsActive = status == PromptStatusActive
@@ -53,6 +62,23 @@ func defaultPromptSchedule() PromptSchedule {
 		Timezone:   DefaultPromptTimezone,
 		ModelCrons: map[string]string{},
 	}
+}
+
+func prunePromptScheduleModelCrons(schedule PromptSchedule, allowedModelIDs []string) PromptSchedule {
+	allowed := make(map[string]struct{}, len(allowedModelIDs))
+	for _, modelID := range allowedModelIDs {
+		allowed[modelID] = struct{}{}
+	}
+
+	modelCrons := make(map[string]string, len(schedule.ModelCrons))
+	for modelID, cron := range schedule.ModelCrons {
+		if _, ok := allowed[strings.TrimSpace(modelID)]; ok {
+			modelCrons[modelID] = cron
+		}
+	}
+
+	schedule.ModelCrons = modelCrons
+	return schedule
 }
 
 func isValidCronExpression(raw string) bool {
@@ -133,9 +159,18 @@ func normalizePromptSchedule(raw PromptSchedule, allowedModelIDs []string) (Prom
 }
 
 func (s *Service) AddPrompts(ctx context.Context, projectID string, organizationID int64, prompts []string) ([]Prompt, error) {
+	return s.addPromptsWithKind(ctx, projectID, organizationID, prompts, PromptKindMonitoring)
+}
+
+func (s *Service) AddPromptsWithKind(ctx context.Context, projectID string, organizationID int64, prompts []string, kind string) ([]Prompt, error) {
+	return s.addPromptsWithKind(ctx, projectID, organizationID, prompts, kind)
+}
+
+func (s *Service) addPromptsWithKind(ctx context.Context, projectID string, organizationID int64, prompts []string, kind string) ([]Prompt, error) {
 	if len(prompts) == 0 {
 		return nil, fmt.Errorf("%w: prompts cannot be empty", ErrValidation)
 	}
+	promptKind := normalizePromptKind(kind)
 
 	normalized := make([]string, 0, len(prompts))
 	for _, raw := range prompts {
@@ -169,6 +204,7 @@ func (s *Service) AddPrompts(ctx context.Context, projectID string, organization
 			ID:        s.nextID("prm"),
 			ProjectID: projectID,
 			Text:      text,
+			Kind:      promptKind,
 			ModelIDs:  nonNilStringSlice(defaultModelIDs),
 			Schedule:  defaultPromptSchedule(),
 			Status:    PromptStatusActive,
@@ -309,6 +345,9 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 	if input.Intent != nil {
 		prompt.Intent = strings.TrimSpace(*input.Intent)
 	}
+	if input.Kind != nil {
+		prompt.Kind = normalizePromptKind(*input.Kind)
+	}
 	if input.ModelIDs != nil {
 		enabledModelIDs := filterEnabledModels(s.projectModels, s.models, project.ID)
 		modelIDs, err := validatePromptModelIDs(*input.ModelIDs, enabledModelIDs)
@@ -316,6 +355,9 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 			return Prompt{}, err
 		}
 		prompt.ModelIDs = modelIDs
+		if input.Schedule == nil {
+			prompt.Schedule = prunePromptScheduleModelCrons(prompt.Schedule, prompt.ModelIDs)
+		}
 	}
 	if input.Schedule != nil {
 		schedule, err := normalizePromptSchedule(*input.Schedule, effectivePromptModelIDs(prompt, filterEnabledModels(s.projectModels, s.models, project.ID)))

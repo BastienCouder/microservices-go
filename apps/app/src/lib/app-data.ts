@@ -198,7 +198,6 @@ export const PERCEPTION_TEXT = {
   topErrors: {
     title: "Principales erreurs détectées",
     emptyTitle: "Aucune erreur détectée",
-    emptyDescription: "Les réponses IA analysées sont alignées avec votre référentiel de marque pour les filtres sélectionnés.",
     seeMore: "Voir plus",
     sheetDescription: "Détail de l'erreur détectée et action d'optimisation recommandée.",
     aiClaim: "Ce que l'IA dit",

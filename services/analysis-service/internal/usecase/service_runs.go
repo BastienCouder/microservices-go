@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -29,7 +30,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	if runType == "" {
 		runType = "manual"
 	}
-	if runType != "manual" && runType != "scheduled" {
+	if runType != "manual" && runType != "scheduled" && runType != "perception" {
 		return StartAnalysisResult{}, fmt.Errorf("%w: invalid runType", ErrValidation)
 	}
 
@@ -79,8 +80,35 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 			}
 			promptRuns := s.promptRunsForRunLocked(existingRunID)
 			s.mu.Unlock()
+			log.Printf(
+				"analysis_run.replayed run_id=%s project_id=%s request_id=%s status=%s completed=%d expected=%d",
+				run.ID,
+				projectID,
+				requestID,
+				run.Status,
+				run.CompletedResponses,
+				run.ExpectedResponses,
+			)
 			return StartAnalysisResult{
 				AnalysisRun: copyAnalysisRun(run),
+				PromptRuns:  promptRuns,
+			}, nil
+		}
+	}
+
+	if runType == "perception" {
+		if existing := s.latestFreshPerceptionRunLocked(projectID, s.now().UTC()); existing != nil {
+			promptRuns := s.promptRunsForRunLocked(existing.ID)
+			s.mu.Unlock()
+			log.Printf(
+				"analysis_run.perception_reused run_id=%s project_id=%s completed=%d expected=%d",
+				existing.ID,
+				projectID,
+				existing.CompletedResponses,
+				existing.ExpectedResponses,
+			)
+			return StartAnalysisResult{
+				AnalysisRun: copyAnalysisRun(existing),
 				PromptRuns:  promptRuns,
 			}, nil
 		}
@@ -160,7 +188,37 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 
 	s.storeDashboardInCache(ctx, projectID, input.OrganizationID, dashboard)
 
+	log.Printf(
+		"analysis_run.created run_id=%s project_id=%s organization_id=%d run_type=%s request_id=%s prompts=%d models=%d expected_responses=%d",
+		run.ID,
+		projectID,
+		input.OrganizationID,
+		runType,
+		requestID,
+		len(normalizedPrompts),
+		len(normalizedModels),
+		expectedResponses,
+	)
+
 	return result, nil
+}
+
+func (s *Service) latestFreshPerceptionRunLocked(projectID string, now time.Time) *AnalysisRun {
+	cutoff := now.AddDate(0, 0, -7)
+	runIDs := s.runsByProject[projectID]
+	for i := len(runIDs) - 1; i >= 0; i-- {
+		run := s.runs[runIDs[i]]
+		if run == nil || run.RunType != "perception" {
+			continue
+		}
+		if run.CreatedAt.Before(cutoff) {
+			return nil
+		}
+		if run.CompletedResponses > 0 || run.Status == "running" {
+			return run
+		}
+	}
+	return nil
 }
 
 func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error {
@@ -244,10 +302,29 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 	}
 	projectID := run.ProjectID
 	organizationID := run.OrganizationID
+	status := run.Status
+	completedResponses := run.CompletedResponses
+	expectedResponses := run.ExpectedResponses
+	visibilityScore := run.VisibilityScore
 	dashboard := s.dashboardDataLocked(projectID)
 	s.mu.Unlock()
 
 	s.storeDashboardInCache(ctx, projectID, organizationID, dashboard)
+
+	log.Printf(
+		"analysis_response.recorded run_id=%s project_id=%s prompt_run_id=%s model_id=%s status=%s completed=%d expected=%d visibility_score=%d brand_mentioned=%t sentiment=%s response_chars=%d",
+		runID,
+		projectID,
+		promptRunID,
+		modelID,
+		status,
+		completedResponses,
+		expectedResponses,
+		visibilityScore,
+		input.BrandMentioned,
+		input.Sentiment,
+		len(strings.TrimSpace(input.RawResponse)),
+	)
 
 	return nil
 }
@@ -434,9 +511,22 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	if hasProjectModels {
 		responses = filterResponsesByModelIDs(responses, projectModels)
 	}
+	perceptionResponses := filterResponsesByRunType(responses, "perception")
+	monitoringResponsesUsed := 0
+	sourceMode := "fallback_all"
+	if len(perceptionResponses) > 0 {
+		monitoringResponsesUsed = 0
+		responses = perceptionResponses
+		sourceMode = "perception_primary"
+	} else {
+		monitoringResponsesUsed = len(responses)
+	}
 	if !dashboard.HasData || len(responses) == 0 {
 		result.Metadata["responses"] = 0
 		result.Metadata["analyzedResponses"] = 0
+		result.Metadata["perceptionResponses"] = 0
+		result.Metadata["monitoringResponsesUsed"] = 0
+		result.Metadata["sourceMode"] = sourceMode
 		return result, nil
 	}
 
@@ -470,6 +560,19 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	result.Metadata["windowLabel"] = derivePerceptionWindowLabel(responses, time.Now().UTC())
 	result.Metadata["responses"] = len(responses)
 	result.Metadata["analyzedResponses"] = len(responses)
+	result.Metadata["perceptionResponses"] = len(perceptionResponses)
+	result.Metadata["monitoringResponsesUsed"] = monitoringResponsesUsed
+	result.Metadata["sourceMode"] = sourceMode
 	result.Metadata["visibilityScore"] = dashboard.VisibilityScore
 	return result, nil
+}
+
+func filterResponsesByRunType(responses []AIResponse, runType string) []AIResponse {
+	out := make([]AIResponse, 0, len(responses))
+	for _, response := range responses {
+		if strings.TrimSpace(response.RunType) == runType {
+			out = append(out, response)
+		}
+	}
+	return out
 }

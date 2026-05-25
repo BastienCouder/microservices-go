@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import type { PageInsight } from "../../_lib/pages-panel/types";
 
 type TopPagesListProps = {
+  errorLabel?: string | null;
   pages: PageInsight[];
   search: string;
   onSearchChange: (value: string) => void;
@@ -21,6 +22,7 @@ type TopPagesListProps = {
 };
 
 export function TopPagesList({
+  errorLabel,
   pages,
   search,
   onSearchChange,
@@ -80,9 +82,10 @@ export function TopPagesList({
             ) : pages.length === 0 ? (
               <EmptyStateCard
                 label={
-                  search.trim()
+                  errorLabel ||
+                  (search.trim()
                     ? "Aucune page ne correspond à la recherche."
-                    : "Aucune page citée pour le moment."
+                    : "Aucune page citée pour le moment.")
                 }
                 className="h-40"
               />

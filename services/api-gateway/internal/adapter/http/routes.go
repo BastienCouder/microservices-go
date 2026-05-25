@@ -19,6 +19,11 @@ func isBillingStripeWebhookRequest(r *http.Request) bool {
 	return r.Method == http.MethodPost && r.URL.Path == "/billing/stripe/webhook"
 }
 
+func isBillingPublicPlansRequest(r *http.Request) bool {
+	return r.Method == http.MethodGet &&
+		(r.URL.Path == "/billing/public/plans" || r.URL.Path == "/billing/public/pricing-tiers")
+}
+
 func isAttributionStripeWebhookRequest(r *http.Request) bool {
 	return r.Method == http.MethodPost &&
 		(r.URL.Path == "/attribution/stripe/webhook" || strings.HasPrefix(r.URL.Path, "/attribution/stripe/webhook/"))
@@ -35,6 +40,9 @@ func (h *Handler) buildRoutes() []routeEntry {
 	})
 	userHandler := h.withAuth(h.userProxy, "user-service", "users")
 	billingStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		h.serveProxyWithInternalAuth(w, r, h.billingProxy, "billing-service", internalTokenClaims{})
+	})
+	billingPublicPlansHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.billingProxy, "billing-service", internalTokenClaims{})
 	})
 	attributionStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -71,6 +79,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/invitations"), handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations"), service: "organizations-service"},
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions"), service: "permission-service"},
 		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler, service: "billing-service"},
+		{match: isBillingPublicPlansRequest, handler: billingPublicPlansHandler, service: "billing-service"},
 		{match: isAttributionStripeWebhookRequest, handler: attributionStripeWebhookHandler, service: "attribution-service"},
 		{match: isAttributionIngestionRequest, handler: attributionIngestionHandler, service: "attribution-service"},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},

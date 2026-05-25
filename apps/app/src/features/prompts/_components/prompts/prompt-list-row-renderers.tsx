@@ -81,7 +81,13 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
           </div>
         ) : null}
       </TableCell>
-      <TableCell>{hasResults ? <Badge className={cn("text-sm", props.rankTone(item.rank))}>{item.rank.toFixed(1)}</Badge> : null}</TableCell>
+      <TableCell>
+        {hasResults && item.rank !== null ? (
+          <Badge className={cn("text-sm", props.rankTone(item.rank))}>{item.rank.toFixed(1)}</Badge>
+        ) : hasResults ? (
+          <span className="text-sm text-muted-foreground">-</span>
+        ) : null}
+      </TableCell>
       <TableCell>
         {hasResults ? (
           <div className="w-16">
@@ -177,7 +183,10 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
 
           <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <Metric label={content.mention} value={hasResults ? `${item.mentionRate}%` : null} />
-            <Metric label={content.rank} value={hasResults ? item.rank.toFixed(1) : null} />
+            <Metric
+              label={content.rank}
+              value={hasResults ? (item.rank !== null ? item.rank.toFixed(1) : "-") : null}
+            />
             <Metric
               label={content.columnCadence}
               value={promptCadenceLabel(item, props.locale)}
@@ -262,12 +271,12 @@ export function PromptRowModeSwitch({
   const content = useI18nScope("prompts-workspace");
 
   return (
-    <div className="flex h-10 shrink-0 gap-1 rounded-full border p-1">
+    <div className="flex h-10 max-w-full shrink-0 gap-1 rounded-full border p-1">
       <Button
         type="button"
         size="sm"
         variant={promptRowMode === "global" ? "default" : "ghost"}
-        className="h-8 rounded-full px-3 text-sm"
+        className="h-8 rounded-full px-2 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("global")}
       >
         <Layers3 className="mr-1.5 h-4 w-4" />
@@ -277,7 +286,7 @@ export function PromptRowModeSwitch({
         type="button"
         size="sm"
         variant={promptRowMode === "model" ? "default" : "ghost"}
-        className="h-8 rounded-full px-3 text-sm"
+        className="h-8 rounded-full px-2 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("model")}
       >
         <Bot className="mr-1.5 h-4 w-4" />

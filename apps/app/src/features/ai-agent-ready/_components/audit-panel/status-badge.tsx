@@ -1,6 +1,6 @@
 import { AlertCircle, Ban, CheckCircle2, CircleDashed } from "lucide-react";
 
-import { cn } from "@/shared/utils";
+import { Badge } from "@/components/ui/badge";
 
 import type { AuditCheckStatus } from "../../_lib/shared/types";
 
@@ -10,29 +10,29 @@ type StatusBadgeProps = {
 
 const statusContent = {
   pass: {
-    label: "Pass",
+    label: "OK",
     icon: CheckCircle2,
-    className: "bg-[#1fa35b]/10 text-[#126c3b] ring-[#1fa35b]/20",
+    className: "border-transparent bg-green-500/10 text-green-700",
   },
   fail: {
-    label: "Fail",
+    label: "Échec",
     icon: AlertCircle,
-    className: "bg-[#df4c4c]/10 text-[#a83333] ring-[#df4c4c]/20",
+    className: "border-transparent bg-destructive/10 text-destructive",
   },
   warning: {
-    label: "Warning",
+    label: "Alerte",
     icon: AlertCircle,
-    className: "bg-[#f3a43b]/14 text-[#8a5616] ring-[#f3a43b]/25",
+    className: "border-transparent bg-amber-500/10 text-amber-700",
   },
   skipped: {
-    label: "Skipped",
+    label: "Ignoré",
     icon: CircleDashed,
-    className: "bg-[#d8d1ca]/35 text-[#6e6259] ring-[#d8d1ca]",
+    className: "border-border bg-muted/60 text-muted-foreground",
   },
   not_applicable: {
     label: "N/A",
     icon: Ban,
-    className: "bg-[#d8d1ca]/35 text-[#6e6259] ring-[#d8d1ca]",
+    className: "border-border bg-muted/60 text-muted-foreground",
   },
 } satisfies Record<
   AuditCheckStatus,
@@ -44,14 +44,9 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   const Icon = content.icon;
 
   return (
-    <span
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1",
-        content.className,
-      )}
-    >
+    <Badge variant="outline" className={content.className}>
       <Icon className="size-3.5" aria-hidden="true" />
       {content.label}
-    </span>
+    </Badge>
   );
 }

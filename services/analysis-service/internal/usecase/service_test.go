@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,6 +78,63 @@ func TestStartAnalysisCreatesRun(t *testing.T) {
 	}
 	if result.AnalysisRun.ExpectedResponses != 4 {
 		t.Fatalf("expected 4 expected responses, got %d", result.AnalysisRun.ExpectedResponses)
+	}
+}
+
+func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+	now := time.Date(2026, time.May, 19, 9, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	first, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-1", Text: "What is Acme?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "perception",
+	})
+	if err != nil {
+		t.Fatalf("start perception: %v", err)
+	}
+
+	now = now.AddDate(0, 0, 1)
+	second, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-2", Text: "Who is Acme for?"},
+		},
+		ModelIDs: []string{"sonar"},
+		RunType:  "perception",
+	})
+	if err != nil {
+		t.Fatalf("reuse perception: %v", err)
+	}
+	if second.AnalysisRun.ID != first.AnalysisRun.ID {
+		t.Fatalf("expected fresh perception run %s to be reused, got %s", first.AnalysisRun.ID, second.AnalysisRun.ID)
+	}
+
+	now = now.AddDate(0, 0, 8)
+	third, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-3", Text: "How does Acme compare?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "perception",
+	})
+	if err != nil {
+		t.Fatalf("new weekly perception: %v", err)
+	}
+	if third.AnalysisRun.ID == first.AnalysisRun.ID {
+		t.Fatalf("expected perception run older than a week not to be reused")
 	}
 }
 
@@ -986,7 +1044,7 @@ func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
 	}
 }
 
-func TestGetOptimizationErrorsGroupsMonitoringAlertsAndPerceptionErrors(t *testing.T) {
+func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()
 
@@ -1042,6 +1100,28 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsAndPerceptionErrors(t *testi
 	}); err != nil {
 		t.Fatalf("record response: %v", err)
 	}
+	if err := svc.saveLatestContentOptimizerCrawl(ctx, "project-1", 42, "crawl-1", ContentOptimizerCrawlResult{
+		ID:     "crawl-1",
+		Status: "completed",
+		Total:  1,
+		Records: []ContentOptimizerCrawlRecord{{
+			URL:        "https://example.com/pricing",
+			Status:     "completed",
+			HTTPStatus: 200,
+			Title:      "Pricing",
+			Issues: []ContentOptimizerIssue{{
+				ID:             "example-com-pricing-missing_schema_markup",
+				Category:       "geo",
+				Severity:       "medium",
+				Title:          "Schema markup absent",
+				Description:    "Aucune donnee structuree exploitable n'a ete detectee.",
+				Recommendation: "Ajouter un JSON-LD WebPage et FAQPage.",
+				FixType:        "add_schema_markup",
+			}},
+		}},
+	}); err != nil {
+		t.Fatalf("seed content optimizer crawl: %v", err)
+	}
 
 	board, err := svc.GetOptimizationErrors(ctx, "project-1", 42)
 	if err != nil {
@@ -1055,26 +1135,153 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsAndPerceptionErrors(t *testi
 		t.Fatalf("expected high, medium, low column order, got %#v", board.Columns)
 	}
 
-	var hasMonitoringError, hasPerceptionError bool
+	var hasMonitoringError, hasPerceptionError, hasCrawlerError, hasSeededCrawlerError bool
+	var hasMonitoringAlertOrigin, hasMonitoringDerivedOrigin bool
+	var hasCrawlerResource bool
 	for _, item := range board.Errors {
 		switch item.Source {
 		case "monitoring":
 			hasMonitoringError = true
+			if item.Origin == "alert" {
+				hasMonitoringAlertOrigin = true
+			}
+			if item.Origin == "derived" {
+				hasMonitoringDerivedOrigin = true
+			}
 		case "perception":
 			hasPerceptionError = true
+		case "crawler":
+			hasCrawlerError = true
+			if item.ID == "crawler:example-com-pricing-missing_schema_markup" {
+				hasSeededCrawlerError = true
+				if item.Resource == "https://example.com/pricing" {
+					hasCrawlerResource = true
+				}
+				if item.FixType != "schema_update" {
+					t.Fatalf("expected crawler schema issue to map to schema_update, got %q", item.FixType)
+				}
+			}
 		}
 		if item.FixType == "" || item.OptimizePriority == "" {
 			t.Fatalf("expected optimization item to carry card-compatible fields, got %#v", item)
 		}
 	}
-	if !hasMonitoringError || !hasPerceptionError {
-		t.Fatalf("expected monitoring and perception errors, got %#v", board.Errors)
+	if !hasMonitoringError || !hasPerceptionError || !hasCrawlerError {
+		t.Fatalf("expected monitoring, perception and crawler errors, got %#v", board.Errors)
+	}
+	if !hasSeededCrawlerError {
+		t.Fatalf("expected seeded crawler error to keep a stable id, got %#v", board.Errors)
+	}
+	if !hasCrawlerResource {
+		t.Fatalf("expected seeded crawler error to expose its page resource, got %#v", board.Errors)
+	}
+	if !hasMonitoringAlertOrigin || !hasMonitoringDerivedOrigin {
+		t.Fatalf("expected monitoring origins to distinguish alerts and derived diagnostics, got %#v", board.Errors)
+	}
+	for _, item := range board.Errors {
+		if item.Source == "monitoring" && item.GeneratedContentKey == "" {
+			t.Fatalf("expected monitoring error to expose generated content key, got %#v", item)
+		}
 	}
 	if board.Metadata["totalErrors"] != len(board.Errors) {
 		t.Fatalf("expected metadata totalErrors to match errors length, got %#v for %d errors", board.Metadata["totalErrors"], len(board.Errors))
 	}
-	if board.Metadata["monitoringErrors"] != 1 {
-		t.Fatalf("expected 1 monitoring error, got %#v", board.Metadata["monitoringErrors"])
+	if got, ok := board.Metadata["monitoringAlertErrors"].(int); !ok || got != 1 {
+		t.Fatalf("expected 1 monitoring alert error, got %#v", board.Metadata["monitoringAlertErrors"])
+	}
+	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got < 1 {
+		t.Fatalf("expected derived monitoring errors to be present, got %#v", board.Metadata["monitoringDerivedErrors"])
+	}
+	if got, ok := board.Metadata["monitoringErrors"].(int); !ok || got < 2 {
+		t.Fatalf("expected combined monitoring errors to include alerts and derived items, got %#v", board.Metadata["monitoringErrors"])
+	}
+	if got, ok := board.Metadata["crawlerErrors"].(int); !ok || got < 1 {
+		t.Fatalf("expected crawlerErrors metadata to include crawler items, got %#v", board.Metadata["crawlerErrors"])
+	}
+}
+
+func TestGetOptimizationErrorsIncludesDerivedMonitoringErrors(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini", "sonar"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est a peine citee et sans source.",
+		BrandMentioned: true,
+		BrandPosition:  "bottom",
+		CitationFound:  false,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record first response: %v", err)
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "sonar",
+		RawResponse:    "La marque n'est pas recommandee dans cette reponse.",
+		BrandMentioned: false,
+		BrandPosition:  "unknown",
+		CitationFound:  false,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record second response: %v", err)
+	}
+
+	board, err := svc.GetOptimizationErrors(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get optimization errors: %v", err)
+	}
+
+	hasDerivedMonitoring := false
+	for _, item := range board.Errors {
+		if item.Source == "monitoring" && strings.HasPrefix(item.ID, "monitoring-derived:") {
+			if item.Origin != "derived" {
+				t.Fatalf("expected derived monitoring error origin to be set, got %#v", item)
+			}
+			if item.GeneratedContentKey == "" {
+				t.Fatalf("expected derived monitoring error generated content key to be set, got %#v", item)
+			}
+			hasDerivedMonitoring = true
+			break
+		}
+	}
+	if !hasDerivedMonitoring {
+		t.Fatalf("expected derived monitoring errors in board, got %#v", board.Errors)
+	}
+	if board.Metadata["monitoringDerivedErrors"] == nil {
+		t.Fatalf("expected monitoringDerivedErrors metadata to be set")
 	}
 }
 

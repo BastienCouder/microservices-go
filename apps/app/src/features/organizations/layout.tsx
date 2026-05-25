@@ -76,6 +76,7 @@ export function OrganizationsLayout({
         title="Organisations"
         baseline="Projets, membres et invitations de l'organisation active."
         actionsVariant="classic"
+        className="hidden md:block"
       />
 
       {isInitialLoading ? (
@@ -83,7 +84,7 @@ export function OrganizationsLayout({
       ) : selectedOrganization ? (
         <div className="min-h-0 flex-1 overflow-auto pr-1">
           <OrganizationSummaryPanel organization={selectedOrganization} resources={resources} />
-          <div className="mt-4">
+          <div className="md:mt-4">
             {activeTab === "projects" ? (
                 <ProjectsPanel
                   projects={resources.projects}

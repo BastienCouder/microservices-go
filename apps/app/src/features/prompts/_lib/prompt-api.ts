@@ -144,6 +144,37 @@ export async function createProjectPrompt(
   return normalizeProjectPromptRecord(firstItem);
 }
 
+export async function generateProjectPrompts(
+  apiBaseURL: string,
+  organizationId: string,
+  projectId: string,
+): Promise<ProjectPromptRecord[]> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.projects.generatePrompts(projectId),
+    {
+      method: "POST",
+      organizationId,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(response.error || "Impossible de generer les prompts.");
+  }
+
+  const payload = unwrapSuccessEnvelope(response.data);
+  const rawItems = Array.isArray(payload)
+    ? payload
+    : typeof payload === "object" && payload !== null && Array.isArray((payload as { items?: unknown[] }).items)
+      ? (payload as { items: unknown[] }).items
+      : [];
+
+  return rawItems
+    .filter((entry): entry is Record<string, unknown> => typeof entry === "object" && entry !== null)
+    .map(normalizeProjectPromptRecord)
+    .filter((item) => item.id !== "" && item.text !== "");
+}
+
 export async function patchPrompt(
   apiBaseURL: string,
   organizationId: string,

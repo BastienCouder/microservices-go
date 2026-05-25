@@ -1,11 +1,16 @@
-import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Settings2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Settings2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  pushErrorToast,
+  pushSuccessToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import { cn } from "@/lib/utils";
 import {
   Select,
@@ -78,7 +83,29 @@ export function GA4IntegrationCard({
     selectedOAuthPropertyId,
     oauthProperties,
   );
-  const llmSetupStatus = getLLMSetupStatus(llmSetup);
+  const llmSetupStatus = getLLMSetupStatus(llmSetup, { loading, saving });
+
+  useEffect(() => {
+    if (!llmSetupStatus) {
+      return;
+    }
+
+    if (llmSetupStatus.tone === "success") {
+      pushSuccessToast(llmSetupStatus.title, llmSetupStatus.description);
+      return;
+    }
+
+    if (llmSetupStatus.tone === "warning") {
+      pushWarningToast(llmSetupStatus.title, llmSetupStatus.description);
+      return;
+    }
+
+    pushErrorToast(
+      new Error(llmSetupStatus.title),
+      llmSetupStatus.title,
+      llmSetupStatus.description,
+    );
+  }, [llmSetupStatus?.description, llmSetupStatus?.title, llmSetupStatus?.tone]);
 
   function handlePrimaryAction() {
     if (!connected && !hasOAuthToken) {
@@ -91,7 +118,7 @@ export function GA4IntegrationCard({
   return (
     <section
       className={cn(
-        "group flex flex-col rounded-2xl lg:max-w-lg border bg-card p-4 text-card-foreground transition-all duration-200",
+        "group flex w-full flex-col rounded-2xl border bg-card p-4 text-card-foreground transition-all duration-200 sm:p-5 lg:max-w-lg",
         connected || hasOAuthToken ? "border-background bg-background" : "border-background bg-background",
       )}
     >
@@ -130,31 +157,9 @@ export function GA4IntegrationCard({
         {loading ? (
           <Skeleton className="h-4 w-40" />
         ) : propertySummary ? (
-          <p className="truncate text-sm text-muted-foreground">{propertySummary}</p>
+          <p className="break-words text-sm text-muted-foreground">{propertySummary}</p>
         ) : null}
 
-        {llmSetupStatus ? (
-          <div
-            className={cn(
-              "mt-3 flex gap-2 rounded-md px-3 py-2 text-sm",
-              llmSetupStatus.tone === "success"
-                ? "bg-primary/10 text-primary"
-                : llmSetupStatus.tone === "warning"
-                  ? "bg-amber-500/10 text-amber-700"
-                  : "bg-destructive/10 text-destructive",
-            )}
-          >
-            {llmSetupStatus.tone === "success" ? (
-              <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            ) : (
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-            )}
-            <div className="min-w-0">
-              <p className="font-medium">{llmSetupStatus.title}</p>
-              <p className="text-xs opacity-85">{llmSetupStatus.description}</p>
-            </div>
-          </div>
-        ) : null}
       </div>
 
       <div className="mt-auto flex flex-col gap-2">
@@ -247,7 +252,7 @@ export function GA4IntegrationCard({
                         </label>
 
                         {selectedOAuthPropertySummary ? (
-                          <p className="truncate text-xs text-muted-foreground">
+                          <p className="break-words text-xs text-muted-foreground">
                             Sélection actuelle : {selectedOAuthPropertySummary}
                           </p>
                         ) : oauthPropertiesLoading ? (
@@ -310,7 +315,7 @@ export function GA4IntegrationCard({
                   <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
                     <li>Dans Google Cloud, crée ou ouvre un projet et active Google Analytics Data API.</li>
                     <li>Crée un Service Account, puis génère une clé JSON.</li>
-                    <li>Dans GA4, ouvre Admin, Property access management, puis ajoute l’email du Service Account avec le rôle Viewer.</li>
+                    <li>Dans GA4, ouvre Admin, Property access management, puis ajoute l’email du Service Account avec le rôle Editor.</li>
                     <li>Copie l’ID numérique de la propriété GA4 depuis Property details.</li>
                     <li>Colle cet ID et le JSON complet ci-dessous, puis connecte.</li>
                   </ol>
@@ -336,6 +341,21 @@ export function GA4IntegrationCard({
                         className="min-h-28 resize-none font-mono text-xs"
                       />
                     </label>
+
+                    <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                      Service Account JSON introuvable ? Dans Google Cloud, ouvre
+                      {" "}
+                      <span className="font-medium text-foreground">
+                        IAM & Admin &gt; Service Accounts
+                      </span>
+                      , choisis le service account, puis va dans
+                      {" "}
+                      <span className="font-medium text-foreground">Keys</span>
+                      . Crée une nouvelle clé
+                      {" "}
+                      <span className="font-medium text-foreground">JSON</span>
+                      , puis reconnecte GA4 avec ce fichier.
+                    </p>
 
                     <Button
                       type="button"
@@ -370,31 +390,57 @@ export function GA4IntegrationCard({
   );
 }
 
-function getLLMSetupStatus(setup: TrafficGA4LLMSetupResult | null): {
+function getLLMSetupStatus(
+  setup: TrafficGA4LLMSetupResult | null,
+  options?: { loading?: boolean; saving?: boolean },
+): {
   title: string;
   description: string;
   tone: "success" | "warning" | "error";
 } | null {
+  if (options?.loading || options?.saving) {
+    return null;
+  }
   if (!setup) {
     return null;
   }
   if (setup.setupStatus === "success") {
     return {
-      title: "Tracking LLM GA4 activé",
-      description: "Channel group AI / LLM et dimension llm_source prêts.",
+      title: "Tracking AI Traffic GA4 activé",
+      description: "Channel group Default + AI et canal AI prêts.",
       tone: "success",
     };
   }
   if (setup.setupStatus === "partial_success") {
     return {
-      title: "Tracking LLM GA4 partiel",
-      description: setup.errors[0]?.message || "Une ressource GA4 reste à vérifier.",
+      title: "Tracking AI Traffic GA4 partiel",
+      description:
+        formatLLMSetupGuidance(setup.errors[0]?.message) ||
+        "Une ressource GA4 reste à vérifier.",
       tone: "warning",
     };
   }
   return {
-    title: "Tracking LLM GA4 non configuré",
-    description: setup.errors[0]?.message || "Google Analytics a refusé la configuration automatique.",
+    title: "Tracking AI Traffic GA4 non configuré",
+    description:
+      formatLLMSetupGuidance(setup.errors[0]?.message) ||
+      "Google Analytics a refusé la configuration automatique.",
     tone: "error",
   };
+}
+
+function formatLLMSetupGuidance(message?: string): string {
+  const normalized = message?.trim() ?? "";
+  if (normalized === "") {
+    return "";
+  }
+
+  if (
+    normalized.includes("unsupported-channel-grouping-field") ||
+    normalized.includes("provided channel grouping contained a 'field_name' that is not supported")
+  ) {
+    return `GA4 a refusé la création automatique du channel group Default + AI. On tente plusieurs noms de champ via l'Admin API; si le refus persiste, créez le channel group manuellement dans Admin > Channel groups avec le canal AI avant Referral. Détail technique: ${normalized}`;
+  }
+
+  return normalized;
 }

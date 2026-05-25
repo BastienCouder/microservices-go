@@ -20,6 +20,11 @@ describe("getI18nText", () => {
   test("returns the localized sidebar copy for French and English", () => {
     expect(getI18nText("sidebar", "logout", "fr")).toBe("Déconnexion");
     expect(getI18nText("sidebar", "logout", "en")).toBe("Logout");
+    expect(getI18nText("sidebar", "responses", "fr")).toBe("Réponses");
+    expect(getI18nText("sidebar", "back", "en")).toBe("Back");
+    expect(getI18nText("sidebar", "dashboard", "fr")).toBe("Tableau de bord");
+    expect(getI18nText("sidebar", "contentOptimizer", "fr")).toBe("Optimiseur de contenu");
+    expect(getI18nText("sidebar", "organizationTabProjects", "fr")).toBe("Projets");
   });
 
   test("humanizes unknown keys when no translation exists", () => {

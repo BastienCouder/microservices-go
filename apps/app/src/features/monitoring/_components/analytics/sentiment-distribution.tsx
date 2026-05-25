@@ -45,7 +45,7 @@ export const SentimentDistribution = memo(function SentimentDistribution({
           <CardTitle className="text-lg font-semibold">
             <SectionTitle>{content.aiSentimentTitle}</SectionTitle>
           </CardTitle>
-          <CardDescription className="text-xs leading-relaxed md:text-sm">{content.aiSentimentDescription}</CardDescription>
+          <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">{content.aiSentimentDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

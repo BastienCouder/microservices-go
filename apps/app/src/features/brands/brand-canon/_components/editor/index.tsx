@@ -4,10 +4,10 @@ import { useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
+import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
@@ -42,6 +42,7 @@ export function BrandCanonEditorPanel({
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
   const [isSaving, setIsSaving] = useState(false);
   const brandsLocation = buildBrandsLocation(location.search);
+  const loadError = initialData.metadata.emptyStateLabel;
 
   const update = <K extends keyof BrandCanon>(key: K, value: BrandCanon[K]) => {
     setCanonDraft((current) => ({ ...current, [key]: value }));
@@ -108,7 +109,11 @@ export function BrandCanonEditorPanel({
         }
       />
 
-      <ScrollArea className="min-h-0 flex-1 pr-2 [&_[data-slot=scroll-area-scrollbar]]:w-2.5 [&_[data-slot=scroll-area-scrollbar]]:bg-muted/35 [&_[data-slot=scroll-area-thumb]]:rounded-full [&_[data-slot=scroll-area-thumb]]:border [&_[data-slot=scroll-area-thumb]]:border-background/60 [&_[data-slot=scroll-area-thumb]]:bg-muted-foreground/55">
+      {loadError ? (
+        <EmptyStateCard label={loadError} className="mb-4 h-20 text-sm" />
+      ) : null}
+
+      <div className="min-h-0 flex-1 overflow-y-auto pr-2">
         <div className="space-y-4">
           <Card className="rounded-tr-none">
             <CardContent className="space-y-4 pb-6">
@@ -156,7 +161,7 @@ export function BrandCanonEditorPanel({
             </CardContent>
           </Card>
         </div>
-      </ScrollArea>
+      </div>
 
       <div className="border-t px-2 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">

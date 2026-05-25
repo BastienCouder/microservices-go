@@ -16,9 +16,11 @@ export type KpiCardProps = {
   trend?: string;
   trendDir?: "up" | "down" | "stable";
   variant?: "default" | "active";
+  mini?: boolean;
+  className?: string;
 };
 
-export const KpiCard = memo(function KpiCard({ title, value, sub, description, trend, trendDir, variant = "default" }: KpiCardProps) {
+export const KpiCard = memo(function KpiCard({ className, mini = false, title, value, sub, description, trend, trendDir, variant = "default" }: KpiCardProps) {
   const isActive = variant === "active";
   const trendTone = isActive
     ? "border-transparent bg-white/20 text-white"
@@ -32,15 +34,17 @@ export const KpiCard = memo(function KpiCard({ title, value, sub, description, t
     <div
       className={cn(
         "relative flex flex-col rounded-md p-4 transition-all md:p-5",
+        mini ? "border" : "",
         isActive
           ? "bg-linear-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)]"
           : "bg-card text-card-foreground",
+        className,
       )}
     >
       <div className="mb-2 flex items-start justify-between">
         <div className="flex min-w-0 items-center gap-1.5">
           <span className={cn("text-[15px] font-medium leading-tight md:text-sm", isActive ? "text-primary-foreground/90" : "text-muted-foreground")}>{title}</span>
-          {description ? (
+          {mini === false &&  description ? (
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -85,7 +89,7 @@ export const KpiCard = memo(function KpiCard({ title, value, sub, description, t
         ) : null}
       </div>
 
-      {sub ? (
+      {mini === false && sub ? (
         <span className={cn("mt-2 text-xs leading-relaxed md:text-xs", isActive ? "text-primary-foreground/80" : "text-muted-foreground")}>
           {sub}
         </span>

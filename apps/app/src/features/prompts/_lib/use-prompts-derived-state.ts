@@ -13,7 +13,13 @@ import {
 import { buildResponseRows } from "./prompt-data-factory";
 import { buildPromptsDerivedActions } from "./prompt-derived-actions";
 import { usePromptsDerivedEffects } from "./use-prompts-derived-effects";
-import { DEFAULT_PROMPT_PERIOD, normalizeModelName, PERIOD_TO_MINUTES, STAGES } from "./utils";
+import {
+  comparePromptRunsByRecency,
+  DEFAULT_PROMPT_PERIOD,
+  normalizeModelName,
+  PERIOD_TO_MINUTES,
+  STAGES,
+} from "./utils";
 import type { AIModel, PeriodKey, PromptItem, PromptRowMode, PromptSort, PromptSortDirection } from "./types";
 
 type MonitoringDataShape = {
@@ -242,7 +248,7 @@ export function usePromptsDerivedState({
           matchesFocusedPrompt
         );
       })
-      .sort((a, b) => a.minutesAgo - b.minutesAgo);
+      .sort(comparePromptRunsByRecency);
   }, [
     allResponses,
     criticalOnly,

@@ -1,7 +1,5 @@
-import {
-  BrandCanonLoadingState,
-  BrandCanonUnavailableState,
-} from "@/features/perception/_components";
+import { BrandCanonLoadingState } from "@/features/perception/_components";
+import { createEmptyPerceptionViewData } from "@/lib/perception-data";
 import { usePerceptionData } from "@/features/perception/core/use-perception-data";
 
 import { BrandCanonEditorPanel } from "./_components";
@@ -14,7 +12,7 @@ type BrandCanonPageProps = {
 
 export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps) {
   const normalizedRouteSearch = normalizeBrandCanonSearch(routeSearch);
-  const { data, error, loading, reload } = usePerceptionData(
+  const { data, error, loading } = usePerceptionData(
     apiBaseURL,
     normalizedRouteSearch,
   );
@@ -23,13 +21,9 @@ export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps)
     return <BrandCanonLoadingState />;
   }
 
-  if (!data) {
-    return <BrandCanonUnavailableState error={error} onReload={reload} />;
-  }
-
   return (
     <BrandCanonEditorPanel
-      initialData={data}
+      initialData={data ?? createEmptyPerceptionViewData(normalizedRouteSearch, error)}
       apiBaseURL={apiBaseURL}
       routeSearch={normalizedRouteSearch}
     />

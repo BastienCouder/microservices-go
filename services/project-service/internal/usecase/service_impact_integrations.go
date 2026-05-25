@@ -37,23 +37,59 @@ func (s *Service) UpdateProjectImpactIntegrations(
 	projectID string,
 	organizationID int64,
 	input UpdateProjectImpactIntegrationsInput,
-) (ProjectImpactIntegrationsView, error) {
+) (UpdateProjectImpactIntegrationsResult, error) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	if err := s.reloadLocked(ctx); err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		s.mu.Unlock()
+		return UpdateProjectImpactIntegrationsResult{}, err
 	}
 	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		s.mu.Unlock()
+		return UpdateProjectImpactIntegrationsResult{}, err
 	}
 
 	current := normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
 	updated, generatedIngestionToken, err := applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
 	if err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		s.mu.Unlock()
+		return UpdateProjectImpactIntegrationsResult{}, err
 	}
 
+	shouldSetupLLM := updated.GA4.PropertyID != "" &&
+		updated.GA4.ServiceAccountJSON != "" &&
+		updated.GA4.OAuthRefreshToken == "" &&
+		input.GA4 != nil &&
+		!input.GA4.Disconnect
+	llmSetupProvider := s.ga4LLMSetupProvider
+	serviceAccountJSON := updated.GA4.ServiceAccountJSON
+	propertyID := updated.GA4.PropertyID
+	s.mu.Unlock()
+
+	llmSetup := GA4LLMSetupResult{}
+	if shouldSetupLLM {
+		if llmSetupProvider == nil {
+			return UpdateProjectImpactIntegrationsResult{}, fmt.Errorf("%w: ga4 llm setup is not configured", ErrDependencyUnavailable)
+		}
+		llmSetup, err = llmSetupProvider.SetupLLMTrackingWithServiceAccount(ctx, serviceAccountJSON, propertyID)
+		if err != nil {
+			return UpdateProjectImpactIntegrationsResult{}, fmt.Errorf("%w: setup ga4 llm tracking: %v", ErrDependencyUnavailable, err)
+		}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.reloadLocked(ctx); err != nil {
+		return UpdateProjectImpactIntegrationsResult{}, err
+	}
+	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+		return UpdateProjectImpactIntegrationsResult{}, err
+	}
+	current = normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
+	updated, generatedIngestionToken, err = applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
+	if err != nil {
+		return UpdateProjectImpactIntegrationsResult{}, err
+	}
 	if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" && updated.GA4.OAuthRefreshToken == "" &&
 		updated.Stripe.WebhookSecret == "" &&
 		updated.Ingestion.SigningToken == "" {
@@ -64,9 +100,12 @@ func (s *Service) UpdateProjectImpactIntegrations(
 	}
 
 	if err := s.persistLocked(ctx); err != nil {
-		return ProjectImpactIntegrationsView{}, err
+		return UpdateProjectImpactIntegrationsResult{}, err
 	}
-	return buildProjectImpactIntegrationsView(updated, generatedIngestionToken), nil
+	return UpdateProjectImpactIntegrationsResult{
+		Integration: buildProjectImpactIntegrationsView(updated, generatedIngestionToken),
+		LLMSetup:    llmSetup,
+	}, nil
 }
 
 func (s *Service) GetProjectImpactContext(ctx context.Context, projectID string) (ProjectImpactContext, error) {

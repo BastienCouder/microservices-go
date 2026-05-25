@@ -25,7 +25,7 @@ export function SidebarLanguageSwitcher({ collapsed }: SidebarLanguageSwitcherPr
       type="button"
       variant="ghost"
       className={cn(
-        "w-full rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted hover:text-foreground",
+        "w-full rounded-md px-2 py-1.5 text-sm text-background/80 bg-background/10 hover:bg-background/20 hover:text-background",
         collapsed ? "justify-center" : "justify-between",
       )}
     >

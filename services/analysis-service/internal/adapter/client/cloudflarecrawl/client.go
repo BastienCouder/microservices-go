@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -19,6 +20,8 @@ const (
 	defaultBaseURL = "https://api.cloudflare.com"
 	defaultTimeout = 30 * time.Second
 )
+
+var ErrAuthentication = errors.New("cloudflare crawl authentication failed")
 
 type Config struct {
 	AccountID  string
@@ -91,7 +94,7 @@ func (c *Client) StartCrawl(ctx context.Context, input usecase.ContentOptimizerC
 		return usecase.ContentOptimizerCrawlJob{}, err
 	}
 	if !envelope.Success || strings.TrimSpace(envelope.Result) == "" {
-		return usecase.ContentOptimizerCrawlJob{}, fmt.Errorf("cloudflare crawl start failed: %s", envelope.errorMessage())
+		return usecase.ContentOptimizerCrawlJob{}, newAPIErrorFromEnvelope("start", envelope)
 	}
 	return usecase.ContentOptimizerCrawlJob{ID: envelope.Result, Status: "running"}, nil
 }
@@ -113,7 +116,7 @@ func (c *Client) GetCrawl(ctx context.Context, jobID string, input usecase.Conte
 		return usecase.ContentOptimizerCrawlResult{}, err
 	}
 	if !envelope.Success {
-		return usecase.ContentOptimizerCrawlResult{}, fmt.Errorf("cloudflare crawl result failed: %s", envelope.errorMessage())
+		return usecase.ContentOptimizerCrawlResult{}, newAPIErrorFromEnvelope("result", envelope)
 	}
 	return envelope.Result.toUsecase(), nil
 }
@@ -161,7 +164,7 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, query url.Va
 		if message == "" {
 			message = http.StatusText(resp.StatusCode)
 		}
-		return fmt.Errorf("cloudflare crawl error (%d): %s", resp.StatusCode, message)
+		return newAPIErrorFromStatus(resp.StatusCode, message)
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
@@ -177,6 +180,7 @@ type apiEnvelope[T any] struct {
 }
 
 type apiErrorObject struct {
+	Code    int    `json:"code"`
 	Message string `json:"message"`
 }
 
@@ -191,6 +195,91 @@ func (e apiEnvelope[T]) errorMessage() string {
 		return "unknown error"
 	}
 	return strings.Join(messages, "; ")
+}
+
+type apiError struct {
+	operation      string
+	statusCode     int
+	message        string
+	authentication bool
+	validation     bool
+}
+
+func (e *apiError) Error() string {
+	message := strings.TrimSpace(e.message)
+	if message == "" {
+		message = "unknown error"
+	}
+	switch {
+	case e.authentication:
+		return "cloudflare crawl authentication failed: " + message
+	case e.validation:
+		if e.operation != "" {
+			return "validation error: cloudflare crawl " + e.operation + " request invalid: " + message
+		}
+		return "validation error: cloudflare crawl request invalid: " + message
+	default:
+		if e.operation != "" {
+			return "dependency unavailable: cloudflare crawl " + e.operation + " failed: " + message
+		}
+		return "dependency unavailable: cloudflare crawl failed: " + message
+	}
+}
+
+func (e *apiError) Is(target error) bool {
+	switch target {
+	case ErrAuthentication:
+		return e.authentication
+	case usecase.ErrValidation:
+		return e.validation
+	case usecase.ErrDependencyUnavailable:
+		return !e.validation
+	default:
+		return false
+	}
+}
+
+func newAPIErrorFromStatus(statusCode int, message string) error {
+	return &apiError{
+		statusCode:     statusCode,
+		message:        message,
+		authentication: statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden,
+		validation:     statusCode == http.StatusBadRequest || statusCode == http.StatusUnprocessableEntity,
+	}
+}
+
+func newAPIErrorFromEnvelope[T any](operation string, envelope apiEnvelope[T]) error {
+	message := envelope.errorMessage()
+	authentication := envelope.hasErrorCode(10000) || containsAuthenticationMessage(message)
+	return &apiError{
+		operation:      operation,
+		message:        message,
+		authentication: authentication,
+		validation:     !authentication && envelope.hasValidationError(),
+	}
+}
+
+func (e apiEnvelope[T]) hasErrorCode(code int) bool {
+	for _, item := range e.Errors {
+		if item.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func (e apiEnvelope[T]) hasValidationError() bool {
+	for _, item := range e.Errors {
+		if item.Code == 1000 {
+			return true
+		}
+	}
+	return false
+}
+
+func containsAuthenticationMessage(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(message, "authentication")
 }
 
 type crawlResultPayload struct {

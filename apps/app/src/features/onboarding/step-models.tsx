@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { ModelCard } from "@/components/shared/model-card";
-import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
+import {
+  pushErrorToast,
+  pushSuccessToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import {
   createProviderCredentialLookup,
   getCatalogDefaultSelection,
@@ -23,7 +27,6 @@ import { useProviderCredentialMutations } from "@/features/models/_lib/models-pa
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
-import { getBillingPlanTranslationKey } from "@/shared/billing-plan";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
@@ -65,7 +68,6 @@ export function StepModels({
     queryFn: ({ signal }) =>
       loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
   });
-  const plan = billingQuery.data?.plan ?? null;
   const requiresProjectProviderCredentials = false;
 
   const catalogQuery = useQuery({
@@ -325,7 +327,6 @@ export function StepModels({
       t,
     ],
   );
-  const planLabel = plan ? t(getBillingPlanTranslationKey(plan)) : null;
   const providerKeyRequirements = useMemo(
     () =>
       requiresProjectProviderCredentials
@@ -368,10 +369,21 @@ export function StepModels({
     providerCredentialsReady &&
     selectedCount > 0 &&
     missingProviderLabels.length > 0;
+  const developerPlanMissingKeysMessage = developerPlanMissingKeys
+    ? t("modelsDeveloperKeysRequired", {
+        providers: missingProviderLabels.join(", "),
+      })
+    : "";
   const canContinue =
     selectedCount > 0 &&
     !developerPlanMissingKeys &&
     (!requiresProjectProviderCredentials || providerCredentialsReady);
+
+  useEffect(() => {
+    if (developerPlanMissingKeysMessage) {
+      pushWarningToast(developerPlanMissingKeysMessage);
+    }
+  }, [developerPlanMissingKeysMessage]);
 
   const providerApiKeyTexts = useMemo(
     () => ({
@@ -500,24 +512,6 @@ export function StepModels({
         </span>
       </div>
 
-      <div className="rounded-md border border-border/70 bg-muted/20 px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-foreground">
-              {t("modelsChangesTitle")}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {t("modelsChangesHint")}
-            </p>
-          </div>
-          {planLabel ? (
-            <div className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-foreground">
-              {t("modelsCurrentPlan", { plan: planLabel })}
-            </div>
-          ) : null}
-        </div>
-      </div>
-
       {requiresProjectProviderCredentials ? (
         <div className="flex flex-col gap-3">
           <ProviderApiKeysPanel
@@ -534,13 +528,6 @@ export function StepModels({
             onDelete={deleteProviderKey}
             texts={providerApiKeyTexts}
           />
-          {developerPlanMissingKeys ? (
-            <p className="text-sm text-destructive">
-              {t("modelsDeveloperKeysRequired", {
-                providers: missingProviderLabels.join(", "),
-              })}
-            </p>
-          ) : null}
         </div>
       ) : null}
 

@@ -31,7 +31,7 @@ export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, to
           <CardTitle className="text-lg font-semibold">
             <SectionTitle>{content.topCitedPagesTitle}</SectionTitle>
           </CardTitle>
-          <CardDescription className="text-xs leading-relaxed md:text-sm">{content.topCitedPagesDescription}</CardDescription>
+          <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">{content.topCitedPagesDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>

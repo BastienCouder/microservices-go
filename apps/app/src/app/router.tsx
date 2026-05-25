@@ -27,6 +27,16 @@ const AdminModelsPage = lazy(() =>
     default: module.AdminModelsPage,
   })),
 );
+const AdminOrganizationsPage = lazy(() =>
+  import("@/features/admin-organizations").then((module) => ({
+    default: module.AdminOrganizationsPage,
+  })),
+);
+const AdminPricingPage = lazy(() =>
+  import("@/features/admin-pricing").then((module) => ({
+    default: module.AdminPricingPage,
+  })),
+);
 const BrandsPage = lazy(() =>
   import("@/features/brands/index").then((module) => ({
     default: module.BrandsPage,
@@ -55,6 +65,11 @@ const AccountPage = lazy(() =>
 const CrawlerPage = lazy(() =>
   import("@/features/crawler/index").then((module) => ({
     default: module.CrawlerPage,
+  })),
+);
+const ContentOptimizerPage = lazy(() =>
+  import("@/features/content-optimizer/index").then((module) => ({
+    default: module.ContentOptimizerPage,
   })),
 );
 const AgentReadyPage = lazy(() =>
@@ -149,6 +164,28 @@ export function AppRouter({
         }
       />
       <Route
+        path="/admin/organizations"
+        element={
+          <Suspense fallback={null}>
+            <AdminOrganizationsPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/admin/pricing"
+        element={
+          <Suspense fallback={null}>
+            <AdminPricingPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
+          </Suspense>
+        }
+      />
+      <Route
         path="/perception"
         element={
           <Suspense fallback={null}>
@@ -165,10 +202,18 @@ export function AppRouter({
         }
       />
       <Route
+        path="/content-optimizer"
+        element={
+          <Suspense fallback={null}>
+            <ContentOptimizerPage />
+          </Suspense>
+        }
+      />
+      <Route
         path="/ai-agent-ready"
         element={
           <Suspense fallback={null}>
-            <AgentReadyPage apiBaseURL={apiBaseURL} />
+            <AgentReadyPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
           </Suspense>
         }
       />

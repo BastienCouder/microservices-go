@@ -28,7 +28,7 @@ export function PerceptionUnavailableState({
   error: string | null;
 }) {
   const { t } = useScopedI18n("perception");
-  const errorLabel = (error || "").trim().toLowerCase() !== "" ? t("unavailableNoData") : t("unavailableNoData");
+  const errorLabel = error?.trim() || t("unavailableNoData");
 
   return (
     <PerceptionThreeColumnLayout
@@ -71,7 +71,7 @@ export function PerceptionUnavailableState({
               <CardDescription>{t("heatmapDescription")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <EmptyStateCard label={t("unavailableNoData")} className="h-[280px] text-sm" />
+              <EmptyStateCard label={errorLabel} className="h-[280px] text-sm" />
             </CardContent>
           </Card>
         </div>
@@ -102,7 +102,7 @@ export function BrandCanonUnavailableState({
   onReload: () => Promise<void>;
 }) {
   const { t } = useScopedI18n("perception");
-  const errorLabel = (error || "").trim().toLowerCase() !== "" ? t("unavailableNoData") : t("unavailableNoData");
+  const errorLabel = error?.trim() || t("unavailableNoData");
 
   return (
     <div className="mx-0 my-0 grid grid-cols-12 gap-0 md:m-4 xl:h-full xl:min-h-0">

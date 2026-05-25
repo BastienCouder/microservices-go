@@ -54,9 +54,10 @@ func (s *Subscription) Validate() error {
 }
 
 const (
-	PlanStarter = "starter"
-	PlanGrowth  = "growth"
-	PlanPro     = "pro"
+	PlanDeveloper = "developer"
+	PlanStarter   = "starter"
+	PlanGrowth    = "growth"
+	PlanPro       = "pro"
 )
 
 const (

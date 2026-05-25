@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CheckCircle2, Loader2, RotateCw, ShieldCheck, XCircle } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import {
   Dialog,
   DialogContent,
@@ -59,15 +59,16 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
     });
   }, [apiBaseURL, invitationToken]);
 
+  useEffect(() => {
+    if (state.status === "success") {
+      pushSuccessToast(state.message);
+    }
+    if (state.status === "error") {
+      pushErrorToast(new Error(state.message), state.message);
+    }
+  }, [state.message, state.status]);
+
   const isLoading = state.status === "loading";
-  const Icon =
-    state.status === "success"
-      ? CheckCircle2
-      : state.status === "error"
-        ? XCircle
-        : state.status === "loading"
-          ? Loader2
-          : ShieldCheck;
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center px-4 py-8">
@@ -79,20 +80,6 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
               Vous avez ete invite. En confirmant, votre compte sera ajoute au projet lie a cette invitation.
             </DialogDescription>
           </DialogHeader>
-
-          <Alert variant={state.status === "error" ? "destructive" : "default"}>
-            <Icon className={isLoading ? "animate-spin" : ""} />
-            <AlertTitle>
-              {state.status === "success"
-                ? "Invitation acceptee"
-                : state.status === "error"
-                  ? "Invitation non acceptee"
-                  : state.status === "loading"
-                    ? "Confirmation en cours"
-                    : "Confirmation requise"}
-            </AlertTitle>
-            <AlertDescription>{state.message}</AlertDescription>
-          </Alert>
 
           <DialogFooter>
             {state.status === "success" ? (
@@ -114,22 +101,6 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <section className="sr-only">
-        <Alert variant={state.status === "error" ? "destructive" : "default"}>
-          <Icon className={isLoading ? "animate-spin" : ""} />
-          <AlertTitle>
-            {state.status === "success"
-              ? "Invitation acceptee"
-              : state.status === "error"
-                ? "Invitation non acceptee"
-                : state.status === "loading"
-                  ? "Invitation en cours"
-                  : "Invitation a confirmer"}
-          </AlertTitle>
-          <AlertDescription>{state.message}</AlertDescription>
-        </Alert>
-      </section>
     </main>
   );
 }

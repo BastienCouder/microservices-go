@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import {
   buildScopedHref,
   readOrganizationIdFromSearch,
@@ -43,9 +42,13 @@ export const PROVIDER_API_KEY_TEXTS = {
 };
 
 function readOrganizationId(routeSearch: string): string {
+  const routeProjectId = readProjectIdFromSearch(routeSearch);
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
   if (/^\d+$/.test(routeOrganizationId)) {
     return routeOrganizationId;
+  }
+  if (routeProjectId) {
+    return "";
   }
 
   return readSelectedOrganizationID();

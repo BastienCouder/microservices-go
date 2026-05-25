@@ -54,7 +54,34 @@ const ERROR_TYPE_TRANSLATION_KEYS = {
   wrong_category: "errorTypeWrongCategory",
   missing_feature: "errorTypeMissingFeature",
   competitor_misattribution: "errorTypeCompetitorMisattribution",
+  visibility_drop: "errorTypeVisibilityDrop",
+  competitor_surge: "errorTypeCompetitorSurge",
+  ranking_loss: "errorTypeRankingLoss",
+  sentiment_drop: "errorTypeSentimentDrop",
+  factual_error_spike: "errorTypeFactualErrorSpike",
+  mention_drop: "errorTypeMentionDrop",
+  citation_drop: "errorTypeCitationDrop",
+  pricing_mismatch: "errorTypePricingMismatch",
+  monitoring_visibility_gap: "errorTypeMonitoringVisibilityGap",
+  monitoring_citation_gap: "errorTypeMonitoringCitationGap",
+  monitoring_ranking_gap: "errorTypeMonitoringRankingGap",
+  monitoring_negative_shift: "errorTypeMonitoringNegativeShift",
+  monitoring_model_volatility: "errorTypeMonitoringModelVolatility",
 } as const;
+
+const GENERATED_CONTENT_TRANSLATION_KEYS = new Set([
+  "generatedContentPerceptionPositioningGap",
+  "generatedContentPerceptionCitationGap",
+  "generatedContentPerceptionUseCaseGap",
+  "generatedContentPerceptionSentimentGap",
+  "generatedContentPerceptionCompetitiveGap",
+  "generatedContentMonitoringAlert",
+  "generatedContentMonitoringVisibilityGap",
+  "generatedContentMonitoringCitationGap",
+  "generatedContentMonitoringRankingGap",
+  "generatedContentMonitoringNegativeShift",
+  "generatedContentMonitoringModelVolatility",
+] as const);
 
 const SEVERITY_TRANSLATION_KEYS: Record<PerceptionSeverity, string> = {
   high: "topErrorsSeverityHigh",
@@ -154,6 +181,18 @@ export function formatPerceptionFixTypeLabel(value: string, locale: string): str
 
 export function formatPerceptionErrorTypeLabel(value: string, locale: string): string {
   return formatMappedPerceptionLabel(value, locale, ERROR_TYPE_TRANSLATION_KEYS);
+}
+
+export function resolvePerceptionGeneratedContent(
+  value: string,
+  key: string | undefined,
+  locale: string,
+): string {
+  const normalizedKey = key?.trim();
+  if (normalizedKey && GENERATED_CONTENT_TRANSLATION_KEYS.has(normalizedKey as never)) {
+    return translatePerception(normalizedKey, locale);
+  }
+  return value;
 }
 
 export function getPerceptionSeverityLabel(

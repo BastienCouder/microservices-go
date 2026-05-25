@@ -270,6 +270,7 @@ func derivePerceptionTopErrors(
 		impact           string
 		fixType          string
 		generatedContent string
+		generatedContentKey string
 	}
 
 	brandLabel := strings.TrimSpace(canon.BrandName)
@@ -292,6 +293,7 @@ func derivePerceptionTopErrors(
 			impact:           "La marque peut etre oubliee ou mal classee sur les requetes de consideration.",
 			fixType:          "website_copy",
 			generatedContent: "Clarifier la proposition de valeur, la categorie et les scenarios cibles dans les pages d'entree et les FAQ.",
+			generatedContentKey: "generatedContentPerceptionPositioningGap",
 		},
 		{
 			errorType:        "citation_gap",
@@ -302,6 +304,7 @@ func derivePerceptionTopErrors(
 			impact:           "La fiabilite percue de la marque baisse dans les syntheses IA.",
 			fixType:          "faq_snippet",
 			generatedContent: "Ajouter des preuves, chiffres, FAQ et contenus de reference directement citables sur les points cles.",
+			generatedContentKey: "generatedContentPerceptionCitationGap",
 		},
 		{
 			errorType:        "use_case_gap",
@@ -312,6 +315,7 @@ func derivePerceptionTopErrors(
 			impact:           "Les IA ne relient pas encore assez la marque aux besoins cibles.",
 			fixType:          "website_copy",
 			generatedContent: "Rendre les use cases prioritaires plus visibles dans la navigation, les hero sections et les pages de comparaison.",
+			generatedContentKey: "generatedContentPerceptionUseCaseGap",
 		},
 		{
 			errorType:        "sentiment_gap",
@@ -322,6 +326,7 @@ func derivePerceptionTopErrors(
 			impact:           "La desirabilite de la marque baisse dans les recommandations IA.",
 			fixType:          "prompt_patch",
 			generatedContent: "Renforcer les preuves de valeur, resultats clients et differentiants dans les contenus sources.",
+			generatedContentKey: "generatedContentPerceptionSentimentGap",
 		},
 		{
 			errorType:        "competitive_gap",
@@ -332,6 +337,7 @@ func derivePerceptionTopErrors(
 			impact:           "La marque peut perdre des comparatifs ou apparaitre derriere des alternatives.",
 			fixType:          "schema_update",
 			generatedContent: "Ajouter des comparatifs, tableaux de differenciation et contenus de preuve contre les alternatives majeures.",
+			generatedContentKey: "generatedContentPerceptionCompetitiveGap",
 		},
 	}
 
@@ -366,6 +372,7 @@ func derivePerceptionTopErrors(
 			DetectedInModels: lowScoringPerceptionModels(metricsByModel, item.axis),
 			FixType:          item.fixType,
 			GeneratedContent: item.generatedContent,
+			GeneratedContentKey: item.generatedContentKey,
 			OptimizePriority: priority,
 		})
 	}

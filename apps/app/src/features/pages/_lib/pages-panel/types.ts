@@ -7,6 +7,9 @@ export type PageModelBadge = {
 export type PagePromptHit = {
   id: string;
   prompt: string;
+  response: string;
+  promptId: string;
+  responseId: string;
   model: PageModelBadge | null;
   persona: string;
   time: string;

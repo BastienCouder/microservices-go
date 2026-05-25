@@ -41,6 +41,7 @@ type executePromptRequest struct {
 	ModelID        string   `json:"modelId"`
 	ProviderID     string   `json:"providerId"`
 	ProviderAPIKey string   `json:"providerApiKey"`
+	PromptMode     string   `json:"promptMode"`
 	BrandName      string   `json:"brandName"`
 	Competitors    []string `json:"competitors"`
 	MockResponse   string   `json:"mockResponse"`
@@ -59,6 +60,7 @@ func (h *Handler) executePrompt(w http.ResponseWriter, r *http.Request) {
 		ModelID:        req.ModelID,
 		ProviderID:     req.ProviderID,
 		ProviderAPIKey: req.ProviderAPIKey,
+		PromptMode:     usecase.PromptMode(req.PromptMode),
 		BrandName:      req.BrandName,
 		Competitors:    req.Competitors,
 		MockResponse:   req.MockResponse,
