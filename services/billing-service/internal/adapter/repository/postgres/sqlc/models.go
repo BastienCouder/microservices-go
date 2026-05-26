@@ -31,12 +31,14 @@ type BillingPlanSetting struct {
 	MonthlyQuota            int32
 	ModelSelectionLimit     int32
 	MonthlyModelChangeLimit int32
+	MaxProjects             int32
 	UpdatedAt               pgtype.Timestamptz
 }
 
 type BillingPricingTier struct {
 	PromptVolume        int32
 	Label               string
+	PricesJson          string
 	DeveloperPriceCents pgtype.Int4
 	StarterPriceCents   pgtype.Int4
 	GrowthPriceCents    pgtype.Int4

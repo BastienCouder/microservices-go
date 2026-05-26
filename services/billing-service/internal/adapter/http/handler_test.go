@@ -335,6 +335,9 @@ func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
 	if !strings.Contains(body, `"monthly_model_change_limit":0`) {
 		t.Fatalf("expected monthly model change limit in payload, got %s", body)
 	}
+	if !strings.Contains(body, `"max_projects":5`) {
+		t.Fatalf("expected max projects in payload, got %s", body)
+	}
 	if !strings.Contains(body, `"subscription_status":"active"`) {
 		t.Fatalf("expected subscription status in payload, got %s", body)
 	}
@@ -368,7 +371,8 @@ func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
 		"yearly_price_cents": 39900,
 		"monthly_quota": 1500,
 		"model_selection_limit": 12,
-		"monthly_model_change_limit": 4
+		"monthly_model_change_limit": 4,
+		"max_projects": 25
 	}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateReq.Header.Set("X-Organization-ID", "7")
@@ -395,7 +399,78 @@ func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
 	if !strings.Contains(body, `"monthly_quota":1500`) {
 		t.Fatalf("expected default plan quota propagated, got %s", body)
 	}
+	if !strings.Contains(body, `"max_projects":25`) {
+		t.Fatalf("expected max projects in entitlements, got %s", body)
+	}
 	if !strings.Contains(updateRec.Body.String(), `"monthly_quota":1500`) {
 		t.Fatalf("expected updated plan quota in response, got %s", updateRec.Body.String())
+	}
+	if !strings.Contains(updateRec.Body.String(), `"max_projects":25`) {
+		t.Fatalf("expected updated max projects in response, got %s", updateRec.Body.String())
+	}
+}
+
+func TestUpdatePlanSettingsAcceptsCustomPlan(t *testing.T) {
+	repo := &memoryRepo{}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/plans", strings.NewReader(`{
+		"plan": "agency-plus",
+		"monthly_price_cents": 9900,
+		"yearly_price_cents": 7900,
+		"monthly_quota": 500,
+		"model_selection_limit": 8,
+		"monthly_model_change_limit": 2,
+		"max_projects": 12
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `"plan":"agency-plus"`) {
+		t.Fatalf("expected custom plan in response, got %s", body)
+	}
+	if !strings.Contains(body, `"max_projects":12`) {
+		t.Fatalf("expected custom plan max projects in response, got %s", body)
+	}
+}
+
+func TestUpdatePricingTierAcceptsDynamicPlanPrices(t *testing.T) {
+	repo := &memoryRepo{}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/pricing-tiers", strings.NewReader(`{
+		"prompt_volume": 250,
+		"label": "250",
+		"prices": {
+			"starter": 24900,
+			"growth": 49900,
+			"agency-plus": 79900
+		}
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	body := rec.Body.String()
+	if !strings.Contains(body, `"agency-plus":79900`) {
+		t.Fatalf("expected custom plan price in response, got %s", body)
 	}
 }

@@ -483,6 +483,15 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	if err != nil {
 		return PerceptionData{}, err
 	}
+	return s.buildPerceptionFromDashboard(ctx, projectID, organizationID, dashboard)
+}
+
+func (s *Service) buildPerceptionFromDashboard(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	dashboard DashboardData,
+) (PerceptionData, error) {
 	projectModels, hasProjectModels, err := s.listProjectEnabledModels(ctx, projectID, organizationID)
 	if err != nil {
 		return PerceptionData{}, err

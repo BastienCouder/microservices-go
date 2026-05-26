@@ -79,6 +79,7 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 		Plan                    string `json:"plan"`
 		ModelSelectionLimit     int    `json:"model_selection_limit"`
 		MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
+		MaxProjects             int    `json:"max_projects"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
 		return usecase.BillingEntitlements{}, fmt.Errorf("decode billing response: %w", err)
@@ -88,5 +89,6 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 		Plan:                    strings.TrimSpace(payload.Plan),
 		ModelSelectionLimit:     payload.ModelSelectionLimit,
 		MonthlyModelChangeLimit: payload.MonthlyModelChangeLimit,
+		MaxProjects:             payload.MaxProjects,
 	}, nil
 }

@@ -54,6 +54,7 @@ describe("billing plan settings", () => {
         monthly_quota: 1000,
         model_selection_limit: 12,
         monthly_model_change_limit: 4,
+        max_projects: 10,
       }),
     ).toEqual({
       plan: "pro",
@@ -62,6 +63,29 @@ describe("billing plan settings", () => {
       monthlyQuota: 1000,
       modelSelectionLimit: 12,
       monthlyModelChangeLimit: 4,
+      maxProjects: 10,
+    });
+  });
+
+  test("keeps custom plan identifiers for admin pricing", () => {
+    expect(
+      normalizeBillingPlanSettings({
+        plan: "agency-plus",
+        monthly_price_cents: 9900,
+        yearly_price_cents: 7900,
+        monthly_quota: 500,
+        model_selection_limit: 8,
+        monthly_model_change_limit: 2,
+        max_projects: 12,
+      }),
+    ).toEqual({
+      plan: "agency-plus",
+      monthlyPriceCents: 9900,
+      yearlyPriceCents: 7900,
+      monthlyQuota: 500,
+      modelSelectionLimit: 8,
+      monthlyModelChangeLimit: 2,
+      maxProjects: 12,
     });
   });
 
@@ -78,6 +102,7 @@ describe("billing plan settings", () => {
           monthly_quota: 1200,
           model_selection_limit: 12,
           monthly_model_change_limit: 4,
+          max_projects: 15,
         }),
         {
           status: 200,
@@ -95,6 +120,7 @@ describe("billing plan settings", () => {
         monthlyQuota: 1200,
         modelSelectionLimit: 12,
         monthlyModelChangeLimit: 4,
+        maxProjects: 15,
       });
     } finally {
       globalThis.fetch = originalFetch;
@@ -110,6 +136,7 @@ describe("billing plan settings", () => {
       monthly_quota: 1200,
       model_selection_limit: 12,
       monthly_model_change_limit: 4,
+      max_projects: 15,
     });
   });
 });
@@ -120,6 +147,13 @@ describe("billing pricing tiers", () => {
       normalizeBillingPricingTier({
         prompt_volume: 1000,
         label: "1k",
+        prices: {
+          developer: 24900,
+          starter: null,
+          growth: 89900,
+          pro: 149900,
+          "agency-plus": 219900,
+        },
         developer_price_cents: 24900,
         starter_price_cents: null,
         growth_price_cents: 89900,
@@ -128,6 +162,13 @@ describe("billing pricing tiers", () => {
     ).toEqual({
       promptVolume: 1000,
       label: "1k",
+      prices: {
+        developer: 24900,
+        starter: null,
+        growth: 89900,
+        pro: 149900,
+        "agency-plus": 219900,
+      },
       developerPriceCents: 24900,
       starterPriceCents: null,
       growthPriceCents: 89900,
@@ -144,6 +185,13 @@ describe("billing pricing tiers", () => {
         JSON.stringify({
           prompt_volume: 1000,
           label: "1k",
+          prices: {
+            developer: 24900,
+            starter: null,
+            growth: 89900,
+            pro: 149900,
+            "agency-plus": 219900,
+          },
           developer_price_cents: 24900,
           starter_price_cents: null,
           growth_price_cents: 89900,
@@ -161,6 +209,13 @@ describe("billing pricing tiers", () => {
         organizationId: "7",
         promptVolume: 1000,
         label: "1k",
+        prices: {
+          developer: 24900,
+          starter: null,
+          growth: 89900,
+          pro: 149900,
+          "agency-plus": 219900,
+        },
         developerPriceCents: 24900,
         starterPriceCents: null,
         growthPriceCents: 89900,
@@ -176,6 +231,13 @@ describe("billing pricing tiers", () => {
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       prompt_volume: 1000,
       label: "1k",
+      prices: {
+        developer: 24900,
+        starter: null,
+        growth: 89900,
+        pro: 149900,
+        "agency-plus": 219900,
+      },
       developer_price_cents: 24900,
       starter_price_cents: null,
       growth_price_cents: 89900,

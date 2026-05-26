@@ -64,11 +64,13 @@ type updatePlanSettingsRequest struct {
 	MonthlyQuota            int    `json:"monthly_quota"`
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
+	MaxProjects             int    `json:"max_projects"`
 }
 
 type updatePricingTierRequest struct {
 	PromptVolume        int    `json:"prompt_volume"`
 	Label               string `json:"label"`
+	Prices              map[string]*int `json:"prices"`
 	DeveloperPriceCents *int   `json:"developer_price_cents"`
 	StarterPriceCents   *int   `json:"starter_price_cents"`
 	GrowthPriceCents    *int   `json:"growth_price_cents"`
@@ -129,6 +131,7 @@ func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
 		MonthlyQuota:            req.MonthlyQuota,
 		ModelSelectionLimit:     req.ModelSelectionLimit,
 		MonthlyModelChangeLimit: req.MonthlyModelChangeLimit,
+		MaxProjects:             req.MaxProjects,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPlanSettings) {
@@ -166,6 +169,7 @@ func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 	tier, err := h.svc.UpdatePricingTier(r.Context(), domain.PricingTier{
 		PromptVolume:        req.PromptVolume,
 		Label:               strings.TrimSpace(req.Label),
+		Prices:              req.Prices,
 		DeveloperPriceCents: req.DeveloperPriceCents,
 		StarterPriceCents:   req.StarterPriceCents,
 		GrowthPriceCents:    req.GrowthPriceCents,

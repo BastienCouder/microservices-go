@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/sheet";
 import type { OptimizationError } from "@/lib/optimization-errors-data";
 
-import { ErrorDetailsContent } from "../../perception/_components";
+import {
+  ErrorDetailsContent,
+  buildPerceptionModelLookup,
+} from "../../perception/_components/top-errors-panel";
 type ErrorHubDetailsPanelProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
   generatedIds: ReadonlySet<string>;
@@ -28,7 +31,7 @@ type ErrorHubDetailsPanelProps = {
   locale: string;
   markingDoneErrorIds: ReadonlySet<string>;
   modelLookup: ReturnType<
-    typeof import("../../perception/_components").buildPerceptionModelLookup
+    typeof buildPerceptionModelLookup
   >;
   onCreateAction: (error: OptimizationError) => void | Promise<void>;
   onMarkDone: (error: OptimizationError) => void | Promise<void>;

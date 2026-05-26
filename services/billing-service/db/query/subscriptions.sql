@@ -85,6 +85,7 @@ SELECT
   monthly_quota,
   model_selection_limit,
   monthly_model_change_limit,
+  max_projects,
   updated_at
 FROM billing_plan_settings
 ORDER BY
@@ -104,9 +105,10 @@ INSERT INTO billing_plan_settings (
   monthly_quota,
   model_selection_limit,
   monthly_model_change_limit,
+  max_projects,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (plan)
 DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -114,12 +116,14 @@ DO UPDATE SET
   monthly_quota = EXCLUDED.monthly_quota,
   model_selection_limit = EXCLUDED.model_selection_limit,
   monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
+  max_projects = EXCLUDED.max_projects,
   updated_at = EXCLUDED.updated_at;
 
 -- name: ListBillingPricingTiers :many
 SELECT
   prompt_volume,
   label,
+  prices_json::text AS prices_json,
   developer_price_cents,
   starter_price_cents,
   growth_price_cents,
@@ -132,16 +136,18 @@ ORDER BY prompt_volume;
 INSERT INTO billing_pricing_tiers (
   prompt_volume,
   label,
+  prices_json,
   developer_price_cents,
   starter_price_cents,
   growth_price_cents,
   pro_price_cents,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8)
 ON CONFLICT (prompt_volume)
 DO UPDATE SET
   label = EXCLUDED.label,
+  prices_json = EXCLUDED.prices_json,
   developer_price_cents = EXCLUDED.developer_price_cents,
   starter_price_cents = EXCLUDED.starter_price_cents,
   growth_price_cents = EXCLUDED.growth_price_cents,

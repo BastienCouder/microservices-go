@@ -46,11 +46,13 @@ import {
 } from "@/features/organizations/_lib/shared/api-normalizers";
 import {
   loadBillingEntitlements,
+  loadBillingPlanSettings,
   updateBillingSubscription,
   type BillingEntitlements,
+  type BillingPlanCode,
 } from "@/shared/billing";
 import { gatewayJSON } from "@/shared/api/gateway";
-import { getBillingPlanLabel, type SimulatedPlan } from "@/shared/billing-plan";
+import { getBillingPlanLabel } from "@/shared/billing-plan";
 
 type AdminOrganizationsPageProps = {
   apiBaseURL: string;
@@ -65,14 +67,24 @@ type OrganizationQuotaRow = {
 };
 
 type Draft = {
-  plan: SimulatedPlan;
+  plan: BillingPlanCode;
   monthlyQuota: string;
 };
 
-const ADMIN_PLANS: SimulatedPlan[] = ["starter", "growth", "pro"];
-const DEFAULT_PLAN: SimulatedPlan = "starter";
+const DEFAULT_ADMIN_PLANS: BillingPlanCode[] = ["starter", "growth", "pro"];
+const DEFAULT_PLAN: BillingPlanCode = "starter";
 const EMPTY_ROWS: OrganizationQuotaRow[] = [];
 const PLAN_FILTER_ALL = "all";
+
+function sortBillingPlans(plans: BillingPlanCode[]) {
+  const priority = new Map(DEFAULT_ADMIN_PLANS.map((plan, index) => [plan, index]));
+  return Array.from(new Set(plans.filter(Boolean))).sort((left, right) => {
+    const leftRank = priority.get(left) ?? 100;
+    const rightRank = priority.get(right) ?? 100;
+    if (leftRank === rightRank) return left.localeCompare(right);
+    return leftRank - rightRank;
+  });
+}
 
 function canManageUsage(organization: OrganizationSummary) {
   return (
@@ -166,6 +178,18 @@ export function AdminOrganizationsPage({
     ],
     [apiBaseURL, manageableOrganizations],
   );
+  const planOptionsQuery = useQuery({
+    queryKey: appQueryKeys.billingPlans(
+      apiBaseURL,
+      manageableOrganizations[0]?.id ?? "",
+    ),
+    enabled:
+      apiBaseURL.trim() !== "" && (manageableOrganizations[0]?.id ?? "") !== "",
+    queryFn: ({ signal }) =>
+      loadBillingPlanSettings(apiBaseURL, manageableOrganizations[0]!.id, {
+        signal,
+      }),
+  });
 
   const quotasQuery = useQuery({
     queryKey: quotaQueryKey,
@@ -181,6 +205,15 @@ export function AdminOrganizationsPage({
   });
 
   const rows = quotasQuery.data ?? EMPTY_ROWS;
+  const availablePlans = useMemo(
+    () =>
+      sortBillingPlans([
+        ...DEFAULT_ADMIN_PLANS,
+        ...(planOptionsQuery.data ?? []).map((plan) => plan.plan),
+        ...rows.map((row) => row.entitlements.plan ?? DEFAULT_PLAN),
+      ]),
+    [planOptionsQuery.data, rows],
+  );
   const filteredRows = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
     return rows.filter((row) => {
@@ -379,7 +412,7 @@ export function AdminOrganizationsPage({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value={PLAN_FILTER_ALL}>Tous les plans</SelectItem>
-                    {ADMIN_PLANS.map((plan) => (
+                    {availablePlans.map((plan) => (
                       <SelectItem key={plan} value={plan}>
                         {getBillingPlanLabel(plan)}
                       </SelectItem>
@@ -454,6 +487,7 @@ export function AdminOrganizationsPage({
                         }
                         onUpdateDraft={updateDraft}
                         onSave={saveQuota}
+                        planOptions={availablePlans}
                       />
                     ))}
                   </TableBody>
@@ -476,6 +510,7 @@ export function AdminOrganizationsPage({
                     }
                     onUpdateDraft={updateDraft}
                     onSave={saveQuota}
+                    planOptions={availablePlans}
                   />
                 ))}
               </div>
@@ -498,12 +533,14 @@ function AdminOrganizationTableRow({
   pending,
   onUpdateDraft,
   onSave,
+  planOptions,
 }: {
   row: OrganizationQuotaRow;
   draft: Draft;
   pending: boolean;
   onUpdateDraft: (organizationId: string, patch: Partial<Draft>) => void;
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
+  planOptions: BillingPlanCode[];
 }) {
   return (
     <TableRow>
@@ -530,6 +567,7 @@ function AdminOrganizationTableRow({
       <TableCell>
         <PlanSelect
           value={draft.plan}
+          planOptions={planOptions}
           onValueChange={(plan) =>
             onUpdateDraft(row.organization.id, { plan })
           }
@@ -559,12 +597,14 @@ function AdminOrganizationMobileCard({
   pending,
   onUpdateDraft,
   onSave,
+  planOptions,
 }: {
   row: OrganizationQuotaRow;
   draft: Draft;
   pending: boolean;
   onUpdateDraft: (organizationId: string, patch: Partial<Draft>) => void;
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
+  planOptions: BillingPlanCode[];
 }) {
   return (
     <form
@@ -591,6 +631,7 @@ function AdminOrganizationMobileCard({
         </div>
         <PlanSelect
           value={draft.plan}
+          planOptions={planOptions}
           onValueChange={(plan) => onUpdateDraft(row.organization.id, { plan })}
         />
         <QuotaInput
@@ -676,21 +717,20 @@ function MobileSummaryBlock({
 
 function PlanSelect({
   value,
+  planOptions,
   onValueChange,
 }: {
-  value: SimulatedPlan;
-  onValueChange: (plan: SimulatedPlan) => void;
+  value: BillingPlanCode;
+  planOptions: BillingPlanCode[];
+  onValueChange: (plan: BillingPlanCode) => void;
 }) {
   return (
-    <Select
-      value={value}
-      onValueChange={(plan) => onValueChange(plan as SimulatedPlan)}
-    >
+    <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger className="h-10 w-full">
         <SelectValue placeholder="Plan" />
       </SelectTrigger>
       <SelectContent>
-        {ADMIN_PLANS.map((plan) => (
+        {planOptions.map((plan) => (
           <SelectItem key={plan} value={plan}>
             {getBillingPlanLabel(plan)}
           </SelectItem>

@@ -59,6 +59,7 @@ SELECT
   monthly_quota,
   model_selection_limit,
   monthly_model_change_limit,
+  max_projects,
   updated_at
 FROM billing_plan_settings
 ORDER BY
@@ -87,6 +88,7 @@ func (q *Queries) ListBillingPlanSettings(ctx context.Context) ([]BillingPlanSet
 			&i.MonthlyQuota,
 			&i.ModelSelectionLimit,
 			&i.MonthlyModelChangeLimit,
+			&i.MaxProjects,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -103,6 +105,7 @@ const listBillingPricingTiers = `-- name: ListBillingPricingTiers :many
 SELECT
   prompt_volume,
   label,
+  prices_json::text AS prices_json,
   developer_price_cents,
   starter_price_cents,
   growth_price_cents,
@@ -124,6 +127,7 @@ func (q *Queries) ListBillingPricingTiers(ctx context.Context) ([]BillingPricing
 		if err := rows.Scan(
 			&i.PromptVolume,
 			&i.Label,
+			&i.PricesJson,
 			&i.DeveloperPriceCents,
 			&i.StarterPriceCents,
 			&i.GrowthPriceCents,
@@ -230,9 +234,10 @@ INSERT INTO billing_plan_settings (
   monthly_quota,
   model_selection_limit,
   monthly_model_change_limit,
+  max_projects,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (plan)
 DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -240,6 +245,7 @@ DO UPDATE SET
   monthly_quota = EXCLUDED.monthly_quota,
   model_selection_limit = EXCLUDED.model_selection_limit,
   monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
+  max_projects = EXCLUDED.max_projects,
   updated_at = EXCLUDED.updated_at
 `
 
@@ -250,6 +256,7 @@ type UpsertBillingPlanSettingsParams struct {
 	MonthlyQuota            int32
 	ModelSelectionLimit     int32
 	MonthlyModelChangeLimit int32
+	MaxProjects             int32
 	UpdatedAt               pgtype.Timestamptz
 }
 
@@ -261,6 +268,7 @@ func (q *Queries) UpsertBillingPlanSettings(ctx context.Context, arg UpsertBilli
 		arg.MonthlyQuota,
 		arg.ModelSelectionLimit,
 		arg.MonthlyModelChangeLimit,
+		arg.MaxProjects,
 		arg.UpdatedAt,
 	)
 	return err
@@ -270,16 +278,18 @@ const upsertBillingPricingTier = `-- name: UpsertBillingPricingTier :exec
 INSERT INTO billing_pricing_tiers (
   prompt_volume,
   label,
+  prices_json,
   developer_price_cents,
   starter_price_cents,
   growth_price_cents,
   pro_price_cents,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7)
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8)
 ON CONFLICT (prompt_volume)
 DO UPDATE SET
   label = EXCLUDED.label,
+  prices_json = EXCLUDED.prices_json,
   developer_price_cents = EXCLUDED.developer_price_cents,
   starter_price_cents = EXCLUDED.starter_price_cents,
   growth_price_cents = EXCLUDED.growth_price_cents,
@@ -290,6 +300,7 @@ DO UPDATE SET
 type UpsertBillingPricingTierParams struct {
 	PromptVolume        int32
 	Label               string
+	PricesJson          string
 	DeveloperPriceCents pgtype.Int4
 	StarterPriceCents   pgtype.Int4
 	GrowthPriceCents    pgtype.Int4
@@ -301,6 +312,7 @@ func (q *Queries) UpsertBillingPricingTier(ctx context.Context, arg UpsertBillin
 	_, err := q.db.Exec(ctx, upsertBillingPricingTier,
 		arg.PromptVolume,
 		arg.Label,
+		arg.PricesJson,
 		arg.DeveloperPriceCents,
 		arg.StarterPriceCents,
 		arg.GrowthPriceCents,

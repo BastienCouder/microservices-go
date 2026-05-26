@@ -18,4 +18,9 @@ describe("useOptimizationErrors", () => {
     expect(errorHubSource.includes("onMarkActionDone={() => void onMarkDone(error)}")).toBe(true);
     expect(errorHubSource.includes("markingActionDone={markingDoneErrorIds.has(error.id)}")).toBe(true);
   });
+
+  test("does not abort the error hub board request during route context churn", () => {
+    expect(source.includes("queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),")).toBe(true);
+    expect(source.includes("queryFn: ({ signal }) => loadOptimizationErrors(apiBaseURL, routeSearch, { signal })")).toBe(false);
+  });
 });

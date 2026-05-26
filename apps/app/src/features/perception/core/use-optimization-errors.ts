@@ -56,7 +56,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   const query = useQuery({
     queryKey: appQueryKeys.optimizationErrors(apiBaseURL, projectId),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadOptimizationErrors(apiBaseURL, routeSearch, { signal }),
+    queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),
   });
   const activeProjectId = query.data?.projectId ?? projectId ?? "";
 

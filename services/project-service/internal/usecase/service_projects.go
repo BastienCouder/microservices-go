@@ -29,6 +29,20 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 		s.mu.Unlock()
 		return Project{}, err
 	}
+	entitlements, err := s.resolveBillingEntitlementsLocked(ctx, input.OrganizationID)
+	if err != nil {
+		s.mu.Unlock()
+		return Project{}, err
+	}
+	if entitlements.MaxProjects > 0 && countProjectsForOrganization(s.projects, input.OrganizationID) >= entitlements.MaxProjects {
+		s.mu.Unlock()
+		return Project{}, fmt.Errorf(
+			"%w: plan %s allows up to %d projects",
+			ErrValidation,
+			strings.TrimSpace(entitlements.Plan),
+			entitlements.MaxProjects,
+		)
+	}
 
 	now := s.now().UTC()
 	project := &Project{
@@ -295,4 +309,14 @@ func listProjectsFromMap(projectsByID map[string]*Project, organizationID int64)
 		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
 	})
 	return projects
+}
+
+func countProjectsForOrganization(projectsByID map[string]*Project, organizationID int64) int {
+	count := 0
+	for _, project := range projectsByID {
+		if project.OrganizationID == organizationID {
+			count++
+		}
+	}
+	return count
 }

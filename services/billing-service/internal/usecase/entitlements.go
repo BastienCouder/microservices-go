@@ -17,6 +17,7 @@ type OrganizationEntitlements struct {
 	Seats                   int    `json:"seats"`
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
+	MaxProjects             int    `json:"max_projects"`
 }
 
 func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitlements {
@@ -30,6 +31,7 @@ func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitleme
 		Seats:                   1,
 		ModelSelectionLimit:     settings.ModelSelectionLimit,
 		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
+		MaxProjects:             settings.MaxProjects,
 	}
 }
 
@@ -47,6 +49,7 @@ func EntitlementsFromSubscription(sub *domain.Subscription) OrganizationEntitlem
 		Seats:                   sub.Seats,
 		ModelSelectionLimit:     settings.ModelSelectionLimit,
 		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
+		MaxProjects:             settings.MaxProjects,
 	}
 }
 
@@ -62,6 +65,7 @@ func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationI
 			entitlements.MonthlyQuota = settings.MonthlyQuota
 			entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
 			entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
+			entitlements.MaxProjects = settings.MaxProjects
 			return entitlements, nil
 		}
 		return entitlements, err
@@ -74,6 +78,7 @@ func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationI
 	}
 	entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
 	entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
+	entitlements.MaxProjects = settings.MaxProjects
 	return entitlements, nil
 }
 

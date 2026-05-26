@@ -1136,7 +1136,7 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 	}
 
 	var hasMonitoringError, hasPerceptionError, hasCrawlerError, hasSeededCrawlerError bool
-	var hasMonitoringAlertOrigin, hasMonitoringDerivedOrigin bool
+	var hasMonitoringAlertOrigin bool
 	var hasCrawlerResource bool
 	for _, item := range board.Errors {
 		switch item.Source {
@@ -1146,7 +1146,7 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 				hasMonitoringAlertOrigin = true
 			}
 			if item.Origin == "derived" {
-				hasMonitoringDerivedOrigin = true
+				t.Fatalf("expected error hub to expose monitoring alerts only, got derived item %#v", item)
 			}
 		case "perception":
 			hasPerceptionError = true
@@ -1175,8 +1175,8 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 	if !hasCrawlerResource {
 		t.Fatalf("expected seeded crawler error to expose its page resource, got %#v", board.Errors)
 	}
-	if !hasMonitoringAlertOrigin || !hasMonitoringDerivedOrigin {
-		t.Fatalf("expected monitoring origins to distinguish alerts and derived diagnostics, got %#v", board.Errors)
+	if !hasMonitoringAlertOrigin {
+		t.Fatalf("expected monitoring alert origin, got %#v", board.Errors)
 	}
 	for _, item := range board.Errors {
 		if item.Source == "monitoring" && item.GeneratedContentKey == "" {
@@ -1189,18 +1189,18 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 	if got, ok := board.Metadata["monitoringAlertErrors"].(int); !ok || got != 1 {
 		t.Fatalf("expected 1 monitoring alert error, got %#v", board.Metadata["monitoringAlertErrors"])
 	}
-	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got < 1 {
-		t.Fatalf("expected derived monitoring errors to be present, got %#v", board.Metadata["monitoringDerivedErrors"])
+	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got != 0 {
+		t.Fatalf("expected derived monitoring errors to be excluded, got %#v", board.Metadata["monitoringDerivedErrors"])
 	}
-	if got, ok := board.Metadata["monitoringErrors"].(int); !ok || got < 2 {
-		t.Fatalf("expected combined monitoring errors to include alerts and derived items, got %#v", board.Metadata["monitoringErrors"])
+	if got, ok := board.Metadata["monitoringErrors"].(int); !ok || got != 1 {
+		t.Fatalf("expected monitoring errors to include alerts only, got %#v", board.Metadata["monitoringErrors"])
 	}
 	if got, ok := board.Metadata["crawlerErrors"].(int); !ok || got < 1 {
 		t.Fatalf("expected crawlerErrors metadata to include crawler items, got %#v", board.Metadata["crawlerErrors"])
 	}
 }
 
-func TestGetOptimizationErrorsIncludesDerivedMonitoringErrors(t *testing.T) {
+func TestGetOptimizationErrorsExcludesDerivedMonitoringDiagnostics(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()
 
@@ -1264,24 +1264,13 @@ func TestGetOptimizationErrorsIncludesDerivedMonitoringErrors(t *testing.T) {
 		t.Fatalf("get optimization errors: %v", err)
 	}
 
-	hasDerivedMonitoring := false
 	for _, item := range board.Errors {
 		if item.Source == "monitoring" && strings.HasPrefix(item.ID, "monitoring-derived:") {
-			if item.Origin != "derived" {
-				t.Fatalf("expected derived monitoring error origin to be set, got %#v", item)
-			}
-			if item.GeneratedContentKey == "" {
-				t.Fatalf("expected derived monitoring error generated content key to be set, got %#v", item)
-			}
-			hasDerivedMonitoring = true
-			break
+			t.Fatalf("expected derived monitoring diagnostics to be excluded, got %#v", item)
 		}
 	}
-	if !hasDerivedMonitoring {
-		t.Fatalf("expected derived monitoring errors in board, got %#v", board.Errors)
-	}
-	if board.Metadata["monitoringDerivedErrors"] == nil {
-		t.Fatalf("expected monitoringDerivedErrors metadata to be set")
+	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got != 0 {
+		t.Fatalf("expected monitoringDerivedErrors metadata to be zero, got %#v", board.Metadata["monitoringDerivedErrors"])
 	}
 }
 

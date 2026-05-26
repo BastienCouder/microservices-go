@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -112,6 +113,7 @@ func (r *Repository) ListPlanSettings(ctx context.Context) ([]domain.PlanSetting
 			MonthlyQuota:            int(item.MonthlyQuota),
 			ModelSelectionLimit:     int(item.ModelSelectionLimit),
 			MonthlyModelChangeLimit: int(item.MonthlyModelChangeLimit),
+			MaxProjects:             int(item.MaxProjects),
 			UpdatedAt:               fromPgTimestamptz(item.UpdatedAt),
 		})
 	}
@@ -126,6 +128,7 @@ func (r *Repository) UpsertPlanSettings(ctx context.Context, settings domain.Pla
 		MonthlyQuota:            int32(settings.MonthlyQuota),
 		ModelSelectionLimit:     int32(settings.ModelSelectionLimit),
 		MonthlyModelChangeLimit: int32(settings.MonthlyModelChangeLimit),
+		MaxProjects:             int32(settings.MaxProjects),
 		UpdatedAt:               toPgTimestamptz(settings.UpdatedAt),
 	})
 	if err != nil {
@@ -141,23 +144,37 @@ func (r *Repository) ListPricingTiers(ctx context.Context) ([]domain.PricingTier
 	}
 	tiers := make([]domain.PricingTier, 0, len(items))
 	for _, item := range items {
-		tiers = append(tiers, domain.PricingTier{
+		prices, err := decodePricingTierPrices(item.PricesJson)
+		if err != nil {
+			return nil, fmt.Errorf("decode pricing tier prices: %w", err)
+		}
+		tier := domain.PricingTier{
 			PromptVolume:        int(item.PromptVolume),
 			Label:               item.Label,
+			Prices:              prices,
 			DeveloperPriceCents: fromPgNullableInt4(item.DeveloperPriceCents),
 			StarterPriceCents:   fromPgNullableInt4(item.StarterPriceCents),
 			GrowthPriceCents:    fromPgNullableInt4(item.GrowthPriceCents),
 			ProPriceCents:       fromPgNullableInt4(item.ProPriceCents),
 			UpdatedAt:           fromPgTimestamptz(item.UpdatedAt),
-		})
+		}
+		if err := tier.Validate(); err != nil {
+			return nil, fmt.Errorf("normalize pricing tier: %w", err)
+		}
+		tiers = append(tiers, tier)
 	}
 	return tiers, nil
 }
 
 func (r *Repository) UpsertPricingTier(ctx context.Context, tier domain.PricingTier) error {
-	err := r.queries.UpsertBillingPricingTier(ctx, sqlc.UpsertBillingPricingTierParams{
+	pricesJSON, err := encodePricingTierPrices(tier.Prices)
+	if err != nil {
+		return fmt.Errorf("encode pricing tier prices: %w", err)
+	}
+	err = r.queries.UpsertBillingPricingTier(ctx, sqlc.UpsertBillingPricingTierParams{
 		PromptVolume:        int32(tier.PromptVolume),
 		Label:               tier.Label,
+		PricesJson:          pricesJSON,
 		DeveloperPriceCents: toPgNullableInt4(tier.DeveloperPriceCents),
 		StarterPriceCents:   toPgNullableInt4(tier.StarterPriceCents),
 		GrowthPriceCents:    toPgNullableInt4(tier.GrowthPriceCents),
@@ -221,4 +238,26 @@ func fromPgNullableInt4(value pgtype.Int4) *int {
 	}
 	v := int(value.Int32)
 	return &v
+}
+
+func decodePricingTierPrices(raw string) (map[string]*int, error) {
+	if raw == "" {
+		return map[string]*int{}, nil
+	}
+	decoded := make(map[string]*int)
+	if err := json.Unmarshal([]byte(raw), &decoded); err != nil {
+		return nil, err
+	}
+	return decoded, nil
+}
+
+func encodePricingTierPrices(prices map[string]*int) (string, error) {
+	if prices == nil {
+		return "{}", nil
+	}
+	encoded, err := json.Marshal(prices)
+	if err != nil {
+		return "", err
+	}
+	return string(encoded), nil
 }

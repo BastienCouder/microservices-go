@@ -175,6 +175,24 @@ func TestCreateStripeCheckoutSession_Disabled(t *testing.T) {
 	}
 }
 
+func TestListPricingTiersKeepsLegacyPlanPricesForDefaultTiers(t *testing.T) {
+	svc := NewService(&fakeRepo{})
+	tiers, err := svc.ListPricingTiers(context.Background())
+	if err != nil {
+		t.Fatalf("list pricing tiers: %v", err)
+	}
+	if len(tiers) == 0 {
+		t.Fatalf("expected default pricing tiers")
+	}
+	first := tiers[0]
+	if first.DeveloperPriceCents == nil || *first.DeveloperPriceCents != 2900 {
+		t.Fatalf("expected developer legacy price on first tier, got %+v", first)
+	}
+	if first.Prices[domain.PlanDeveloper] == nil || *first.Prices[domain.PlanDeveloper] != 2900 {
+		t.Fatalf("expected dynamic developer price on first tier, got %+v", first.Prices)
+	}
+}
+
 func TestCreateStripeCheckoutSession_Success(t *testing.T) {
 	repo := &fakeRepo{}
 	stripe := &fakeStripeProvider{

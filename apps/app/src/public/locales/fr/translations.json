@@ -116,7 +116,7 @@
     "heroSummaryLeaderSolo": "{{mentions}} mentions détectées, soit {{mentionRate}}% des réponses suivies."
   },
   "monitoring-activity-panel": {
-    "criticalUpdates": "Mises à jour critiques",
+    "criticalUpdates": "Erreurs monitoring",
     "promptsStream": "Flux de prompts",
     "noPromptsFound": "Aucun prompt trouvé.",
     "showMore": "Voir plus",
@@ -124,7 +124,7 @@
     "mentioned": "Mentionné",
     "missed": "Manqué",
     "rankTop": "Rang n°1",
-    "alertInsight": "Insight d'alerte",
+    "alertInsight": "Insight d'erreur",
     "triggerPrompt": "Prompt déclencheur",
     "score": "Score",
     "mentions": "Mentions",
@@ -411,7 +411,7 @@
     "yourMonitoring": "Votre monitoring",
     "defaultTagline": "Gardez une lecture claire de votre visibilité IA, même en déplacement.",
     "responses": "Réponses",
-    "alerts": "Alertes",
+    "alerts": "Erreurs",
     "filters": "Filtres",
     "periodPrefix": "Période",
     "noAdvancedFilters": "Aucun filtre avancé",
@@ -420,7 +420,7 @@
     "analysisPeriodDescription": "Glissez horizontalement pour changer de fenêtre.",
     "activityEyebrow": "Activité",
     "recentSignalsTitle": "Signaux récents",
-    "recentSignalsDescription": "Alertes critiques et derniers prompts restent accessibles sans quitter le monitoring.",
+    "recentSignalsDescription": "Erreurs monitoring et derniers prompts restent accessibles sans quitter le monitoring.",
     "customRangeTitle": "Plage personnalisée",
     "customRangeDescription": "Choisissez une période précise pour resserrer la lecture du monitoring.",
     "start": "Début",
@@ -701,6 +701,13 @@
     "description": "L’espace d’optimisation est en préparation.",
     "cardTitle": "Bientôt disponible",
     "cardDescription": "Cette page aidera à prioriser les changements de contenu, générer des briefs d’optimisation et suivre les améliorations à partir des signaux du crawl."
+  },
+  "ai-agent-ready": {
+    "title": "Prêt pour les agents IA",
+    "badge": "En cours de développement",
+    "description": "L’espace d’audit pour les agents IA est en préparation.",
+    "cardTitle": "En cours de développement",
+    "cardDescription": "Cette page aidera à évaluer si votre site est prêt pour les agents IA, prioriser les points à améliorer et suivre les recommandations d’accessibilité et de découvrabilité."
   },
   "onboarding": {
     "language": "Langue",

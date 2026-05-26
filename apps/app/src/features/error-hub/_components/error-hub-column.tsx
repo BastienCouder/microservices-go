@@ -5,8 +5,10 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
-import { PerceptionTopErrorCard } from "../../perception/_components";
-import { getCrawlerGroupLabel } from "../_lib/error-hub-utils";
+import {
+  PerceptionTopErrorCard,
+  buildPerceptionModelLookup,
+} from "../../perception/_components/top-errors-panel";
 import { ErrorHubColumnLoading } from "./template";
 
 type ErrorHubColumnProps = {
@@ -19,7 +21,7 @@ type ErrorHubColumnProps = {
   locale: string;
   markingDoneErrorIds: ReadonlySet<string>;
   modelLookup: ReturnType<
-    typeof import("../../perception/_components").buildPerceptionModelLookup
+    typeof buildPerceptionModelLookup
   >;
   onCreateAction: (error: OptimizationError) => void | Promise<void>;
   onMarkDone: (error: OptimizationError) => void | Promise<void>;
@@ -29,12 +31,6 @@ type ErrorHubColumnProps = {
   title: string;
   tone: string;
   totalColumns: number;
-  getContextBadge: (
-    error: OptimizationError,
-  ) => { label: string; className: string } | undefined;
-  getContextMeta: (
-    error: OptimizationError,
-  ) => { label: string; value: string } | undefined;
 };
 
 export function ErrorHubColumn({
@@ -43,8 +39,6 @@ export function ErrorHubColumn({
   emptyLabel,
   errors,
   generatedIds,
-  getContextBadge,
-  getContextMeta,
   loading,
   locale,
   markingDoneErrorIds,
@@ -86,50 +80,25 @@ export function ErrorHubColumn({
         {loading ? (
           <ErrorHubColumnLoading />
         ) : errors.length > 0 ? (
-          errors.map((error, index) => {
-            const previous = index > 0 ? errors[index - 1] : null;
-            const groupLabel = getCrawlerGroupLabel(error, locale);
-            const previousGroupLabel = previous
-              ? getCrawlerGroupLabel(previous, locale)
-              : undefined;
-            const shouldRenderGroupHeader =
-              groupLabel !== undefined && groupLabel !== previousGroupLabel;
-
-            return (
-              <div key={error.id} className="space-y-2">
-                {shouldRenderGroupHeader ? (
-                  <div className="rounded-md border border-border/60 bg-background/80 px-3 py-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-                      {locale.startsWith("fr")
-                        ? "Problèmes détectés sur cette page"
-                        : "Issues detected on this page"}
-                    </p>
-                    <p className="mt-1 truncate text-sm font-semibold text-foreground">
-                      {groupLabel}
-                    </p>
-                  </div>
-                ) : null}
-
-                <PerceptionTopErrorCard
-                  contextBadge={getContextBadge(error)}
-                  contextMeta={getContextMeta(error)}
-                  error={error}
-                  footerAlign="end"
-                  index={index}
-                  locale={locale}
-                  modelLookup={modelLookup}
-                  onOpenDetails={() => onOpenDetails(error)}
-                  showIndex={false}
-                  actionGenerated={generatedIds.has(error.id)}
-                  actionSaving={savingErrorIds.has(error.id)}
-                  actionStatus={actionStatusesByErrorId.get(error.id)}
-                  markingActionDone={markingDoneErrorIds.has(error.id)}
-                  onCreateAction={() => void onCreateAction(error)}
-                  onMarkActionDone={() => void onMarkDone(error)}
-                />
-              </div>
-            );
-          })
+          errors.map((error, index) => (
+            <PerceptionTopErrorCard
+              key={error.id}
+              error={error}
+              footerAlign="end"
+              index={index}
+              locale={locale}
+              modelLookup={modelLookup}
+              onOpenDetails={() => onOpenDetails(error)}
+              showIndex={false}
+              footerMeta={error.resource}
+              actionGenerated={generatedIds.has(error.id)}
+              actionSaving={savingErrorIds.has(error.id)}
+              actionStatus={actionStatusesByErrorId.get(error.id)}
+              markingActionDone={markingDoneErrorIds.has(error.id)}
+              onCreateAction={() => void onCreateAction(error)}
+              onMarkActionDone={() => void onMarkDone(error)}
+            />
+          ))
         ) : (
           <EmptyStateCard
             label={emptyLabel || "Aucune erreur à afficher dans cette colonne pour les filtres sélectionnés."}

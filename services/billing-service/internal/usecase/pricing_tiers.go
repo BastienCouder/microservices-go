@@ -15,14 +15,18 @@ func priceCents(value int) *int {
 
 func defaultPricingTiers() []domain.PricingTier {
 	now := time.Time{}
-	return []domain.PricingTier{
-		{PromptVolume: 50, Label: "50", DeveloperPriceCents: priceCents(2900), StarterPriceCents: priceCents(7900), GrowthPriceCents: priceCents(29900), ProPriceCents: priceCents(79900), UpdatedAt: now},
-		{PromptVolume: 100, Label: "100", DeveloperPriceCents: priceCents(4900), StarterPriceCents: priceCents(14900), GrowthPriceCents: priceCents(34900), ProPriceCents: priceCents(84900), UpdatedAt: now},
-		{PromptVolume: 250, Label: "250", DeveloperPriceCents: priceCents(9900), StarterPriceCents: priceCents(24900), GrowthPriceCents: priceCents(49900), ProPriceCents: priceCents(99900), UpdatedAt: now},
-		{PromptVolume: 500, Label: "500", DeveloperPriceCents: priceCents(14900), StarterPriceCents: priceCents(39900), GrowthPriceCents: priceCents(59900), ProPriceCents: priceCents(119900), UpdatedAt: now},
-		{PromptVolume: 1000, Label: "1k", DeveloperPriceCents: priceCents(24900), StarterPriceCents: nil, GrowthPriceCents: priceCents(89900), ProPriceCents: priceCents(149900), UpdatedAt: now},
-		{PromptVolume: 5000, Label: "5k+", DeveloperPriceCents: nil, StarterPriceCents: nil, GrowthPriceCents: nil, ProPriceCents: nil, UpdatedAt: now},
+	tiers := []domain.PricingTier{
+		{PromptVolume: 50, Label: "50", Prices: map[string]*int{domain.PlanDeveloper: priceCents(2900), domain.PlanStarter: priceCents(7900), domain.PlanGrowth: priceCents(29900), domain.PlanPro: priceCents(79900)}, UpdatedAt: now},
+		{PromptVolume: 100, Label: "100", Prices: map[string]*int{domain.PlanDeveloper: priceCents(4900), domain.PlanStarter: priceCents(14900), domain.PlanGrowth: priceCents(34900), domain.PlanPro: priceCents(84900)}, UpdatedAt: now},
+		{PromptVolume: 250, Label: "250", Prices: map[string]*int{domain.PlanDeveloper: priceCents(9900), domain.PlanStarter: priceCents(24900), domain.PlanGrowth: priceCents(49900), domain.PlanPro: priceCents(99900)}, UpdatedAt: now},
+		{PromptVolume: 500, Label: "500", Prices: map[string]*int{domain.PlanDeveloper: priceCents(14900), domain.PlanStarter: priceCents(39900), domain.PlanGrowth: priceCents(59900), domain.PlanPro: priceCents(119900)}, UpdatedAt: now},
+		{PromptVolume: 1000, Label: "1k", Prices: map[string]*int{domain.PlanDeveloper: priceCents(24900), domain.PlanStarter: nil, domain.PlanGrowth: priceCents(89900), domain.PlanPro: priceCents(149900)}, UpdatedAt: now},
+		{PromptVolume: 5000, Label: "5k+", Prices: map[string]*int{domain.PlanDeveloper: nil, domain.PlanStarter: nil, domain.PlanGrowth: nil, domain.PlanPro: nil}, UpdatedAt: now},
 	}
+	for index := range tiers {
+		_ = tiers[index].Validate()
+	}
+	return tiers
 }
 
 func defaultPricingTiersByVolume() map[int]domain.PricingTier {

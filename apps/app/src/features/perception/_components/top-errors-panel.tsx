@@ -630,6 +630,7 @@ export function PerceptionTopErrorCard({
   index,
   markingActionDone = false,
   showIndex = true,
+  footerMeta,
   modelLookup = new Map(),
   onOpenDetails,
   onCreateAction,
@@ -647,6 +648,7 @@ export function PerceptionTopErrorCard({
   index: number;
   markingActionDone?: boolean;
   showIndex?: boolean;
+  footerMeta?: string;
   modelLookup?: ReadonlyMap<string, PerceptionModelOption>;
   onOpenDetails: () => void;
   onCreateAction?: () => void;
@@ -816,6 +818,14 @@ export function PerceptionTopErrorCard({
               +{error.detectedInModels.length - 2}
             </Badge>
           ) : null}
+          {footerMeta ? (
+            <span
+              className="max-w-full truncate text-[11px] font-medium text-muted-foreground md:max-w-[260px] md:text-xs"
+              title={footerMeta}
+            >
+              {footerMeta}
+            </span>
+          ) : null}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -823,7 +833,7 @@ export function PerceptionTopErrorCard({
             <Badge
               variant="outline"
               className={cn(
-                "h-6 rounded-sm px-2 text-xs font-bold",
+                "h-6 rounded-sm px-2 text-xs font-bold border-none",
                 statusTone,
               )}
             >

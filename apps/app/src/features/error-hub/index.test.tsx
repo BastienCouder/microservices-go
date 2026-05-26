@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 const source = await Bun.file(new URL("./index.tsx", import.meta.url)).text();
+const columnSource = await Bun.file(
+  new URL("./_components/error-hub-column.tsx", import.meta.url),
+).text();
+const utilsSource = await Bun.file(
+  new URL("./_lib/error-hub-utils.ts", import.meta.url),
+).text();
 const normalizedSource = source.replace(/\s+/g, " ");
 
 describe("error hub", () => {
@@ -46,5 +52,21 @@ describe("error hub", () => {
         "initialSourceFilter={readSourceFilterFromSearch(routeSearch)}",
       ),
     ).toBe(true);
+  });
+
+  test("keeps error cards free from page grouping headers and context badges", () => {
+    expect(columnSource.includes("Problèmes détectés sur cette page")).toBe(
+      false,
+    );
+    expect(columnSource.includes("Issues detected on this page")).toBe(false);
+    expect(columnSource.includes("getCrawlerGroupLabel")).toBe(false);
+    expect(columnSource.includes("contextBadge=")).toBe(false);
+    expect(columnSource.includes("contextMeta=")).toBe(false);
+    expect(columnSource.includes("footerMeta={error.resource}")).toBe(true);
+  });
+
+  test("uses alertes monitoring copy instead of monitoring alerte", () => {
+    expect(utilsSource.includes("Monitoring alerte")).toBe(false);
+    expect(utilsSource.includes("Alerte monitoring")).toBe(true);
   });
 });

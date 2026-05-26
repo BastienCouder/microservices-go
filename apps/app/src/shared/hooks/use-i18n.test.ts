@@ -10,6 +10,14 @@ describe("getI18nText", () => {
     expect(getI18nText("monitoring-analytics-panel", "visibilityAnalyticsTitle", "en-US")).toBe(
       "Visibility analysis",
     );
+    expect(getI18nText("monitoring-activity-panel", "criticalUpdates", "fr")).toBe(
+      "Erreurs monitoring",
+    );
+    expect(getI18nText("monitoring-activity-panel", "criticalUpdates", "en")).toBe(
+      "Monitoring errors",
+    );
+    expect(getI18nText("monitoring-mobile", "alerts", "fr")).toBe("Erreurs");
+    expect(getI18nText("monitoring-mobile", "alerts", "en")).toBe("Errors");
   });
 
   test("returns the localized prompts copy for French and English", () => {

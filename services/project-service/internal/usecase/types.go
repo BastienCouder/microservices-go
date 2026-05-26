@@ -418,6 +418,7 @@ type BillingEntitlements struct {
 	Plan                    string `json:"plan"`
 	ModelSelectionLimit     int    `json:"modelSelectionLimit"`
 	MonthlyModelChangeLimit int    `json:"monthlyModelChangeLimit"`
+	MaxProjects             int    `json:"maxProjects"`
 }
 
 type ProjectModelSelectionChangeUsage struct {

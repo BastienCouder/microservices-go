@@ -238,6 +238,7 @@ func (s *Service) resolveBillingEntitlementsLocked(ctx context.Context, organiza
 			Plan:                    "starter",
 			ModelSelectionLimit:     3,
 			MonthlyModelChangeLimit: 0,
+			MaxProjects:             3,
 		}, nil
 	}
 

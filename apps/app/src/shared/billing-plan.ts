@@ -28,32 +28,40 @@ const BILLING_PLAN_TRANSLATION_KEYS: Record<SimulatedPlan, string> = {
   "agency-enterprise": "planAgencyEnterprise",
 };
 
-export function normalizeBillingPlan(rawPlan: string | null): SimulatedPlan | null {
-  if (
-    rawPlan === "starter" ||
-    rawPlan === "developer" ||
-    rawPlan === "growth" ||
-    rawPlan === "pro" ||
-    rawPlan === "agency-enterprise"
-  ) {
-    return rawPlan;
-  }
-
+export function normalizeBillingPlan(rawPlan: string | null): string | null {
   if (!rawPlan) {
     return null;
   }
 
-  return LEGACY_PLAN_ALIASES[rawPlan] ?? null;
+  const normalized = rawPlan.trim().toLowerCase();
+  if (
+    normalized === "starter" ||
+    normalized === "developer" ||
+    normalized === "growth" ||
+    normalized === "pro" ||
+    normalized === "agency-enterprise"
+  ) {
+    return normalized;
+  }
+
+  return LEGACY_PLAN_ALIASES[normalized] ?? normalized;
 }
 
-export function getBillingPlanLabel(plan: SimulatedPlan): string {
-  return BILLING_PLAN_LABELS[plan];
+export function getBillingPlanLabel(plan: string): string {
+  if (plan in BILLING_PLAN_LABELS) {
+    return BILLING_PLAN_LABELS[plan as SimulatedPlan];
+  }
+  return plan
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 export function getBillingPlanTranslationKey(plan: SimulatedPlan): string {
   return BILLING_PLAN_TRANSLATION_KEYS[plan];
 }
 
-export function isDeveloperBillingPlan(plan: SimulatedPlan | null): boolean {
+export function isDeveloperBillingPlan(plan: string | null): boolean {
   return plan === "developer";
 }

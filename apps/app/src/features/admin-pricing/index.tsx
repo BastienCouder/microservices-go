@@ -8,7 +8,16 @@ import {
   type InputHTMLAttributes,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Building2, Check, Code, RefreshCw, Save, Terminal, Zap } from "lucide-react";
+import {
+  Building2,
+  Check,
+  Code,
+  Plus,
+  RefreshCw,
+  Save,
+  Terminal,
+  Zap,
+} from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +36,12 @@ import {
   loadBillingPricingTiers,
   updateBillingPlanSettings,
   updateBillingPricingTier,
+  type BillingPlanCode,
   type BillingPlanSettings,
   type BillingPricingTier,
+  type BillingPriceMap,
 } from "@/shared/billing";
-import { getBillingPlanLabel, type SimulatedPlan } from "@/shared/billing-plan";
+import { getBillingPlanLabel } from "@/shared/billing-plan";
 import { cn } from "@/shared/utils";
 
 type AdminPricingPageProps = {
@@ -38,37 +49,27 @@ type AdminPricingPageProps = {
   routeSearch: string;
 };
 
-type PriceKey =
-  | "developerPriceCents"
-  | "starterPriceCents"
-  | "growthPriceCents"
-  | "proPriceCents";
-
 type TierDraft = {
   promptVolume: string;
   label: string;
-  developer: string;
-  starter: string;
-  growth: string;
-  pro: string;
+  prices: Record<string, string>;
 };
 
 type PlanLimitDraft = {
   monthlyQuota: string;
   modelSelectionLimit: string;
   monthlyModelChangeLimit: string;
+  maxProjects: string;
 };
 
-const PLAN_ORDER = ["developer", "starter", "growth", "pro"] as const satisfies SimulatedPlan[];
-type ConfigurablePlan = (typeof PLAN_ORDER)[number];
+type NewPlanDraft = PlanLimitDraft & {
+  plan: string;
+  currentTierPrice: string;
+};
+
+const CORE_PLAN_ORDER = ["developer", "starter", "growth", "pro"] as const;
 const EMPTY_PLANS: BillingPlanSettings[] = [];
 const EMPTY_TIERS: BillingPricingTier[] = [];
-const PRICE_KEYS: Record<ConfigurablePlan, PriceKey> = {
-  developer: "developerPriceCents",
-  starter: "starterPriceCents",
-  growth: "growthPriceCents",
-  pro: "proPriceCents",
-};
 
 function canManageUsage(organization: OrganizationSummary) {
   return (
@@ -88,6 +89,16 @@ function euroStringToNullableCents(value: string) {
   if (normalized === "") return null;
   const parsed = Number.parseFloat(normalized);
   return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
+}
+
+function normalizePlanCode(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .split(/\s+/)
+    .filter(Boolean)
+    .join("-");
 }
 
 function toPositiveInteger(value: string, fallback: number) {
@@ -111,14 +122,64 @@ function formatPrice(cents: number | null) {
   return `${Math.round(cents / 100)}€`;
 }
 
-function tierDraftFromTier(tier: BillingPricingTier): TierDraft {
+function sortBillingPlans(plans: string[]) {
+  const uniquePlans = Array.from(
+    new Set(plans.map(normalizePlanCode).filter(Boolean)),
+  );
+  uniquePlans.sort((left, right) => {
+    const leftIndex = CORE_PLAN_ORDER.indexOf(left as (typeof CORE_PLAN_ORDER)[number]);
+    const rightIndex = CORE_PLAN_ORDER.indexOf(right as (typeof CORE_PLAN_ORDER)[number]);
+    const leftRank = leftIndex === -1 ? 100 : leftIndex;
+    const rightRank = rightIndex === -1 ? 100 : rightIndex;
+    if (leftRank === rightRank) return left.localeCompare(right);
+    return leftRank - rightRank;
+  });
+  return uniquePlans;
+}
+
+function emptyPriceDrafts(planKeys: string[], current?: Record<string, string>) {
+  return Object.fromEntries(
+    planKeys.map((plan) => [plan, current?.[plan] ?? ""]),
+  );
+}
+
+function emptyPlanDraft(): PlanLimitDraft {
+  return {
+    monthlyQuota: "1",
+    modelSelectionLimit: "0",
+    monthlyModelChangeLimit: "0",
+    maxProjects: "0",
+  };
+}
+
+function emptyPlanSettings(plan: BillingPlanCode): BillingPlanSettings {
+  return {
+    plan,
+    monthlyPriceCents: 0,
+    yearlyPriceCents: 0,
+    monthlyQuota: 1,
+    modelSelectionLimit: 0,
+    monthlyModelChangeLimit: 0,
+    maxProjects: 0,
+  };
+}
+
+function nextPromptVolume(tiers: BillingPricingTier[]) {
+  const lastTier = tiers[tiers.length - 1];
+  if (!lastTier) return 100;
+  if (lastTier.promptVolume >= 5000) return lastTier.promptVolume + 1000;
+  return lastTier.promptVolume * 2;
+}
+
+function tierDraftFromTier(tier: BillingPricingTier, planKeys: string[]): TierDraft {
+  const prices = emptyPriceDrafts(planKeys);
+  for (const plan of planKeys) {
+    prices[plan] = centsToEuroString(tier.prices[plan] ?? null);
+  }
   return {
     promptVolume: String(tier.promptVolume),
     label: tier.label,
-    developer: centsToEuroString(tier.developerPriceCents),
-    starter: centsToEuroString(tier.starterPriceCents),
-    growth: centsToEuroString(tier.growthPriceCents),
-    pro: centsToEuroString(tier.proPriceCents),
+    prices,
   };
 }
 
@@ -127,23 +188,32 @@ function planLimitDraftFromSettings(settings: BillingPlanSettings): PlanLimitDra
     monthlyQuota: String(Math.max(1, settings.monthlyQuota || 1)),
     modelSelectionLimit: String(Math.max(0, settings.modelSelectionLimit)),
     monthlyModelChangeLimit: String(Math.max(0, settings.monthlyModelChangeLimit)),
+    maxProjects: String(Math.max(0, settings.maxProjects)),
   };
 }
 
 function normalizeTierDraft(draft: TierDraft): BillingPricingTier {
   const promptVolume = toPositiveInteger(draft.promptVolume, 1);
+  const prices = Object.fromEntries(
+    Object.entries(draft.prices).map(([plan, value]) => [
+      normalizePlanCode(plan),
+      euroStringToNullableCents(value),
+    ]),
+  ) as BillingPriceMap;
+
   return {
     promptVolume,
     label: draft.label.trim() || formatPrompts(promptVolume),
-    developerPriceCents: euroStringToNullableCents(draft.developer),
-    starterPriceCents: euroStringToNullableCents(draft.starter),
-    growthPriceCents: euroStringToNullableCents(draft.growth),
-    proPriceCents: euroStringToNullableCents(draft.pro),
+    prices,
+    developerPriceCents: prices.developer ?? null,
+    starterPriceCents: prices.starter ?? null,
+    growthPriceCents: prices.growth ?? null,
+    proPriceCents: prices.pro ?? null,
   };
 }
 
 function normalizePlanLimitDraft(
-  plan: ConfigurablePlan,
+  plan: BillingPlanCode,
   settings: BillingPlanSettings,
   draft: PlanLimitDraft,
 ): BillingPlanSettings {
@@ -153,10 +223,11 @@ function normalizePlanLimitDraft(
     monthlyQuota: toPositiveInteger(draft.monthlyQuota, settings.monthlyQuota || 1),
     modelSelectionLimit: toNonNegativeInteger(draft.modelSelectionLimit),
     monthlyModelChangeLimit: toNonNegativeInteger(draft.monthlyModelChangeLimit),
+    maxProjects: toNonNegativeInteger(draft.maxProjects),
   };
 }
 
-function iconForPlan(plan: ConfigurablePlan) {
+function iconForPlan(plan: string) {
   switch (plan) {
     case "developer":
       return <Terminal className="size-4" />;
@@ -174,6 +245,16 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const [volumeIndex, setVolumeIndex] = useState(2);
   const [tierDrafts, setTierDrafts] = useState<Record<number, TierDraft>>({});
   const [planDrafts, setPlanDrafts] = useState<Record<string, PlanLimitDraft>>({});
+  const [newPlanDraft, setNewPlanDraft] = useState<NewPlanDraft>({
+    plan: "",
+    currentTierPrice: "",
+    ...emptyPlanDraft(),
+  });
+  const [newTierDraft, setNewTierDraft] = useState<TierDraft>({
+    promptVolume: "100",
+    label: "",
+    prices: {},
+  });
 
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
@@ -204,9 +285,18 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
 
   const plans = plansQuery.data ?? EMPTY_PLANS;
   const tiers = tiersQuery.data ?? EMPTY_TIERS;
+  const orderedPlans = useMemo(
+    () =>
+      sortBillingPlans([
+        ...plans.map((plan) => plan.plan),
+        ...tiers.flatMap((tier) => Object.keys(tier.prices)),
+      ]),
+    [plans, tiers],
+  );
   const selectedTier = tiers[Math.min(volumeIndex, Math.max(0, tiers.length - 1))];
   const selectedTierDraft = selectedTier
-    ? tierDrafts[selectedTier.promptVolume] ?? tierDraftFromTier(selectedTier)
+    ? tierDrafts[selectedTier.promptVolume] ??
+      tierDraftFromTier(selectedTier, orderedPlans)
     : null;
   const normalizedSelectedTier = selectedTierDraft
     ? normalizeTierDraft(selectedTierDraft)
@@ -234,30 +324,37 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   }, [plansQuery.error, tiersQuery.error]);
 
   useEffect(() => {
-    if (tiers.length === 0) return;
     setTierDrafts((current) => {
       const next = { ...current };
       for (const tier of tiers) {
-        if (!next[tier.promptVolume]) {
-          next[tier.promptVolume] = tierDraftFromTier(tier);
-        }
+        next[tier.promptVolume] = tierDraftFromTier(
+          tier,
+          orderedPlans.length > 0 ? orderedPlans : Object.keys(tier.prices),
+        );
       }
       return next;
     });
-  }, [tiers]);
+  }, [orderedPlans, tiers]);
 
   useEffect(() => {
     if (plans.length === 0) return;
     setPlanDrafts((current) => {
       const next = { ...current };
       for (const plan of plans) {
-        if (!next[plan.plan]) {
-          next[plan.plan] = planLimitDraftFromSettings(plan);
-        }
+        next[plan.plan] = current[plan.plan] ?? planLimitDraftFromSettings(plan);
       }
       return next;
     });
   }, [plans]);
+
+  useEffect(() => {
+    setNewTierDraft((current) => ({
+      ...current,
+      promptVolume:
+        current.promptVolume || String(nextPromptVolume(tiers)),
+      prices: emptyPriceDrafts(orderedPlans, current.prices),
+    }));
+  }, [orderedPlans, tiers]);
 
   const updateTierMutation = useMutation({
     mutationFn: async (tier: BillingPricingTier) => {
@@ -282,7 +379,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
       settings,
       tier,
     }: {
-      plan: ConfigurablePlan;
+      plan: BillingPlanCode;
       settings: BillingPlanSettings;
       tier: BillingPricingTier;
     }) => {
@@ -318,25 +415,34 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     setTierDrafts((current) => ({
       ...current,
       [selectedTier.promptVolume]: {
-        ...(current[selectedTier.promptVolume] ?? tierDraftFromTier(selectedTier)),
+        ...(current[selectedTier.promptVolume] ??
+          tierDraftFromTier(selectedTier, orderedPlans)),
         ...patch,
       },
     }));
   };
 
-  const updatePlanDraft = (plan: ConfigurablePlan, patch: Partial<PlanLimitDraft>) => {
-    const settings = plansByID.get(plan);
+  const updateTierDraftPrice = (plan: BillingPlanCode, value: string) => {
+    if (!selectedTier) return;
+    const fallback = tierDraftFromTier(selectedTier, orderedPlans);
+    setTierDrafts((current) => ({
+      ...current,
+      [selectedTier.promptVolume]: {
+        ...(current[selectedTier.promptVolume] ?? fallback),
+        prices: {
+          ...((current[selectedTier.promptVolume] ?? fallback).prices),
+          [plan]: value,
+        },
+      },
+    }));
+  };
+
+  const updatePlanDraft = (plan: BillingPlanCode, patch: Partial<PlanLimitDraft>) => {
+    const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
     setPlanDrafts((current) => ({
       ...current,
       [plan]: {
-        ...(current[plan] ??
-          (settings
-            ? planLimitDraftFromSettings(settings)
-            : {
-                monthlyQuota: "1",
-                modelSelectionLimit: "0",
-                monthlyModelChangeLimit: "0",
-              })),
+        ...(current[plan] ?? planLimitDraftFromSettings(settings)),
         ...patch,
       },
     }));
@@ -350,7 +456,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
 
   const savePlan = (
     event: FormEvent<HTMLFormElement>,
-    plan: ConfigurablePlan,
+    plan: BillingPlanCode,
     settings: BillingPlanSettings,
   ) => {
     event.preventDefault();
@@ -366,6 +472,60 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     });
   };
 
+  const saveNewTier = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = normalizeTierDraft(newTierDraft);
+    updateTierMutation.mutate(normalized, {
+      onSuccess: () => {
+        setNewTierDraft({
+          promptVolume: String(nextPromptVolume(tiers)),
+          label: "",
+          prices: emptyPriceDrafts(orderedPlans),
+        });
+      },
+    });
+  };
+
+  const saveNewPlan = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedTierDraft || !normalizedSelectedTier) return;
+    const plan = normalizePlanCode(newPlanDraft.plan);
+    if (!plan) {
+      pushErrorToast(new Error("Plan invalide."), "Le code du plan est requis.");
+      return;
+    }
+
+    const settings = normalizePlanLimitDraft(
+      plan,
+      plansByID.get(plan) ?? emptyPlanSettings(plan),
+      newPlanDraft,
+    );
+    const tier = normalizeTierDraft({
+      ...selectedTierDraft,
+      prices: {
+        ...selectedTierDraft.prices,
+        [plan]: newPlanDraft.currentTierPrice,
+      },
+    });
+
+    updatePlanMutation.mutate(
+      {
+        plan,
+        settings,
+        tier,
+      },
+      {
+        onSuccess: () => {
+          setNewPlanDraft({
+            plan: "",
+            currentTierPrice: "",
+            ...emptyPlanDraft(),
+          });
+        },
+      },
+    );
+  };
+
   const isLoading =
     organizationsQuery.isLoading || plansQuery.isLoading || tiersQuery.isLoading;
   const isFetching =
@@ -375,13 +535,13 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
         title="Admin prices"
-        baseline="La meme grille que la page marketing : volume, prix et droits par plan."
+        baseline="Gerez dynamiquement les paliers de prompts, les plans et les limites associees."
         actionsVariant="classic"
         className="mb-3 md:mb-4"
         meta={
           <>
             <Badge variant="default">{tiers.length} paliers</Badge>
-            <Badge variant="outline">Developer inclus</Badge>
+            <Badge variant="outline">{orderedPlans.length} plans</Badge>
           </>
         }
         actions={
@@ -495,10 +655,69 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                 </div>
               </form>
 
+              <form
+                onSubmit={saveNewTier}
+                className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-5 lg:p-6"
+              >
+                <div className="mb-4 flex items-center gap-2">
+                  <Plus className="size-4 text-primary" />
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Nouveau palier
+                  </h2>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+                  <Field
+                    id="new-tier-volume"
+                    label="Prompts"
+                    value={newTierDraft.promptVolume}
+                    type="number"
+                    min={1}
+                    step="1"
+                    onChange={(promptVolume) =>
+                      setNewTierDraft((current) => ({ ...current, promptVolume }))
+                    }
+                  />
+                  <Field
+                    id="new-tier-label"
+                    label="Label"
+                    value={newTierDraft.label}
+                    onChange={(label) =>
+                      setNewTierDraft((current) => ({ ...current, label }))
+                    }
+                  />
+                  {orderedPlans.map((plan) => (
+                    <Field
+                      key={plan}
+                      id={`new-tier-price-${plan}`}
+                      label={`Prix ${getBillingPlanLabel(plan)} (€)`}
+                      value={newTierDraft.prices[plan] ?? ""}
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      helper="Vide = Sur devis / indisponible"
+                      onChange={(value) =>
+                        setNewTierDraft((current) => ({
+                          ...current,
+                          prices: {
+                            ...current.prices,
+                            [plan]: value,
+                          },
+                        }))
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button type="submit" disabled={updateTierMutation.isPending}>
+                    <Plus data-icon="inline-start" />
+                    Ajouter le palier
+                  </Button>
+                </div>
+              </form>
+
               <div className="grid gap-px overflow-hidden rounded-2xl border border-border/70 md:grid-cols-2 xl:grid-cols-4">
-                {PLAN_ORDER.map((plan, index) => {
-                  const settings = plansByID.get(plan);
-                  if (!settings) return null;
+                {orderedPlans.map((plan, index) => {
+                  const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
                   return (
                     <PlanCard
                       key={plan}
@@ -506,19 +725,125 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                       plan={plan}
                       settings={settings}
                       tier={normalizedSelectedTier}
-                      tierDraft={selectedTierDraft}
+                      tierPriceDraft={selectedTierDraft.prices[plan] ?? ""}
                       planDraft={planDrafts[plan] ?? planLimitDraftFromSettings(settings)}
                       pending={
                         updatePlanMutation.isPending &&
                         updatePlanMutation.variables?.plan === plan
                       }
-                      onUpdateTierDraft={updateTierDraft}
+                      onUpdateTierPrice={updateTierDraftPrice}
                       onUpdatePlanDraft={updatePlanDraft}
                       onSave={savePlan}
                     />
                   );
                 })}
               </div>
+
+              <form
+                onSubmit={saveNewPlan}
+                className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-5 lg:p-6"
+              >
+                <div className="mb-2 flex items-center gap-2">
+                  <Plus className="size-4 text-primary" />
+                  <h2 className="text-lg font-semibold text-foreground">
+                    Nouveau plan
+                  </h2>
+                </div>
+                <p className="mb-4 text-sm text-muted-foreground">
+                  Le prix saisi sera cree pour le palier actuellement selectionne.
+                </p>
+                <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                  <Field
+                    id="new-plan-code"
+                    label="Code plan"
+                    value={newPlanDraft.plan}
+                    helper="Exemple: agency-plus"
+                    onChange={(plan) =>
+                      setNewPlanDraft((current) => ({ ...current, plan }))
+                    }
+                  />
+                  <Field
+                    id="new-plan-price"
+                    label={`Prix pour ${selectedTier.label} (€)`}
+                    value={newPlanDraft.currentTierPrice}
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    helper="Vide = Sur devis / indisponible"
+                    onChange={(currentTierPrice) =>
+                      setNewPlanDraft((current) => ({
+                        ...current,
+                        currentTierPrice,
+                      }))
+                    }
+                  />
+                  <Field
+                    id="new-plan-monthly-quota"
+                    label="Quota prompts app"
+                    value={newPlanDraft.monthlyQuota}
+                    type="number"
+                    min={1}
+                    step="1"
+                    onChange={(monthlyQuota) =>
+                      setNewPlanDraft((current) => ({
+                        ...current,
+                        monthlyQuota,
+                      }))
+                    }
+                  />
+                  <Field
+                    id="new-plan-model-limit"
+                    label="Modeles utilisables en meme temps"
+                    value={newPlanDraft.modelSelectionLimit}
+                    type="number"
+                    min={0}
+                    step="1"
+                    helper="0 = illimite"
+                    onChange={(modelSelectionLimit) =>
+                      setNewPlanDraft((current) => ({
+                        ...current,
+                        modelSelectionLimit,
+                      }))
+                    }
+                  />
+                  <Field
+                    id="new-plan-model-change-limit"
+                    label="Changements de modeles / mois"
+                    value={newPlanDraft.monthlyModelChangeLimit}
+                    type="number"
+                    min={0}
+                    step="1"
+                    helper="0 = illimite"
+                    onChange={(monthlyModelChangeLimit) =>
+                      setNewPlanDraft((current) => ({
+                        ...current,
+                        monthlyModelChangeLimit,
+                      }))
+                    }
+                  />
+                  <Field
+                    id="new-plan-max-projects"
+                    label="Projets maximum"
+                    value={newPlanDraft.maxProjects}
+                    type="number"
+                    min={0}
+                    step="1"
+                    helper="0 = illimite"
+                    onChange={(maxProjects) =>
+                      setNewPlanDraft((current) => ({
+                        ...current,
+                        maxProjects,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="mt-4 flex justify-end">
+                  <Button type="submit" disabled={updatePlanMutation.isPending}>
+                    <Plus data-icon="inline-start" />
+                    Ajouter le plan
+                  </Button>
+                </div>
+              </form>
             </div>
           )}
         </div>
@@ -532,32 +857,31 @@ function PlanCard({
   plan,
   settings,
   tier,
-  tierDraft,
+  tierPriceDraft,
   planDraft,
   pending,
-  onUpdateTierDraft,
+  onUpdateTierPrice,
   onUpdatePlanDraft,
   onSave,
 }: {
   index: number;
-  plan: ConfigurablePlan;
+  plan: BillingPlanCode;
   settings: BillingPlanSettings;
   tier: BillingPricingTier;
-  tierDraft: TierDraft;
+  tierPriceDraft: string;
   planDraft: PlanLimitDraft;
   pending: boolean;
-  onUpdateTierDraft: (patch: Partial<TierDraft>) => void;
-  onUpdatePlanDraft: (plan: ConfigurablePlan, patch: Partial<PlanLimitDraft>) => void;
+  onUpdateTierPrice: (plan: BillingPlanCode, value: string) => void;
+  onUpdatePlanDraft: (plan: BillingPlanCode, patch: Partial<PlanLimitDraft>) => void;
   onSave: (
     event: FormEvent<HTMLFormElement>,
-    plan: ConfigurablePlan,
+    plan: BillingPlanCode,
     settings: BillingPlanSettings,
   ) => void;
 }) {
-  const priceKey = PRICE_KEYS[plan];
-  const priceDraftKey = plan;
-  const currentPrice = tier[priceKey];
+  const currentPrice = tier.prices[plan] ?? null;
   const modelLimit = toNonNegativeInteger(planDraft.modelSelectionLimit);
+  const maxProjects = toNonNegativeInteger(planDraft.maxProjects);
 
   return (
     <form
@@ -601,12 +925,12 @@ function PlanCard({
         <Field
           id={`${plan}-tier-price`}
           label="Prix du palier (€)"
-          value={tierDraft[priceDraftKey]}
+          value={tierPriceDraft}
           type="number"
           min={0}
           step="0.01"
           helper="Vide = Sur devis / indisponible"
-          onChange={(value) => onUpdateTierDraft({ [priceDraftKey]: value })}
+          onChange={(value) => onUpdateTierPrice(plan, value)}
         />
         <Field
           id={`${plan}-monthly-quota`}
@@ -643,6 +967,16 @@ function PlanCard({
             onUpdatePlanDraft(plan, { monthlyModelChangeLimit })
           }
         />
+        <Field
+          id={`${plan}-max-projects`}
+          label="Projets maximum"
+          value={planDraft.maxProjects}
+          type="number"
+          min={0}
+          step="1"
+          helper="0 = illimite"
+          onChange={(maxProjects) => onUpdatePlanDraft(plan, { maxProjects })}
+        />
       </div>
 
       <ul className="my-6 space-y-2 text-sm text-muted-foreground">
@@ -653,6 +987,10 @@ function PlanCard({
         <li className="flex items-center gap-2">
           <Check className="size-4 text-foreground" />
           {modelLimit === 0 ? "Modeles illimites" : `${modelLimit} modeles simultanes`}
+        </li>
+        <li className="flex items-center gap-2">
+          <Check className="size-4 text-foreground" />
+          {maxProjects === 0 ? "Projets illimites" : `${maxProjects} projets max`}
         </li>
       </ul>
 

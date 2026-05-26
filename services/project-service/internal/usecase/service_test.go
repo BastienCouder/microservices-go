@@ -110,6 +110,41 @@ func TestProjectUnauthorizedAccess(t *testing.T) {
 	}
 }
 
+func TestCreateProjectRejectsWhenPlanProjectLimitIsReached(t *testing.T) {
+	svc, err := NewServiceWithDependencies(context.Background(), Dependencies{
+		BillingClient: &fakeBillingClient{
+			entitlements: BillingEntitlements{
+				Plan:        "starter",
+				MaxProjects: 1,
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+	ctx := context.Background()
+
+	if _, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Project one",
+		Domain:         "one.test",
+		WebsiteURL:     "https://one.test",
+	}); err != nil {
+		t.Fatalf("create first project: %v", err)
+	}
+
+	if _, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Project two",
+		Domain:         "two.test",
+		WebsiteURL:     "https://two.test",
+	}); err == nil || !strings.Contains(err.Error(), "allows up to 1 projects") {
+		t.Fatalf("expected project limit error, got %v", err)
+	}
+}
+
 func TestUpdateProjectCanRenameProject(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()

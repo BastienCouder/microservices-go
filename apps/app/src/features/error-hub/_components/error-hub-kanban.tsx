@@ -11,9 +11,7 @@ import {
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 
-import {
-  buildPerceptionModelLookup,
-} from "../../perception/_components";
+import { buildPerceptionModelLookup } from "../../perception/_components/top-errors-panel";
 import { ErrorHubColumn } from "./error-hub-column";
 import { ErrorHubDetailsPanel } from "./error-hub-details-panel";
 import { ErrorHubFiltersToolbar } from "./error-hub-filters-toolbar";
@@ -185,7 +183,7 @@ export function ErrorHubKanban({
     <div className="flex h-auto min-h-full flex-col px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <PageHeader
         title="Error hub"
-        baseline="Centre de triage des erreurs de perception, monitoring, crawler et optimisation."
+        baseline="Centre de triage des erreurs de l'application"
         actionsVariant="classic"
       />
 
@@ -231,8 +229,6 @@ export function ErrorHubKanban({
               columnIndex={columnIndex}
               emptyLabel={persistError}
               generatedIds={generatedIds}
-              getContextBadge={getContextBadge}
-              getContextMeta={getContextMeta}
               loading={loading}
               locale={locale}
               markingDoneErrorIds={markingDoneErrorIds}

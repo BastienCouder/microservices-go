@@ -76,7 +76,13 @@ const (
 )
 
 func NormalizePlan(plan string) string {
-	return strings.TrimSpace(strings.ToLower(plan))
+	normalized := strings.TrimSpace(strings.ToLower(plan))
+	if normalized == "" {
+		return ""
+	}
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.Join(strings.Fields(normalized), "-")
+	return normalized
 }
 
 func NormalizeBillingCycle(cycle string) string {

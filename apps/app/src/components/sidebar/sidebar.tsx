@@ -387,6 +387,7 @@ function SidebarComponent({
       title: content.projectSettings,
       indent: true,
       items: [
+        item(links.crawler, content.crawler),
         item(links.brands, content.brands),
         item(links.models, content.models),
       ],
@@ -395,10 +396,9 @@ function SidebarComponent({
       title: content.optimizeActions,
       indent: true,
       items: [
-        item(links.crawler, content.crawler),
         item(links.contentOptimizer, content.contentOptimizer),
         item(links.errorHub, content.errorHub),
-        item(links.aiAgentReady, content.aiAgentReady),
+       
       ],
     },
     {

@@ -116,7 +116,7 @@
     "heroSummaryLeaderSolo": "{{mentions}} mentions detected, or {{mentionRate}}% of tracked responses."
   },
   "monitoring-activity-panel": {
-    "criticalUpdates": "Critical updates",
+    "criticalUpdates": "Monitoring errors",
     "promptsStream": "Prompt stream",
     "noPromptsFound": "No prompt found.",
     "showMore": "Show more",
@@ -124,7 +124,7 @@
     "mentioned": "Mentioned",
     "missed": "Missed",
     "rankTop": "Rank #1",
-    "alertInsight": "Alert insight",
+    "alertInsight": "Monitoring error insight",
     "triggerPrompt": "Trigger prompt",
     "score": "Score",
     "mentions": "Mentions",
@@ -411,7 +411,7 @@
     "yourMonitoring": "Your monitoring",
     "defaultTagline": "Keep a clear read on your AI visibility, even on the go.",
     "responses": "Responses",
-    "alerts": "Alerts",
+    "alerts": "Errors",
     "filters": "Filters",
     "periodPrefix": "Period",
     "noAdvancedFilters": "No advanced filter",
@@ -420,7 +420,7 @@
     "analysisPeriodDescription": "Swipe horizontally to change time window.",
     "activityEyebrow": "Activity",
     "recentSignalsTitle": "Recent signals",
-    "recentSignalsDescription": "Critical alerts and latest prompts stay accessible without leaving monitoring.",
+    "recentSignalsDescription": "Monitoring errors and latest prompts stay accessible without leaving monitoring.",
     "customRangeTitle": "Custom range",
     "customRangeDescription": "Choose a precise time range to narrow the monitoring view.",
     "start": "Start",
@@ -701,6 +701,13 @@
     "description": "The optimization workspace is being prepared.",
     "cardTitle": "Soon available",
     "cardDescription": "This page will help prioritize content changes, generate optimization briefs, and follow improvements from crawl signals."
+  },
+  "ai-agent-ready": {
+    "title": "AI Agent Ready",
+    "badge": "Under development",
+    "description": "The AI agent audit workspace is being prepared.",
+    "cardTitle": "Under development",
+    "cardDescription": "This page will help assess whether your site is ready for AI agents, prioritize improvements, and track accessibility and discoverability recommendations."
   },
   "onboarding": {
     "language": "Language",

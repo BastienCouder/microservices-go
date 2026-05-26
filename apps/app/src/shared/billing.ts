@@ -1,34 +1,38 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON } from "@/shared/api/gateway";
-import { normalizeBillingPlan, type SimulatedPlan } from "@/shared/billing-plan";
+import { normalizeBillingPlan } from "@/shared/billing-plan";
 
 type JsonObject = Record<string, unknown>;
+export type BillingPlanCode = string;
+export type BillingPriceMap = Record<string, number | null>;
 
 export type BillingEntitlements = {
   organizationId: string;
-  plan: SimulatedPlan | null;
+  plan: BillingPlanCode | null;
   subscriptionStatus: string;
   isPaid: boolean;
   monthlyQuota: number;
   seats: number;
   modelSelectionLimit: number;
   monthlyModelChangeLimit: number;
+  maxProjects: number;
 };
 
 export type BillingSubscriptionUpdateInput = {
   organizationId: string;
-  plan: SimulatedPlan;
+  plan: BillingPlanCode;
   monthlyQuota: number;
   seats: number;
 };
 
 export type BillingPlanSettings = {
-  plan: SimulatedPlan;
+  plan: BillingPlanCode;
   monthlyPriceCents: number;
   yearlyPriceCents: number;
   monthlyQuota: number;
   modelSelectionLimit: number;
   monthlyModelChangeLimit: number;
+  maxProjects: number;
 };
 
 export type BillingPlanSettingsUpdateInput = BillingPlanSettings & {
@@ -38,6 +42,7 @@ export type BillingPlanSettingsUpdateInput = BillingPlanSettings & {
 export type BillingPricingTier = {
   promptVolume: number;
   label: string;
+  prices: BillingPriceMap;
   developerPriceCents: number | null;
   starterPriceCents: number | null;
   growthPriceCents: number | null;
@@ -64,24 +69,30 @@ function asNumber(value: unknown): number {
     : 0;
 }
 
+function asPlanCode(value: unknown): BillingPlanCode | null {
+  const plan = normalizeBillingPlan(asString(value) || null);
+  return plan === null ? null : plan;
+}
+
 export function normalizeBillingEntitlements(value: unknown): BillingEntitlements {
   const payload = asObject(value);
 
   return {
     organizationId: asString(payload.organization_id),
-    plan: normalizeBillingPlan(asString(payload.plan) || null),
+    plan: asPlanCode(payload.plan),
     subscriptionStatus: asString(payload.subscription_status),
     isPaid: payload.is_paid === true,
     monthlyQuota: asNumber(payload.monthly_quota),
     seats: asNumber(payload.seats),
     modelSelectionLimit: asNumber(payload.model_selection_limit),
     monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
+    maxProjects: asNumber(payload.max_projects),
   };
 }
 
 export function normalizeBillingPlanSettings(value: unknown): BillingPlanSettings | null {
   const payload = asObject(value);
-  const plan = normalizeBillingPlan(asString(payload.plan) || null);
+  const plan = asPlanCode(payload.plan);
   if (plan === null) return null;
 
   return {
@@ -91,6 +102,7 @@ export function normalizeBillingPlanSettings(value: unknown): BillingPlanSetting
     monthlyQuota: asNumber(payload.monthly_quota),
     modelSelectionLimit: asNumber(payload.model_selection_limit),
     monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
+    maxProjects: asNumber(payload.max_projects),
   };
 }
 
@@ -99,18 +111,52 @@ function asNullableNumber(value: unknown): number | null {
   return asNumber(value);
 }
 
+function asNullablePriceMap(value: unknown): BillingPriceMap {
+  if (!value || typeof value !== "object") return {};
+  const prices: BillingPriceMap = {};
+  for (const [plan, price] of Object.entries(value as JsonObject)) {
+    const normalizedPlan = asPlanCode(plan);
+    if (!normalizedPlan) continue;
+    prices[normalizedPlan] = asNullableNumber(price);
+  }
+  return prices;
+}
+
 export function normalizeBillingPricingTier(value: unknown): BillingPricingTier | null {
   const payload = asObject(value);
   const promptVolume = asNumber(payload.prompt_volume);
   if (promptVolume <= 0) return null;
 
+  const prices = asNullablePriceMap(payload.prices);
+  const developerPriceCents =
+    prices.developer ?? asNullableNumber(payload.developer_price_cents);
+  const starterPriceCents =
+    prices.starter ?? asNullableNumber(payload.starter_price_cents);
+  const growthPriceCents =
+    prices.growth ?? asNullableNumber(payload.growth_price_cents);
+  const proPriceCents =
+    prices.pro ?? asNullableNumber(payload.pro_price_cents);
+
   return {
     promptVolume,
     label: asString(payload.label) || String(promptVolume),
-    developerPriceCents: asNullableNumber(payload.developer_price_cents),
-    starterPriceCents: asNullableNumber(payload.starter_price_cents),
-    growthPriceCents: asNullableNumber(payload.growth_price_cents),
-    proPriceCents: asNullableNumber(payload.pro_price_cents),
+    prices: {
+      ...prices,
+      ...(developerPriceCents !== null || "developer" in prices
+        ? { developer: developerPriceCents }
+        : {}),
+      ...(starterPriceCents !== null || "starter" in prices
+        ? { starter: starterPriceCents }
+        : {}),
+      ...(growthPriceCents !== null || "growth" in prices
+        ? { growth: growthPriceCents }
+        : {}),
+      ...(proPriceCents !== null || "pro" in prices ? { pro: proPriceCents } : {}),
+    },
+    developerPriceCents,
+    starterPriceCents,
+    growthPriceCents,
+    proPriceCents,
   };
 }
 
@@ -199,6 +245,7 @@ export async function updateBillingPlanSettings(
       monthly_quota: Math.max(1, Math.floor(input.monthlyQuota)),
       model_selection_limit: Math.max(0, Math.floor(input.modelSelectionLimit)),
       monthly_model_change_limit: Math.max(0, Math.floor(input.monthlyModelChangeLimit)),
+      max_projects: Math.max(0, Math.floor(input.maxProjects)),
     }),
   });
 
@@ -250,6 +297,7 @@ export async function updateBillingPricingTier(
       body: JSON.stringify({
         prompt_volume: Math.max(1, Math.floor(input.promptVolume)),
         label: input.label,
+        prices: input.prices,
         developer_price_cents: input.developerPriceCents,
         starter_price_cents: input.starterPriceCents,
         growth_price_cents: input.growthPriceCents,

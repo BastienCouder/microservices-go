@@ -17,11 +17,11 @@ var optimizationSeverityTitles = map[string]string{
 var optimizationSeverityOrder = []string{"high", "medium", "low"}
 
 func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, organizationID int64) (OptimizationErrorBoard, error) {
-	perception, err := s.GetPerception(ctx, projectID, organizationID)
+	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
-	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
+	perception, err := s.buildPerceptionFromDashboard(ctx, projectID, organizationID, dashboard)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
@@ -35,32 +35,27 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 		return OptimizationErrorBoard{}, err
 	}
 
-	monitoringResponses := filterNonPerceptionResponses(dashboard.Responses)
-	monitoringDerivedErrors := deriveMonitoringTopErrors(monitoringResponses)
-
-	errors := make([]OptimizationError, 0, len(alerts)+len(monitoringDerivedErrors)+len(perception.TopErrors)+len(crawlerErrors))
+	errors := make([]OptimizationError, 0, len(alerts)+len(perception.TopErrors)+len(crawlerErrors))
 	monitoringAlertCount := 0
 	for _, alert := range alerts {
 		severity := normalizeOptimizationSeverity(alert.Severity)
 		monitoringAlertCount++
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring:" + alert.ID,
-			Source:           "monitoring",
-			Origin:           "alert",
-			Severity:         severity,
-			Title:            strings.TrimSpace(alert.Title),
-			Issue:            strings.TrimSpace(alert.Description),
-			Impact:           "Alerte monitoring detectee sur les reponses IA du projet.",
-			Type:             strings.TrimSpace(alert.AlertType),
-			FixType:          "prompt_patch",
-			OptimizePriority: severity,
-			GeneratedContent: "Verifier les prompts, les reponses recentes et les sources qui declenchent cette alerte.",
+			ID:                  "monitoring:" + alert.ID,
+			Source:              "monitoring",
+			Origin:              "alert",
+			Severity:            severity,
+			Title:               strings.TrimSpace(alert.Title),
+			Issue:               strings.TrimSpace(alert.Description),
+			Impact:              "Alerte monitoring detectee sur les reponses IA du projet.",
+			Type:                strings.TrimSpace(alert.AlertType),
+			FixType:             "prompt_patch",
+			OptimizePriority:    severity,
+			GeneratedContent:    "Verifier les prompts, les reponses recentes et les sources qui declenchent cette alerte.",
 			GeneratedContentKey: "generatedContentMonitoringAlert",
-			CreatedAt:        alert.CreatedAt.UTC().Format(time.RFC3339Nano),
+			CreatedAt:           alert.CreatedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}
-	errors = append(errors, monitoringDerivedErrors...)
-
 	perceptionCount := 0
 	for _, item := range perception.TopErrors {
 		perceptionCount++
@@ -103,9 +98,9 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			"projectId":               projectID,
 			"generatedAt":             time.Now().UTC().Format(time.RFC3339Nano),
 			"totalErrors":             len(errors),
-			"monitoringErrors":        monitoringAlertCount + len(monitoringDerivedErrors),
+			"monitoringErrors":        monitoringAlertCount,
 			"monitoringAlertErrors":   monitoringAlertCount,
-			"monitoringDerivedErrors": len(monitoringDerivedErrors),
+			"monitoringDerivedErrors": 0,
 			"perceptionErrors":        perceptionCount,
 			"crawlerErrors":           len(crawlerErrors),
 			"analyzedResponses":       perception.Metadata["analyzedResponses"],
@@ -193,18 +188,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			severity = "high"
 		}
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring-derived:visibility_gap",
-			Source:           "monitoring",
-			Origin:           "derived",
-			Severity:         severity,
-			Title:            "La marque ressort trop peu dans les prompts suivis",
-			Issue:            "Le taux de mention reste insuffisant sur les requetes monitoring prioritaires.",
-			Impact:           "La marque risque d'etre absente des recommandations IA sur les moments d'intention cle.",
-			Type:             "monitoring_visibility_gap",
-			FixType:          "prompt_patch",
-			OptimizePriority: severity,
-			DetectedInModels: lowestMentionModels(modelStats, 2),
-			GeneratedContent: "Revoir les prompts coeur de marche, renforcer les pages de positionnement et les preuves citees par les IA.",
+			ID:                  "monitoring-derived:visibility_gap",
+			Source:              "monitoring",
+			Origin:              "derived",
+			Severity:            severity,
+			Title:               "La marque ressort trop peu dans les prompts suivis",
+			Issue:               "Le taux de mention reste insuffisant sur les requetes monitoring prioritaires.",
+			Impact:              "La marque risque d'etre absente des recommandations IA sur les moments d'intention cle.",
+			Type:                "monitoring_visibility_gap",
+			FixType:             "prompt_patch",
+			OptimizePriority:    severity,
+			DetectedInModels:    lowestMentionModels(modelStats, 2),
+			GeneratedContent:    "Revoir les prompts coeur de marche, renforcer les pages de positionnement et les preuves citees par les IA.",
 			GeneratedContentKey: "generatedContentMonitoringVisibilityGap",
 		})
 	}
@@ -214,18 +209,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			severity = "high"
 		}
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring-derived:citation_gap",
-			Source:           "monitoring",
-			Origin:           "derived",
-			Severity:         severity,
-			Title:            "La marque est mentionnee mais manque de sources citees",
-			Issue:            "Les IA citent encore trop rarement des preuves ou URLs fiables quand elles parlent de la marque.",
-			Impact:           "La credibilite de la marque reste fragile dans les reponses et comparatifs IA.",
-			Type:             "monitoring_citation_gap",
-			FixType:          "faq_snippet",
-			OptimizePriority: severity,
-			DetectedInModels: lowestCitationModels(modelStats, 2),
-			GeneratedContent: "Ajouter des contenus davantage citables: FAQ, comparatifs, chiffres, preuves produit et pages de reference.",
+			ID:                  "monitoring-derived:citation_gap",
+			Source:              "monitoring",
+			Origin:              "derived",
+			Severity:            severity,
+			Title:               "La marque est mentionnee mais manque de sources citees",
+			Issue:               "Les IA citent encore trop rarement des preuves ou URLs fiables quand elles parlent de la marque.",
+			Impact:              "La credibilite de la marque reste fragile dans les reponses et comparatifs IA.",
+			Type:                "monitoring_citation_gap",
+			FixType:             "faq_snippet",
+			OptimizePriority:    severity,
+			DetectedInModels:    lowestCitationModels(modelStats, 2),
+			GeneratedContent:    "Ajouter des contenus davantage citables: FAQ, comparatifs, chiffres, preuves produit et pages de reference.",
 			GeneratedContentKey: "generatedContentMonitoringCitationGap",
 		})
 	}
@@ -235,18 +230,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			severity = "high"
 		}
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring-derived:ranking_gap",
-			Source:           "monitoring",
-			Origin:           "derived",
-			Severity:         severity,
-			Title:            "La marque perd les positions hautes sur les prompts suivis",
-			Issue:            "Les reponses mentionnent la marque mais la placent trop rarement en tete et trop souvent en bas de classement.",
-			Impact:           "La visibilite IA devient moins competitive sur les prompts a forte intention.",
-			Type:             "monitoring_ranking_gap",
-			FixType:          "website_copy",
-			OptimizePriority: severity,
-			DetectedInModels: worstRankingModels(modelStats, 2),
-			GeneratedContent: "Clarifier la proposition de valeur, les differentiants et les comparatifs concurrentiels sur les pages cle.",
+			ID:                  "monitoring-derived:ranking_gap",
+			Source:              "monitoring",
+			Origin:              "derived",
+			Severity:            severity,
+			Title:               "La marque perd les positions hautes sur les prompts suivis",
+			Issue:               "Les reponses mentionnent la marque mais la placent trop rarement en tete et trop souvent en bas de classement.",
+			Impact:              "La visibilite IA devient moins competitive sur les prompts a forte intention.",
+			Type:                "monitoring_ranking_gap",
+			FixType:             "website_copy",
+			OptimizePriority:    severity,
+			DetectedInModels:    worstRankingModels(modelStats, 2),
+			GeneratedContent:    "Clarifier la proposition de valeur, les differentiants et les comparatifs concurrentiels sur les pages cle.",
 			GeneratedContentKey: "generatedContentMonitoringRankingGap",
 		})
 	}
@@ -256,35 +251,35 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			severity = "high"
 		}
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring-derived:negative_shift",
-			Source:           "monitoring",
-			Origin:           "derived",
-			Severity:         severity,
-			Title:            "La tonalite des reponses devient trop negative",
-			Issue:            "Une part trop importante des reponses monitoring parle de la marque avec une tonalite negative.",
-			Impact:           "La desirabilite et la confiance baissent dans les recommandations et comparatifs IA.",
-			Type:             "monitoring_negative_shift",
-			FixType:          "website_copy",
-			OptimizePriority: severity,
-			DetectedInModels: mostNegativeModels(modelStats, 2),
-			GeneratedContent: "Renforcer les contenus de reassurance, les cas clients, les preuves de resultat et les objections traitees.",
+			ID:                  "monitoring-derived:negative_shift",
+			Source:              "monitoring",
+			Origin:              "derived",
+			Severity:            severity,
+			Title:               "La tonalite des reponses devient trop negative",
+			Issue:               "Une part trop importante des reponses monitoring parle de la marque avec une tonalite negative.",
+			Impact:              "La desirabilite et la confiance baissent dans les recommandations et comparatifs IA.",
+			Type:                "monitoring_negative_shift",
+			FixType:             "website_copy",
+			OptimizePriority:    severity,
+			DetectedInModels:    mostNegativeModels(modelStats, 2),
+			GeneratedContent:    "Renforcer les contenus de reassurance, les cas clients, les preuves de resultat et les objections traitees.",
 			GeneratedContentKey: "generatedContentMonitoringNegativeShift",
 		})
 	}
 	if hasMonitoringVolatility(modelStats) {
 		errors = append(errors, OptimizationError{
-			ID:               "monitoring-derived:model_volatility",
-			Source:           "monitoring",
-			Origin:           "derived",
-			Severity:         "medium",
-			Title:            "Les modeles racontent des histoires trop differentes sur la marque",
-			Issue:            "Les performances monitoring varient fortement d'un modele a l'autre, signe d'un positionnement encore instable.",
-			Impact:           "La marque peut sembler forte sur certains assistants et faible sur d'autres, ce qui reduit la coherence globale.",
-			Type:             "monitoring_model_volatility",
-			FixType:          "prompt_patch",
-			OptimizePriority: "medium",
-			DetectedInModels: volatilityModels(modelStats, 2),
-			GeneratedContent: "Uniformiser les contenus de positionnement, les cas d'usage et les comparatifs pour reduire l'ecart entre modeles.",
+			ID:                  "monitoring-derived:model_volatility",
+			Source:              "monitoring",
+			Origin:              "derived",
+			Severity:            "medium",
+			Title:               "Les modeles racontent des histoires trop differentes sur la marque",
+			Issue:               "Les performances monitoring varient fortement d'un modele a l'autre, signe d'un positionnement encore instable.",
+			Impact:              "La marque peut sembler forte sur certains assistants et faible sur d'autres, ce qui reduit la coherence globale.",
+			Type:                "monitoring_model_volatility",
+			FixType:             "prompt_patch",
+			OptimizePriority:    "medium",
+			DetectedInModels:    volatilityModels(modelStats, 2),
+			GeneratedContent:    "Uniformiser les contenus de positionnement, les cas d'usage et les comparatifs pour reduire l'ecart entre modeles.",
 			GeneratedContentKey: "generatedContentMonitoringModelVolatility",
 		})
 	}

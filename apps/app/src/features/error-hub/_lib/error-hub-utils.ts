@@ -241,7 +241,7 @@ export function getMonitoringOriginBadge(
   if (error.origin === "alert") {
     return {
       label: locale.startsWith("fr")
-        ? "Monitoring alerte"
+        ? "Alerte monitoring"
         : "Monitoring alert",
       className:
         "border-amber-200 bg-amber-500/10 text-amber-700 dark:border-amber-400/30 dark:text-amber-300",

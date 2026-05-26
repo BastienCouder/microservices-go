@@ -19,6 +19,7 @@ func defaultPlanSettings() []domain.PlanSettings {
 			MonthlyQuota:            1000,
 			ModelSelectionLimit:     1,
 			MonthlyModelChangeLimit: 0,
+			MaxProjects:             1,
 			UpdatedAt:               now,
 		},
 		{
@@ -28,6 +29,7 @@ func defaultPlanSettings() []domain.PlanSettings {
 			MonthlyQuota:            50,
 			ModelSelectionLimit:     3,
 			MonthlyModelChangeLimit: 0,
+			MaxProjects:             3,
 			UpdatedAt:               now,
 		},
 		{
@@ -37,6 +39,7 @@ func defaultPlanSettings() []domain.PlanSettings {
 			MonthlyQuota:            200,
 			ModelSelectionLimit:     6,
 			MonthlyModelChangeLimit: 0,
+			MaxProjects:             5,
 			UpdatedAt:               now,
 		},
 		{
@@ -46,6 +49,7 @@ func defaultPlanSettings() []domain.PlanSettings {
 			MonthlyQuota:            proUnlimitedMonthlyQuota,
 			ModelSelectionLimit:     0,
 			MonthlyModelChangeLimit: 0,
+			MaxProjects:             0,
 			UpdatedAt:               now,
 		},
 	}
@@ -67,20 +71,22 @@ func (s *Service) ListPlanSettings(ctx context.Context) ([]domain.PlanSettings, 
 	}
 	for _, item := range stored {
 		item.Plan = domain.NormalizePlan(item.Plan)
-		if !domain.IsConfigurablePlan(item.Plan) {
+		if item.Plan == "" {
 			continue
 		}
 		defaults[item.Plan] = item
 	}
-
-	plans := []domain.PlanSettings{
-		defaults[domain.PlanDeveloper],
-		defaults[domain.PlanStarter],
-		defaults[domain.PlanGrowth],
-		defaults[domain.PlanPro],
+	plans := make([]domain.PlanSettings, 0, len(defaults))
+	for _, item := range defaults {
+		plans = append(plans, item)
 	}
 	sort.SliceStable(plans, func(left, right int) bool {
-		return planSettingsRank(plans[left].Plan) < planSettingsRank(plans[right].Plan)
+		leftRank := planSettingsRank(plans[left].Plan)
+		rightRank := planSettingsRank(plans[right].Plan)
+		if leftRank == rightRank {
+			return plans[left].Plan < plans[right].Plan
+		}
+		return leftRank < rightRank
 	})
 	return plans, nil
 }
@@ -110,8 +116,8 @@ func (s *Service) UpdatePlanSettings(ctx context.Context, settings domain.PlanSe
 
 func (s *Service) planSettingsForPlan(ctx context.Context, plan string) (domain.PlanSettings, error) {
 	normalized := domain.NormalizePlan(plan)
-	if !domain.IsConfigurablePlan(normalized) {
-		return domain.PlanSettings{}, fmt.Errorf("%w: unsupported plan", domain.ErrInvalidPlanSettings)
+	if normalized == "" {
+		return domain.PlanSettings{}, fmt.Errorf("%w: plan is required", domain.ErrInvalidPlanSettings)
 	}
 	settings, err := s.ListPlanSettings(ctx)
 	if err != nil {
@@ -122,7 +128,10 @@ func (s *Service) planSettingsForPlan(ctx context.Context, plan string) (domain.
 			return item, nil
 		}
 	}
-	return defaultPlanSettingsByPlan()[normalized], nil
+	if fallback, ok := defaultPlanSettingsByPlan()[normalized]; ok {
+		return fallback, nil
+	}
+	return domain.PlanSettings{Plan: normalized}, nil
 }
 
 func planSettingsRank(plan string) int {
