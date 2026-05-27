@@ -63,6 +63,8 @@ type PersistedOnboardingState = Partial<OnboardingState> & {
   brandPreparationCompleted?: boolean;
 };
 
+export type OnboardingInitialState = PersistedOnboardingState;
+
 const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   step: 1,
   organizationName: "",
@@ -85,7 +87,7 @@ const OnboardingContext = createContext<OnboardingContextValue | null>(null);
 
 type OnboardingProviderProps = {
   children: ReactNode;
-  initialState?: Partial<OnboardingState>;
+  initialState?: OnboardingInitialState;
   totalSteps?: number;
 };
 

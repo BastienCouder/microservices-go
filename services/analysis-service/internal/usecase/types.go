@@ -117,17 +117,17 @@ type PerceptionRadarPoint struct {
 }
 
 type PerceptionError struct {
-	ID               string   `json:"id"`
-	Severity         string   `json:"severity"`
-	Title            string   `json:"title"`
-	Issue            string   `json:"issue"`
-	Impact           string   `json:"impact"`
-	DetectedInModels []string `json:"detectedInModels"`
-	FixType          string   `json:"fixType"`
-	GeneratedContent string   `json:"generatedContent"`
-	GeneratedContentKey string `json:"generatedContentKey,omitempty"`
-	OptimizePriority string   `json:"optimizePriority"`
-	Type             string   `json:"type"`
+	ID                  string   `json:"id"`
+	Severity            string   `json:"severity"`
+	Title               string   `json:"title"`
+	Issue               string   `json:"issue"`
+	Impact              string   `json:"impact"`
+	DetectedInModels    []string `json:"detectedInModels"`
+	FixType             string   `json:"fixType"`
+	GeneratedContent    string   `json:"generatedContent"`
+	GeneratedContentKey string   `json:"generatedContentKey,omitempty"`
+	OptimizePriority    string   `json:"optimizePriority"`
+	Type                string   `json:"type"`
 }
 
 type PerceptionData struct {
@@ -138,22 +138,27 @@ type PerceptionData struct {
 	Metadata   map[string]any         `json:"metadata"`
 }
 
+type PerceptionWithDashboardData struct {
+	PerceptionData
+	Dashboard DashboardData `json:"dashboard"`
+}
+
 type OptimizationError struct {
-	ID               string   `json:"id"`
-	Source           string   `json:"source"`
-	Origin           string   `json:"origin,omitempty"`
-	Resource         string   `json:"resource,omitempty"`
-	Severity         string   `json:"severity"`
-	Title            string   `json:"title"`
-	Issue            string   `json:"issue"`
-	Impact           string   `json:"impact"`
-	Type             string   `json:"type"`
-	FixType          string   `json:"fixType"`
-	OptimizePriority string   `json:"optimizePriority"`
-	DetectedInModels []string `json:"detectedInModels"`
-	GeneratedContent string   `json:"generatedContent"`
-	GeneratedContentKey string `json:"generatedContentKey,omitempty"`
-	CreatedAt        string   `json:"createdAt,omitempty"`
+	ID                  string   `json:"id"`
+	Source              string   `json:"source"`
+	Origin              string   `json:"origin,omitempty"`
+	Resource            string   `json:"resource,omitempty"`
+	Severity            string   `json:"severity"`
+	Title               string   `json:"title"`
+	Issue               string   `json:"issue"`
+	Impact              string   `json:"impact"`
+	Type                string   `json:"type"`
+	FixType             string   `json:"fixType"`
+	OptimizePriority    string   `json:"optimizePriority"`
+	DetectedInModels    []string `json:"detectedInModels"`
+	GeneratedContent    string   `json:"generatedContent"`
+	GeneratedContentKey string   `json:"generatedContentKey,omitempty"`
+	CreatedAt           string   `json:"createdAt,omitempty"`
 }
 
 type OptimizationErrorColumn struct {
@@ -288,16 +293,28 @@ type ContentIssueAnalyzer interface {
 	AnalyzeContentIssues(ctx context.Context, input ContentIssueAnalysisInput) ([]ContentOptimizerIssue, error)
 }
 
+type OnboardingBrandProfileAnalysisInput struct {
+	WebsiteURL string
+	BrandName  string
+	CrawlText  string
+	Fallback   OnboardingBrandProfilePreview
+}
+
+type OnboardingBrandProfileAnalyzer interface {
+	AnalyzeOnboardingBrandProfile(ctx context.Context, input OnboardingBrandProfileAnalysisInput) (OnboardingBrandProfilePreview, error)
+}
+
 type Dependencies struct {
-	Store                StateStore
-	DashboardCache       DashboardCache
-	DashboardCacheTTL    time.Duration
-	ProjectVerifier      ProjectAccessVerifier
-	ProjectCompetitors   ProjectCompetitorsProvider
-	ProjectModels        ProjectModelsProvider
-	BillingQuota         BillingQuotaProvider
-	ContentCrawler       ContentCrawler
-	ContentIssueAnalyzer ContentIssueAnalyzer
+	Store                          StateStore
+	DashboardCache                 DashboardCache
+	DashboardCacheTTL              time.Duration
+	ProjectVerifier                ProjectAccessVerifier
+	ProjectCompetitors             ProjectCompetitorsProvider
+	ProjectModels                  ProjectModelsProvider
+	BillingQuota                   BillingQuotaProvider
+	ContentCrawler                 ContentCrawler
+	ContentIssueAnalyzer           ContentIssueAnalyzer
+	OnboardingBrandProfileAnalyzer OnboardingBrandProfileAnalyzer
 }
 
 type persistedState struct {
@@ -342,13 +359,14 @@ type Service struct {
 	optimizeActions     map[string]*OptimizeAction
 	actionsByProject    map[string][]string
 
-	store                StateStore
-	dashboardCache       DashboardCache
-	dashboardCacheTTL    time.Duration
-	projectVerifier      ProjectAccessVerifier
-	projectCompetitors   ProjectCompetitorsProvider
-	projectModels        ProjectModelsProvider
-	billingQuota         BillingQuotaProvider
-	contentCrawler       ContentCrawler
-	contentIssueAnalyzer ContentIssueAnalyzer
+	store                          StateStore
+	dashboardCache                 DashboardCache
+	dashboardCacheTTL              time.Duration
+	projectVerifier                ProjectAccessVerifier
+	projectCompetitors             ProjectCompetitorsProvider
+	projectModels                  ProjectModelsProvider
+	billingQuota                   BillingQuotaProvider
+	contentCrawler                 ContentCrawler
+	contentIssueAnalyzer           ContentIssueAnalyzer
+	onboardingBrandProfileAnalyzer OnboardingBrandProfileAnalyzer
 }

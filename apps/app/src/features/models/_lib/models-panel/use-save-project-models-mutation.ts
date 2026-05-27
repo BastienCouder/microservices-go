@@ -1,6 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
+import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
+import { gatewayJSON } from "@/shared/api/gateway";
 
 const DEFAULT_UPDATE_ERROR = "Impossible de mettre a jour les modeles du projet.";
 
@@ -34,23 +36,16 @@ export function useSaveProjectModelsMutation({
 
   return useMutation({
     mutationFn: async (modelIds: string[]) => {
-      const response = await fetch(
-        `${apiBaseURL.replace(/\/$/, "")}/projects/${selectedProjectId}/models`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Organization-ID": organizationId,
-          },
-          body: JSON.stringify({ modelIds }),
-          credentials: "include",
-        },
-      );
-      const payload = (await response.json().catch(() => null)) as
+      const response = await gatewayJSON<
         | { error?: string }
-        | null;
+        | null
+      >(apiBaseURL, apiRoutes.projects.models(selectedProjectId), {
+        method: "PATCH",
+        organizationId,
+        body: JSON.stringify({ modelIds }),
+      });
 
-      if (!response.ok) throw new Error(sanitizeLegacyModelUpdateError(payload?.error));
+      if (!response.ok) throw new Error(sanitizeLegacyModelUpdateError(response.error));
       return modelIds;
     },
     onSuccess: async (nextModelIds) => {

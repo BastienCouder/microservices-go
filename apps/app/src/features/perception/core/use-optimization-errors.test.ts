@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
 const source = await Bun.file(new URL("./use-optimization-errors.ts", import.meta.url)).text();
-const errorHubSource = await Bun.file(new URL("../../error-hub/index.tsx", import.meta.url)).text();
+const errorHubColumnSource = await Bun.file(
+  new URL("../../error-hub/_components/error-hub-column.tsx", import.meta.url),
+).text();
 
 describe("useOptimizationErrors", () => {
   test("creates AI optimize actions in processing status and exposes done transitions", () => {
@@ -14,9 +16,9 @@ describe("useOptimizationErrors", () => {
   });
 
   test("error hub passes action status and done handler to error cards", () => {
-    expect(errorHubSource.includes("actionStatus={actionStatusesByErrorId.get(error.id)}")).toBe(true);
-    expect(errorHubSource.includes("onMarkActionDone={() => void onMarkDone(error)}")).toBe(true);
-    expect(errorHubSource.includes("markingActionDone={markingDoneErrorIds.has(error.id)}")).toBe(true);
+    expect(errorHubColumnSource.includes("actionStatus={actionStatusesByErrorId.get(error.id)}")).toBe(true);
+    expect(errorHubColumnSource.includes("onMarkActionDone={() => void onMarkDone(error)}")).toBe(true);
+    expect(errorHubColumnSource.includes("markingActionDone={markingDoneErrorIds.has(error.id)}")).toBe(true);
   });
 
   test("does not abort the error hub board request during route context churn", () => {

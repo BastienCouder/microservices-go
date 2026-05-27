@@ -1,63 +1,60 @@
-import { API_CONFIG, buildApiPath } from "@/lib/api-config";
+import { API_CONFIG } from "@/lib/api-config";
+import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import { readSelectedOrganizationID } from "@/shared/selection";
 
-function buildURL(path: string): string {
-  const base = API_CONFIG.BASE_URL?.trim();
-  return base ? `${base}${buildApiPath(path)}` : buildApiPath(path);
-}
+function readData<T>(result: GatewayResult<unknown>): T {
+  if (!result.ok) throw new Error(result.error || `HTTP ${result.status}`);
 
-async function readJSON<T>(res: Response): Promise<T> {
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
-
-  const json = (await res.json()) as { data?: T; message?: string };
+  const json = result.data as { data?: T; message?: string };
   if (json?.data !== undefined) return json.data;
   throw new Error(json?.message || "Reponse API invalide");
 }
 
+function readOrganizationId(): string | undefined {
+  const organizationId = readSelectedOrganizationID();
+  return organizationId || undefined;
+}
+
 export async function getPerceptionClientJSON<T>(path: string): Promise<T> {
-  const res = await fetch(buildURL(path), {
+  const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "GET",
-    credentials: "include",
+    organizationId: readOrganizationId(),
   });
 
-  return readJSON<T>(res);
+  return readData<T>(result);
 }
 
 export async function postPerceptionClientJSON<T>(
   path: string,
   body: unknown,
 ): Promise<T> {
-  const res = await fetch(buildURL(path), {
+  const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    organizationId: readOrganizationId(),
   });
 
-  return readJSON<T>(res);
+  return readData<T>(result);
 }
 
 export async function patchPerceptionClientJSON<T>(
   path: string,
   body: unknown,
 ): Promise<T> {
-  const res = await fetch(buildURL(path), {
+  const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "PATCH",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    organizationId: readOrganizationId(),
   });
 
-  return readJSON<T>(res);
+  return readData<T>(result);
 }
 
 export async function deletePerceptionClientJSON<T>(path: string): Promise<T> {
-  const res = await fetch(buildURL(path), {
+  const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "DELETE",
-    credentials: "include",
+    organizationId: readOrganizationId(),
   });
 
-  return readJSON<T>(res);
+  return readData<T>(result);
 }

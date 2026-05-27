@@ -486,6 +486,21 @@ func (s *Service) GetPerception(ctx context.Context, projectID string, organizat
 	return s.buildPerceptionFromDashboard(ctx, projectID, organizationID, dashboard)
 }
 
+func (s *Service) GetPerceptionWithDashboard(ctx context.Context, projectID string, organizationID int64) (PerceptionWithDashboardData, error) {
+	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
+	if err != nil {
+		return PerceptionWithDashboardData{}, err
+	}
+	perception, err := s.buildPerceptionFromDashboard(ctx, projectID, organizationID, dashboard)
+	if err != nil {
+		return PerceptionWithDashboardData{}, err
+	}
+	return PerceptionWithDashboardData{
+		PerceptionData: perception,
+		Dashboard:      dashboard,
+	}, nil
+}
+
 func (s *Service) buildPerceptionFromDashboard(
 	ctx context.Context,
 	projectID string,

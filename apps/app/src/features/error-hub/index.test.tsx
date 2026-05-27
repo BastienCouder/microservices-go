@@ -1,51 +1,61 @@
 import { describe, expect, test } from "bun:test";
 
 const source = await Bun.file(new URL("./index.tsx", import.meta.url)).text();
+const kanbanSource = await Bun.file(
+  new URL("./_components/error-hub-kanban.tsx", import.meta.url),
+).text();
+const detailsSource = await Bun.file(
+  new URL("./_components/error-hub-details-panel.tsx", import.meta.url),
+).text();
 const columnSource = await Bun.file(
   new URL("./_components/error-hub-column.tsx", import.meta.url),
 ).text();
 const utilsSource = await Bun.file(
   new URL("./_lib/error-hub-utils.ts", import.meta.url),
 ).text();
+const typesSource = await Bun.file(
+  new URL("./_lib/error-hub-types.ts", import.meta.url),
+).text();
 const normalizedSource = source.replace(/\s+/g, " ");
+const normalizedDetailsSource = detailsSource.replace(/\s+/g, " ");
 
 describe("error hub", () => {
   test("opens perception-style detail sheets from kanban cards", () => {
-    expect(source.includes("ErrorDetailsContent")).toBe(true);
-    expect(source.includes("const [selectedError, setSelectedError]")).toBe(
+    expect(detailsSource.includes("ErrorDetailsContent")).toBe(true);
+    expect(kanbanSource.includes("const [selectedError, setSelectedError]")).toBe(
       true,
     );
     expect(
-      source.includes("onOpenDetails={() => setSelectedError(error)}"),
+      kanbanSource.includes("onOpenDetails={setSelectedError}"),
     ).toBe(true);
     expect(
-      normalizedSource.includes("<Sheet open={selectedError !== null}"),
+      normalizedDetailsSource.includes("<Sheet open={selectedError !== null}"),
     ).toBe(true);
     expect(
-      normalizedSource.includes("<Drawer open={selectedError !== null}"),
+      normalizedDetailsSource.includes("<Drawer open={selectedError !== null}"),
     ).toBe(true);
     expect(
-      source.includes(
+      detailsSource.includes(
         "actionStatus={actionStatusesByErrorId.get(selectedError.id)}",
       ),
     ).toBe(true);
     expect(
-      source.includes(
+      detailsSource.includes(
         "onMarkActionDone={() => void onMarkDone(selectedError)}",
       ),
     ).toBe(true);
-    expect(source.includes("ACTION_STATUS_OPTIONS")).toBe(true);
-    expect(source.includes("filterErrorsByActionStatus")).toBe(true);
-    expect(source.includes("setActionStatusFilter")).toBe(true);
-    expect(source.includes("sortErrorsByActionStatus")).toBe(true);
-    expect(source.includes('if (status === "processing") return 0;')).toBe(
+    expect(kanbanSource.includes("setActionStatusFilter")).toBe(true);
+    expect(typesSource.includes("ACTION_STATUS_OPTIONS")).toBe(true);
+    expect(utilsSource.includes("filterErrorsByActionStatus")).toBe(true);
+    expect(utilsSource.includes("sortErrorsByActionStatus")).toBe(true);
+    expect(utilsSource.includes('if (status === "processing") return 0;')).toBe(
       true,
     );
-    expect(source.includes('if (status === "done") return 2;')).toBe(true);
-    expect(source.includes("SOURCE_OPTIONS")).toBe(true);
-    expect(source.includes('value: "crawler"')).toBe(true);
-    expect(source.includes("filterErrorsBySource")).toBe(true);
-    expect(source.includes("setSourceFilter")).toBe(true);
+    expect(utilsSource.includes('if (status === "done") return 2;')).toBe(true);
+    expect(typesSource.includes("SOURCE_OPTIONS")).toBe(true);
+    expect(typesSource.includes('value: "crawler"')).toBe(true);
+    expect(utilsSource.includes("filterErrorsBySource")).toBe(true);
+    expect(kanbanSource.includes("setSourceFilter")).toBe(true);
     expect(source.includes("readSourceFilterFromSearch")).toBe(true);
     expect(
       normalizedSource.includes(

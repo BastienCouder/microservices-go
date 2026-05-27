@@ -271,6 +271,19 @@ export async function updateOrganizationName(
   });
 }
 
+export async function deleteOrganization(
+  apiBaseURL: string,
+  organizationId: string,
+): Promise<void> {
+  await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.delete(organizationId), {
+      method: "DELETE",
+      organizationId,
+    }),
+    "Impossible de supprimer l'organisation.",
+  );
+}
+
 export async function updateOrganizationProject(
   apiBaseURL: string,
   organizationId: string,

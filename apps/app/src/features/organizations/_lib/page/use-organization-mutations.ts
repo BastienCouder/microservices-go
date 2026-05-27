@@ -4,6 +4,7 @@ import {
   assignOrganizationProjectMember,
   createOrganizationAPIKey,
   createOrganizationInvitation,
+  deleteOrganization,
   deleteOrganizationProject,
   removeOrganizationMember,
   removeOrganizationProjectMember,
@@ -44,6 +45,7 @@ type OrganizationMutationsInput = {
   setNotice: (value: string | null) => void;
   setLocalError: (value: string | null) => void;
   invalidateOrganizationData: () => Promise<void>;
+  onDeleteOrganizationSuccess: () => void;
 };
 
 function buildOrganizationError(error: unknown, fallback: string): string {
@@ -72,6 +74,7 @@ export function useOrganizationMutations({
   setNotice,
   setLocalError,
   invalidateOrganizationData,
+  onDeleteOrganizationSuccess,
 }: OrganizationMutationsInput) {
   const getMemberRoles = (userId: string): string[] =>
     resources.members.find((member) => member.userId === userId)?.roles ?? [];
@@ -348,6 +351,23 @@ export function useOrganizationMutations({
     },
   });
 
+  const deleteOrganizationMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      await deleteOrganization(apiBaseURL, selectedOrganizationId);
+    },
+    onSuccess: async () => {
+      setNotice("Organisation supprimee.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+      onDeleteOrganizationSuccess();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de supprimer l'organisation."));
+    },
+  });
+
   const createAPIKeyMutation = useMutation({
     mutationFn: async (name: string) => {
       const nextName = name.trim();
@@ -413,6 +433,7 @@ export function useOrganizationMutations({
     removeMemberMutation,
     createInvitationMutation,
     updateOrganizationNameMutation,
+    deleteOrganizationMutation,
     createAPIKeyMutation,
     revokeAPIKeyMutation,
     revokeInvitationMutation,

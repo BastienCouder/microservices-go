@@ -98,6 +98,10 @@ export default function App() {
     queryFn: ({ signal }) => loadUserOrganizationSummaries(apiBaseURL, signal),
   });
   const organizations = organizationsQuery.data ?? [];
+  const organizationIdsKey = useMemo(
+    () => organizations.map((organization) => organization.id).sort().join(","),
+    [organizations],
+  );
   const shouldResolveRouteProjectContext =
     apiBaseURL.trim() !== "" &&
     !busy &&
@@ -106,23 +110,19 @@ export default function App() {
     routeProjectToken !== "" &&
     organizations.length > 0;
   const routeProjectContextQuery = useQuery({
-    queryKey: [
-      "route-project-context",
-      apiBaseURL,
-      routeProjectToken,
-      organizations.map((organization) => organization.id).join(","),
-    ] as const,
+    queryKey: appQueryKeys.projectContextHierarchies(apiBaseURL, organizationIdsKey),
     enabled: shouldResolveRouteProjectContext,
-    queryFn: async ({ signal }) => {
-      const hierarchies = await loadProjectContextHierarchies(
-        apiBaseURL,
-        organizations,
-        signal,
-      );
-      return findResolvedProjectContext(hierarchies, routeProjectToken);
-    },
+    queryFn: ({ signal }) =>
+      loadProjectContextHierarchies(apiBaseURL, organizations, signal),
   });
-  const resolvedProjectContext = routeProjectContextQuery.data ?? null;
+  const resolvedProjectContext = useMemo(
+    () =>
+      findResolvedProjectContext(
+        routeProjectContextQuery.data ?? [],
+        routeProjectToken,
+      ),
+    [routeProjectContextQuery.data, routeProjectToken],
+  );
   const routeSearch = useMemo(
     () =>
       bypassResolvedContext
@@ -169,6 +169,9 @@ export default function App() {
     busy,
     user,
     isOnboardingRoute,
+    isBillingRoute,
+    isInvitationRoute,
+    billingAccess,
     projectCount:
       projectGuardQuery.isLoading || projectGuardQuery.isFetching
         ? null
@@ -263,7 +266,7 @@ export default function App() {
   }
 
   if (mustRedirectToOnboarding) {
-    return <Navigate replace to="/onboarding" />;
+    return <Navigate replace to="/onboarding?setup=account" />;
   }
 
   if (isOnboardingRoute || isInvitationRoute || isBillingRoute) {

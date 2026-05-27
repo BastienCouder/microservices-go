@@ -11,6 +11,9 @@ type ShouldRedirectToOnboardingInput = {
   busy: boolean;
   user: UserProfile | null;
   isOnboardingRoute: boolean;
+  isBillingRoute?: boolean;
+  isInvitationRoute?: boolean;
+  billingAccess?: BillingAccessState;
   projectCount: number | null;
 };
 
@@ -49,13 +52,25 @@ export function shouldRedirectToOnboarding({
   busy,
   user,
   isOnboardingRoute,
+  isBillingRoute = false,
+  isInvitationRoute = false,
+  billingAccess = "unknown",
   projectCount,
 }: ShouldRedirectToOnboardingInput): boolean {
   if (apiBaseURL.trim() === "") {
     return false;
   }
-  if (busy || user === null || isOnboardingRoute) {
+  if (
+    busy ||
+    user === null ||
+    isOnboardingRoute ||
+    isBillingRoute ||
+    isInvitationRoute
+  ) {
     return false;
+  }
+  if (billingAccess === "missing_organization") {
+    return true;
   }
   if (projectCount === null) {
     return false;
@@ -71,7 +86,7 @@ export function shouldRedirectToBillingGate({
   isInvitationRoute,
   billingAccess,
 }: ShouldRedirectToBillingGateInput): boolean {
-/*   if (apiBaseURL.trim() === "") {
+ /*  if (apiBaseURL.trim() === "") {
     return false;
   }
   if (busy || user === null || isBillingRoute || isInvitationRoute) {

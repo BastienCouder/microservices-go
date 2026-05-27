@@ -40,6 +40,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.billingQuota = deps.BillingQuota
 	svc.contentCrawler = deps.ContentCrawler
 	svc.contentIssueAnalyzer = deps.ContentIssueAnalyzer
+	svc.onboardingBrandProfileAnalyzer = deps.OnboardingBrandProfileAnalyzer
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
 			return nil, err

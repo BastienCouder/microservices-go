@@ -1,5 +1,8 @@
 import { useEffect, useRef } from "react";
-import { readOrganizationIdFromSearch, readSelectedOrganizationID } from "@/shared/selection";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationID,
+} from "@/shared/selection";
 import {
   OnboardingProvider,
   useOnboarding,
@@ -7,6 +10,7 @@ import {
 import { OnboardingLeftPanel } from "./left-panel";
 import { StepAnalysis } from "./step-analysis";
 import { StepAttribution } from "./step-attribution";
+import { StepAccountType } from "./step-account-type";
 import { StepBrand } from "./step-brand";
 import { StepCompetitors } from "./step-competitors";
 import { StepModels } from "./step-models";
@@ -15,6 +19,11 @@ import { StepPrompts } from "./step-prompts";
 import { StepWebsite } from "./step-website";
 import { AnimatedWave } from "./animated-wave";
 import { OnboardingLanguageSwitcher } from "./language-switcher";
+import {
+  createFreshOnboardingInitialState,
+  getOnboardingSetupMode,
+  shouldStartFreshOnboarding,
+} from "./onboarding-mode";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -26,27 +35,51 @@ type OnboardingPageProps = {
 
 function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps) {
   const { step } = useOnboarding();
+  const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const setupMode = getOnboardingSetupMode(routeSearch);
   const selectedOrganizationId =
-    readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch);
+    setupMode === "account"
+      ? ""
+      : readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID();
   const hasOrganizationContext = selectedOrganizationId !== "";
 
   const steps = [
-    { component: <StepWebsite askOrganizationName={!hasOrganizationContext} />, id: 1 },
-    ...(!hasOrganizationContext ? [{ component: <StepAttribution />, id: 2 }] : []),
-    { component: <StepBrand />, id: hasOrganizationContext ? 2 : 3 },
-    { component: <StepCompetitors />, id: hasOrganizationContext ? 3 : 4 },
-    { component: <StepPrompts />, id: hasOrganizationContext ? 4 : 5 },
-    { component: <StepModels apiBaseURL={apiBaseURL} />, id: hasOrganizationContext ? 5 : 6 },
-    { component: <StepAnalysis apiBaseURL={apiBaseURL} />, id: hasOrganizationContext ? 6 : 7 },
+    ...(!hasOrganizationContext ? [{ component: <StepAccountType />, id: 1 }] : []),
+    {
+      component: <StepWebsite askOrganizationName={!hasOrganizationContext} />,
+      id: hasOrganizationContext ? 1 : 2,
+    },
+    ...(!hasOrganizationContext ? [{ component: <StepAttribution />, id: 3 }] : []),
+    {
+      component: <StepBrand apiBaseURL={apiBaseURL} />,
+      id: hasOrganizationContext ? 2 : 4,
+    },
+    { component: <StepCompetitors />, id: hasOrganizationContext ? 3 : 5 },
+    { component: <StepPrompts />, id: hasOrganizationContext ? 4 : 6 },
+    {
+      component: (
+        <StepModels
+          apiBaseURL={apiBaseURL}
+          organizationId={selectedOrganizationId}
+        />
+      ),
+      id: hasOrganizationContext ? 5 : 7,
+    },
+    {
+      component: (
+        <StepAnalysis
+          apiBaseURL={apiBaseURL}
+          organizationId={selectedOrganizationId}
+        />
+      ),
+      id: hasOrganizationContext ? 6 : 8,
+    },
   ];
 
   useEffect(() => {
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: "auto" });
   }, [step]);
-
-    const navigate = useNavigate();
-
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.08),_transparent_34%),linear-gradient(180deg,_#f8f9fc_0%,_#f1f3f8_100%)] lg:h-screen">
@@ -57,14 +90,17 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
       <OnboardingLeftPanel />
 
       <section className="relative z-10 min-w-0 flex-1">
-        
         <div className="absolute left-4 top-4 z-30 sm:right-6 lg:right-10">
-          <Button variant="outline" onClick={() => navigate(-1)} className="flex items-center text-xs font-medium text-muted-foreground gap-1 rounded-full border-none bg-white/50 hover:bg-white/80 p-1.5 outline-none backdrop-blur">
-           <ArrowLeft className="mr-2 h-4 w-4" />
+          <Button
+            variant="outline"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-1 rounded-full border-none bg-white/50 p-1.5 text-xs font-medium text-muted-foreground outline-none backdrop-blur hover:bg-white/80"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
             Back
           </Button>
         </div>
-        
+
         <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center px-4">
           <StepProgress step={step} total={steps.length} />
         </div>
@@ -86,12 +122,29 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
 }
 
 export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps) {
+  const normalizedRouteSearch = routeSearch ?? "";
+  const setupMode = getOnboardingSetupMode(normalizedRouteSearch);
   const selectedOrganizationId =
-    readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch ?? "");
-  const totalSteps = selectedOrganizationId ? 6 : 7;
+    setupMode === "account"
+      ? ""
+      : readOrganizationIdFromSearch(normalizedRouteSearch) ||
+        readSelectedOrganizationID();
+  const totalSteps = selectedOrganizationId ? 6 : 8;
+  const providerKey =
+    setupMode === "resume"
+      ? selectedOrganizationId || "no-organization"
+      : `${setupMode}-setup:${selectedOrganizationId || "no-organization"}`;
 
   return (
-    <OnboardingProvider totalSteps={totalSteps}>
+    <OnboardingProvider
+      key={providerKey}
+      initialState={
+        shouldStartFreshOnboarding(normalizedRouteSearch)
+          ? createFreshOnboardingInitialState()
+          : undefined
+      }
+      totalSteps={totalSteps}
+    >
       <OnboardingContent apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
     </OnboardingProvider>
   );

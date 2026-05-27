@@ -124,6 +124,31 @@ func (c *Client) AnalyzeContentIssues(ctx context.Context, input usecase.Content
 	return issues, nil
 }
 
+func (c *Client) AnalyzeOnboardingBrandProfile(
+	ctx context.Context,
+	input usecase.OnboardingBrandProfileAnalysisInput,
+) (usecase.OnboardingBrandProfilePreview, error) {
+	body := executePromptRequest{
+		PromptID:   "onboarding-brand-profile",
+		PromptText: buildOnboardingBrandProfilePrompt(input),
+		ModelID:    c.modelID,
+		ProviderID: c.providerID,
+	}
+
+	rawResponse, err := c.executeStructuredPrompt(ctx, body, 0)
+	if err != nil {
+		return usecase.OnboardingBrandProfilePreview{}, err
+	}
+
+	preview, err := parseOnboardingBrandProfileResponse(rawResponse)
+	if err != nil {
+		return usecase.OnboardingBrandProfilePreview{}, err
+	}
+	preview.Status = input.Fallback.Status
+	preview.CrawlJobID = input.Fallback.CrawlJobID
+	return preview, nil
+}
+
 type executePromptRequest struct {
 	PromptID   string `json:"promptId"`
 	PromptText string `json:"promptText"`
@@ -136,6 +161,50 @@ type executePromptEnvelope struct {
 	Data    struct {
 		RawResponse string `json:"rawResponse"`
 	} `json:"data"`
+}
+
+func (c *Client) executeStructuredPrompt(ctx context.Context, body executePromptRequest, organizationID int64) (string, error) {
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("encode ia request: %w", err)
+	}
+
+	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "analysis-service", security.OutboundTokenClaims{
+		Organization: organizationID,
+	})
+	if err != nil {
+		return "", fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/ai/execute", bytes.NewReader(payload))
+	if err != nil {
+		return "", fmt.Errorf("create ia request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("call ia service: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
+	if err != nil {
+		return "", fmt.Errorf("read ia response: %w", err)
+	}
+	if resp.StatusCode >= 400 {
+		return "", fmt.Errorf("ia service returned status %d: %s", resp.StatusCode, strings.TrimSpace(string(raw)))
+	}
+
+	var envelope executePromptEnvelope
+	if err := json.Unmarshal(raw, &envelope); err != nil {
+		return "", fmt.Errorf("decode ia response: %w", err)
+	}
+	if !envelope.Success {
+		return "", fmt.Errorf("ia service returned unsuccessful response")
+	}
+	return envelope.Data.RawResponse, nil
 }
 
 type contentIssueResponse struct {
@@ -215,6 +284,147 @@ func parseContentIssueResponse(rawResponse string, pageURL string) ([]usecase.Co
 		}
 	}
 	return issues, nil
+}
+
+type onboardingBrandProfileResponse struct {
+	BrandName             string                                     `json:"brandName"`
+	BrandShortDescription string                                     `json:"brandShortDescription"`
+	BrandDescription      string                                     `json:"brandDescription"`
+	Industry              string                                     `json:"industry"`
+	KeyFeatures           []string                                   `json:"keyFeatures"`
+	Competitors           []usecase.OnboardingBrandProfileCompetitor `json:"competitors"`
+	Prompts               []usecase.OnboardingBrandProfilePrompt     `json:"prompts"`
+}
+
+func buildOnboardingBrandProfilePrompt(input usecase.OnboardingBrandProfileAnalysisInput) string {
+	fallbackJSON, _ := json.Marshal(input.Fallback)
+	content := trimForPrompt(input.CrawlText, 9000)
+	return strings.TrimSpace(fmt.Sprintf(`Tu es un analyste de marque senior pour un onboarding SaaS.
+Analyse le contenu crawle de la page d'accueil et de la page a propos, puis retourne uniquement du JSON valide, sans markdown.
+
+Schema exact:
+{"brandName":"...","brandShortDescription":"...","brandDescription":"...","industry":"...","keyFeatures":["..."],"competitors":[{"name":"...","website":"..."}],"prompts":[{"text":"...","language":"fr"}]}
+
+Regles:
+- brandShortDescription: 1 phrase claire.
+- brandDescription: 1 a 2 paragraphes exploitables dans un formulaire.
+- keyFeatures: 3 a 5 propositions de valeur concretes.
+- competitors: 3 a 5 concurrents plausibles; website peut etre vide si incertain.
+- prompts: 4 a 6 prompts que des prospects pourraient poser a une IA pour comparer ou choisir une solution.
+- Si une information manque, deduis prudemment depuis le contenu et le domaine.
+
+Contexte:
+websiteUrl: %s
+brandNameHint: %s
+fallback: %s
+
+Contenu crawle:
+%s`, input.WebsiteURL, input.BrandName, string(fallbackJSON), content))
+}
+
+func parseOnboardingBrandProfileResponse(rawResponse string) (usecase.OnboardingBrandProfilePreview, error) {
+	rawResponse = strings.TrimSpace(rawResponse)
+	rawResponse = strings.TrimPrefix(rawResponse, "```json")
+	rawResponse = strings.TrimPrefix(rawResponse, "```")
+	rawResponse = strings.TrimSuffix(rawResponse, "```")
+	rawResponse = strings.TrimSpace(rawResponse)
+	if rawResponse == "" {
+		return usecase.OnboardingBrandProfilePreview{}, nil
+	}
+
+	var parsed onboardingBrandProfileResponse
+	if err := json.Unmarshal([]byte(rawResponse), &parsed); err != nil {
+		return usecase.OnboardingBrandProfilePreview{}, fmt.Errorf("decode ia onboarding brand profile: %w", err)
+	}
+
+	return usecase.OnboardingBrandProfilePreview{
+		BrandName:             strings.TrimSpace(parsed.BrandName),
+		BrandShortDescription: strings.TrimSpace(parsed.BrandShortDescription),
+		BrandDescription:      strings.TrimSpace(parsed.BrandDescription),
+		Industry:              strings.TrimSpace(parsed.Industry),
+		KeyFeatures:           cleanOnboardingFeatureList(parsed.KeyFeatures, 5),
+		Competitors:           cleanOnboardingCompetitors(parsed.Competitors, 5),
+		Prompts:               cleanOnboardingPrompts(parsed.Prompts, 6),
+	}, nil
+}
+
+func cleanOnboardingFeatureList(values []string, limit int) []string {
+	out := make([]string, 0, limit)
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		lower := strings.ToLower(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[lower]; ok {
+			continue
+		}
+		seen[lower] = struct{}{}
+		out = append(out, value)
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+func cleanOnboardingCompetitors(
+	values []usecase.OnboardingBrandProfileCompetitor,
+	limit int,
+) []usecase.OnboardingBrandProfileCompetitor {
+	out := make([]usecase.OnboardingBrandProfileCompetitor, 0, limit)
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		name := strings.TrimSpace(value.Name)
+		if name == "" {
+			continue
+		}
+		key := strings.ToLower(name)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, usecase.OnboardingBrandProfileCompetitor{
+			Name:    name,
+			Website: strings.TrimSpace(value.Website),
+		})
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
+}
+
+func cleanOnboardingPrompts(
+	values []usecase.OnboardingBrandProfilePrompt,
+	limit int,
+) []usecase.OnboardingBrandProfilePrompt {
+	out := make([]usecase.OnboardingBrandProfilePrompt, 0, limit)
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		text := strings.TrimSpace(value.Text)
+		if text == "" {
+			continue
+		}
+		key := strings.ToLower(text)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		language := strings.TrimSpace(value.Language)
+		if language == "" {
+			language = "fr"
+		}
+		seen[key] = struct{}{}
+		out = append(out, usecase.OnboardingBrandProfilePrompt{
+			Text:     text,
+			Language: language,
+		})
+		if len(out) == limit {
+			break
+		}
+	}
+	return out
 }
 
 func normalizeIssueCategory(value string) string {

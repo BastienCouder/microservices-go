@@ -240,6 +240,12 @@ type PerceptionApiPayload = {
   topErrors?: Array<Partial<PerceptionError>>;
   metadata?: Partial<PerceptionViewData["metadata"]>;
 };
+type PerceptionApiPayloadWithDashboard = PerceptionApiPayload & {
+  dashboard?: unknown;
+  Dashboard?: unknown;
+  monitoring?: unknown;
+  Monitoring?: unknown;
+};
 
 type JsonObject = Record<string, unknown>;
 type ProjectRouteCandidate = {
@@ -340,6 +346,16 @@ function unwrapRequiredEnvelope<T>(
     throw new PerceptionRequestError(result.status, `${scope}: ${result.error}`);
   }
   return unwrapSuccessEnvelope(result.data);
+}
+
+function readBundledDashboard(payload: PerceptionApiPayloadWithDashboard): unknown | null {
+  const candidate =
+    payload.dashboard ??
+    payload.Dashboard ??
+    payload.monitoring ??
+    payload.Monitoring ??
+    null;
+  return candidate === null || candidate === undefined ? null : candidate;
 }
 
 function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
@@ -1237,7 +1253,7 @@ export async function loadPerceptionData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [modelsRes, competitorsRes, monitoringRes, perceptionRes] = await Promise.all([
+  const [modelsRes, competitorsRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(encodedProjectId), {
       method: "GET",
       signal: options?.signal,
@@ -1246,11 +1262,7 @@ export async function loadPerceptionData(
       method: "GET",
       signal: options?.signal,
     }),
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.monitoring(encodedProjectId), {
-      method: "GET",
-      signal: options?.signal,
-    }),
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.perception(encodedProjectId), {
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.perception(encodedProjectId, { includeDashboard: true }), {
       method: "GET",
       signal: options?.signal,
     }),
@@ -1259,8 +1271,18 @@ export async function loadPerceptionData(
   const projectPayload = unwrapRequiredEnvelope(projectRes, "project");
   const modelsPayload = unwrapRequiredEnvelope(modelsRes, "models");
   const competitorsPayload = unwrapRequiredEnvelope(competitorsRes, "competitors");
-  const monitoringPayload = unwrapRequiredEnvelope(monitoringRes, "monitoring");
-  const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayload;
+  const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayloadWithDashboard;
+  let monitoringPayload = readBundledDashboard(perceptionPayload);
+
+  if (!monitoringPayload) {
+    monitoringPayload = unwrapRequiredEnvelope(
+      await gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.monitoring(encodedProjectId), {
+        method: "GET",
+        signal: options?.signal,
+      }),
+      "monitoring",
+    );
+  }
 
   const modelCatalog = normalizeModelPayloadList(modelsPayload).map((model) =>
     toProjectModelMeta(model),

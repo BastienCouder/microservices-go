@@ -85,6 +85,55 @@ func (f *fakeRepo) UpdateName(_ context.Context, id int64, name string) (*domain
 	return &clone, nil
 }
 
+func (f *fakeRepo) DeleteOrganization(_ context.Context, organizationID int64, deletedAt time.Time) error {
+	org, ok := f.organizations[organizationID]
+	if !ok || org.DeletedAt != nil {
+		return domain.ErrOrganizationNotFound
+	}
+	deletedAt = deletedAt.UTC()
+	org.Name = "Deleted organization"
+	org.DeletedAt = &deletedAt
+
+	for index, team := range f.teams[organizationID] {
+		team.Name = "Deleted team"
+		team.DeletedAt = &deletedAt
+		f.teams[organizationID][index] = team
+	}
+	for key, member := range f.members {
+		if key[0] != organizationID {
+			continue
+		}
+		member.TeamID = 0
+		member.Roles = nil
+		member.DeletedAt = &deletedAt
+		f.members[key] = member
+	}
+	for id, invitation := range f.invitations {
+		if invitation.OrganizationID != organizationID {
+			continue
+		}
+		invitation.Email = "deleted-invitation@anonymized.local"
+		invitation.Token = "deleted-invitation"
+		invitation.Message = ""
+		invitation.Status = domain.InvitationStatusRevoked
+		invitation.RespondedAt = &deletedAt
+		invitation.DeletedAt = &deletedAt
+		f.invitations[id] = invitation
+	}
+	for id, key := range f.apiKeys {
+		if key.OrganizationID != organizationID {
+			continue
+		}
+		key.Name = "Deleted API key"
+		key.Prefix = "deleted"
+		key.KeyHash = "deleted-api-key"
+		key.Key = ""
+		key.RevokedAt = &deletedAt
+		f.apiKeys[id] = key
+	}
+	return nil
+}
+
 func (f *fakeRepo) ListOrganizationsByUser(_ context.Context, userID int64) ([]domain.Membership, error) {
 	out := make([]domain.Membership, 0)
 	for key, member := range f.members {
@@ -477,6 +526,73 @@ func TestUpdateOrganizationName(t *testing.T) {
 	}
 	if stored.Name != "Acme Europe" {
 		t.Fatalf("expected persisted name, got %q", stored.Name)
+	}
+}
+
+func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+	deletedAt := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
+	svc.now = func() time.Time { return deletedAt }
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	team, err := svc.CreateTeam(context.Background(), org.ID, "Sensitive Team")
+	if err != nil {
+		t.Fatalf("create team: %v", err)
+	}
+	if _, err := svc.AddMember(context.Background(), org.ID, 42, team.ID); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+	if _, err := svc.AssignRole(context.Background(), org.ID, 42, "admin"); err != nil {
+		t.Fatalf("assign role: %v", err)
+	}
+	if _, err := svc.CreateOrganizationAPIKey(context.Background(), org.ID, "Production key"); err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	if _, err := svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"person@example.com",
+		"member",
+		"Private onboarding note",
+		nil,
+	); err != nil {
+		t.Fatalf("create invitation: %v", err)
+	}
+
+	if err := svc.DeleteOrganization(context.Background(), org.ID); err != nil {
+		t.Fatalf("delete org: %v", err)
+	}
+
+	stored := repo.organizations[org.ID]
+	if stored.DeletedAt == nil || !stored.DeletedAt.Equal(deletedAt) {
+		t.Fatalf("expected organization deleted_at %s, got %v", deletedAt, stored.DeletedAt)
+	}
+	if stored.Name == "Acme" {
+		t.Fatalf("expected organization name to be anonymized")
+	}
+	for _, team := range repo.teams[org.ID] {
+		if team.DeletedAt == nil || team.Name == "Sensitive Team" {
+			t.Fatalf("expected team to be soft deleted and anonymized: %+v", team)
+		}
+	}
+	member := repo.members[[2]int64{org.ID, 42}]
+	if member.DeletedAt == nil || member.TeamID != 0 || len(member.Roles) != 0 {
+		t.Fatalf("expected member access to be removed and soft deleted: %+v", member)
+	}
+	for _, invitation := range repo.invitations {
+		if invitation.Email == "person@example.com" || invitation.Message != "" || invitation.DeletedAt == nil {
+			t.Fatalf("expected invitation to be anonymized and revoked: %+v", invitation)
+		}
+	}
+	for _, key := range repo.apiKeys {
+		if key.Name == "Production key" || key.KeyHash == "" || key.RevokedAt == nil {
+			t.Fatalf("expected api key to be anonymized and revoked: %+v", key)
+		}
 	}
 }
 

@@ -1,6 +1,7 @@
-import { API_CONFIG, apiRoutes, buildApiPath } from "@/lib/api-config";
+import { API_CONFIG, apiRoutes } from "@/lib/api-config";
 import type { BrandCanon, BrandCompetitor } from "@/lib/perception-data";
 import { SELECTED_ORG_KEY } from "@/features/models/_lib/model-access";
+import { gatewayJSON } from "@/shared/api/gateway";
 
 function readSelectedOrganizationId(): string {
   if (typeof window === "undefined") return "";
@@ -12,33 +13,16 @@ function readSelectedOrganizationId(): string {
 }
 
 async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
-  const base = API_CONFIG.BASE_URL?.trim();
-  const url = base ? `${base}${buildApiPath(path)}` : buildApiPath(path);
   const organizationId = readSelectedOrganizationId();
-  const headers = new Headers(init.headers ?? undefined);
-  if (!headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-  if (organizationId) {
-    headers.set("X-Organization-ID", organizationId);
-  }
-
-  const res = await fetch(url, {
+  const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     ...init,
-    credentials: "include",
-    headers,
+    organizationId: organizationId || undefined,
   });
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(text || `HTTP ${res.status}`);
-  }
+  if (!result.ok) throw new Error(result.error || `HTTP ${result.status}`);
+  if (result.status === 204 || result.data === null) return undefined as T;
 
-  if (res.status === 204) return undefined as T;
-  const text = await res.text();
-  if (!text) return undefined as T;
-
-  const json = JSON.parse(text) as unknown;
+  const json = result.data;
   if (json && typeof json === "object" && "data" in json) {
     return (json as { data: T }).data;
   }
@@ -104,21 +88,22 @@ export async function syncCompetitors(
     return Boolean(previous) && (previous!.name !== competitor.name || previous!.website !== competitor.website);
   });
 
-  for (const competitor of competitorsToUpdate) {
-    await requestJson(apiRoutes.competitors.update(competitor.id!), {
-      method: "PATCH",
-      body: JSON.stringify({
-        name: competitor.name,
-        websiteUrl: competitor.website,
+  await Promise.all([
+    ...competitorsToUpdate.map((competitor) =>
+      requestJson(apiRoutes.competitors.update(competitor.id!), {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: competitor.name,
+          websiteUrl: competitor.website,
+        }),
       }),
-    });
-  }
-
-  for (const competitor of competitorsToDelete) {
-    await requestJson(apiRoutes.competitors.delete(competitor.id), {
-      method: "DELETE",
-    });
-  }
+    ),
+    ...competitorsToDelete.map((competitor) =>
+      requestJson(apiRoutes.competitors.delete(competitor.id), {
+        method: "DELETE",
+      }),
+    ),
+  ]);
 
   if (competitorsToCreate.length > 0) {
     await requestJson(apiRoutes.projects.competitors(projectId), {

@@ -21,6 +21,7 @@ type ProjectsPanelProps = {
   currentUserId: string;
   memberDrafts: Record<string, ProjectMemberDraft>;
   onboardingHref: string;
+  onStartOnboarding: () => void;
   search: string;
   canManageProjects: boolean;
   canDeleteProjects: boolean;
@@ -43,6 +44,7 @@ export function ProjectsPanel({
   currentUserId,
   memberDrafts,
   onboardingHref,
+  onStartOnboarding,
   search,
   canManageProjects,
   canDeleteProjects,
@@ -87,7 +89,7 @@ export function ProjectsPanel({
             </div>
             {canManageProjects ? (
               <Button asChild className="w-full sm:w-auto">
-                <Link to={onboardingHref}>
+                <Link to={onboardingHref} onClick={onStartOnboarding}>
                   <FolderPlus data-icon="inline-start" />
                   Creer un nouveau projet
                 </Link>

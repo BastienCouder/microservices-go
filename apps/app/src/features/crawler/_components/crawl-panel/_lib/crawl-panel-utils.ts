@@ -15,8 +15,6 @@ export type StatusFilter =
   | "cancelled";
 export type SortKey = "page" | "http" | "status" | "priority" | "findings";
 
-export const DEFAULT_REANALYZE_LIMIT = 100;
-
 export const columns: CrawlColumn[] = [
   { id: "page", label: "Page", className: "min-w-[260px]" },
   { id: "url", label: "URL", className: "min-w-[260px]" },

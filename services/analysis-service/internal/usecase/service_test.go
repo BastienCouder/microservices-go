@@ -652,6 +652,51 @@ func TestGetPerceptionIncludesBrandCanon(t *testing.T) {
 	}
 }
 
+func TestGetPerceptionWithDashboardReturnsDashboardFromSameLoad(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est cite avec une source.",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://acme.test"},
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	perception, err := svc.GetPerceptionWithDashboard(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception with dashboard: %v", err)
+	}
+
+	if len(perception.Dashboard.Responses) != 1 {
+		t.Fatalf("expected bundled dashboard responses, got %+v", perception.Dashboard.Responses)
+	}
+	if got := perception.Metadata["responses"]; got != 1 {
+		t.Fatalf("expected perception metadata from the same data set, got %#v", got)
+	}
+}
+
 func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()

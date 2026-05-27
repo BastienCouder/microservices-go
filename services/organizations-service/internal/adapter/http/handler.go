@@ -138,6 +138,9 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 1 && (r.Method == http.MethodPatch || r.Method == http.MethodPut):
 		h.updateOrganization(w, r, organizationID)
 		return
+	case len(parts) == 1 && r.Method == http.MethodDelete:
+		h.deleteOrganization(w, r, organizationID)
+		return
 	case len(parts) == 2 && parts[1] == "api-keys" && r.Method == http.MethodGet:
 		h.listOrganizationAPIKeys(w, r, organizationID)
 		return
@@ -301,6 +304,30 @@ func (h *Handler) updateOrganization(w http.ResponseWriter, r *http.Request, org
 		"result":          "success",
 	})
 	writeJSON(w, http.StatusOK, organization)
+}
+
+func (h *Handler) deleteOrganization(w http.ResponseWriter, r *http.Request, organizationID int64) {
+	authUserID, ok := authenticatedUserID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		return
+	}
+
+	if err := h.svc.DeleteOrganization(r.Context(), organizationID); err != nil {
+		h.writeDomainError(w, err)
+		auditSecurityEvent("organization_delete", map[string]any{
+			"organization_id": organizationID,
+			"user_id":         authUserID,
+			"result":          "error",
+		})
+		return
+	}
+	auditSecurityEvent("organization_delete", map[string]any{
+		"organization_id": organizationID,
+		"user_id":         authUserID,
+		"result":          "success",
+	})
+	w.WriteHeader(http.StatusNoContent)
 }
 
 type createOrganizationAPIKeyRequest struct {

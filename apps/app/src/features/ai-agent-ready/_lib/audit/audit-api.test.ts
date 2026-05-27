@@ -46,6 +46,41 @@ describe("agent ready audit api", () => {
     expect(calls[0]?.url).toBe("http://api.test/projects/prj_1");
   });
 
+  test("resolves a public project slug before loading the audit project summary", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (input, init) => {
+      const url = String(input);
+      calls.push({ url, init });
+      if (url.endsWith("/projects/acme")) {
+        return jsonResponse(404, { error: "not found" });
+      }
+      if (url.endsWith("/projects")) {
+        return jsonResponse(200, {
+          success: true,
+          data: [{ id: "prj_1", name: "Acme" }],
+        });
+      }
+      return jsonResponse(200, {
+        data: { id: "prj_1", name: "Acme", websiteUrl: "example.com" },
+      });
+    }) as typeof fetch;
+
+    const result = await getAgentReadyProjectSummary("http://api.test", {
+      projectId: "acme",
+      organizationId: "42",
+    });
+
+    expect(result).toEqual({ name: "Acme", websiteUrl: "https://example.com" });
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://api.test/projects/acme",
+      "http://api.test/projects",
+      "http://api.test/projects/prj_1",
+    ]);
+    expect(new Headers(calls[1]?.init?.headers).get("X-Organization-ID")).toBe(
+      "42",
+    );
+  });
+
   test("starts a content-site scan through the gateway route", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
@@ -60,7 +95,7 @@ describe("agent ready audit api", () => {
     });
 
     expect(result).toEqual({ scan_id: "scan-1", status: "queued" });
-    expect(calls[0]?.url).toBe("http://api.test/api/scan");
+    expect(calls[0]?.url).toBe("http://api.test/analysis/agent-ready/scans");
     expect(calls[0]?.init?.method).toBe("POST");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       url: "https://example.com",

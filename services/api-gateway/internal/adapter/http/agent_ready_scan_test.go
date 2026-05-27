@@ -84,3 +84,28 @@ func TestAgentReadyScanRejectsUnsupportedMode(t *testing.T) {
 		t.Fatal("expected unsupported mode error")
 	}
 }
+
+func TestAgentReadyScanRoutesUseCanonicalPathsOnly(t *testing.T) {
+	canonicalCollection := httptest.NewRequest(http.MethodPost, "/analysis/agent-ready/scans", nil)
+	if !isAgentReadyScanCollectionRequest(canonicalCollection) {
+		t.Fatal("expected canonical scan collection route to match")
+	}
+
+	legacyCollection := httptest.NewRequest(http.MethodPost, "/api/scan", nil)
+	if isAgentReadyScanCollectionRequest(legacyCollection) {
+		t.Fatal("expected legacy scan collection route to be removed")
+	}
+
+	canonicalItem := httptest.NewRequest(http.MethodGet, "/analysis/agent-ready/scans/scan-1", nil)
+	if !isAgentReadyScanItemRequest(canonicalItem) {
+		t.Fatal("expected canonical scan item route to match")
+	}
+	if got := agentReadyScanIDFromPath(canonicalItem.URL.Path); got != "scan-1" {
+		t.Fatalf("unexpected canonical scan id: %q", got)
+	}
+
+	legacyItem := httptest.NewRequest(http.MethodGet, "/api/scan/scan-1", nil)
+	if isAgentReadyScanItemRequest(legacyItem) {
+		t.Fatal("expected legacy scan item route to be removed")
+	}
+}

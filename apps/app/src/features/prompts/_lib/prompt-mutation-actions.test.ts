@@ -4,6 +4,7 @@ import {
   deletePromptsLocally,
   resolveBulkPromptIds,
 } from "./prompt-mutation-actions";
+import type { PromptItem } from "./types";
 
 describe("resolveBulkPromptIds", () => {
   test("dedupes selected model rows to their source prompt ids", () => {
@@ -23,7 +24,7 @@ describe("resolveBulkPromptIds", () => {
           id: "prompt-2::gemma",
           sourcePromptId: "prompt-2",
         },
-      ] as never,
+      ] satisfies Array<Pick<PromptItem, "id" | "sourcePromptId">>,
     });
 
     expect(ids).toEqual(["prompt-1", "prompt-2"]);
@@ -34,8 +35,7 @@ describe("deletePromptsLocally", () => {
   test("removes manual prompts, clears matching selections, and deletes server prompts remotely", () => {
     let manualPrompts = [
       { id: "manual-1", sourcePromptId: "manual-1" },
-      { id: "server-1", sourcePromptId: "server-1" },
-    ] as never[];
+    ] as PromptItem[];
     let selectedPromptIds = ["manual-1", "server-1::gemma", "keep-1::gpt"];
     let selectedPromptId: string | null = "server-1::gemma";
     let hiddenPromptIds = ["existing-hidden"];
@@ -68,7 +68,7 @@ describe("deletePromptsLocally", () => {
 
     expect(manualPrompts).toEqual([]);
     expect(selectedPromptIds).toEqual(["keep-1::gpt"]);
-    expect(selectedPromptId).toBeNull();
+    expect(selectedPromptId).toBe(null);
     expect(hiddenPromptIds).toEqual(["existing-hidden", "server-1"]);
     expect(remoteDeletes).toEqual(["server-1"]);
   });

@@ -9,6 +9,7 @@ type Repository interface {
 	Create(ctx context.Context, organization *Organization) error
 	GetByID(ctx context.Context, id int64) (*Organization, error)
 	UpdateName(ctx context.Context, id int64, name string) (*Organization, error)
+	DeleteOrganization(ctx context.Context, organizationID int64, deletedAt time.Time) error
 	ListOrganizationsByUser(ctx context.Context, userID int64) ([]Membership, error)
 	CreateAPIKey(ctx context.Context, key *OrganizationAPIKey) error
 	ListAPIKeys(ctx context.Context, organizationID int64) ([]OrganizationAPIKey, error)

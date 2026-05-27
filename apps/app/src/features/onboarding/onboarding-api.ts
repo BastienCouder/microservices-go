@@ -1,14 +1,13 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
-import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
+import { gatewayJSON } from "@/shared/api/gateway";
 import { storeSelectedOrganizationID } from "@/shared/selection";
 
-type OnboardingCompetitor = {
+export type OnboardingCompetitor = {
   name: string;
   website: string;
 };
 
-type OnboardingPrompt = {
+export type OnboardingPrompt = {
   text: string;
   language: string;
 };
@@ -24,6 +23,18 @@ type CreateOnboardingProjectInput = {
   competitors: OnboardingCompetitor[];
   prompts: OnboardingPrompt[];
   modelIds: string[];
+};
+
+export type OnboardingBrandProfilePreview = {
+  status: string;
+  crawlJobId?: string;
+  brandName: string;
+  brandShortDescription: string;
+  brandDescription: string;
+  industry: string;
+  keyFeatures: string[];
+  competitors: OnboardingCompetitor[];
+  prompts: OnboardingPrompt[];
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -50,55 +61,52 @@ function getIDString(value: unknown): string {
   return "";
 }
 
-async function requireGatewayData<T>(
-  promise: Promise<GatewayResult<T>>,
-  message: string,
-): Promise<T> {
-  const response = await promise;
-  if (!response.ok) {
-    throw new Error(response.error || message);
-  }
-  return response.data;
+function getString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
 }
 
-async function runOptionalGatewayStep<T>(
-  promise: Promise<GatewayResult<T>>,
-  message: string,
-  warnings: string[],
-): Promise<T | null> {
-  const response = await promise;
-  if (!response.ok) {
-    warnings.push(response.error || message);
-    return null;
-  }
-  return response.data;
+function getStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value
+        .filter((item): item is string => typeof item === "string")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 }
 
-function deriveDomain(value: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
-  const normalized = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+function normalizePreviewCompetitors(value: unknown): OnboardingCompetitor[] {
+  return Array.isArray(value)
+    ? value
+        .filter(isRecord)
+        .map((item) => ({
+          name: getString(item.name),
+          website: getString(item.website),
+        }))
+        .filter((item) => item.name !== "")
+    : [];
+}
 
-  try {
-    return new URL(normalized).hostname.replace(/^www\./i, "").toLowerCase();
-  } catch {
-    return normalized
-      .replace(/^https?:\/\//i, "")
-      .split("/", 1)[0]
-      ?.replace(/^www\./i, "")
-      .toLowerCase() ?? "";
-  }
+function normalizePreviewPrompts(value: unknown): OnboardingPrompt[] {
+  return Array.isArray(value)
+    ? value
+        .filter(isRecord)
+        .map((item) => ({
+          text: getString(item.text),
+          language: getString(item.language) || "fr",
+        }))
+        .filter((item) => item.text !== "")
+    : [];
 }
 
 export async function createOnboardingProject(
   apiBaseURL: string,
   input: CreateOnboardingProjectInput,
 ): Promise<OnboardingProjectResult> {
-  const warnings: string[] = [];
-  let organizationId = input.organizationId.trim();
   const brandName = input.brandName.trim();
   const websiteUrl = input.websiteUrl.trim();
-  const domain = deriveDomain(websiteUrl);
+  const organizationId = input.organizationId.trim();
+  const organizationName = input.organizationName.trim();
+  const modelIds = input.modelIds.map((modelId) => modelId.trim()).filter(Boolean);
 
   if (!brandName) {
     throw new Error("Le nom du projet est obligatoire.");
@@ -106,139 +114,97 @@ export async function createOnboardingProject(
   if (!websiteUrl) {
     throw new Error("L'URL du site est obligatoire.");
   }
-  if (!domain) {
-    throw new Error("Le domaine est obligatoire.");
+  if (!organizationId && !organizationName) {
+    throw new Error("Le nom de l'organisation est obligatoire.");
+  }
+  if (modelIds.length === 0) {
+    throw new Error("Selectionne au moins un modele IA.");
   }
 
-  if (!organizationId) {
-    const organizationName = input.organizationName.trim();
-    if (!organizationName) {
-      throw new Error("Le nom de l'organisation est obligatoire.");
-    }
-
-    const organizationPayload = await requireGatewayData(
-      gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.create(), {
-        method: "POST",
-        body: JSON.stringify({ name: organizationName }),
-      }),
-      "Impossible de creer l'organisation.",
-    );
-    const organization = unwrapData(organizationPayload);
-    organizationId = isRecord(organization)
-      ? getIDString(organization.id ?? organization.ID)
-      : "";
-    if (!organizationId) {
-      throw new Error("L'organisation a ete creee mais son identifiant est introuvable.");
-    }
-    storeSelectedOrganizationID(organizationId);
-  }
-
-  const createdProjectPayload = await requireGatewayData(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.create(), {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.onboarding.bootstrap(),
+    {
       method: "POST",
-      organizationId,
       body: JSON.stringify({
-        name: brandName,
-        websiteUrl,
-        domain,
+        organizationId,
+        organizationName,
         brandName,
+        websiteUrl,
         brandDescription: input.brandDescription.trim(),
         industry: input.industry.trim(),
         attributionSource: input.attributionSource.trim(),
+        competitors: input.competitors,
+        prompts: input.prompts,
+        modelIds,
       }),
-    }),
-    "Impossible de creer le projet.",
+    },
   );
-
-  const createdProject = unwrapData(createdProjectPayload);
-  const projectId = isRecord(createdProject) ? getIDString(createdProject.id ?? createdProject.ID) : "";
-  if (!projectId) {
-    throw new Error("Le projet a ete cree mais son identifiant est introuvable.");
-  }
-  const createdProjectOrganizationId =
-    (isRecord(createdProject)
-      ? getIDString(
-          createdProject.organizationId ?? createdProject.OrganizationID,
-        )
-      : "") || organizationId;
-
-  if (createdProjectOrganizationId) {
-    storeSelectedOrganizationID(createdProjectOrganizationId);
+  if (!response.ok) {
+    throw new Error(response.error || "Impossible de finaliser l'onboarding.");
   }
 
-  const competitors = input.competitors
-    .map((competitor) => ({
-      name: competitor.name.trim(),
-      websiteUrl: competitor.website.trim(),
-      domain: deriveDomain(competitor.website),
-    }))
-    .filter((competitor) => competitor.name !== "");
-
-  const prompts = input.prompts
-    .map((prompt) => prompt.text.trim())
-    .filter(Boolean);
-
-  const modelIds = input.modelIds.map((modelId) => modelId.trim()).filter(Boolean);
-
-  if (competitors.length > 0) {
-    await runOptionalGatewayStep(
-      gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.competitors(projectId), {
-        method: "POST",
-        organizationId: createdProjectOrganizationId,
-        body: JSON.stringify({ competitors }),
-      }),
-      "Impossible d'ajouter les concurrents.",
-      warnings,
-    );
-  }
-
-  if (prompts.length > 0) {
-    await runOptionalGatewayStep(
-      gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.prompts(projectId), {
-        method: "POST",
-        organizationId: createdProjectOrganizationId,
-        body: JSON.stringify({ prompts }),
-      }),
-      "Impossible d'ajouter les prompts.",
-      warnings,
-    );
-  }
-
-  // Project model assignment is handled after onboarding.
-  // Keeping creation bootstrap minimal avoids blocking the flow on
-  // project-model permission issues while the project itself is already created.
-  void modelIds;
-
-  const projectsPayload = await runOptionalGatewayStep(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.list(), {
-      method: "GET",
-      organizationId: createdProjectOrganizationId,
-    }),
-    "Impossible de charger les projets de l'organisation.",
-    warnings,
+  const payload = unwrapData(response.data);
+  const record = isRecord(payload) ? payload : {};
+  const projectId = getIDString(record.projectId ?? record.projectID ?? record.id);
+  const createdProjectOrganizationId = getIDString(
+    record.organizationId ?? record.organizationID,
   );
-  const projectsData = unwrapData(projectsPayload);
+  const createdProjectSlug = getString(record.projectSlug) || projectId;
+  const warnings = Array.isArray(record.warnings)
+    ? record.warnings.filter((warning): warning is string => typeof warning === "string")
+    : [];
 
-  const createdProjectSlug = projectsPayload
-    ? attachStableSlugs(
-        (Array.isArray(projectsData) ? projectsData : [])
-          .filter((project): project is JsonRecord => isRecord(project))
-          .map((project) => ({
-            id: getIDString(project.id ?? project.ID),
-            name: (typeof (project.name ?? project.Name) === "string"
-              ? String(project.name ?? project.Name).trim()
-              : "") || "Projet",
-          }))
-          .filter((project) => project.id !== ""),
-        "project",
-      ).find((project) => project.id === projectId)?.slug ??
-      slugifyPublicName(brandName, "project")
-    : slugifyPublicName(brandName, "project");
+  if (!projectId || !createdProjectOrganizationId) {
+    throw new Error("L'onboarding a reussi mais la reponse est incomplete.");
+  }
+  storeSelectedOrganizationID(createdProjectOrganizationId);
 
   return {
     projectId,
     projectSlug: createdProjectSlug,
     organizationId: createdProjectOrganizationId,
     warnings,
+  };
+}
+
+export async function previewOnboardingBrandProfile(
+  apiBaseURL: string,
+  input: {
+    websiteUrl: string;
+    brandName: string;
+  },
+  signal?: AbortSignal,
+): Promise<OnboardingBrandProfilePreview> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    "/onboarding/brand-profile",
+    {
+      method: "POST",
+      signal,
+      body: JSON.stringify({
+        websiteUrl: input.websiteUrl.trim(),
+        brandName: input.brandName.trim(),
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(response.error || "Impossible de preparer le profil de marque.");
+  }
+
+  const payload = unwrapData(response.data);
+  const record = isRecord(payload) ? payload : {};
+
+  return {
+    status: getString(record.status) || "completed",
+    crawlJobId: getString(record.crawlJobId) || undefined,
+    brandName: getString(record.brandName),
+    brandShortDescription: getString(record.brandShortDescription),
+    brandDescription: getString(record.brandDescription),
+    industry: getString(record.industry),
+    keyFeatures: getStringArray(record.keyFeatures),
+    competitors: normalizePreviewCompetitors(record.competitors),
+    prompts: normalizePreviewPrompts(record.prompts),
   };
 }

@@ -36,6 +36,7 @@ describe("createOnboardingProject", () => {
           id: "prj-299",
           organizationId: 42,
           name: "Acme",
+          projectSlug: "acme",
         },
       }),
       jsonResponse(200, {

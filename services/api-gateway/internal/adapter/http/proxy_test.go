@@ -111,6 +111,105 @@ func TestGatewayProxyAuth(t *testing.T) {
 	}
 }
 
+func TestGatewayAppEntryRedirectsAccountsWithoutOrganization(t *testing.T) {
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/validate" {
+			t.Fatalf("unexpected auth path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"authenticated":true,"identity_id":"kratos-id"}`))
+	}))
+	defer authUpstream.Close()
+
+	userUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/users/by-auth/kratos-id" {
+			t.Fatalf("unexpected user path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":42}`))
+	}))
+	defer userUpstream.Close()
+
+	organizationsUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/organizations/me" {
+			t.Fatalf("unexpected organizations path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer organizationsUpstream.Close()
+
+	h, err := NewHandler(userUpstream.URL, authUpstream.URL, organizationsUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, 100, "test-secret", "api-gateway")
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/app-entry", nil)
+	req.Header.Set("X-Original-URI", "/monitoring")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if got := rec.Header().Get("X-App-Redirect"); got != "/onboarding?setup=account" {
+		t.Fatalf("unexpected app redirect: %q", got)
+	}
+}
+
+func TestGatewayAppEntryAllowsOnboardingRouteWithoutOrganizationCheck(t *testing.T) {
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"authenticated":true,"identity_id":"kratos-id"}`))
+	}))
+	defer authUpstream.Close()
+
+	userUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/users/by-auth/kratos-id" {
+			t.Fatalf("unexpected user path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":42}`))
+	}))
+	defer userUpstream.Close()
+
+	var organizationCalls atomic.Int64
+	organizationsUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		organizationCalls.Add(1)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	defer organizationsUpstream.Close()
+
+	h, err := NewHandler(userUpstream.URL, authUpstream.URL, organizationsUpstream.URL, userUpstream.URL, userUpstream.URL, userUpstream.URL, 100, "test-secret", "api-gateway")
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/auth/app-entry", nil)
+	req.Header.Set("X-Original-URI", "/onboarding?setup=account")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if organizationCalls.Load() != 0 {
+		t.Fatalf("expected onboarding bypass to skip organization checks, got %d calls", organizationCalls.Load())
+	}
+}
+
 func TestGatewayBillingStripeWebhookIsPublic(t *testing.T) {
 	var upstreamAuthz string
 

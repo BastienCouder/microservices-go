@@ -272,7 +272,6 @@ export function useModelsPanelViewModel({
         pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
-
       data.setSelectedModelIds((current) => [...current, modelId]);
     },
     [data],

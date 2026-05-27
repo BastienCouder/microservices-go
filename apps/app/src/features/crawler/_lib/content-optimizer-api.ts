@@ -1,5 +1,6 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 export type ContentOptimizerCrawlJob = {
   id: string;
@@ -75,6 +76,7 @@ export type GetContentOptimizerCrawlInput = {
   limit?: number;
   status?: string;
   cursor?: string;
+  analyze?: boolean;
 };
 
 function encodePathSegment(value: string): string {
@@ -83,13 +85,46 @@ function encodePathSegment(value: string): string {
 
 function unwrapGatewayData<T>(response: GatewayResult<unknown>): T {
   if (!response.ok) {
-    throw new Error(response.error);
+    throw new Error(normalizeContentOptimizerError(response.error));
   }
   const payload = response.data;
   if (payload && typeof payload === "object" && "data" in payload) {
     return (payload as { data: T }).data;
   }
   return payload as T;
+}
+
+function shouldRetryWithResolvedProjectId(response: GatewayResult<unknown>): boolean {
+  return !response.ok && [401, 403, 404].includes(response.status);
+}
+
+async function resolveProjectPathToken(
+  apiBaseURL: string,
+  input: {
+    projectId: string;
+    organizationId?: string;
+  },
+  signal?: AbortSignal,
+): Promise<string> {
+  const resolvedProjectId = await resolveProjectTokenToId(apiBaseURL, {
+    projectToken: input.projectId,
+    organizationId: input.organizationId,
+    signal,
+  });
+
+  return resolvedProjectId ?? input.projectId;
+}
+
+function normalizeContentOptimizerError(error: string): string {
+  const normalized = error.trim();
+  if (
+    normalized.includes("cloudflare crawl authentication failed") ||
+    normalized.includes('"code":10000') ||
+    normalized.toLowerCase().includes("authentication error")
+  ) {
+    return "Authentification Cloudflare invalide. Vérifie le token Browser Rendering dans deployments/secrets/cloudflare_api_token.txt, puis redémarre analysis-service.";
+  }
+  return normalized || "request failed";
 }
 
 function uniqueTrimmedValues(values: string[] | undefined): string[] {
@@ -146,7 +181,7 @@ export async function getProjectWebsiteURL(
   },
   signal?: AbortSignal,
 ): Promise<string> {
-  const response = await gatewayJSON<ContentOptimizerProject>(
+  let response = await gatewayJSON<ContentOptimizerProject>(
     apiBaseURL,
     apiRoutes.projects.get(encodePathSegment(input.projectId)),
     {
@@ -155,6 +190,21 @@ export async function getProjectWebsiteURL(
       signal,
     },
   );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerProject>(
+        apiBaseURL,
+        apiRoutes.projects.get(encodePathSegment(resolvedProjectId)),
+        {
+          method: "GET",
+          organizationId: input.organizationId,
+          signal,
+        },
+      );
+    }
+  }
 
   return readProjectWebsiteURL(unwrapGatewayData(response));
 }
@@ -167,7 +217,7 @@ export async function getProjectSummary(
   },
   signal?: AbortSignal,
 ): Promise<ContentOptimizerProjectSummary> {
-  const response = await gatewayJSON<ContentOptimizerProject>(
+  let response = await gatewayJSON<ContentOptimizerProject>(
     apiBaseURL,
     apiRoutes.projects.get(encodePathSegment(input.projectId)),
     {
@@ -176,6 +226,21 @@ export async function getProjectSummary(
       signal,
     },
   );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerProject>(
+        apiBaseURL,
+        apiRoutes.projects.get(encodePathSegment(resolvedProjectId)),
+        {
+          method: "GET",
+          organizationId: input.organizationId,
+          signal,
+        },
+      );
+    }
+  }
 
   const payload = unwrapGatewayData(response);
   return {
@@ -201,7 +266,7 @@ export async function startContentOptimizerCrawl(
     ...(includePatterns.length > 0 ? { options: { includePatterns } } : {}),
   };
 
-  const response = await gatewayJSON<ContentOptimizerCrawlJob>(
+  let response = await gatewayJSON<ContentOptimizerCrawlJob>(
     apiBaseURL,
     `/analysis/projects/${encodePathSegment(input.projectId)}/content-optimizer/crawl`,
     {
@@ -211,6 +276,22 @@ export async function startContentOptimizerCrawl(
       body: JSON.stringify(body),
     },
   );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerCrawlJob>(
+        apiBaseURL,
+        `/analysis/projects/${encodePathSegment(resolvedProjectId)}/content-optimizer/crawl`,
+        {
+          method: "POST",
+          organizationId: input.organizationId,
+          signal,
+          body: JSON.stringify(body),
+        },
+      );
+    }
+  }
 
   return unwrapGatewayData(response);
 }
@@ -230,9 +311,12 @@ export async function getContentOptimizerCrawl(
   if (input.cursor?.trim()) {
     params.set("cursor", input.cursor.trim());
   }
+  if (input.analyze === false) {
+    params.set("analyze", "false");
+  }
 
   const query = params.toString();
-  const response = await gatewayJSON<ContentOptimizerCrawlResult>(
+  let response = await gatewayJSON<ContentOptimizerCrawlResult>(
     apiBaseURL,
     `/analysis/projects/${encodePathSegment(input.projectId)}/content-optimizer/crawl/${encodePathSegment(input.jobId)}${query ? `?${query}` : ""}`,
     {
@@ -242,6 +326,22 @@ export async function getContentOptimizerCrawl(
       retry: { delayMs: 500 },
     },
   );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerCrawlResult>(
+        apiBaseURL,
+        `/analysis/projects/${encodePathSegment(resolvedProjectId)}/content-optimizer/crawl/${encodePathSegment(input.jobId)}${query ? `?${query}` : ""}`,
+        {
+          method: "GET",
+          organizationId: input.organizationId,
+          signal,
+          retry: { delayMs: 500 },
+        },
+      );
+    }
+  }
 
   return unwrapGatewayData(response);
 }
@@ -254,7 +354,7 @@ export async function getLatestContentOptimizerCrawl(
   },
   signal?: AbortSignal,
 ): Promise<ContentOptimizerCrawlSnapshot | null> {
-  const response = await gatewayJSON<ContentOptimizerCrawlSnapshot>(
+  let response = await gatewayJSON<ContentOptimizerCrawlSnapshot>(
     apiBaseURL,
     `/analysis/projects/${encodePathSegment(input.projectId)}/content-optimizer/crawl`,
     {
@@ -264,6 +364,22 @@ export async function getLatestContentOptimizerCrawl(
       retry: { attempts: 0 },
     },
   );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerCrawlSnapshot>(
+        apiBaseURL,
+        `/analysis/projects/${encodePathSegment(resolvedProjectId)}/content-optimizer/crawl`,
+        {
+          method: "GET",
+          organizationId: input.organizationId,
+          signal,
+          retry: { attempts: 0 },
+        },
+      );
+    }
+  }
 
   if (!response.ok && response.status === 404) {
     return null;

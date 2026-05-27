@@ -78,8 +78,9 @@ func main() {
 	}
 
 	var contentIssueAnalyzer usecase.ContentIssueAnalyzer
+	var onboardingBrandProfileAnalyzer usecase.OnboardingBrandProfileAnalyzer
 	if cfg.IAServiceURL != "" && cfg.ContentIssueAnalyzerModelID != "" {
-		contentIssueAnalyzer, err = iaclient.NewClient(iaclient.Config{
+		iaAnalyzer, err := iaclient.NewClient(iaclient.Config{
 			BaseURL:    cfg.IAServiceURL,
 			JWTSecret:  cfg.InternalJWTSecret,
 			JWTIssuer:  cfg.InternalJWTIssuer,
@@ -89,21 +90,24 @@ func main() {
 		if err != nil {
 			log.Fatalf("init content issue analyzer: %v", err)
 		}
+		contentIssueAnalyzer = iaAnalyzer
+		onboardingBrandProfileAnalyzer = iaAnalyzer
 		log.Printf("content optimizer AI issue analyzer enabled with model %s", cfg.ContentIssueAnalyzerModelID)
 	} else {
 		log.Printf("content optimizer AI issue analyzer disabled: IA_SERVICE_URL and CONTENT_ISSUE_ANALYZER_MODEL_ID are required")
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:                analysisstate.NewStateStore(db),
-		DashboardCache:       dashboardCache,
-		DashboardCacheTTL:    cfg.DashboardCacheTTL,
-		ProjectVerifier:      projectGRPCClient,
-		ProjectCompetitors:   projectGRPCClient,
-		ProjectModels:        projectGRPCClient,
-		BillingQuota:         billingHTTPClient,
-		ContentCrawler:       contentCrawler,
-		ContentIssueAnalyzer: contentIssueAnalyzer,
+		Store:                          analysisstate.NewStateStore(db),
+		DashboardCache:                 dashboardCache,
+		DashboardCacheTTL:              cfg.DashboardCacheTTL,
+		ProjectVerifier:                projectGRPCClient,
+		ProjectCompetitors:             projectGRPCClient,
+		ProjectModels:                  projectGRPCClient,
+		BillingQuota:                   billingHTTPClient,
+		ContentCrawler:                 contentCrawler,
+		ContentIssueAnalyzer:           contentIssueAnalyzer,
+		OnboardingBrandProfileAnalyzer: onboardingBrandProfileAnalyzer,
 	})
 	if err != nil {
 		log.Fatalf("initialize analysis service: %v", err)

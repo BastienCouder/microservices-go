@@ -66,10 +66,21 @@ export const apiRoutes = {
     delete: (competitorId: string) => `/competitors/${competitorId}`,
   },
   aiModels: {
-    list: (activeOnly = true) => `/projects/ai-models?active_only=${activeOnly ? "true" : "false"}`,
-    create: () => "/projects/ai-models",
-    syncOpenRouter: () => "/projects/ai-models/sync/openrouter",
-    update: (modelId: string) => `/projects/ai-models/${encodeURIComponent(modelId)}`,
+    list: (activeOnly = true) => `/ai-models?active_only=${activeOnly ? "true" : "false"}`,
+    onboardingList: (activeOnly = true) => `/onboarding/ai-models?active_only=${activeOnly ? "true" : "false"}`,
+    create: () => "/ai-models",
+    syncOpenRouter: () => "/ai-models/sync/openrouter",
+    update: (modelId: string) => `/ai-models/${encodeURIComponent(modelId)}`,
+  },
+  agentReady: {
+    scans: () => "/analysis/agent-ready/scans",
+    scan: (scanId: string) => `/analysis/agent-ready/scans/${encodeURIComponent(scanId)}`,
+  },
+  onboarding: {
+    bootstrap: () => "/onboarding/bootstrap",
+    project: () => "/onboarding/project",
+    projectModels: (projectId: string) =>
+      `/onboarding/projects/${encodeURIComponent(projectId)}/models`,
   },
   llmProviderCredentials: {
     list: (projectId: string) =>
@@ -89,10 +100,13 @@ export const apiRoutes = {
     stripeCheckoutSession: () => "/billing/stripe/checkout-session",
   },
   analysis: {
-    analyze: (projectId: string) => `/projects/${projectId}/analysis/run`,
+    analyze: (projectId: string) => `/analysis/projects/${projectId}/run`,
     quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
-    perception: (projectId: string) => `/analysis/projects/${projectId}/perception`,
+    perception: (projectId: string, options?: { includeDashboard?: boolean }) =>
+      options?.includeDashboard
+        ? `/analysis/projects/${projectId}/perception?includeDashboard=1`
+        : `/analysis/projects/${projectId}/perception`,
     optimizationErrors: (projectId: string) => `/analysis/projects/${projectId}/optimization-errors`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
     optimizeAction: (projectId: string, actionId: string) =>

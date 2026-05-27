@@ -1,5 +1,6 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 import type {
   AuditQueuedResponse,
@@ -71,7 +72,7 @@ export async function getAgentReadyProjectSummary(
   },
   signal?: AbortSignal,
 ): Promise<ProjectSummary> {
-  const response = await gatewayJSON<unknown>(
+  let response = await gatewayJSON<unknown>(
     apiBaseURL,
     apiRoutes.projects.get(encodeURIComponent(input.projectId.trim())),
     {
@@ -80,6 +81,25 @@ export async function getAgentReadyProjectSummary(
       signal,
     },
   );
+
+  if (!response.ok && [401, 403, 404].includes(response.status)) {
+    const resolvedProjectId = await resolveProjectTokenToId(apiBaseURL, {
+      projectToken: input.projectId,
+      organizationId: input.organizationId,
+      signal,
+    });
+    if (resolvedProjectId && resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<unknown>(
+        apiBaseURL,
+        apiRoutes.projects.get(encodeURIComponent(resolvedProjectId)),
+        {
+          method: "GET",
+          organizationId: input.organizationId,
+          signal,
+        },
+      );
+    }
+  }
 
   if (!response.ok) {
     throw new Error(response.error);
@@ -100,7 +120,7 @@ export async function startAgentReadyScan(
   apiBaseURL: string,
   input: AuditScanInput,
 ): Promise<AuditQueuedResponse> {
-  const response = await gatewayJSON<AuditQueuedResponse>(apiBaseURL, "/api/scan", {
+  const response = await gatewayJSON<AuditQueuedResponse>(apiBaseURL, apiRoutes.agentReady.scans(), {
     method: "POST",
     body: JSON.stringify(input),
     retry: { attempts: 0 },
@@ -119,7 +139,7 @@ export async function getAgentReadyScan(
 ): Promise<AuditScanResult> {
   const response = await gatewayJSON<AuditScanResult>(
     apiBaseURL,
-    `/api/scan/${encodeURIComponent(scanID)}`,
+    apiRoutes.agentReady.scan(scanID),
     { method: "GET", retry: { delayMs: 200 }, signal },
   );
 

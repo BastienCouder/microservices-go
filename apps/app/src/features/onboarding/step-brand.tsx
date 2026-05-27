@@ -5,6 +5,7 @@ import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { useEffect, useState } from "react";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { previewOnboardingBrandProfile } from "./onboarding-api";
 import {
   OnboardingField,
   OnboardingStep,
@@ -12,14 +13,20 @@ import {
 } from "./step-shell";
 
 type StepBrandProps = {
+  apiBaseURL: string;
   hideBack?: boolean;
   nextLabel?: string;
 };
 
-export function StepBrand({ hideBack = false, nextLabel = "Next" }: StepBrandProps) {
+export function StepBrand({
+  apiBaseURL,
+  hideBack = false,
+  nextLabel = "Next",
+}: StepBrandProps) {
   const {
     brandName,
     setBrandName,
+    websiteUrl,
     brandShortDescription,
     setBrandShortDescription,
     brandDescription,
@@ -28,6 +35,10 @@ export function StepBrand({ hideBack = false, nextLabel = "Next" }: StepBrandPro
     setIndustry,
     keyFeatures,
     setKeyFeatures,
+    competitors,
+    setCompetitors,
+    selectedPrompts,
+    setSelectedPrompts,
     brandPreparationCompleted,
     setBrandPreparationCompleted,
     nextStep,
@@ -40,6 +51,7 @@ export function StepBrand({ hideBack = false, nextLabel = "Next" }: StepBrandPro
   useEffect(() => {
     if (brandPreparationCompleted) return;
 
+    const abortController = new AbortController();
     const durationMs = 15_600;
     const startedAt = Date.now();
     let timeoutId: number | undefined;
@@ -58,13 +70,76 @@ export function StepBrand({ hideBack = false, nextLabel = "Next" }: StepBrandPro
       }, 420);
     }, 170);
 
+    if (websiteUrl.trim()) {
+      void previewOnboardingBrandProfile(
+        apiBaseURL,
+        {
+          websiteUrl,
+          brandName,
+        },
+        abortController.signal,
+      )
+        .then((preview) => {
+          if (abortController.signal.aborted) return;
+          if (!brandName.trim() && preview.brandName) {
+            setBrandName(preview.brandName);
+          }
+          if (!brandShortDescription.trim() && preview.brandShortDescription) {
+            setBrandShortDescription(preview.brandShortDescription);
+          }
+          if (!brandDescription.trim() && preview.brandDescription) {
+            setBrandDescription(preview.brandDescription);
+          }
+          if (!industry.trim() && preview.industry) {
+            setIndustry(preview.industry);
+          }
+          if (keyFeatures.length === 0 && preview.keyFeatures.length > 0) {
+            setKeyFeatures(preview.keyFeatures);
+          }
+          if (competitors.length === 0 && preview.competitors.length > 0) {
+            setCompetitors(
+              preview.competitors.map((competitor) => ({
+                ...competitor,
+                logo: competitor.name.slice(0, 2).toUpperCase(),
+              })),
+            );
+          }
+          if (selectedPrompts.length === 0 && preview.prompts.length > 0) {
+            setSelectedPrompts(preview.prompts);
+          }
+          setPrepProgress(100);
+          setBrandPreparationCompleted(true);
+        })
+        .catch(() => {});
+    }
+
     return () => {
+      abortController.abort();
       window.clearInterval(timer);
       if (timeoutId) {
         window.clearTimeout(timeoutId);
       }
     };
-  }, [brandPreparationCompleted, setBrandPreparationCompleted]);
+  }, [
+    apiBaseURL,
+    brandDescription,
+    brandName,
+    brandPreparationCompleted,
+    brandShortDescription,
+    competitors,
+    industry,
+    keyFeatures,
+    selectedPrompts,
+    setBrandDescription,
+    setBrandName,
+    setBrandPreparationCompleted,
+    setBrandShortDescription,
+    setCompetitors,
+    setIndustry,
+    setKeyFeatures,
+    setSelectedPrompts,
+    websiteUrl,
+  ]);
 
   const addFeature = () => {
     const feature = newFeature.trim();

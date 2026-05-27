@@ -63,14 +63,16 @@ export function useModelsPanelData({
 
   const currentPlan = billingQuery.data?.plan ?? null;
   const planLabel = currentPlan ? getPlanLabel(currentPlan) : null;
+  const billingSelectionLimit = billingQuery.data?.modelSelectionLimit ?? 0;
+  const selectionLimit =
+    billingQuery.data
+      ? billingSelectionLimit > 0
+        ? billingSelectionLimit
+        : catalog.length
+      : 0;
   const isDeveloperPlan = isDeveloperBillingPlan(currentPlan);
   const showDeveloperUpgradeBanner =
     !isDeveloperPlan && !billingQuery.isLoading && !billingQuery.error;
-  const selectionLimit = useMemo(() => {
-    const limit = billingQuery.data?.modelSelectionLimit ?? 0;
-    return limit > 0 ? limit : catalog.length;
-  }, [billingQuery.data?.modelSelectionLimit, catalog.length]);
-
   const providerCredentialsQuery = useQuery({
     queryKey: appQueryKeys.llmProviderCredentials(
       apiBaseURL,
@@ -199,9 +201,9 @@ export function useModelsPanelData({
     selectedProjectId,
     selectedProject,
     planLabel,
+    selectionLimit,
     isDeveloperPlan,
     showDeveloperUpgradeBanner,
-    selectionLimit,
     providerCredentialsQuery,
     providerCredentials,
     providerCredentialLookup,

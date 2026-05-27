@@ -1,6 +1,5 @@
 import type {
   OptimizationError,
-  OptimizationErrorSource,
 } from "@/lib/optimization-errors-data";
 import {
   toProjectModelVisual,

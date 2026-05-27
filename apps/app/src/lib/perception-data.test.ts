@@ -23,6 +23,23 @@ function mockFetchSequence(responses: Response[]) {
   }) as typeof fetch;
 }
 
+function mockFetchSequenceWithRequests(responses: Response[]) {
+  const requests: string[] = [];
+  let index = 0;
+
+  globalThis.fetch = (async (input) => {
+    requests.push(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
+    const response = responses[index];
+    index += 1;
+    if (!response) {
+      throw new Error(`unexpected fetch call #${index}`);
+    }
+    return response;
+  }) as typeof fetch;
+
+  return requests;
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
@@ -75,61 +92,58 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          promptRuns: [
-            {
-              id: "prompt-run-1",
-              promptId: "prompt-1",
-              promptText: "Quel CRM recommander pour une PME ?",
-            },
-            {
-              id: "prompt-run-2",
-              promptId: "prompt-2",
-              promptText: "Compare Acme avec HubSpot.",
-            },
-          ],
-          aiResponses: [
-            {
-              id: "response-1",
-              promptRunId: "prompt-run-1",
-              modelId: "gpt-4o-mini",
-              rawResponse: "Acme est un CRM pour PME. Voir https://acme.test/pricing",
-              brandMentioned: true,
-              brandPosition: "top",
-              citationFound: true,
-              citedUrls: ["https://acme.test/pricing"],
-              sentiment: "positive",
-              createdAt: "2026-03-04T08:00:00Z",
-            },
-            {
-              id: "response-2",
-              promptRunId: "prompt-run-2",
-              modelId: "gpt-4o-mini",
-              rawResponse: "Acme reste solide face a HubSpot.",
-              brandMentioned: true,
-              brandPosition: "mid",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "neutral",
-              createdAt: "2026-03-05T10:00:00Z",
-            },
-            {
-              id: "response-3",
-              promptRunId: "prompt-run-2",
-              modelId: "claude-3-7-sonnet",
-              rawResponse: "HubSpot ressort davantage dans cette comparaison.",
-              brandMentioned: false,
-              brandPosition: "low",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "negative",
-              createdAt: "2026-03-06T12:00:00Z",
-            },
-          ],
-        },
-      }),
-      jsonResponse(200, {
-        success: true,
-        data: {
+          dashboard: {
+            promptRuns: [
+              {
+                id: "prompt-run-1",
+                promptId: "prompt-1",
+                promptText: "Quel CRM recommander pour une PME ?",
+              },
+              {
+                id: "prompt-run-2",
+                promptId: "prompt-2",
+                promptText: "Compare Acme avec HubSpot.",
+              },
+            ],
+            aiResponses: [
+              {
+                id: "response-1",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est un CRM pour PME. Voir https://acme.test/pricing",
+                brandMentioned: true,
+                brandPosition: "top",
+                citationFound: true,
+                citedUrls: ["https://acme.test/pricing"],
+                sentiment: "positive",
+                createdAt: "2026-03-04T08:00:00Z",
+              },
+              {
+                id: "response-2",
+                promptRunId: "prompt-run-2",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme reste solide face a HubSpot.",
+                brandMentioned: true,
+                brandPosition: "mid",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "neutral",
+                createdAt: "2026-03-05T10:00:00Z",
+              },
+              {
+                id: "response-3",
+                promptRunId: "prompt-run-2",
+                modelId: "claude-3-7-sonnet",
+                rawResponse: "HubSpot ressort davantage dans cette comparaison.",
+                brandMentioned: false,
+                brandPosition: "low",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "negative",
+                createdAt: "2026-03-06T12:00:00Z",
+              },
+            ],
+          },
           scores: {
             positioningAccuracy: 67,
             factualAccuracy: 33,
@@ -171,6 +185,69 @@ describe("loadPerceptionData", () => {
     expect(JSON.stringify(result.data).includes("Nike")).toBe(false);
   });
 
+  test("loads perception with the bundled dashboard instead of issuing a second dashboard request", async () => {
+    const requests = mockFetchSequenceWithRequests([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+        ],
+      }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          dashboard: {
+            promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+            aiResponses: [
+              {
+                id: "response-1",
+                runId: "run-1",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est recommandee.",
+                brandMentioned: true,
+                brandPosition: "top",
+                citationFound: true,
+                citedUrls: ["https://acme.test"],
+                sentiment: "positive",
+                createdAt: "2026-03-10T08:00:00Z",
+              },
+            ],
+          },
+          metadata: {
+            generatedAt: "2026-03-10T09:30:00Z",
+            projectModels: ["gpt-4o-mini"],
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
+
+    expect(result.data.metadata.analyzedResponses).toBe(1);
+    expect(requests.some((request) => request.includes("/dashboard"))).toBe(false);
+    expect(requests.some((request) => request.includes("/perception?includeDashboard=1"))).toBe(true);
+    expect(requests).toHaveLength(4);
+  });
+
   test("filters perception responses to the currently enabled project models when backend provides them", async () => {
     mockFetchSequence([
       jsonResponse(200, {
@@ -210,38 +287,35 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
-          aiResponses: [
-            {
-              id: "response-1",
-              promptRunId: "prompt-run-1",
-              modelId: "gpt-4o-mini",
-              rawResponse: "Acme est recommandee avec source.",
-              brandMentioned: true,
-              brandPosition: "top",
-              citationFound: true,
-              citedUrls: ["https://acme.test"],
-              sentiment: "positive",
-              createdAt: "2026-03-10T08:00:00Z",
-            },
-            {
-              id: "response-2",
-              promptRunId: "prompt-run-1",
-              modelId: "sonar",
-              rawResponse: "HubSpot est devant Acme.",
-              brandMentioned: true,
-              brandPosition: "bottom",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "negative",
-              createdAt: "2026-03-10T09:00:00Z",
-            },
-          ],
-        },
-      }),
-      jsonResponse(200, {
-        success: true,
-        data: {
+          dashboard: {
+            promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+            aiResponses: [
+              {
+                id: "response-1",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est recommandee avec source.",
+                brandMentioned: true,
+                brandPosition: "top",
+                citationFound: true,
+                citedUrls: ["https://acme.test"],
+                sentiment: "positive",
+                createdAt: "2026-03-10T08:00:00Z",
+              },
+              {
+                id: "response-2",
+                promptRunId: "prompt-run-1",
+                modelId: "sonar",
+                rawResponse: "HubSpot est devant Acme.",
+                brandMentioned: true,
+                brandPosition: "bottom",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "negative",
+                createdAt: "2026-03-10T09:00:00Z",
+              },
+            ],
+          },
           scores: {
             positioningAccuracy: 100,
             factualAccuracy: 100,
@@ -355,10 +429,10 @@ describe("loadPerceptionData", () => {
         ],
       }),
       jsonResponse(200, { success: true, data: [] }),
-      jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
       jsonResponse(200, {
         success: true,
         data: {
+          dashboard: { promptRuns: [], aiResponses: [] },
           metadata: {
             generatedAt: "2026-03-10T09:30:00Z",
           },
@@ -411,41 +485,38 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          latestRun: { id: "run-disabled" },
-          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
-          aiResponses: [
-            {
-              id: "response-1",
-              runId: "run-enabled",
-              promptRunId: "prompt-run-1",
-              modelId: "gpt-4o-mini",
-              rawResponse: "Acme est recommandee avec source.",
-              brandMentioned: true,
-              brandPosition: "top",
-              citationFound: true,
-              citedUrls: ["https://acme.test"],
-              sentiment: "positive",
-              createdAt: "2026-03-10T08:00:00Z",
-            },
-            {
-              id: "response-2",
-              runId: "run-disabled",
-              promptRunId: "prompt-run-1",
-              modelId: "sonar",
-              rawResponse: "HubSpot est devant Acme.",
-              brandMentioned: true,
-              brandPosition: "bottom",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "negative",
-              createdAt: "2026-03-11T09:00:00Z",
-            },
-          ],
-        },
-      }),
-      jsonResponse(200, {
-        success: true,
-        data: {
+          dashboard: {
+            latestRun: { id: "run-disabled" },
+            promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+            aiResponses: [
+              {
+                id: "response-1",
+                runId: "run-enabled",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est recommandee avec source.",
+                brandMentioned: true,
+                brandPosition: "top",
+                citationFound: true,
+                citedUrls: ["https://acme.test"],
+                sentiment: "positive",
+                createdAt: "2026-03-10T08:00:00Z",
+              },
+              {
+                id: "response-2",
+                runId: "run-disabled",
+                promptRunId: "prompt-run-1",
+                modelId: "sonar",
+                rawResponse: "HubSpot est devant Acme.",
+                brandMentioned: true,
+                brandPosition: "bottom",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "negative",
+                createdAt: "2026-03-11T09:00:00Z",
+              },
+            ],
+          },
           scores: {
             positioningAccuracy: 100,
             factualAccuracy: 100,
@@ -510,40 +581,37 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
-          promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
-          aiResponses: [
-            {
-              id: "response-1",
-              runId: "run-1",
-              promptRunId: "prompt-run-1",
-              modelId: "gpt-4o-mini",
-              rawResponse: "Acme est un CRM pertinent.",
-              brandMentioned: true,
-              brandPosition: "top",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "positive",
-              createdAt: "2026-03-10T08:00:00Z",
-            },
-            {
-              id: "response-2",
-              runId: "run-1",
-              promptRunId: "prompt-run-1",
-              modelId: "gpt-4.1-mini",
-              rawResponse: "Acme convient bien aux PME.",
-              brandMentioned: true,
-              brandPosition: "mid",
-              citationFound: false,
-              citedUrls: [],
-              sentiment: "neutral",
-              createdAt: "2026-03-10T08:05:00Z",
-            },
-          ],
-        },
-      }),
-      jsonResponse(200, {
-        success: true,
-        data: {
+          dashboard: {
+            promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+            aiResponses: [
+              {
+                id: "response-1",
+                runId: "run-1",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est un CRM pertinent.",
+                brandMentioned: true,
+                brandPosition: "top",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "positive",
+                createdAt: "2026-03-10T08:00:00Z",
+              },
+              {
+                id: "response-2",
+                runId: "run-1",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4.1-mini",
+                rawResponse: "Acme convient bien aux PME.",
+                brandMentioned: true,
+                brandPosition: "mid",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "neutral",
+                createdAt: "2026-03-10T08:05:00Z",
+              },
+            ],
+          },
           metadata: {
             generatedAt: "2026-03-10T09:00:00Z",
             projectModels: ["gpt-4o-mini", "gpt-4.1-mini"],

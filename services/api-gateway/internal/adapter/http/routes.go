@@ -34,6 +34,47 @@ func isAttributionIngestionRequest(r *http.Request) bool {
 		(r.URL.Path == "/attribution/ingest" || strings.HasPrefix(r.URL.Path, "/attribution/ingest/"))
 }
 
+func isAppEntryRequest(r *http.Request) bool {
+	return r.Method == http.MethodGet && r.URL.Path == "/auth/app-entry"
+}
+
+func isOnboardingModelCatalogRequest(r *http.Request) bool {
+	return r.Method == http.MethodGet && r.URL.Path == "/onboarding/ai-models"
+}
+
+func isOnboardingProjectCreateRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/onboarding/project"
+}
+
+func isOnboardingBootstrapRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/onboarding/bootstrap"
+}
+
+func isOnboardingProjectModelsRequest(r *http.Request) bool {
+	if r.Method != http.MethodPatch {
+		return false
+	}
+	path := strings.Trim(r.URL.Path, "/")
+	parts := strings.Split(path, "/")
+	return len(parts) == 4 &&
+		parts[0] == "onboarding" &&
+		parts[1] == "projects" &&
+		parts[2] != "" &&
+		parts[3] == "models"
+}
+
+func isCanonicalProjectAnalysisRunRequest(r *http.Request) bool {
+	if r.Method != http.MethodPost {
+		return false
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	return len(parts) == 4 &&
+		parts[0] == "analysis" &&
+		parts[1] == "projects" &&
+		parts[2] != "" &&
+		parts[3] == "run"
+}
+
 func (h *Handler) buildRoutes() []routeEntry {
 	authHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.authProxy, "auth-service", internalTokenClaims{})
@@ -56,6 +97,35 @@ func (h *Handler) buildRoutes() []routeEntry {
 		}
 		h.serveProxyWithInternalAuth(w, r2, h.attributionProxy, "attribution-service", internalTokenClaims{})
 	})
+	onboardingModelCatalogHandler := h.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := r.Clone(r.Context())
+		urlCopy := *r.URL
+		r2.URL = &urlCopy
+		r2.URL.Path = "/ai-models"
+		r2.URL.RawPath = ""
+		h.projectProxy.ServeHTTP(w, r2)
+	}), "project-service", "projects")
+	onboardingProjectCreateHandler := h.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r2 := r.Clone(r.Context())
+		urlCopy := *r.URL
+		r2.URL = &urlCopy
+		r2.URL.Path = "/projects"
+		r2.URL.RawPath = ""
+		h.projectProxy.ServeHTTP(w, r2)
+	}), "project-service", "projects")
+	onboardingProjectModelsHandler := h.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+		projectID := parts[2]
+		r2 := r.Clone(r.Context())
+		r2.Header = r.Header.Clone()
+		r2.Header.Set("X-Organization-Full-Access", "true")
+		urlCopy := *r.URL
+		r2.URL = &urlCopy
+		r2.URL.Path = "/projects/" + projectID + "/models"
+		r2.URL.RawPath = ""
+		h.projectProxy.ServeHTTP(w, r2)
+	}), "project-service", "projects")
+	projectAnalysisRunHandler := h.withAuth(h.projectProxy, "project-service", "projects")
 
 	routes := []routeEntry{
 		{
@@ -72,6 +142,12 @@ func (h *Handler) buildRoutes() []routeEntry {
 			handler: h.withAuth(http.HandlerFunc(h.handleAgentReadyScan), "api-gateway", "analysis"),
 			service: "api-gateway",
 		},
+		{match: isAppEntryRequest, handler: http.HandlerFunc(h.handleAppEntry), service: "api-gateway"},
+		{match: isOnboardingBootstrapRequest, handler: http.HandlerFunc(h.handleOnboardingBootstrap), service: "api-gateway"},
+		{match: isOnboardingModelCatalogRequest, handler: onboardingModelCatalogHandler, service: "project-service"},
+		{match: isOnboardingProjectCreateRequest, handler: onboardingProjectCreateHandler, service: "project-service"},
+		{match: isOnboardingProjectModelsRequest, handler: onboardingProjectModelsHandler, service: "project-service"},
+		{match: isCanonicalProjectAnalysisRunRequest, handler: projectAnalysisRunHandler, service: "project-service"},
 		{match: matchPathPrefix("/auth"), handler: authHandler, service: "auth-service"},
 		{match: matchPathPrefix("/users"), handler: userHandler, service: "user-service"},
 		{match: matchPathPrefix("/admin/users"), handler: userHandler, service: "user-service"},
@@ -84,6 +160,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: isAttributionIngestionRequest, handler: attributionIngestionHandler, service: "attribution-service"},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications"), service: "notification-service"},
+		{match: matchPathPrefix("/onboarding"), handler: h.withAuth(h.analysisProxy, "analysis-service", "analysis"), service: "analysis-service"},
 		{match: matchPathPrefix("/projects"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
 		{match: matchPathPrefix("/prompts"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},
 		{match: matchPathPrefix("/competitors"), handler: h.withAuth(h.projectProxy, "project-service", "projects"), service: "project-service"},

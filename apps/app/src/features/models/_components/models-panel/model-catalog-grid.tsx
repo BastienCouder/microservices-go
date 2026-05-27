@@ -61,9 +61,7 @@ export function ModelCatalogGrid({
               disabledLabel={
                 disabledByApiKey
                   ? "Cle API requise"
-                  : disabledByPlan
-                    ? "Limite du plan"
-                    : undefined
+                  : undefined
               }
             />
           </div>

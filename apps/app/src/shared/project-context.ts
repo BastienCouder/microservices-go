@@ -173,7 +173,7 @@ export function applyResolvedProjectContextSearch(
     routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
   );
   params.set("project", context.projectSlug || context.projectId);
-  params.delete("projectId");
+  params.set("projectId", context.projectId);
   params.delete("project_id");
   params.set("organizationId", context.organizationId);
   params.delete("organization_id");

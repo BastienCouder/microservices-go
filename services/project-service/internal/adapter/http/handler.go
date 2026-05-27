@@ -29,12 +29,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /projects/llm-provider-credentials/{provider}", h.deleteLLMProviderCredential)
 	mux.HandleFunc("GET /internal/scheduled-analysis/jobs", h.listScheduledAnalysisJobs)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
-	mux.HandleFunc("POST /projects/ai-models", h.createModel)
-	mux.HandleFunc("GET /projects/ai-models", h.listModels)
-	mux.HandleFunc("POST /projects/ai-models/seed", h.seedModels)
-	mux.HandleFunc("POST /projects/ai-models/sync/openrouter", h.syncOpenRouterModels)
-	mux.HandleFunc("/projects/ai-models/", h.projectAIModelRoutes)
 	mux.HandleFunc("/projects/", h.projectRoutes)
+	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
 	mux.HandleFunc("/competitors/", h.competitorRoutes)
 	mux.HandleFunc("POST /ai-models", h.createModel)
@@ -46,10 +42,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 
 func (h *Handler) aiModelRoutes(w http.ResponseWriter, r *http.Request) {
 	h.aiModelRoutesWithPrefix(w, r, "/ai-models/")
-}
-
-func (h *Handler) projectAIModelRoutes(w http.ResponseWriter, r *http.Request) {
-	h.aiModelRoutesWithPrefix(w, r, "/projects/ai-models/")
 }
 
 func (h *Handler) aiModelRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
@@ -86,6 +78,16 @@ func (h *Handler) internalProjectRoutes(w http.ResponseWriter, r *http.Request) 
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *Handler) analysisProjectRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/analysis/projects/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] != "run" || r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+
+	h.runManualAnalysis(w, r, parts[0])
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
@@ -190,8 +192,6 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.deleteProject(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "finalize" && r.Method == http.MethodPost:
 		h.finalizeProject(w, r, projectID)
-	case len(parts) == 3 && parts[1] == "analysis" && parts[2] == "run" && r.Method == http.MethodPost:
-		h.runManualAnalysis(w, r, projectID)
 	case len(parts) == 4 && parts[1] == "analysis" && parts[2] == "perception" && parts[3] == "run" && r.Method == http.MethodPost:
 		h.runPerceptionAnalysis(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "prompts" && r.Method == http.MethodPost:

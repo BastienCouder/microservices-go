@@ -40,15 +40,19 @@ describe("project context resolution", () => {
     });
   });
 
-  test("overwrites stale organization scope with the resolved project organization", () => {
-    expect(
-      applyResolvedProjectContextSearch("?project=bco&organizationId=org-nike&period=7d", {
+  test("overwrites stale organization scope and injects the canonical project id", () => {
+    const search = applyResolvedProjectContextSearch("?project=bco&organizationId=org-nike&period=7d", {
         organizationId: "org-bco",
         organizationSlug: "bco-org",
         projectId: "prj-bco",
         projectSlug: "bco",
         projectName: "BCO",
-      }),
-    ).toBe("?project=bco&organizationId=org-bco&period=7d");
+      });
+
+    const params = new URLSearchParams(search.slice(1));
+    expect(params.get("project")).toBe("bco");
+    expect(params.get("projectId")).toBe("prj-bco");
+    expect(params.get("organizationId")).toBe("org-bco");
+    expect(params.get("period")).toBe("7d");
   });
 });

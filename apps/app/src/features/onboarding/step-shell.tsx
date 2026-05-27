@@ -34,7 +34,7 @@ export function OnboardingStep({
   return (
     <Card
       className={cn(
-        "h-full w-full rounded-md border-white/70 bg-white/95 shadow-none",
+        "h-full w-full rounded-md border-white/70 bg-white/95 shadow-none ",
         className,
       )}
     >

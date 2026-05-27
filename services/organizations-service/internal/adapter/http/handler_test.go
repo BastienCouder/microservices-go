@@ -35,6 +35,13 @@ func (stubRepo) UpdateName(_ context.Context, id int64, name string) (*domain.Or
 	return &domain.Organization{ID: id, Name: name, OwnerIdentityID: 7, CreatedAt: time.Now().UTC()}, nil
 }
 
+func (stubRepo) DeleteOrganization(_ context.Context, organizationID int64, _ time.Time) error {
+	if organizationID <= 0 {
+		return domain.ErrOrganizationNotFound
+	}
+	return nil
+}
+
 func (stubRepo) ListOrganizationsByUser(_ context.Context, _ int64) ([]domain.Membership, error) {
 	return nil, nil
 }
@@ -269,6 +276,21 @@ func TestMemberActionRoutes(t *testing.T) {
 				t.Fatalf("expected %d, got %d body=%s", tt.want, resp.Code, resp.Body.String())
 			}
 		})
+	}
+}
+
+func TestDeleteOrganizationRoute(t *testing.T) {
+	h := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodDelete, "/organizations/1", nil)
+	req.Header.Set("X-Authenticated-User-ID", "7")
+	req.Header.Set("X-Organization-ID", "1")
+	resp := httptest.NewRecorder()
+
+	h.organizationRoutes(resp, req)
+
+	if resp.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d body=%s", resp.Code, resp.Body.String())
 	}
 }
 

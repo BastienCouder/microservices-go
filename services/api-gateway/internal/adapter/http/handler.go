@@ -27,6 +27,7 @@ type Handler struct {
 	authURL              string
 	userURL              string
 	organizationsURL     string
+	projectURL           string
 	permissionGRPC       *permissionGRPCClient
 	httpClient           *http.Client
 	scanStore            *agentReadyScanStore
@@ -211,6 +212,7 @@ func NewHandlerWithGRPCAndServices(
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
 		organizationsURL:   strings.TrimRight(organizationsServiceURL, "/"),
+		projectURL:         strings.TrimRight(projectServiceURL, "/"),
 		permissionGRPC:     permissionGRPC,
 		httpClient: &http.Client{
 			Transport: transport,

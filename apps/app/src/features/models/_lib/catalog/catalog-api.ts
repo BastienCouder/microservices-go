@@ -41,6 +41,23 @@ export async function loadModelCatalog(
   return normalizeCatalog(response.data);
 }
 
+export async function loadOnboardingModelCatalog(
+  apiBaseURL: string,
+  options?: { activeOnly?: boolean; signal?: AbortSignal },
+): Promise<ModelCatalogItem[]> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.aiModels.onboardingList(options?.activeOnly ?? true),
+    { method: "GET", signal: options?.signal },
+  );
+
+  if (!response.ok) {
+    throw new Error("Impossible de charger le catalogue des modeles.");
+  }
+
+  return normalizeCatalog(response.data);
+}
+
 export async function loadProjectsAndCatalog(
   apiBaseURL: string,
   organizationId: string,

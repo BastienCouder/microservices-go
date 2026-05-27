@@ -16,10 +16,17 @@ import {
   getOrganizationViewTabsForRoles,
   ORGANIZATION_VIEW_TABS,
 } from "@/features/organizations/_lib/shared/constants";
-import { buildCreateProjectOnboardingHref } from "@/features/organizations/_lib/shared/organization-page-links";
+import {
+  buildCreateProjectOnboardingHref,
+  prepareCreateProjectOnboardingContext,
+} from "@/features/organizations/_lib/shared/organization-page-links";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { OrganizationHierarchy } from "@/shared/models";
+import {
+  findResolvedProjectContext,
+  loadProjectContextHierarchies,
+} from "@/shared/project-context";
 import { findBySlugOrId } from "@/shared/public-slugs";
 import {
   SELECTED_CONTEXT_CHANGE_EVENT,
@@ -40,7 +47,6 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarPromptPlanProgress } from "./sidebar-prompt-plan-progress";
 import type { SidebarProjectOption } from "./sidebar-constants";
 import {
-  findOrganizationIdForProjectToken,
   findProjectIdForToken,
   normalizeOrganizationHierarchy,
   selectPreferredID,
@@ -119,17 +125,6 @@ async function loadHierarchy(
 
   return normalizeOrganizationHierarchy(response.data, organizationId);
 }
-
-const loadHierarchies = (
-  apiBaseURL: string,
-  organizations: OrganizationSummary[],
-  signal?: AbortSignal,
-) =>
-  Promise.all(
-    organizations.map(({ id }) =>
-      loadHierarchy(apiBaseURL, id, signal).catch(() => null),
-    ),
-  );
 
 function NavSection({ title, items, collapsed, indent }: NavSectionProps) {
   return (
@@ -214,7 +209,14 @@ function SidebarComponent({
   });
 
   const routeOrg = findBySlugOrId(organizations, routeOrgToken);
-  const organizationIds = organizations.map(({ id }) => id);
+  const organizationIds = useMemo(
+    () => organizations.map(({ id }) => id),
+    [organizations],
+  );
+  const organizationIdsKey = useMemo(
+    () => [...organizationIds].sort().join(","),
+    [organizationIds],
+  );
 
   const shouldResolveOrg =
     apiEnabled &&
@@ -222,21 +224,18 @@ function SidebarComponent({
     !!preferredProjectToken &&
     !routeOrgToken;
 
-  const projectOrgQuery = useQuery({
-    queryKey: [
-      "sidebar-project-organization",
-      apiBaseURL,
-      organizationIds.join(","),
-      preferredProjectToken,
-    ],
+  const projectContextQuery = useQuery({
+    queryKey: appQueryKeys.projectContextHierarchies(apiBaseURL, organizationIdsKey),
     enabled: shouldResolveOrg,
-    queryFn: ({ signal }) => loadHierarchies(apiBaseURL, organizations, signal),
+    queryFn: ({ signal }) =>
+      loadProjectContextHierarchies(apiBaseURL, organizations, signal),
   });
 
-  const projectOrgId = findOrganizationIdForProjectToken(
-    projectOrgQuery.data ?? [],
-    preferredProjectToken,
-  );
+  const projectOrgId =
+    findResolvedProjectContext(
+      projectContextQuery.data ?? [],
+      preferredProjectToken,
+    )?.organizationId ?? "";
 
   const selectedOrgId = selectPreferredID({
     candidates: [
@@ -275,10 +274,10 @@ function SidebarComponent({
     organizations.find(({ id }) => id === selectedOrgId) ?? null;
 
   useEffect(() => {
-    if ((!shouldResolveOrg || projectOrgQuery.data) && selectedOrgId) {
+    if ((!shouldResolveOrg || projectContextQuery.data) && selectedOrgId) {
       storeSelectedOrganizationID(selectedOrgId);
     }
-  }, [shouldResolveOrg, projectOrgQuery.data, selectedOrgId]);
+  }, [shouldResolveOrg, projectContextQuery.data, selectedOrgId]);
 
   const links = useMemo(() => {
     const project = activeProject?.slug;
@@ -302,7 +301,7 @@ function SidebarComponent({
       adminPricing: buildScopedHref("/admin/pricing", { org }),
       adminModels: buildScopedHref("/admin/models", { org }),
       account: "/account",
-      addProject: buildCreateProjectOnboardingHref(selectedOrgId),
+      addProject: buildCreateProjectOnboardingHref(),
     };
   }, [activeProject, activeOrg, selectedOrgId]);
 
@@ -323,6 +322,10 @@ function SidebarComponent({
     onClick?: () => void,
     active = isActiveHref(href),
   ): NavItem => ({ href, label, active, onClick });
+
+  const startCreateProjectOnboarding = () => {
+    prepareCreateProjectOnboardingContext(selectedOrgId);
+  };
 
   const selectProject = (projectId: string) => {
     const project = projects.find(({ id }) => id === projectId);
@@ -496,6 +499,7 @@ function SidebarComponent({
               activeProjectId={activeProject?.id ?? ""}
               onSelectProject={selectProject}
               addProjectHref={links.addProject}
+              onAddProject={startCreateProjectOnboarding}
               canAddProject={canManageOrg}
               orgOpen={orgOpen}
               setOrgOpen={setOrgOpen}

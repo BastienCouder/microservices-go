@@ -9,6 +9,7 @@ type GatewayRetryOptions = {
 
 const DEFAULT_RETRY_ATTEMPTS = 2;
 const DEFAULT_RETRY_DELAY_MS = 150;
+const DEFAULT_TIMEOUT_MS = 30_000;
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
 function parseErrorPayload(payload: unknown): string {
@@ -26,7 +27,11 @@ async function parseJSON(response: Response): Promise<unknown> {
   if (!contentType.includes("application/json")) {
     return null;
   }
-  return (await response.json()) as unknown;
+  try {
+    return (await response.json()) as unknown;
+  } catch {
+    return null;
+  }
 }
 
 function getRequestMethod(method: string | undefined): string {
@@ -46,11 +51,11 @@ function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) return Promise.reject(signal.reason);
 
   return new Promise((resolve, reject) => {
-    const timeout = window.setTimeout(resolve, delayMs);
+    const timeout = globalThis.setTimeout(resolve, delayMs);
     signal?.addEventListener(
       "abort",
       () => {
-        window.clearTimeout(timeout);
+        globalThis.clearTimeout(timeout);
         reject(signal.reason);
       },
       { once: true },
@@ -58,19 +63,71 @@ function waitForRetry(delayMs: number, signal?: AbortSignal): Promise<void> {
   });
 }
 
+function createRequestSignal(
+  sourceSignal: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal?: AbortSignal; cleanup: () => void; timedOut: () => boolean } {
+  if (!sourceSignal && timeoutMs <= 0) {
+    return { cleanup: () => undefined, timedOut: () => false };
+  }
+
+  const controller = new AbortController();
+  let didTimeout = false;
+  let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+
+  const abortFromSource = () => {
+    controller.abort(sourceSignal?.reason ?? new Error("request cancelled"));
+  };
+
+  if (sourceSignal?.aborted) {
+    abortFromSource();
+  } else {
+    sourceSignal?.addEventListener("abort", abortFromSource, { once: true });
+  }
+
+  if (timeoutMs > 0) {
+    timeout = globalThis.setTimeout(() => {
+      didTimeout = true;
+      controller.abort(new Error("request timed out"));
+    }, timeoutMs);
+  }
+
+  return {
+    signal: controller.signal,
+    cleanup: () => {
+      if (timeout) globalThis.clearTimeout(timeout);
+      sourceSignal?.removeEventListener("abort", abortFromSource);
+    },
+    timedOut: () => didTimeout,
+  };
+}
+
 export async function gatewayJSON<T>(
   baseURL: string,
   path: string,
-  init?: RequestInit & { organizationId?: string; retry?: GatewayRetryOptions },
+  init?: RequestInit & {
+    organizationId?: string;
+    retry?: GatewayRetryOptions;
+    timeoutMs?: number;
+  },
 ): Promise<GatewayResult<T>> {
   const url = `${baseURL.replace(/\/$/, "")}${path.startsWith("/") ? "" : "/"}${path}`;
-  const { organizationId: rawOrganizationId, retry, ...fetchInit } = init ?? {};
+  const {
+    organizationId: rawOrganizationId,
+    retry,
+    timeoutMs,
+    ...fetchInit
+  } = init ?? {};
   const organizationId = rawOrganizationId?.trim() ?? "";
   const method = getRequestMethod(fetchInit.method);
   const retryAttempts = Math.max(0, retry?.attempts ?? DEFAULT_RETRY_ATTEMPTS);
   const retryDelayMs = Math.max(0, retry?.delayMs ?? DEFAULT_RETRY_DELAY_MS);
+  const requestTimeoutMs = Math.max(0, timeoutMs ?? DEFAULT_TIMEOUT_MS);
 
   const headers = new Headers(fetchInit.headers ?? undefined);
+  if (!headers.has("Accept")) {
+    headers.set("Accept", "application/json");
+  }
   if (!headers.has("Content-Type") && fetchInit.body) {
     headers.set("Content-Type", "application/json");
   }
@@ -79,11 +136,36 @@ export async function gatewayJSON<T>(
   }
 
   for (let attempt = 0; attempt <= retryAttempts; attempt += 1) {
-    const response = await fetch(url, {
-      ...fetchInit,
-      headers,
-      credentials: "include",
-    });
+    const requestSignal = createRequestSignal(
+      fetchInit.signal ?? undefined,
+      requestTimeoutMs,
+    );
+
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        ...fetchInit,
+        headers,
+        credentials: "include",
+        signal: requestSignal.signal,
+      });
+    } catch {
+      const timedOut = requestSignal.timedOut();
+      requestSignal.cleanup();
+      if (timedOut) {
+        return { ok: false, status: 0, error: "request timed out" };
+      }
+      if (fetchInit.signal?.aborted) {
+        return { ok: false, status: 0, error: "request cancelled" };
+      }
+      if (attempt < retryAttempts && isIdempotentMethod(method)) {
+        await waitForRetry(retryDelayMs * 2 ** attempt, fetchInit.signal ?? undefined);
+        continue;
+      }
+      return { ok: false, status: 0, error: "request failed" };
+    }
+
+    requestSignal.cleanup();
 
     const payload = await parseJSON(response);
     if (response.ok) {

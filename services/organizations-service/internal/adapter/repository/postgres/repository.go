@@ -116,6 +116,87 @@ func (r *Repository) UpdateName(ctx context.Context, id int64, name string) (*do
 	return &org, nil
 }
 
+func (r *Repository) DeleteOrganization(ctx context.Context, organizationID int64, deletedAt time.Time) error {
+	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin delete organization transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	deletedAt = deletedAt.UTC()
+	tag, err := tx.Exec(ctx, `
+		UPDATE organizations
+		SET name = $2,
+		    owner_user_id = 0,
+		    deleted_at = $3
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`, organizationID, fmt.Sprintf("Deleted organization %d", organizationID), toPgTimestamptz(deletedAt))
+	if err != nil {
+		return fmt.Errorf("soft delete organization: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrOrganizationNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE teams
+		SET name = 'Deleted team ' || id::text,
+		    deleted_at = COALESCE(deleted_at, $2)
+		WHERE organization_id = $1
+	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
+		return fmt.Errorf("anonymize organization teams: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM member_roles
+		WHERE organization_id = $1
+	`, organizationID); err != nil {
+		return fmt.Errorf("delete organization member roles: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE organization_members
+		SET team_id = NULL,
+		    deleted_at = COALESCE(deleted_at, $2)
+		WHERE organization_id = $1
+	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
+		return fmt.Errorf("soft delete organization members: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE organization_invitations
+		SET project_id = '',
+		    email = 'deleted-invitation-' || id::text || '@anonymized.local',
+		    token = 'deleted-invitation-' || id::text,
+		    message = '',
+		    status = 'revoked',
+		    invited_by_user_id = 0,
+		    accepted_by_user_id = 0,
+		    responded_at = COALESCE(responded_at, $2),
+		    deleted_at = COALESCE(deleted_at, $2)
+		WHERE organization_id = $1
+	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
+		return fmt.Errorf("anonymize organization invitations: %w", err)
+	}
+
+	if _, err := tx.Exec(ctx, `
+		UPDATE organization_api_keys
+		SET name = 'Deleted API key ' || id::text,
+		    prefix = 'deleted',
+		    key_hash = 'deleted-api-key-' || id::text,
+		    revoked_at = COALESCE(revoked_at, $2)
+		WHERE organization_id = $1
+	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
+		return fmt.Errorf("anonymize organization api keys: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit delete organization transaction: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
 	query := r.psql.Select(
 		"m.organization_id",

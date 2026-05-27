@@ -15,6 +15,7 @@ type SidebarOrganizationSwitcherProps = {
   activeProjectId: string;
   onSelectProject: (projectId: string) => void;
   addProjectHref: string;
+  onAddProject?: () => void;
   canAddProject?: boolean;
   orgOpen: boolean;
   setOrgOpen: (open: boolean) => void;
@@ -39,6 +40,7 @@ export function SidebarOrganizationSwitcher({
   activeProjectId,
   onSelectProject,
   addProjectHref,
+  onAddProject,
   canAddProject = true,
   orgOpen,
   setOrgOpen,
@@ -78,7 +80,9 @@ export function SidebarOrganizationSwitcher({
         <PopoverContent side="right" align="start" className="w-64 p-1.5">
           {canAddProject ? (
             <Button asChild>
-              <Link to={addProjectHref}>{content.addProject}</Link>
+              <Link to={addProjectHref} onClick={onAddProject}>
+                {content.addProject}
+              </Link>
             </Button>
           ) : null}
           {projects.length > 0 ? (

@@ -5,10 +5,8 @@ import { useContentOptimizerViewModel } from "../../_lib/crawl/use-content-optim
 import { CrawlerPageHeader } from "./_components/crawler-page-header";
 import { CrawlerResultsView } from "./_components/crawler-results-view";
 import { InitialSetupCard } from "./_components/initial-setup-card";
-import { ReanalyzeDialog } from "./_components/reanalyze-dialog";
 import {
   computePriority,
-  DEFAULT_REANALYZE_LIMIT,
   primaryIssue,
   statusLabel,
   type SeverityFilter,
@@ -23,13 +21,13 @@ type CrawlPanelProps = {
 
 export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
-  const records = viewModel.crawlRecords;
+  const reviewingDiscoveredPages =
+    viewModel.phase === "review" && viewModel.discoveredPages.length > 0;
+  const records = reviewingDiscoveredPages
+    ? viewModel.discoveredPages
+    : viewModel.crawlRecords;
 
   const [query, setQuery] = useState("");
-  const [reanalyzeDialogOpen, setReanalyzeDialogOpen] = useState(false);
-  const [reanalyzeURLs, setReanalyzeURLs] = useState<Set<string>>(
-    () => new Set(),
-  );
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [issuesOnly, setIssuesOnly] = useState(false);
@@ -93,8 +91,9 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
 
   const selectedRecord =
     filteredRecords.find(
-      (record) => record.url === viewModel.selectedResult?.url,
+      (record) => record.url === viewModel.selectedResultURL,
     ) ??
+    viewModel.selectedResult ??
     filteredRecords[0] ??
     null;
 
@@ -106,21 +105,12 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   ).length;
   const reanalyzing = viewModel.discovering || viewModel.crawling;
   const hasAnalysis = viewModel.crawlRecords.length > 0;
-  const reviewingDiscoveredPages =
-    viewModel.phase === "review" && viewModel.discoveredPages.length > 0;
+  const canUsePageSelection = records.length > 0;
   const showInitialSetup =
-    !viewModel.error && !viewModel.loadingLatest && !hasAnalysis && !reviewingDiscoveredPages;
-  const reanalyzePages = useMemo(
-    () =>
-      (records.length > 0 ? records : viewModel.discoveredPages).filter(
-        (record) => record.url.trim() !== "",
-      ),
-    [records, viewModel.discoveredPages],
-  );
-  const allReanalyzePagesSelected =
-    reanalyzePages.length > 0 &&
-    reanalyzePages.every((record) => reanalyzeURLs.has(record.url.trim()));
-
+    !viewModel.error &&
+    !viewModel.loadingLatest &&
+    !hasAnalysis &&
+    !reviewingDiscoveredPages;
   function toggleSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -133,62 +123,8 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
     );
   }
 
-  function handleReanalyzeDialogOpenChange(open: boolean) {
-    setReanalyzeDialogOpen(open);
-    if (!open) return;
-
-    const selected =
-      viewModel.selectedURLs.size > 0
-        ? viewModel.selectedURLs
-        : new Set(
-            reanalyzePages.map((record) => record.url.trim()).filter(Boolean),
-          );
-    setReanalyzeURLs(new Set(selected));
-  }
-
-  function toggleReanalyzePage(nextURL: string, checked: boolean) {
-    setReanalyzeURLs((current) => {
-      const next = new Set(current);
-      if (checked) {
-        next.add(nextURL);
-      } else {
-        next.delete(nextURL);
-      }
-      return next;
-    });
-  }
-
-  function toggleAllReanalyzePages(checked: boolean) {
-    if (!checked) {
-      setReanalyzeURLs(new Set());
-      return;
-    }
-    setReanalyzeURLs(
-      new Set(
-        reanalyzePages.map((record) => record.url.trim()).filter(Boolean),
-      ),
-    );
-  }
-
-  function submitReanalysis() {
-    const includePatterns = Array.from(reanalyzeURLs);
-
-    viewModel.reanalyze({
-      limit: DEFAULT_REANALYZE_LIMIT,
-      includePatterns,
-    });
-    setReanalyzeDialogOpen(false);
-  }
-
   function handleAnalyzeSiteClick() {
-    viewModel.reanalyze({
-      limit: DEFAULT_REANALYZE_LIMIT,
-      includePatterns: [],
-    });
-  }
-
-  function handleScopedAnalysisClick() {
-    handleReanalyzeDialogOpenChange(true);
+    viewModel.discover();
   }
 
   useEffect(() => {
@@ -210,11 +146,11 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
     if (reviewingDiscoveredPages) {
       pushInfoToast(
         `${viewModel.discoveredPages.length} page(s) détectée(s)`,
-        "La liste des pages a été mise à jour. Utilise les actions du header pour analyser toutes les pages ou choisir seulement celles à relancer.",
+        "La liste des pages a été mise à jour. Sélectionne les pages à analyser, puis lance l'analyse depuis le header.",
       );
     }
   }, [reviewingDiscoveredPages, viewModel.discoveredPages.length]);
-  
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       {showInitialSetup ? null : (
@@ -228,24 +164,10 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
           canReanalyze={viewModel.canReanalyze}
           loadingLatest={viewModel.loadingLatest}
           onDiscover={() => viewModel.discover()}
-          onOpenScopedAnalysis={handleScopedAnalysisClick}
           onCrawlSelected={() => viewModel.crawlSelected()}
           onAnalyzeSite={handleAnalyzeSiteClick}
         />
       )}
-
-      <ReanalyzeDialog
-        open={reanalyzeDialogOpen}
-        reviewingDiscoveredPages={reviewingDiscoveredPages}
-        reanalyzing={reanalyzing}
-        reanalyzePages={reanalyzePages}
-        reanalyzeURLs={reanalyzeURLs}
-        allReanalyzePagesSelected={allReanalyzePagesSelected}
-        onOpenChange={handleReanalyzeDialogOpenChange}
-        onToggleAll={toggleAllReanalyzePages}
-        onTogglePage={toggleReanalyzePage}
-        onSubmit={submitReanalysis}
-      />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background">
         {showInitialSetup ? (
@@ -273,6 +195,12 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
             onSeverityFilterChange={setSeverityFilter}
             onToggleSort={toggleSort}
             onSelectRecord={viewModel.setSelectedResultURL}
+            selectable={canUsePageSelection}
+            selectedURLs={viewModel.selectedURLs}
+            selectedCount={viewModel.selectedCount}
+            allSelected={viewModel.allDiscoveredSelected}
+            onTogglePage={viewModel.togglePage}
+            onToggleAll={viewModel.toggleAllPages}
           />
         )}
       </div>

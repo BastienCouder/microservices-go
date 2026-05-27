@@ -103,6 +103,99 @@ func TestStartContentOptimizerCrawlValidatesAccessAndNormalizesRequest(t *testin
 	}
 }
 
+func TestPreviewOnboardingBrandProfileCrawlsHomeAndAboutPages(t *testing.T) {
+	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{ID: "onboarding-crawl", Status: "running"},
+		result: ContentOptimizerCrawlResult{
+			ID:       "onboarding-crawl",
+			Status:   "completed",
+			Total:    2,
+			Finished: 2,
+			Records: []ContentOptimizerCrawlRecord{
+				{
+					URL:      "https://example.com/",
+					Status:   "completed",
+					Title:    "Acme",
+					Markdown: "Acme aide les equipes marketing a suivre leur visibilite dans les reponses IA.\n\n- Monitoring des prompts strategiques\n- Analyse des concurrents\n- Optimisation du contenu cite par les IA",
+				},
+				{
+					URL:      "https://example.com/a-propos",
+					Status:   "completed",
+					Markdown: "A propos d'Acme\n\nNotre plateforme SaaS consolide les signaux SEO et IA pour les marques.",
+				},
+			},
+		},
+	}
+	svc, err := NewServiceWithDependencies(context.Background(), Dependencies{ContentCrawler: crawler})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	preview, err := svc.PreviewOnboardingBrandProfile(context.Background(), OnboardingBrandProfileInput{
+		WebsiteURL: "example.com",
+		BrandName:  "Acme",
+	})
+	if err != nil {
+		t.Fatalf("preview onboarding brand profile: %v", err)
+	}
+
+	if crawler.startInput.URL != "https://example.com" {
+		t.Fatalf("expected normalized website url, got %q", crawler.startInput.URL)
+	}
+	if crawler.startInput.Limit != 6 || crawler.startInput.Depth != 1 {
+		t.Fatalf("expected onboarding crawl scope 6/1, got %d/%d", crawler.startInput.Limit, crawler.startInput.Depth)
+	}
+	if !reflect.DeepEqual(crawler.startInput.Formats, []string{"markdown"}) {
+		t.Fatalf("expected markdown format, got %#v", crawler.startInput.Formats)
+	}
+	if !reflect.DeepEqual(crawler.startInput.CrawlPurposes, []string{"search", "ai-input"}) {
+		t.Fatalf("expected conservative crawl purposes, got %#v", crawler.startInput.CrawlPurposes)
+	}
+	if len(crawler.startInput.Options.IncludePatterns) == 0 {
+		t.Fatal("expected homepage and about include patterns")
+	}
+	if preview.BrandName != "Acme" {
+		t.Fatalf("expected brand name Acme, got %q", preview.BrandName)
+	}
+	if preview.BrandShortDescription == "" || preview.BrandDescription == "" {
+		t.Fatalf("expected descriptions to be inferred, got %#v", preview)
+	}
+	if preview.Industry != "SaaS / logiciel" {
+		t.Fatalf("expected SaaS industry, got %q", preview.Industry)
+	}
+	if len(preview.KeyFeatures) == 0 {
+		t.Fatalf("expected key features, got %#v", preview.KeyFeatures)
+	}
+	if len(preview.Prompts) == 0 {
+		t.Fatalf("expected prompts, got %#v", preview.Prompts)
+	}
+}
+
+func TestPreviewOnboardingBrandProfileFallsBackWhenCrawlerIsUnavailable(t *testing.T) {
+	svc, err := NewServiceWithDependencies(context.Background(), Dependencies{})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	preview, err := svc.PreviewOnboardingBrandProfile(context.Background(), OnboardingBrandProfileInput{
+		WebsiteURL: "example.com",
+		BrandName:  "",
+	})
+	if err != nil {
+		t.Fatalf("preview onboarding brand profile: %v", err)
+	}
+
+	if preview.BrandName != "Example" {
+		t.Fatalf("expected inferred brand name from url, got %q", preview.BrandName)
+	}
+	if preview.Status != "fallback" {
+		t.Fatalf("expected fallback status, got %q", preview.Status)
+	}
+	if len(preview.Prompts) == 0 {
+		t.Fatal("expected fallback prompts")
+	}
+}
+
 func TestStartContentOptimizerCrawlRejectsUnsupportedURLSchemes(t *testing.T) {
 	svc := NewService()
 
@@ -198,6 +291,60 @@ func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	}
 	if len(latest.Result.Records) != 1 || latest.Result.Records[0].Markdown != "# Docs" {
 		t.Fatalf("expected saved record markdown, got %#v", latest.Result.Records)
+	}
+}
+
+func TestGetContentOptimizerCrawlCanSkipAnalysisForDiscovery(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		result: ContentOptimizerCrawlResult{
+			ID:       "crawl-123",
+			Status:   "completed",
+			Total:    1,
+			Finished: 1,
+			Records: []ContentOptimizerCrawlRecord{{
+				URL:        "https://example.com/docs",
+				Status:     "completed",
+				HTTPStatus: 200,
+				Title:      "Docs",
+				Markdown:   "# Docs\nShort page.",
+			}},
+		},
+	}
+	analyzer := &recordingContentIssueAnalyzer{
+		issues: []ContentOptimizerIssue{{
+			ID:      "ai-issue",
+			FixType: "ai_issue",
+		}},
+	}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ContentCrawler:       crawler,
+		ContentIssueAnalyzer: analyzer,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{
+		Limit:        1000,
+		SkipAnalysis: true,
+	})
+	if err != nil {
+		t.Fatalf("get content optimizer crawl: %v", err)
+	}
+
+	if len(result.Records) != 1 {
+		t.Fatalf("expected discovered record, got %#v", result.Records)
+	}
+	if len(result.Records[0].Issues) != 0 {
+		t.Fatalf("expected discovery to skip issues, got %#v", result.Records[0].Issues)
+	}
+	if analyzer.input.ProjectID != "" {
+		t.Fatalf("expected AI analyzer to be skipped, got %#v", analyzer.input)
+	}
+	_, err = svc.GetLatestContentOptimizerCrawl(ctx, "project-1", 42)
+	if !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected discovery result not to be saved as latest analysis, got %v", err)
 	}
 }
 

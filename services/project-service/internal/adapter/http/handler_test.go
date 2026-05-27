@@ -214,7 +214,7 @@ func TestManualAnalysisRunRouteExecutesPrompt(t *testing.T) {
 	handler.Register(mux)
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/projects/"+project.ID+"/analysis/run",
+		"/analysis/projects/"+project.ID+"/run",
 		strings.NewReader(`{"requestId":"manual-route-1","promptTexts":[{"id":"`+prompts[0].ID+`","text":"`+prompts[0].Text+`"}],"modelIds":["gpt-oss-20b-free"],"runType":"manual"}`),
 	)
 	req.Header.Set("Content-Type", "application/json")

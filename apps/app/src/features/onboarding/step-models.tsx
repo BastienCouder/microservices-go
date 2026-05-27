@@ -14,11 +14,10 @@ import {
   getProviderKeyRequirements,
   isProviderUsableWithCredentials,
   loadLLMProviderCredentials,
-  loadModelCatalog,
+  loadOnboardingModelCatalog,
   sortCatalogItemsByProvider,
 } from "@/features/models/_lib/catalog-client";
 import {
-  readSelectedOrganizationId,
   type LLMProviderCredentialStatus,
   type ModelCatalogItem,
 } from "@/features/models/_lib/model-access";
@@ -28,16 +27,19 @@ import { useOnboarding } from "@/hooks/use-onboarding";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { getBillingPlanLabel } from "@/shared/billing-plan";
 import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
 type StepModelsProps = {
   apiBaseURL: string;
+  organizationId?: string;
   hideBack?: boolean;
   nextLabel?: string;
 };
 
 const EMPTY_MODEL_CATALOG: ModelCatalogItem[] = [];
 const EMPTY_PROVIDER_CREDENTIALS: LLMProviderCredentialStatus[] = [];
+const ONBOARDING_MODEL_SELECTION_LIMIT = 3;
 
 function sameStringArray(left: string[], right: string[]): boolean {
   return (
@@ -48,13 +50,14 @@ function sameStringArray(left: string[], right: string[]): boolean {
 
 export function StepModels({
   apiBaseURL,
+  organizationId: providedOrganizationId,
   hideBack = false,
   nextLabel = "Start audit",
 }: StepModelsProps) {
   const { selectedModels, setSelectedModels, nextStep, prevStep } =
     useOnboarding();
   const { t } = useScopedI18n("onboarding");
-  const [organizationId] = useState(readSelectedOrganizationId);
+  const organizationId = providedOrganizationId?.trim() ?? "";
   const didApplyDefaultsRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<
@@ -62,19 +65,24 @@ export function StepModels({
   >({});
   const normalizedApiBaseURL = apiBaseURL.trim();
 
+  const requiresProjectProviderCredentials = false;
+
   const billingQuery = useQuery({
     queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
     enabled: normalizedApiBaseURL !== "" && organizationId !== "",
     queryFn: ({ signal }) =>
       loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
   });
-  const requiresProjectProviderCredentials = false;
 
   const catalogQuery = useQuery({
-    queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "active"),
-    enabled: normalizedApiBaseURL !== "" && organizationId !== "",
+    queryKey: appQueryKeys.modelsCatalog(
+      apiBaseURL,
+      "__onboarding__",
+      "active",
+    ),
+    enabled: normalizedApiBaseURL !== "",
     queryFn: ({ signal }) =>
-      loadModelCatalog(apiBaseURL, organizationId, {
+      loadOnboardingModelCatalog(apiBaseURL, {
         activeOnly: true,
         signal,
       }),
@@ -164,7 +172,16 @@ export function StepModels({
     !requiresProjectProviderCredentials ||
     providerCredentialsQuery.isFetched ||
     providerCredentialsQuery.isError;
-  const selectionLimit = billingQuery.data?.modelSelectionLimit ?? 0;
+  const planLabel = billingQuery.data?.plan
+    ? getBillingPlanLabel(billingQuery.data.plan)
+    : "";
+  const billingSelectionLimit = billingQuery.data?.modelSelectionLimit ?? 0;
+  const selectionLimit =
+    organizationId && billingQuery.data
+      ? billingSelectionLimit > 0
+        ? billingSelectionLimit
+        : catalog.length
+      : ONBOARDING_MODEL_SELECTION_LIMIT;
   const selectedModelIdSet = useMemo(
     () => new Set(selectedModels),
     [selectedModels],
@@ -260,7 +277,10 @@ export function StepModels({
         ? catalog.filter((model) => usableModelIds.has(model.id))
         : catalog,
     );
-    const defaultSelection = getCatalogDefaultSelection(defaultCatalog, 3);
+    const defaultSelection = getCatalogDefaultSelection(
+      defaultCatalog,
+      selectionLimit > 0 ? selectionLimit : ONBOARDING_MODEL_SELECTION_LIMIT,
+    );
     if (defaultSelection.length > 0) {
       setSelectedModels(defaultSelection);
     }
@@ -269,6 +289,7 @@ export function StepModels({
     catalogQuery.isSuccess,
     providerCredentialsReady,
     requiresProjectProviderCredentials,
+    selectionLimit,
     selectedModels.length,
     setSelectedModels,
     usableModelIds,
@@ -430,6 +451,8 @@ export function StepModels({
     <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
       {filteredModels.map((model) => {
         const selected = selectedModelIdSet.has(model.id);
+        const disabledByPlan =
+          !selected && selectionLimit > 0 && selectedCount >= selectionLimit;
         const disabledByApiKey =
           requiresProjectProviderCredentials &&
           providerCredentialsReady &&
@@ -438,6 +461,7 @@ export function StepModels({
             providerCredentials,
             providerCredentialLookup,
           );
+        const disabled = disabledByApiKey || disabledByPlan;
 
         return (
           <div key={model.id}>
@@ -449,9 +473,11 @@ export function StepModels({
               onClick={() => toggleModel(model.id)}
               modelGroup={model.modelGroup}
               size="large"
-              disabled={disabledByApiKey}
+              disabled={disabled}
               disabledLabel={
-                disabledByApiKey ? t("modelsDeveloperModelDisabled") : undefined
+                disabledByApiKey
+                  ? t("modelsDeveloperModelDisabled")
+                  : undefined
               }
             />
           </div>
@@ -460,13 +486,7 @@ export function StepModels({
     </div>
   );
 
-  if (!organizationId) {
-    content = (
-      <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
-        {t("modelsNoOrganization")}
-      </div>
-    );
-  } else if (catalogQuery.isLoading) {
+  if (catalogQuery.isLoading) {
     content = (
       <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
         {t("modelsLoading")}
@@ -508,8 +528,16 @@ export function StepModels({
     >
       <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-border/70 bg-muted/20 px-4 py-3">
         <span className="text-sm font-medium text-foreground">
-          {t("modelsSelected", { count: selectedCount })}
+          {t("modelsSelectedWithLimit", {
+            count: selectedCount,
+            limit: selectionLimit,
+          })}
         </span>
+        {planLabel ? (
+          <span className="rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-medium text-muted-foreground">
+            {t("modelsCurrentPlan", { plan: planLabel })}
+          </span>
+        ) : null}
       </div>
 
       {requiresProjectProviderCredentials ? (

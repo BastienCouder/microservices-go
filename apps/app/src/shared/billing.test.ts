@@ -31,6 +31,7 @@ describe("billing entitlements", () => {
       seats: 3,
       modelSelectionLimit: 6,
       monthlyModelChangeLimit: 2,
+      maxProjects: 0,
     });
   });
 

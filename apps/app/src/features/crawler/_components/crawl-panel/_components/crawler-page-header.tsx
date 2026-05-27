@@ -14,7 +14,6 @@ type CrawlerPageHeaderProps = {
   canReanalyze: boolean;
   loadingLatest: boolean;
   onDiscover: () => void;
-  onOpenScopedAnalysis: () => void;
   onCrawlSelected: () => void;
   onAnalyzeSite: () => void;
 };
@@ -29,7 +28,6 @@ export function CrawlerPageHeader({
   canReanalyze,
   loadingLatest,
   onDiscover,
-  onOpenScopedAnalysis,
   onCrawlSelected,
   onAnalyzeSite,
 }: CrawlerPageHeaderProps) {
@@ -40,28 +38,18 @@ export function CrawlerPageHeader({
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {reviewingDiscoveredPages ? (
-            <>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onOpenScopedAnalysis}
-                disabled={reanalyzing}
-              >
-                Choisir les pages
-              </Button>
-              <Button
-                type="button"
-                onClick={onCrawlSelected}
-                disabled={!canCrawlSelected || reanalyzing}
-              >
-                <RefreshCw
-                  className={cn("h-4 w-4", reanalyzing && "animate-spin")}
-                />
-                {reanalyzing
-                  ? "Analyse en cours"
-                  : "Analyser les pages détectées"}
-              </Button>
-            </>
+            <Button
+              type="button"
+              onClick={onCrawlSelected}
+              disabled={!canCrawlSelected || reanalyzing}
+            >
+              <RefreshCw
+                className={cn("h-4 w-4", reanalyzing && "animate-spin")}
+              />
+              {reanalyzing
+                ? "Analyse en cours"
+                : "Analyser les pages sélectionnées"}
+            </Button>
           ) : hasAnalysis ? (
             <>
               <Button
@@ -79,14 +67,16 @@ export function CrawlerPageHeader({
               </Button>
               <Button
                 type="button"
-                onClick={onOpenScopedAnalysis}
-                disabled={!canReanalyze || loadingLatest}
-                aria-label="Réanalyser certaines pages"
+                onClick={onCrawlSelected}
+                disabled={!canCrawlSelected || loadingLatest || reanalyzing}
+                aria-label="Analyser les pages sélectionnées"
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
                 />
-                {reanalyzing ? "Analyse en cours" : "Réanalyser des pages"}
+                {reanalyzing
+                  ? "Analyse en cours"
+                  : "Analyser les pages sélectionnées"}
               </Button>
             </>
           ) : (
@@ -94,12 +84,12 @@ export function CrawlerPageHeader({
               type="button"
               onClick={onAnalyzeSite}
               disabled={!canReanalyze || loadingLatest}
-              aria-label="Analyser le site"
+              aria-label="Découvrir les URLs du site"
             >
               <RefreshCw
                 className={cn("h-4 w-4", reanalyzing && "animate-spin")}
               />
-              {reanalyzing ? "Analyse en cours" : "Analyser le site"}
+              {reanalyzing ? "Découverte en cours" : "Découvrir les URLs"}
             </Button>
           )}
         </div>

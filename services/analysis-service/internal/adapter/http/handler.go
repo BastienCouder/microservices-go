@@ -25,6 +25,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/analysis/runs/", h.analysisRunRoutes)
 	mux.HandleFunc("/analysis/alerts/", h.analysisAlertRoutes)
+	mux.HandleFunc("/onboarding/brand-profile", h.previewOnboardingBrandProfile)
 
 	// Compatibility aliases for direct service calls without /analysis prefix.
 	mux.HandleFunc("/projects/", h.projectRoutes)
@@ -146,6 +147,38 @@ type startAnalysisRequest struct {
 	PromptTexts []usecase.PromptText `json:"promptTexts"`
 	ModelIDs    []string             `json:"modelIds"`
 	RunType     string               `json:"runType"`
+}
+
+type previewOnboardingBrandProfileRequest struct {
+	WebsiteURL string `json:"websiteUrl"`
+	BrandName  string `json:"brandName"`
+}
+
+func (h *Handler) previewOnboardingBrandProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if _, ok := authenticatedUserID(r); !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		return
+	}
+
+	var req previewOnboardingBrandProfileRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := h.svc.PreviewOnboardingBrandProfile(r.Context(), usecase.OnboardingBrandProfileInput{
+		WebsiteURL: req.WebsiteURL,
+		BrandName:  req.BrandName,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
 }
 
 func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -301,6 +334,16 @@ func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectI
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	if r.URL.Query().Get("includeDashboard") == "1" || r.URL.Query().Get("includeDashboard") == "true" {
+		perception, err := h.svc.GetPerceptionWithDashboard(r.Context(), projectID, organizationID)
+		if err != nil {
+			h.writeUsecaseError(w, err)
+			return
+		}
+		writeSuccess(w, http.StatusOK, perception)
 		return
 	}
 
@@ -481,9 +524,10 @@ func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Reques
 	}
 
 	result, err := h.svc.GetContentOptimizerCrawl(r.Context(), projectID, organizationID, jobID, usecase.ContentOptimizerCrawlResultInput{
-		Cursor: r.URL.Query().Get("cursor"),
-		Limit:  limit,
-		Status: r.URL.Query().Get("status"),
+		Cursor:       r.URL.Query().Get("cursor"),
+		Limit:        limit,
+		Status:       r.URL.Query().Get("status"),
+		SkipAnalysis: strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("analyze")), "false"),
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)

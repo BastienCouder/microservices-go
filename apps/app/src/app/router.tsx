@@ -89,6 +89,7 @@ const ErrorHubPage = lazy(() =>
     default: module.ErrorHubPage,
   })),
 );
+const PerceptionOptimizeActionsPage = ErrorHubPage;
 
 export function AppRouter({
   apiBaseURL,
@@ -222,6 +223,17 @@ export function AppRouter({
         element={
           <Suspense fallback={null}>
             <ErrorHubPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/optimize/actions"
+        element={
+          <Suspense fallback={null}>
+            <PerceptionOptimizeActionsPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
           </Suspense>
         }
       />

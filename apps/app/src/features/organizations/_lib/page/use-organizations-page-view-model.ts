@@ -23,7 +23,10 @@ import {
   loadOrganizationResources,
   loadOrganizationSummaries,
 } from "../shared/organization-page-api";
-import { buildCreateProjectOnboardingHref } from "../shared/organization-page-links";
+import {
+  buildCreateProjectOnboardingHref,
+  prepareCreateProjectOnboardingContext,
+} from "../shared/organization-page-links";
 import { useOrganizationMutations } from "./use-organization-mutations";
 import type {
   InvitationDraft,
@@ -55,6 +58,7 @@ export type OrganizationsPageViewModel = {
   projectMemberDrafts: Record<string, ProjectMemberDraft>;
   invitationDraft: InvitationDraft;
   createProjectOnboardingHref: string;
+  onStartCreateProjectOnboarding: () => void;
   canManageProjects: boolean;
   canDeleteProjects: boolean;
   deletingProjectId: string;
@@ -65,6 +69,7 @@ export type OrganizationsPageViewModel = {
   createInvitationBusy: boolean;
   revokeInvitationBusy: boolean;
   updateOrganizationBusy: boolean;
+  deleteOrganizationBusy: boolean;
   createAPIKeyBusy: boolean;
   revokeAPIKeyBusy: boolean;
   createdAPIKey: OrganizationAPIKey | null;
@@ -82,6 +87,7 @@ export type OrganizationsPageViewModel = {
   onCreateInvitation: () => void;
   onRevokeInvitation: (invitationId: string) => void;
   onUpdateOrganizationName: (name: string) => void;
+  onDeleteOrganization: () => void;
   onCreateAPIKey: (name: string) => void;
   onRevokeAPIKey: (keyId: string) => void;
   onClearCreatedAPIKey: () => void;
@@ -266,6 +272,18 @@ export function useOrganizationsPageViewModel({
     setNotice,
     setLocalError,
     invalidateOrganizationData,
+    onDeleteOrganizationSuccess: () => {
+      storeSelectedOrganizationID("");
+      setSelectedOrganizationId("");
+      setActiveTab(DEFAULT_ORGANIZATION_VIEW_TAB);
+      navigateIfChanged(
+        buildScopedHref(`/organizations${routeSearch}`, {
+          org: null,
+          section: null,
+        }),
+        { replace: true },
+      );
+    },
   });
 
   return {
@@ -282,7 +300,9 @@ export function useOrganizationsPageViewModel({
     projectSearch,
     projectMemberDrafts,
     invitationDraft,
-    createProjectOnboardingHref: buildCreateProjectOnboardingHref(selectedOrganizationId),
+    createProjectOnboardingHref: buildCreateProjectOnboardingHref(),
+    onStartCreateProjectOnboarding: () =>
+      prepareCreateProjectOnboardingContext(selectedOrganizationId),
     canManageProjects,
     canDeleteProjects,
     deletingProjectId: mutations.deleteProjectMutation.isPending
@@ -298,6 +318,7 @@ export function useOrganizationsPageViewModel({
     createInvitationBusy: mutations.createInvitationMutation.isPending,
     revokeInvitationBusy: mutations.revokeInvitationMutation.isPending,
     updateOrganizationBusy: mutations.updateOrganizationNameMutation.isPending,
+    deleteOrganizationBusy: mutations.deleteOrganizationMutation.isPending,
     createAPIKeyBusy: mutations.createAPIKeyMutation.isPending,
     revokeAPIKeyBusy: mutations.revokeAPIKeyMutation.isPending,
     createdAPIKey,
@@ -327,6 +348,7 @@ export function useOrganizationsPageViewModel({
     onCreateInvitation: () => mutations.createInvitationMutation.mutate(),
     onRevokeInvitation: (invitationId) => mutations.revokeInvitationMutation.mutate(invitationId),
     onUpdateOrganizationName: (name) => mutations.updateOrganizationNameMutation.mutate(name),
+    onDeleteOrganization: () => mutations.deleteOrganizationMutation.mutate(),
     onCreateAPIKey: (name) => mutations.createAPIKeyMutation.mutate(name),
     onRevokeAPIKey: (keyId) => mutations.revokeAPIKeyMutation.mutate(keyId),
     onClearCreatedAPIKey: () => setCreatedAPIKey(null),

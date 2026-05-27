@@ -18,10 +18,15 @@ import { OnboardingStep } from "./step-shell";
 
 type StepAnalysisProps = {
   apiBaseURL: string;
+  organizationId?: string;
   hideBack?: boolean;
 };
 
-export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAnalysisProps) {
+export function StepAnalysis({
+  apiBaseURL,
+  organizationId: providedOrganizationId,
+  hideBack: _hideBack = false,
+}: StepAnalysisProps) {
   const {
     organizationName,
     websiteUrl,
@@ -41,7 +46,6 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
   const [attempt, setAttempt] = useState(0);
   const startedAttemptRef = useRef<number | null>(null);
   const analysisRetryErrorMessage = t("analysisRetryError");
-  const monitoringHref = buildScopedHref("/monitoring", { project: createdProjectId });
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -64,10 +68,12 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
     }
     startedAttemptRef.current = attempt;
 
-    let cancelled = false;
     setCreationError(null);
 
-    const organizationId = readSelectedOrganizationID();
+    const organizationId =
+      providedOrganizationId !== undefined
+        ? providedOrganizationId.trim()
+        : readSelectedOrganizationID();
     void createOnboardingProject(apiBaseURL, {
       organizationId,
       organizationName,
@@ -81,7 +87,6 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
       modelIds: selectedModels,
     })
       .then(({ projectId, projectSlug, organizationId: projectOrganizationId, warnings }) => {
-        if (cancelled) return;
         storeSelectedProjectContext({
           organizationId: projectOrganizationId,
           projectId,
@@ -93,9 +98,11 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
         if (warnings.length > 0) {
           pushWarningToast(warnings.join(" "));
         }
+        window.setTimeout(() => {
+          navigate(buildScopedHref("/monitoring", { project: projectSlug }));
+        }, 250);
       })
       .catch((error) => {
-        if (cancelled) return;
         const nextMessage =
           error instanceof Error
             ? error.message
@@ -103,10 +110,6 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
         setCreationError(nextMessage);
         pushErrorToast(error, "Impossible de creer le projet.");
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, [
     attempt,
     apiBaseURL,
@@ -116,23 +119,13 @@ export function StepAnalysis({ apiBaseURL, hideBack: _hideBack = false }: StepAn
     competitors,
     industry,
     organizationName,
+    providedOrganizationId,
     selectedModels,
     selectedPrompts,
     analysisRetryErrorMessage,
+    navigate,
     websiteUrl,
   ]);
-
-  useEffect(() => {
-    if (!createdProjectId || creationError) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      navigate(monitoringHref);
-    }, 250);
-
-    return () => window.clearTimeout(timeout);
-  }, [createdProjectId, creationError, monitoringHref, navigate]);
 
   function retryCreateProject() {
     setCreatedProjectId("");

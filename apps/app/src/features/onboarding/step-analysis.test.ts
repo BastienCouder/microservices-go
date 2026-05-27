@@ -7,8 +7,7 @@ describe("step analysis", () => {
     expect(source.includes("analysisRetry")).toBe(true);
     expect(source.includes("creationError")).toBe(true);
     expect(source.includes("setProgress(10)")).toBe(true);
-    expect(source.includes("!createdProjectId || creationError")).toBe(true);
-    expect(source.includes("navigate(monitoringHref)")).toBe(true);
+    expect(source.includes("navigate(buildScopedHref")).toBe(true);
     expect(source.includes("setTimeout")).toBe(true);
     expect(source.includes("<OnboardingStepFooter")).toBe(false);
     expect(source.includes('t("goToMonitoring")')).toBe(false);
@@ -25,5 +24,11 @@ describe("step analysis", () => {
     expect(source.includes("startedAttemptRef")).toBe(true);
     expect(source.includes("startedAttemptRef.current === attempt")).toBe(true);
     expect(source.includes("startedAttemptRef.current = attempt")).toBe(true);
+  });
+
+  test("does not cancel the successful creation result during React StrictMode effect replay", () => {
+    expect(source.includes("let cancelled = false")).toBe(false);
+    expect(source.includes("if (cancelled) return")).toBe(false);
+    expect(source.includes("cancelled = true")).toBe(false);
   });
 });

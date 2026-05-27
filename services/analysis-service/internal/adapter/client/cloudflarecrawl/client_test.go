@@ -63,6 +63,40 @@ func TestStartCrawlPostsCloudflarePayload(t *testing.T) {
 	}
 }
 
+func TestStartCrawlNormalizesBearerTokenPrefix(t *testing.T) {
+	var gotAuthorization string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuthorization = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"result":"crawl-123"}`))
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{
+		AccountID: "account-1",
+		APIToken:  "Bearer token-1",
+		BaseURL:   server.URL,
+	})
+	if err != nil {
+		t.Fatalf("new cloudflare crawl client: %v", err)
+	}
+
+	_, err = client.StartCrawl(context.Background(), usecase.ContentOptimizerCrawlStartInput{
+		URL:     "https://example.com",
+		Limit:   12,
+		Depth:   2,
+		Formats: []string{"markdown"},
+	})
+	if err != nil {
+		t.Fatalf("start crawl: %v", err)
+	}
+
+	if gotAuthorization != "Bearer token-1" {
+		t.Fatalf("expected normalized bearer token, got %q", gotAuthorization)
+	}
+}
+
 func TestGetCrawlMapsCompletedRecords(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("status") != "completed" {

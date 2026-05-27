@@ -8,6 +8,7 @@ import {
 import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -63,11 +64,17 @@ type CrawlerResultsViewProps = {
   records: ContentOptimizerCrawlRecord[];
   filteredRecords: ContentOptimizerCrawlRecord[];
   selectedRecord: ContentOptimizerCrawlRecord | null;
+  selectable?: boolean;
+  selectedURLs?: Set<string>;
+  selectedCount?: number;
+  allSelected?: boolean;
   onQueryChange: (value: string) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onSeverityFilterChange: (value: SeverityFilter) => void;
   onToggleSort: (key: SortKey) => void;
   onSelectRecord: (url: string) => void;
+  onTogglePage?: (url: string, checked: boolean) => void;
+  onToggleAll?: (checked: boolean) => void;
 };
 
 function loadingRows() {
@@ -220,11 +227,17 @@ export function CrawlerResultsView({
   records,
   filteredRecords,
   selectedRecord,
+  selectable = false,
+  selectedURLs = new Set(),
+  selectedCount = 0,
+  allSelected = false,
   onQueryChange,
   onStatusFilterChange,
   onSeverityFilterChange,
   onToggleSort,
   onSelectRecord,
+  onTogglePage,
+  onToggleAll,
 }: CrawlerResultsViewProps) {
   function renderSortIcon(columnKey: SortKey) {
     if (sortKey !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
@@ -272,6 +285,22 @@ export function CrawlerResultsView({
               description="Filtrer les pages par sévérité des erreurs."
             />
           </div>
+
+          {selectable ? (
+            <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+              <span>
+                {selectedCount}/{records.length} sélectionnée(s)
+              </span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onToggleAll?.(!allSelected)}
+              >
+                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+              </Button>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -280,6 +309,17 @@ export function CrawlerResultsView({
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
+                {selectable ? (
+                  <TableHead className="h-12 w-12 px-3">
+                    <Checkbox
+                      checked={allSelected}
+                      aria-label="Sélectionner toutes les pages"
+                      onCheckedChange={(checked) =>
+                        onToggleAll?.(checked === true)
+                      }
+                    />
+                  </TableHead>
+                ) : null}
                 {columns.map((column) => {
                   const sortMap: Partial<Record<CrawlColumn["id"], SortKey>> = {
                     page: "page",
@@ -321,9 +361,12 @@ export function CrawlerResultsView({
                 loadingRows()
               ) : filteredRecords.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="py-6">
+                  <TableCell
+                    colSpan={columns.length + (selectable ? 1 : 0)}
+                    className="py-6"
+                  >
                     <EmptyStateCard
-                        label={
+                      label={
                         errorLabel ||
                         (records.length === 0
                           ? "Aucun résultat disponible."
@@ -338,6 +381,7 @@ export function CrawlerResultsView({
                   const issue = primaryIssue(record);
                   const priority = computePriority(record);
                   const isSelected = selectedRecord?.url === record.url;
+                  const recordURL = record.url.trim();
 
                   return (
                     <TableRow
@@ -357,6 +401,20 @@ export function CrawlerResultsView({
                         isSelected && "border-l-primary bg-muted/50",
                       )}
                     >
+                      {selectable ? (
+                        <TableCell
+                          className="w-12"
+                          onClick={(event) => event.stopPropagation()}
+                        >
+                          <Checkbox
+                            checked={selectedURLs.has(recordURL)}
+                            aria-label={`Sélectionner ${recordURL}`}
+                            onCheckedChange={(checked) =>
+                              onTogglePage?.(recordURL, checked === true)
+                            }
+                          />
+                        </TableCell>
+                      ) : null}
                       <TableCell className="max-w-[360px] whitespace-normal">
                         <div className="space-y-1">
                           <div className="line-clamp-2 text-sm font-medium leading-6">

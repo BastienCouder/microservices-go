@@ -16,6 +16,66 @@ afterEach(() => {
 });
 
 describe("gatewayJSON", () => {
+  test("sends JSON accept headers on gateway requests", async () => {
+    let acceptHeader = "";
+    globalThis.fetch = (async (_url, init) => {
+      acceptHeader = new Headers(init?.headers).get("Accept") ?? "";
+      return jsonResponse(200, { loaded: true });
+    }) as typeof fetch;
+
+    await gatewayJSON<{ loaded: boolean }>("http://api.test", "/projects", {
+      method: "GET",
+    });
+
+    expect(acceptHeader).toBe("application/json");
+  });
+
+  test("returns a timeout result when the gateway request hangs", async () => {
+    globalThis.fetch = (async (_url, init) => {
+      await new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener(
+          "abort",
+          () => reject(init.signal?.reason),
+          { once: true },
+        );
+      });
+      return jsonResponse(200, { loaded: true });
+    }) as typeof fetch;
+
+    const response = await gatewayJSON<{ loaded: boolean }>(
+      "http://api.test",
+      "/projects",
+      { method: "GET", timeoutMs: 1, retry: { attempts: 0 } },
+    );
+
+    expect(response).toEqual({
+      ok: false,
+      status: 0,
+      error: "request timed out",
+    });
+  });
+
+  test("returns a gateway error when an error response contains invalid json", async () => {
+    globalThis.fetch = (async () =>
+      new Response("<html>bad gateway</html>", {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      })) as typeof fetch;
+
+    const response = await gatewayJSON<{ loaded: boolean }>(
+      "http://api.test",
+      "/projects",
+      { method: "GET", retry: { attempts: 0 } },
+    );
+
+    expect(response).toEqual({
+      ok: false,
+      status: 502,
+      error: "request failed",
+      details: null,
+    });
+  });
+
   test("retries transient gateway dependency failures on GET requests", async () => {
     const calls: string[] = [];
     globalThis.fetch = (async (url) => {

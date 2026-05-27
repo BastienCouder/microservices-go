@@ -42,7 +42,7 @@ func NewClient(cfg Config) (*Client, error) {
 	if accountID == "" {
 		return nil, fmt.Errorf("cloudflare account id is required")
 	}
-	apiToken := strings.TrimSpace(cfg.APIToken)
+	apiToken := normalizeAPIToken(cfg.APIToken)
 	if apiToken == "" {
 		return nil, fmt.Errorf("cloudflare api token is required")
 	}
@@ -60,6 +60,14 @@ func NewClient(cfg Config) (*Client, error) {
 		baseURL:    baseURL,
 		httpClient: httpClient,
 	}, nil
+}
+
+func normalizeAPIToken(value string) string {
+	token := strings.TrimSpace(value)
+	if strings.HasPrefix(strings.ToLower(token), "bearer ") {
+		return strings.TrimSpace(token[len("bearer "):])
+	}
+	return token
 }
 
 func (c *Client) StartCrawl(ctx context.Context, input usecase.ContentOptimizerCrawlStartInput) (usecase.ContentOptimizerCrawlJob, error) {

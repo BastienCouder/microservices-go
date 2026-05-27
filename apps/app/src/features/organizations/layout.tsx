@@ -26,6 +26,7 @@ export function OrganizationsLayout({
   projectMemberDrafts,
   invitationDraft,
   createProjectOnboardingHref,
+  onStartCreateProjectOnboarding,
   canManageProjects,
   canDeleteProjects,
   deletingProjectId,
@@ -36,6 +37,7 @@ export function OrganizationsLayout({
   createInvitationBusy,
   revokeInvitationBusy,
   updateOrganizationBusy,
+  deleteOrganizationBusy,
   createAPIKeyBusy,
   revokeAPIKeyBusy,
   createdAPIKey,
@@ -53,6 +55,7 @@ export function OrganizationsLayout({
   onCreateInvitation,
   onRevokeInvitation,
   onUpdateOrganizationName,
+  onDeleteOrganization,
   onCreateAPIKey,
   onRevokeAPIKey,
   onClearCreatedAPIKey,
@@ -93,6 +96,7 @@ export function OrganizationsLayout({
                   currentUserId={currentUserId}
                   memberDrafts={projectMemberDrafts}
                   onboardingHref={createProjectOnboardingHref}
+                  onStartOnboarding={onStartCreateProjectOnboarding}
                   search={projectSearch}
                   canManageProjects={canManageProjects}
                   canDeleteProjects={canDeleteProjects}
@@ -141,7 +145,9 @@ export function OrganizationsLayout({
                 <SettingsPanel
                   organization={selectedOrganization}
                   busy={updateOrganizationBusy}
+                  deleteBusy={deleteOrganizationBusy}
                   onSubmit={onUpdateOrganizationName}
+                  onDelete={onDeleteOrganization}
                 />
               ) : null}
 

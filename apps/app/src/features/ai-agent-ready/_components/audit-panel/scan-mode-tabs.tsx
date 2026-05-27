@@ -29,7 +29,7 @@ export function ScanModeTabs({ modes, value, onChange }: ScanModeTabsProps) {
             aria-selected={active}
             disabled={mode.disabled}
             className={cn(
-              "shrink-0 rounded-lg border px-4 py-2 text-sm font-medium transition duration-150",
+              "shrink-0 rounded-lg border px-4 py-2 text-sm font-medium",
               active
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border/70 bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-foreground",

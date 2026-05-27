@@ -28,6 +28,8 @@ type CrawlRequestOptions = {
   includePatterns?: string[];
 };
 
+const DISCOVERY_LIMIT = 1000;
+
 const TERMINAL_STATUSES = new Set([
   "completed",
   "cancelled_due_to_timeout",
@@ -126,7 +128,9 @@ export function useContentOptimizerViewModel({
     isValidHTTPURL(projectWebsiteURL.trim()) &&
     phase !== "discovering" &&
     phase !== "crawling";
-  const canCrawlSelected = phase === "review" && selectedCount > 0;
+  const canCrawlSelected =
+    (phase === "review" || phase === "completed") &&
+    selectedCount > 0;
   const canReanalyze =
     canDiscover &&
     (selectedCount > 0 || crawlRecords.length > 0 || !crawlResult);
@@ -216,8 +220,8 @@ export function useContentOptimizerViewModel({
         projectId,
         organizationId,
         url: projectWebsiteURL,
-        limit: 50,
-        depth: 3,
+        limit: DISCOVERY_LIMIT,
+        depth: 25,
         render: false,
       }),
     onMutate: () => {
@@ -321,6 +325,7 @@ export function useContentOptimizerViewModel({
           organizationId,
           jobId: activeJobId,
           limit: 1,
+          analyze: activeJobKind !== "discover",
         });
         if (cancelled) return;
 
@@ -329,7 +334,8 @@ export function useContentOptimizerViewModel({
             projectId,
             organizationId,
             jobId: activeJobId,
-            limit: 1000,
+            limit: DISCOVERY_LIMIT,
+            analyze: activeJobKind !== "discover",
           });
           if (cancelled) return;
 
@@ -339,13 +345,34 @@ export function useContentOptimizerViewModel({
             );
             setDiscoveryResult(completed);
             setSelectedURLs(nextURLs);
-            setPhase("review");
-          } else {
-            setCrawlResult(completed);
-            setPhase("completed");
             if (completed.records[0]?.url) {
               setSelectedResultURL(completed.records[0].url);
             }
+            setPhase("review");
+          } else {
+            try {
+              const latest = await getLatestContentOptimizerCrawl(apiBaseURL, {
+                projectId,
+                organizationId,
+              });
+              if (cancelled) return;
+              const nextResult = latest?.result ?? completed;
+              setCrawlResult(nextResult);
+              setDiscoveryResult(nextResult);
+              setSelectedURLs(
+                new Set(nextResult.records.map(pageURL).filter(Boolean)),
+              );
+              if (nextResult.records[0]?.url) {
+                setSelectedResultURL(nextResult.records[0].url);
+              }
+            } catch {
+              if (cancelled) return;
+              setCrawlResult(completed);
+              if (completed.records[0]?.url) {
+                setSelectedResultURL(completed.records[0].url);
+              }
+            }
+            setPhase("completed");
           }
           setActiveJobKind(null);
           return;

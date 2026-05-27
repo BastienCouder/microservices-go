@@ -24,7 +24,7 @@ export function ContentOptimizerLayout() {
             }
             description={t("description")}
             className="border-white/80 bg-white/90"
-            contentClassName="space-y-5"
+            contentClassName="space-y-5 flex items-center justify-center"
           >
            <></>
           </OnboardingStep>

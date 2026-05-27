@@ -31,8 +31,8 @@ export function InitialSetupCard({
           <OnboardingStep
             title={
               projectName
-                ? `Analyser le site ${projectName}`
-                : "Analyser un site pour ce projet"
+                ? `Découvrir les URLs de ${projectName}`
+                : "Découvrir les URLs du site"
             }
             className="rounded-[24px] border-white/80 bg-white/90"
             contentClassName="space-y-5"
@@ -56,7 +56,7 @@ export function InitialSetupCard({
                 disabled={!canReanalyze || reanalyzing}
                 className="min-w-44"
               >
-                {reanalyzing ? "Analyse en cours" : "Analyser le site"}
+                {reanalyzing ? "Découverte en cours" : "Crawler les URLs"}
               </Button>
             </div>
           </OnboardingStep>

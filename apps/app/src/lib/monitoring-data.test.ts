@@ -231,12 +231,11 @@ describe("loadMonitoringData", () => {
     const result = await loadMonitoringData("http://api.test", "");
 
     expect(result.data.recent_prompts).toHaveLength(1);
-    expect(result.data.recent_prompts[0]).toMatchObject({
-      modelId: "gemma-3-4b-free",
-      modelDisplayName: "Gemma 3 4B",
-      modelGroupName: "gemma",
-      modelProviderModelId: "google/gemma-3-4b-it",
-    });
+    const recentPrompt = result.data.recent_prompts[0];
+    expect(recentPrompt.modelId).toBe("gemma-3-4b-free");
+    expect(recentPrompt.modelDisplayName).toBe("Gemma 3 4B");
+    expect(recentPrompt.modelGroupName).toBe("gemma");
+    expect(recentPrompt.modelProviderModelId).toBe("google/gemma-3-4b-it");
   });
 });
 

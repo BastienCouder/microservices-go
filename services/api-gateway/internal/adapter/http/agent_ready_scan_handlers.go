@@ -9,11 +9,15 @@ import (
 )
 
 func isAgentReadyScanCollectionRequest(r *stdhttp.Request) bool {
-	return r.URL.Path == "/api/scan"
+	return r.URL.Path == "/analysis/agent-ready/scans"
 }
 
 func isAgentReadyScanItemRequest(r *stdhttp.Request) bool {
-	return strings.HasPrefix(r.URL.Path, "/api/scan/")
+	return strings.HasPrefix(r.URL.Path, "/analysis/agent-ready/scans/")
+}
+
+func agentReadyScanIDFromPath(path string) string {
+	return strings.TrimSpace(strings.TrimPrefix(path, "/analysis/agent-ready/scans/"))
 }
 
 func (h *Handler) handleAgentReadyScan(w stdhttp.ResponseWriter, r *stdhttp.Request) {
@@ -49,7 +53,7 @@ func (h *Handler) createAgentReadyScan(w stdhttp.ResponseWriter, r *stdhttp.Requ
 }
 
 func (h *Handler) getAgentReadyScan(w stdhttp.ResponseWriter, r *stdhttp.Request) {
-	scanID := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/api/scan/"))
+	scanID := agentReadyScanIDFromPath(r.URL.Path)
 	if scanID == "" || strings.Contains(scanID, "/") {
 		writeJSONError(w, stdhttp.StatusBadRequest, "invalid scan id")
 		return

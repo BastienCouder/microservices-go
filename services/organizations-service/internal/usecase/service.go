@@ -92,6 +92,16 @@ func (s *Service) UpdateOrganizationName(ctx context.Context, id int64, name str
 	return org, nil
 }
 
+func (s *Service) DeleteOrganization(ctx context.Context, id int64) error {
+	if id <= 0 {
+		return fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidOrganization)
+	}
+	if err := s.repo.DeleteOrganization(ctx, id, s.now().UTC()); err != nil {
+		return fmt.Errorf("delete organization %d: %w", id, err)
+	}
+	return nil
+}
+
 func (s *Service) CreateOrganizationAPIKey(ctx context.Context, organizationID int64, name string) (*domain.OrganizationAPIKey, error) {
 	name = strings.TrimSpace(name)
 	rawKey, err := generateOrganizationAPIKey()

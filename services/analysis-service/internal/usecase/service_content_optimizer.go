@@ -34,9 +34,10 @@ type ContentOptimizerCrawlStartInput struct {
 }
 
 type ContentOptimizerCrawlResultInput struct {
-	Cursor string `json:"cursor,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
-	Status string `json:"status,omitempty"`
+	Cursor       string `json:"cursor,omitempty"`
+	Limit        int    `json:"limit,omitempty"`
+	Status       string `json:"status,omitempty"`
+	SkipAnalysis bool   `json:"skipAnalysis,omitempty"`
 }
 
 type ContentOptimizerCrawlJob struct {
@@ -137,9 +138,10 @@ func (s *Service) GetContentOptimizerCrawl(
 	}
 
 	normalized := ContentOptimizerCrawlResultInput{
-		Cursor: strings.TrimSpace(input.Cursor),
-		Limit:  input.Limit,
-		Status: strings.ToLower(strings.TrimSpace(input.Status)),
+		Cursor:       strings.TrimSpace(input.Cursor),
+		Limit:        input.Limit,
+		Status:       strings.ToLower(strings.TrimSpace(input.Status)),
+		SkipAnalysis: input.SkipAnalysis,
 	}
 	if normalized.Limit < 0 {
 		return ContentOptimizerCrawlResult{}, fmt.Errorf("%w: limit must be positive", ErrValidation)
@@ -152,8 +154,10 @@ func (s *Service) GetContentOptimizerCrawl(
 	if err != nil {
 		return ContentOptimizerCrawlResult{}, err
 	}
-	result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
-	if isTerminalCrawlJobStatus(result.Status) && shouldSaveContentOptimizerCrawlResult(normalized, result) {
+	if !normalized.SkipAnalysis {
+		result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
+	}
+	if !normalized.SkipAnalysis && isTerminalCrawlJobStatus(result.Status) && shouldSaveContentOptimizerCrawlResult(normalized, result) {
 		if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
 			return ContentOptimizerCrawlResult{}, err
 		}

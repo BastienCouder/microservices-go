@@ -190,8 +190,8 @@ export const PERCEPTION_TEXT = {
   },
   optimizeActions: {
     title: "Actions d'optimisation générées",
-    description: "Les boutons [Corriger] à droite créent des brouillons d'actions directement exploitables.",
-    empty: "Aucune action générée pour le moment. Cliquez sur [Corriger] dans la colonne de droite.",
+    description: "Les boutons [Créer une action] à droite créent des brouillons d'actions directement exploitables.",
+    empty: "Aucune action générée pour le moment. Cliquez sur [Créer une action] dans la colonne de droite.",
     statusPrefix: "Statut",
     createActionError: "Impossible de créer l'action d'optimisation",
   },
@@ -204,7 +204,7 @@ export const PERCEPTION_TEXT = {
     impact: "Impact",
     generatedFix: "Correction proposée",
     added: "Ajoutée",
-    fix: "Corriger",
+    fix: "Créer une action",
     markDone: "Marquer fait",
     errorPrefix: "Erreur n°",
     severity: {
