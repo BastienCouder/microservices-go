@@ -86,6 +86,12 @@ func (m *memoryRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanS
 	if m.planSettings == nil {
 		m.planSettings = make(map[string]domain.PlanSettings)
 	}
+	if settings.IsMostChosen {
+		for plan, item := range m.planSettings {
+			item.IsMostChosen = false
+			m.planSettings[plan] = item
+		}
+	}
 	m.planSettings[settings.Plan] = settings
 	return nil
 }
@@ -106,12 +112,37 @@ func (m *memoryRepo) UpsertPricingTier(_ context.Context, tier domain.PricingTie
 	return nil
 }
 
+func (m *memoryRepo) DeletePricingTier(_ context.Context, promptVolume int) error {
+	if m.pricingTiers == nil {
+		m.pricingTiers = make(map[int]domain.PricingTier)
+	}
+	m.pricingTiers[promptVolume] = domain.PricingTier{
+		PromptVolume: promptVolume,
+		Label:        "deleted",
+		Deleted:      true,
+	}
+	return nil
+}
+
 type noopStripeProvider struct{}
 
 func (n *noopStripeProvider) CreateSubscriptionCheckoutSession(_ context.Context, _ usecase.StripeCheckoutSessionRequest) (usecase.StripeCheckoutSession, error) {
 	return usecase.StripeCheckoutSession{
 		ID:  "cs_test",
 		URL: "https://checkout.stripe.com/c/pay/cs_test",
+	}, nil
+}
+
+func (n *noopStripeProvider) FindPriceIDByLookupKey(_ context.Context, _ string) (string, error) {
+	return "price_admin_pricing", nil
+}
+
+func (n *noopStripeProvider) SyncPricingCatalog(_ context.Context, _ usecase.StripePricingCatalogSyncRequest) (usecase.StripePricingCatalogSyncResult, error) {
+	return usecase.StripePricingCatalogSyncResult{
+		ProductsCreated: 1,
+		ProductsUpdated: 4,
+		PricesCreated:   20,
+		PricesReused:    1,
 	}, nil
 }
 
@@ -472,5 +503,31 @@ func TestUpdatePricingTierAcceptsDynamicPlanPrices(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, `"agency-plus":79900`) {
 		t.Fatalf("expected custom plan price in response, got %s", body)
+	}
+}
+
+func TestSyncStripePricingCatalogEndpointSyncsOnePlan(t *testing.T) {
+	repo := &memoryRepo{}
+	svc := usecase.NewService(repo)
+	svc.EnableStripe(&noopStripeProvider{}, usecase.StripeCatalog{}, "", "", "")
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/stripe/pricing-catalog/plans/growth/sync", strings.NewReader(`{}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"products_created":1`) {
+		t.Fatalf("expected sync result in response, got %s", body)
+	}
+	if !strings.Contains(body, `"prices_reused":1`) {
+		t.Fatalf("expected price reuse count in response, got %s", body)
 	}
 }

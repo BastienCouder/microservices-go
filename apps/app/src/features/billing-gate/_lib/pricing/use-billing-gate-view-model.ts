@@ -17,6 +17,7 @@ import {
 
 type CheckoutIntent = {
   plan: CheckoutPlan;
+  promptVolume?: number;
 };
 
 export type PricingPlan = {
@@ -113,7 +114,7 @@ export function useBillingGateViewModel({
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: async ({ plan }: CheckoutIntent) => {
+    mutationFn: async ({ plan, promptVolume }: CheckoutIntent) => {
       setLocalError("");
       let organizationId = activeOrganizationId;
       if (!organizationId) {
@@ -126,6 +127,7 @@ export function useBillingGateViewModel({
         organizationId,
         plan,
         billingCycle,
+        promptVolume,
       });
       window.location.assign(checkoutURL);
     },
@@ -161,6 +163,7 @@ export function useBillingGateViewModel({
     setBillingCycle,
     setOrganizationName,
     setSelectedOrganizationId,
-    startCheckout: (plan: CheckoutPlan) => checkoutMutation.mutate({ plan }),
+    startCheckout: (plan: CheckoutPlan, promptVolume?: number) =>
+      checkoutMutation.mutate({ plan, promptVolume }),
   };
 }

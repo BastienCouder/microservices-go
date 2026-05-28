@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import { gatewayJSON, toGatewayError, type GatewayResult } from "@/shared/api/gateway";
 import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 import {
   getArray,
@@ -47,7 +47,7 @@ type LoadOrganizationResourcesOptions = {
 async function requireGatewayData<T>(promise: Promise<GatewayResult<T>>, message: string): Promise<T> {
   const response = await promise;
   if (!response.ok) {
-    throw new Error(response.error || message);
+    throw toGatewayError(response, message);
   }
   return response.data;
 }

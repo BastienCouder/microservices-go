@@ -1,6 +1,7 @@
 package security
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,5 +46,21 @@ func TestInternalAuthMiddlewareProtectsMetricsWithoutToken(t *testing.T) {
 	}
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+
+	var payload struct {
+		Error struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Error.Code != "unauthorized" {
+		t.Fatalf("expected unauthorized code, got %q", payload.Error.Code)
+	}
+	if payload.Error.Message != "invalid internal authorization" {
+		t.Fatalf("expected internal authorization message, got %q", payload.Error.Message)
 	}
 }

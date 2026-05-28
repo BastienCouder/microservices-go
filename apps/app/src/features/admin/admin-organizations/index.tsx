@@ -785,7 +785,7 @@ function SaveButton({
   return (
     <Button type="submit" disabled={pending} className={className}>
       <Save data-icon="inline-start" />
-      {pending ? "Sauvegarde..." : "Sauver"}
+      {pending ? "Sauvegarde..." : "Sauvegarder"}
     </Button>
   );
 }

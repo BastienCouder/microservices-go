@@ -50,17 +50,17 @@ func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	var req sendNotificationRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
 	notification, err := h.svc.Send(r.Context(), req.Channel, req.Recipient, req.Subject, req.Message)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidNotification) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -74,7 +74,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil || parsed <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid limit"})
+			writeError(w, http.StatusBadRequest, "invalid limit")
 			return
 		}
 		limit = parsed
@@ -85,7 +85,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 
 	notifications, err := h.svc.List(r.Context(), limit)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 

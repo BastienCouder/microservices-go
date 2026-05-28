@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -32,8 +33,8 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 	}
 
 	plan := domain.NormalizePlan(input.Plan)
-	if !isStripeSupportedPlan(plan) {
-		return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("%w: %s", ErrStripeUnsupportedPlan, input.Plan)
+	if plan == "" {
+		return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("%w: plan is required", ErrStripeInvalidRequest)
 	}
 	cycle := domain.NormalizeBillingCycle(input.BillingCycle)
 	if cycle != domain.BillingCycleMonthly && cycle != domain.BillingCycleYearly {
@@ -45,7 +46,7 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 		seats = 1
 	}
 
-	priceID, monthlyQuota, err := s.resolvePlanPricing(ctx, plan, cycle)
+	priceID, monthlyQuota, err := s.resolvePlanPricing(ctx, plan, cycle, input.PromptVolume)
 	if err != nil {
 		return CreateStripeCheckoutSessionOutput{}, err
 	}
@@ -198,11 +199,18 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 	return nil
 }
 
-func (s *Service) resolvePlanPricing(ctx context.Context, plan, cycle string) (string, int, error) {
+func (s *Service) resolvePlanPricing(ctx context.Context, plan, cycle string, promptVolume int) (string, int, error) {
 	catalog := s.stripeCatalog
 	settings, settingsErr := s.planSettingsForPlan(ctx, plan)
 	if settingsErr != nil {
 		return "", 0, settingsErr
+	}
+	if promptVolume > 0 && cycle == domain.BillingCycleMonthly {
+		priceID, err := s.resolveAdminPricingPriceID(ctx, plan, promptVolume)
+		if err != nil {
+			return "", 0, err
+		}
+		return priceID, settings.MonthlyQuota, nil
 	}
 	switch plan {
 	case domain.PlanStarter:
@@ -239,8 +247,64 @@ func (s *Service) resolvePlanPricing(ctx context.Context, plan, cycle string) (s
 		}
 		return strings.TrimSpace(catalog.ProMonthlyPriceID), settings.MonthlyQuota, nil
 	default:
-		return "", 0, fmt.Errorf("%w: %s", ErrStripeUnsupportedPlan, plan)
+		if cycle == domain.BillingCycleYearly {
+			return "", 0, fmt.Errorf("%w: yearly custom plan price is not configured", ErrStripeUnsupportedCycle)
+		}
+		priceID, err := s.resolveAdminPricingPriceID(ctx, plan, promptVolume)
+		if err != nil {
+			return "", 0, err
+		}
+		return priceID, settings.MonthlyQuota, nil
 	}
+}
+
+func (s *Service) resolveAdminPricingPriceID(ctx context.Context, plan string, promptVolume int) (string, error) {
+	tier, err := s.adminPricingTierForCheckout(ctx, plan, promptVolume)
+	if err != nil {
+		return "", err
+	}
+	lookupKey := stripeCatalogPriceLookupKey(plan, tier.PromptVolume)
+	priceID, err := s.stripe.FindPriceIDByLookupKey(ctx, lookupKey)
+	if err != nil {
+		return "", fmt.Errorf("lookup stripe price %s: %w", lookupKey, err)
+	}
+	if strings.TrimSpace(priceID) == "" {
+		return "", fmt.Errorf("%w: stripe price %s is missing; push this plan to Stripe first", ErrStripeInvalidRequest, lookupKey)
+	}
+	return strings.TrimSpace(priceID), nil
+}
+
+func (s *Service) adminPricingTierForCheckout(ctx context.Context, plan string, promptVolume int) (domain.PricingTier, error) {
+	normalizedPlan := domain.NormalizePlan(plan)
+	tiers, err := s.ListPricingTiers(ctx)
+	if err != nil {
+		return domain.PricingTier{}, fmt.Errorf("list pricing tiers for checkout: %w", err)
+	}
+	sort.SliceStable(tiers, func(left, right int) bool {
+		return tiers[left].PromptVolume < tiers[right].PromptVolume
+	})
+
+	var firstAvailable *domain.PricingTier
+	for _, tier := range tiers {
+		price := tier.Prices[normalizedPlan]
+		if price == nil {
+			continue
+		}
+		if firstAvailable == nil {
+			copy := tier
+			firstAvailable = &copy
+		}
+		if promptVolume > 0 && tier.PromptVolume == promptVolume {
+			return tier, nil
+		}
+	}
+	if promptVolume > 0 {
+		return domain.PricingTier{}, fmt.Errorf("%w: no price configured for %s at %d prompts", ErrStripeInvalidRequest, normalizedPlan, promptVolume)
+	}
+	if firstAvailable == nil {
+		return domain.PricingTier{}, fmt.Errorf("%w: no price configured for %s", ErrStripeInvalidRequest, normalizedPlan)
+	}
+	return *firstAvailable, nil
 }
 
 func newSubscriptionFromWebhook(event StripeWebhookEvent, nowTime time.Time) *domain.Subscription {

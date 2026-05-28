@@ -77,11 +77,11 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request) {
 
 	session, statusCode, err := h.svc.WhoAmI(r.Context(), r.Header.Get("Cookie"), r.Header.Get("X-Session-Token"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		return
 	}
 	if statusCode != http.StatusOK || session == nil || !session.Active {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
@@ -111,11 +111,11 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 
 	session, statusCode, err := h.svc.WhoAmI(r.Context(), r.Header.Get("Cookie"), r.Header.Get("X-Session-Token"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		return
 	}
 	if statusCode != http.StatusOK || session == nil || !session.Active {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
 	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
@@ -146,29 +146,29 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 	var req passwordRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if !validMode(req.Mode) || req.Email == "" || req.Password == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid mode/email/password"})
+		writeError(w, http.StatusBadRequest, "invalid mode/email/password")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "invalid_input"})
 		return
 	}
 
 	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, "", r.Header.Get("Cookie"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
 		return
 	}
 	if statusCode != http.StatusOK || flow == nil {
-		writeJSON(w, statusCode, map[string]string{"error": "unable to init flow"})
+		writeError(w, statusCode, "unable to init flow")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "flow_init_failed", "status": statusCode})
 		return
 	}
 	csrfToken := flow.CSRFToken()
 	if csrfToken == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "missing csrf token"})
+		writeError(w, http.StatusBadGateway, "missing csrf token")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "missing_csrf"})
 		return
 	}
@@ -188,7 +188,7 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 	submitCookie := mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies)
 	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, flow.ID, payload, submitCookie)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
 		return
 	}
@@ -202,7 +202,7 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 	}
 	var body any
 	if err := json.Unmarshal(raw, &body); err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "invalid kratos response"})
+		writeError(w, http.StatusBadGateway, "invalid kratos response")
 		return
 	}
 	h.syncUserProfileFromSession(r, append([]string{}, initSetCookies...), append([]string{}, submitSetCookies...), "auth_password", req.Mode)
@@ -227,29 +227,29 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 	var req otpStartRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if !validMode(req.Mode) || req.Email == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid mode/email"})
+		writeError(w, http.StatusBadRequest, "invalid mode/email")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "invalid_input"})
 		return
 	}
 
 	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, "", r.Header.Get("Cookie"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
 		return
 	}
 	if statusCode != http.StatusOK || flow == nil {
-		writeJSON(w, statusCode, map[string]string{"error": "unable to init flow"})
+		writeError(w, statusCode, "unable to init flow")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "flow_init_failed", "status": statusCode})
 		return
 	}
 	csrfToken := flow.CSRFToken()
 	if csrfToken == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "missing csrf token"})
+		writeError(w, http.StatusBadGateway, "missing csrf token")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "missing_csrf"})
 		return
 	}
@@ -267,7 +267,7 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 	submitCookie := mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies)
 	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, flow.ID, payload, submitCookie)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "dependency_error"})
 		return
 	}
@@ -281,12 +281,12 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var body domain.BrowserFlow
 	if err := json.Unmarshal(raw, &body); err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "invalid kratos response"})
+		writeError(w, http.StatusBadGateway, "invalid kratos response")
 		return
 	}
 	otpCSRF := body.CSRFToken()
 	if body.ID == "" || otpCSRF == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "missing flow/csrf"})
+		writeError(w, http.StatusBadGateway, "missing flow/csrf")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -311,11 +311,11 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 	var req otpVerifyRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if !validMode(req.Mode) || req.FlowID == "" || req.CSRFToken == "" || req.Code == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid mode/flowId/csrfToken/code"})
+		writeError(w, http.StatusBadRequest, "invalid mode/flowId/csrfToken/code")
 		auditSecurityEvent("auth_otp_verify", map[string]any{"mode": req.Mode, "result": "invalid_input"})
 		return
 	}
@@ -327,7 +327,7 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, req.FlowID, payload, r.Header.Get("Cookie"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_otp_verify", map[string]any{"mode": req.Mode, "result": "dependency_error"})
 		return
 	}
@@ -340,7 +340,7 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	var body any
 	if err := json.Unmarshal(raw, &body); err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "invalid kratos response"})
+		writeError(w, http.StatusBadGateway, "invalid kratos response")
 		return
 	}
 	h.syncUserProfileFromSession(r, nil, append([]string{}, submitSetCookies...), "auth_otp_verify", req.Mode)
@@ -364,12 +364,12 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 
 	initResp, initSetCookies, statusCode, err := h.svc.InitLogout(r.Context(), r.Header.Get("Cookie"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_logout", map[string]any{"result": "dependency_error"})
 		return
 	}
 	if statusCode != http.StatusOK || initResp == nil || initResp.LogoutURL == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed to initialize logout flow"})
+		writeError(w, http.StatusBadRequest, "failed to initialize logout flow")
 		auditSecurityEvent("auth_logout", map[string]any{"result": "init_failed", "status": statusCode})
 		return
 	}
@@ -377,12 +377,12 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 	submitCookie := mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies)
 	completeSetCookies, completeStatus, err := h.svc.CompleteLogout(r.Context(), initResp.LogoutURL, submitCookie)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_logout", map[string]any{"result": "dependency_error"})
 		return
 	}
 	if completeStatus != http.StatusOK {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "failed to complete logout flow"})
+		writeError(w, http.StatusBadRequest, "failed to complete logout flow")
 		auditSecurityEvent("auth_logout", map[string]any{"result": "complete_failed", "status": completeStatus})
 		return
 	}
@@ -406,30 +406,30 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 	var req modeRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if !validMode(req.Mode) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid mode"})
+		writeError(w, http.StatusBadRequest, "invalid mode")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"result": "invalid_input"})
 		return
 	}
 
 	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, strings.TrimSpace(req.ReturnTo), r.Header.Get("Cookie"))
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "dependency_error"})
 		return
 	}
 	if statusCode != http.StatusOK || flow == nil || flow.ID == "" {
-		writeJSON(w, statusCode, map[string]string{"error": "unable to init flow"})
+		writeError(w, statusCode, "unable to init flow")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "flow_init_failed", "status": statusCode})
 		return
 	}
 
 	csrfToken := flow.CSRFToken()
 	if csrfToken == "" {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "missing csrf token in flow"})
+		writeError(w, http.StatusBadGateway, "missing csrf token in flow")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "missing_csrf"})
 		return
 	}
@@ -443,14 +443,14 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 
 	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, flow.ID, submitPayload, submitCookie)
 	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "kratos unavailable"})
+		writeError(w, http.StatusBadGateway, "kratos unavailable")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "submit_failed"})
 		return
 	}
 
 	redirectTo := oidcRedirectFromRaw(raw)
 	if redirectTo == "" {
-		writeJSON(w, submitStatus, map[string]string{"error": "missing oidc redirect url"})
+		writeError(w, submitStatus, "missing oidc redirect url")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "missing_redirect", "status": submitStatus})
 		return
 	}

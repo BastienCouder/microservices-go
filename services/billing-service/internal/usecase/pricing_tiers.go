@@ -45,6 +45,10 @@ func (s *Service) ListPricingTiers(ctx context.Context) ([]domain.PricingTier, e
 	}
 	for _, tier := range stored {
 		if tier.PromptVolume > 0 {
+			if tier.Deleted {
+				delete(defaults, tier.PromptVolume)
+				continue
+			}
 			defaults[tier.PromptVolume] = tier
 		}
 	}
@@ -69,4 +73,14 @@ func (s *Service) UpdatePricingTier(ctx context.Context, tier domain.PricingTier
 		return domain.PricingTier{}, fmt.Errorf("upsert pricing tier: %w", err)
 	}
 	return tier, nil
+}
+
+func (s *Service) DeletePricingTier(ctx context.Context, promptVolume int) error {
+	if promptVolume <= 0 {
+		return fmt.Errorf("%w: prompt volume must be positive", domain.ErrInvalidPricingTier)
+	}
+	if err := s.repo.DeletePricingTier(ctx, promptVolume); err != nil {
+		return fmt.Errorf("delete pricing tier: %w", err)
+	}
+	return nil
 }

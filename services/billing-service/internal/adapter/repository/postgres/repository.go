@@ -100,68 +100,180 @@ func (r *Repository) GetByOrganizationID(ctx context.Context, organizationID int
 }
 
 func (r *Repository) ListPlanSettings(ctx context.Context) ([]domain.PlanSettings, error) {
-	items, err := r.queries.ListBillingPlanSettings(ctx)
+	rows, err := r.db.Query(ctx, `
+SELECT
+  plan,
+  monthly_price_cents,
+  yearly_price_cents,
+  monthly_quota,
+  model_selection_limit,
+  monthly_model_change_limit,
+  max_projects,
+  is_most_chosen,
+  updated_at
+FROM billing_plan_settings
+ORDER BY
+  CASE plan
+    WHEN 'developer' THEN 0
+    WHEN 'starter' THEN 1
+    WHEN 'growth' THEN 2
+    WHEN 'pro' THEN 3
+    ELSE 99
+  END,
+  plan`)
 	if err != nil {
 		return nil, fmt.Errorf("list billing plan settings: %w", err)
 	}
-	settings := make([]domain.PlanSettings, 0, len(items))
-	for _, item := range items {
-		settings = append(settings, domain.PlanSettings{
-			Plan:                    item.Plan,
-			MonthlyPriceCents:       int(item.MonthlyPriceCents),
-			YearlyPriceCents:        int(item.YearlyPriceCents),
-			MonthlyQuota:            int(item.MonthlyQuota),
-			ModelSelectionLimit:     int(item.ModelSelectionLimit),
-			MonthlyModelChangeLimit: int(item.MonthlyModelChangeLimit),
-			MaxProjects:             int(item.MaxProjects),
-			UpdatedAt:               fromPgTimestamptz(item.UpdatedAt),
-		})
+	defer rows.Close()
+
+	settings := make([]domain.PlanSettings, 0)
+	for rows.Next() {
+		var item domain.PlanSettings
+		if err := rows.Scan(
+			&item.Plan,
+			&item.MonthlyPriceCents,
+			&item.YearlyPriceCents,
+			&item.MonthlyQuota,
+			&item.ModelSelectionLimit,
+			&item.MonthlyModelChangeLimit,
+			&item.MaxProjects,
+			&item.IsMostChosen,
+			&item.UpdatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan billing plan settings: %w", err)
+		}
+		settings = append(settings, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate billing plan settings: %w", err)
 	}
 	return settings, nil
 }
 
 func (r *Repository) UpsertPlanSettings(ctx context.Context, settings domain.PlanSettings) error {
-	err := r.queries.UpsertBillingPlanSettings(ctx, sqlc.UpsertBillingPlanSettingsParams{
-		Plan:                    settings.Plan,
-		MonthlyPriceCents:       int32(settings.MonthlyPriceCents),
-		YearlyPriceCents:        int32(settings.YearlyPriceCents),
-		MonthlyQuota:            int32(settings.MonthlyQuota),
-		ModelSelectionLimit:     int32(settings.ModelSelectionLimit),
-		MonthlyModelChangeLimit: int32(settings.MonthlyModelChangeLimit),
-		MaxProjects:             int32(settings.MaxProjects),
-		UpdatedAt:               toPgTimestamptz(settings.UpdatedAt),
-	})
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin billing plan settings upsert: %w", err)
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	if settings.IsMostChosen {
+		if _, err := tx.Exec(ctx, `UPDATE billing_plan_settings SET is_most_chosen = FALSE WHERE plan <> $1`, settings.Plan); err != nil {
+			return fmt.Errorf("clear previous most chosen plan: %w", err)
+		}
+	}
+
+	_, err = tx.Exec(ctx, `
+INSERT INTO billing_plan_settings (
+  plan,
+  monthly_price_cents,
+  yearly_price_cents,
+  monthly_quota,
+  model_selection_limit,
+  monthly_model_change_limit,
+  max_projects,
+  is_most_chosen,
+  updated_at
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT (plan)
+DO UPDATE SET
+  monthly_price_cents = EXCLUDED.monthly_price_cents,
+  yearly_price_cents = EXCLUDED.yearly_price_cents,
+  monthly_quota = EXCLUDED.monthly_quota,
+  model_selection_limit = EXCLUDED.model_selection_limit,
+  monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
+  max_projects = EXCLUDED.max_projects,
+  is_most_chosen = EXCLUDED.is_most_chosen,
+  updated_at = EXCLUDED.updated_at`,
+		settings.Plan,
+		settings.MonthlyPriceCents,
+		settings.YearlyPriceCents,
+		settings.MonthlyQuota,
+		settings.ModelSelectionLimit,
+		settings.MonthlyModelChangeLimit,
+		settings.MaxProjects,
+		settings.IsMostChosen,
+		toPgTimestamptz(settings.UpdatedAt),
+	)
 	if err != nil {
 		return fmt.Errorf("upsert billing plan settings: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit billing plan settings upsert: %w", err)
 	}
 	return nil
 }
 
 func (r *Repository) ListPricingTiers(ctx context.Context) ([]domain.PricingTier, error) {
-	items, err := r.queries.ListBillingPricingTiers(ctx)
+	rows, err := r.db.Query(ctx, `
+SELECT
+  prompt_volume,
+  label,
+  prices_json::text AS prices_json,
+  developer_price_cents,
+  starter_price_cents,
+  growth_price_cents,
+  pro_price_cents,
+  deleted,
+  updated_at
+FROM billing_pricing_tiers
+ORDER BY prompt_volume`)
 	if err != nil {
 		return nil, fmt.Errorf("list billing pricing tiers: %w", err)
 	}
-	tiers := make([]domain.PricingTier, 0, len(items))
-	for _, item := range items {
-		prices, err := decodePricingTierPrices(item.PricesJson)
+	defer rows.Close()
+
+	tiers := make([]domain.PricingTier, 0)
+	for rows.Next() {
+		var (
+			promptVolume        int
+			label               string
+			pricesRaw           string
+			developerPriceCents pgtype.Int4
+			starterPriceCents   pgtype.Int4
+			growthPriceCents    pgtype.Int4
+			proPriceCents       pgtype.Int4
+			deleted             bool
+			updatedAt           pgtype.Timestamptz
+		)
+		if err := rows.Scan(
+			&promptVolume,
+			&label,
+			&pricesRaw,
+			&developerPriceCents,
+			&starterPriceCents,
+			&growthPriceCents,
+			&proPriceCents,
+			&deleted,
+			&updatedAt,
+		); err != nil {
+			return nil, fmt.Errorf("scan billing pricing tier: %w", err)
+		}
+		prices, err := decodePricingTierPrices(pricesRaw)
 		if err != nil {
 			return nil, fmt.Errorf("decode pricing tier prices: %w", err)
 		}
 		tier := domain.PricingTier{
-			PromptVolume:        int(item.PromptVolume),
-			Label:               item.Label,
+			PromptVolume:        promptVolume,
+			Label:               label,
 			Prices:              prices,
-			DeveloperPriceCents: fromPgNullableInt4(item.DeveloperPriceCents),
-			StarterPriceCents:   fromPgNullableInt4(item.StarterPriceCents),
-			GrowthPriceCents:    fromPgNullableInt4(item.GrowthPriceCents),
-			ProPriceCents:       fromPgNullableInt4(item.ProPriceCents),
-			UpdatedAt:           fromPgTimestamptz(item.UpdatedAt),
+			DeveloperPriceCents: fromPgNullableInt4(developerPriceCents),
+			StarterPriceCents:   fromPgNullableInt4(starterPriceCents),
+			GrowthPriceCents:    fromPgNullableInt4(growthPriceCents),
+			ProPriceCents:       fromPgNullableInt4(proPriceCents),
+			Deleted:             deleted,
+			UpdatedAt:           fromPgTimestamptz(updatedAt),
 		}
 		if err := tier.Validate(); err != nil {
 			return nil, fmt.Errorf("normalize pricing tier: %w", err)
 		}
 		tiers = append(tiers, tier)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate billing pricing tiers: %w", err)
 	}
 	return tiers, nil
 }
@@ -171,18 +283,76 @@ func (r *Repository) UpsertPricingTier(ctx context.Context, tier domain.PricingT
 	if err != nil {
 		return fmt.Errorf("encode pricing tier prices: %w", err)
 	}
-	err = r.queries.UpsertBillingPricingTier(ctx, sqlc.UpsertBillingPricingTierParams{
-		PromptVolume:        int32(tier.PromptVolume),
-		Label:               tier.Label,
-		PricesJson:          pricesJSON,
-		DeveloperPriceCents: toPgNullableInt4(tier.DeveloperPriceCents),
-		StarterPriceCents:   toPgNullableInt4(tier.StarterPriceCents),
-		GrowthPriceCents:    toPgNullableInt4(tier.GrowthPriceCents),
-		ProPriceCents:       toPgNullableInt4(tier.ProPriceCents),
-		UpdatedAt:           toPgTimestamptz(tier.UpdatedAt),
-	})
+	_, err = r.db.Exec(ctx, `
+INSERT INTO billing_pricing_tiers (
+  prompt_volume,
+  label,
+  prices_json,
+  developer_price_cents,
+  starter_price_cents,
+  growth_price_cents,
+  pro_price_cents,
+  deleted,
+  updated_at
+)
+VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, FALSE, $8)
+ON CONFLICT (prompt_volume)
+DO UPDATE SET
+  label = EXCLUDED.label,
+  prices_json = EXCLUDED.prices_json,
+  developer_price_cents = EXCLUDED.developer_price_cents,
+  starter_price_cents = EXCLUDED.starter_price_cents,
+  growth_price_cents = EXCLUDED.growth_price_cents,
+  pro_price_cents = EXCLUDED.pro_price_cents,
+  deleted = FALSE,
+  updated_at = EXCLUDED.updated_at`,
+		tier.PromptVolume,
+		tier.Label,
+		pricesJSON,
+		toPgNullableInt4(tier.DeveloperPriceCents),
+		toPgNullableInt4(tier.StarterPriceCents),
+		toPgNullableInt4(tier.GrowthPriceCents),
+		toPgNullableInt4(tier.ProPriceCents),
+		toPgTimestamptz(tier.UpdatedAt),
+	)
 	if err != nil {
 		return fmt.Errorf("upsert billing pricing tier: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) DeletePricingTier(ctx context.Context, promptVolume int) error {
+	rows, err := r.db.Exec(ctx, `
+INSERT INTO billing_pricing_tiers (
+  prompt_volume,
+  label,
+  prices_json,
+  developer_price_cents,
+  starter_price_cents,
+  growth_price_cents,
+  pro_price_cents,
+  deleted,
+  updated_at
+)
+VALUES ($1, $2, '{}'::jsonb, NULL, NULL, NULL, NULL, TRUE, $3)
+ON CONFLICT (prompt_volume)
+DO UPDATE SET
+  deleted = TRUE,
+  prices_json = '{}'::jsonb,
+  developer_price_cents = NULL,
+  starter_price_cents = NULL,
+  growth_price_cents = NULL,
+  pro_price_cents = NULL,
+  updated_at = EXCLUDED.updated_at`,
+		promptVolume,
+		fmt.Sprintf("%d", promptVolume),
+		toPgTimestamptz(time.Now().UTC()),
+	)
+	if err != nil {
+		return fmt.Errorf("delete billing pricing tier: %w", err)
+	}
+	if rows.RowsAffected() == 0 {
+		return pgx.ErrNoRows
 	}
 	return nil
 }

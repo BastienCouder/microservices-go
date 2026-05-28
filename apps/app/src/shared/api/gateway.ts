@@ -1,6 +1,28 @@
+export type GatewayFailure = {
+  ok: false;
+  status: number;
+  error: string;
+  code?: string;
+  details?: unknown;
+};
+
 export type GatewayResult<T> =
   | { ok: true; status: number; data: T }
-  | { ok: false; status: number; error: string; details?: unknown };
+  | GatewayFailure;
+
+export class GatewayError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly details?: unknown;
+
+  constructor(result: GatewayFailure, fallback: string) {
+    super(result.error || fallback);
+    this.name = "GatewayError";
+    this.status = result.status;
+    this.code = result.code;
+    this.details = result.details;
+  }
+}
 
 type GatewayRetryOptions = {
   attempts?: number;
@@ -12,14 +34,26 @@ const DEFAULT_RETRY_DELAY_MS = 150;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const RETRYABLE_STATUSES = new Set([429, 502, 503, 504]);
 
-function parseErrorPayload(payload: unknown): string {
+function parseErrorPayload(payload: unknown): { message: string; code?: string } {
   if (payload && typeof payload === "object" && "error" in payload) {
     const value = (payload as { error?: unknown }).error;
     if (typeof value === "string" && value.trim() !== "") {
-      return value;
+      return { message: value };
+    }
+    if (value && typeof value === "object") {
+      const error = value as { code?: unknown; message?: unknown };
+      const message =
+        typeof error.message === "string" && error.message.trim() !== ""
+          ? error.message
+          : "request failed";
+      const code =
+        typeof error.code === "string" && error.code.trim() !== ""
+          ? error.code
+          : undefined;
+      return { message, code };
     }
   }
-  return "request failed";
+  return { message: "request failed" };
 }
 
 async function parseJSON(response: Response): Promise<unknown> {
@@ -172,12 +206,16 @@ export async function gatewayJSON<T>(
       return { ok: true, status: response.status, data: payload as T };
     }
 
-    const result: GatewayResult<T> = {
+    const parsedError = parseErrorPayload(payload);
+    const result: GatewayFailure = {
       ok: false,
       status: response.status,
-      error: parseErrorPayload(payload),
+      error: parsedError.message,
       details: payload,
     };
+    if (parsedError.code) {
+      result.code = parsedError.code;
+    }
 
     if (attempt < retryAttempts && shouldRetryResponse(response.status, method)) {
       await waitForRetry(retryDelayMs * 2 ** attempt, fetchInit.signal ?? undefined);
@@ -188,4 +226,8 @@ export async function gatewayJSON<T>(
   }
 
   return { ok: false, status: 0, error: "request failed" };
+}
+
+export function toGatewayError(result: GatewayFailure, fallback: string): GatewayError {
+  return new GatewayError(result, fallback);
 }

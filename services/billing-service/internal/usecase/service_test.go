@@ -91,6 +91,12 @@ func (f *fakeRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanSet
 	if f.planSettings == nil {
 		f.planSettings = make(map[string]domain.PlanSettings)
 	}
+	if settings.IsMostChosen {
+		for plan, item := range f.planSettings {
+			item.IsMostChosen = false
+			f.planSettings[plan] = item
+		}
+	}
 	f.planSettings[settings.Plan] = settings
 	return nil
 }
@@ -111,10 +117,28 @@ func (f *fakeRepo) UpsertPricingTier(_ context.Context, tier domain.PricingTier)
 	return nil
 }
 
+func (f *fakeRepo) DeletePricingTier(_ context.Context, promptVolume int) error {
+	if f.pricingTiers == nil {
+		f.pricingTiers = make(map[int]domain.PricingTier)
+	}
+	f.pricingTiers[promptVolume] = domain.PricingTier{
+		PromptVolume: promptVolume,
+		Label:        "deleted",
+		Deleted:      true,
+	}
+	return nil
+}
+
 type fakeStripeProvider struct {
 	checkoutResp StripeCheckoutSession
 	checkoutErr  error
 	lastRequest  StripeCheckoutSessionRequest
+	priceIDs     map[string]string
+	priceLookup  string
+
+	syncResp    StripePricingCatalogSyncResult
+	syncErr     error
+	syncRequest StripePricingCatalogSyncRequest
 
 	portalURL        string
 	portalErr        error
@@ -129,6 +153,16 @@ type fakeStripeProvider struct {
 func (f *fakeStripeProvider) CreateSubscriptionCheckoutSession(_ context.Context, req StripeCheckoutSessionRequest) (StripeCheckoutSession, error) {
 	f.lastRequest = req
 	return f.checkoutResp, f.checkoutErr
+}
+
+func (f *fakeStripeProvider) FindPriceIDByLookupKey(_ context.Context, lookupKey string) (string, error) {
+	f.priceLookup = lookupKey
+	return f.priceIDs[lookupKey], nil
+}
+
+func (f *fakeStripeProvider) SyncPricingCatalog(_ context.Context, req StripePricingCatalogSyncRequest) (StripePricingCatalogSyncResult, error) {
+	f.syncRequest = req
+	return f.syncResp, f.syncErr
 }
 
 func (f *fakeStripeProvider) ParseWebhookEvent(_ []byte, _ string) (StripeWebhookEvent, error) {
@@ -193,6 +227,121 @@ func TestListPricingTiersKeepsLegacyPlanPricesForDefaultTiers(t *testing.T) {
 	}
 }
 
+func TestUpdatePlanSettingsAcceptsCustomPlan(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	settings, err := svc.UpdatePlanSettings(context.Background(), domain.PlanSettings{
+		Plan:                    "Agency Plus",
+		MonthlyPriceCents:       9900,
+		YearlyPriceCents:        7900,
+		MonthlyQuota:            500,
+		ModelSelectionLimit:     8,
+		MonthlyModelChangeLimit: 2,
+		MaxProjects:             12,
+	})
+	if err != nil {
+		t.Fatalf("update custom plan settings: %v", err)
+	}
+	if settings.Plan != "agency-plus" {
+		t.Fatalf("expected normalized custom plan, got %s", settings.Plan)
+	}
+	if _, ok := repo.planSettings["agency-plus"]; !ok {
+		t.Fatalf("expected custom plan settings persisted: %+v", repo.planSettings)
+	}
+}
+
+func TestSyncStripePricingCatalogBuildsStripeProductsFromAdminPricing(t *testing.T) {
+	repo := &fakeRepo{
+		planSettings: map[string]domain.PlanSettings{
+			"agency-plus": {
+				Plan:                    "agency-plus",
+				MonthlyPriceCents:       9900,
+				YearlyPriceCents:        7900,
+				MonthlyQuota:            500,
+				ModelSelectionLimit:     8,
+				MonthlyModelChangeLimit: 2,
+				MaxProjects:             12,
+			},
+		},
+		pricingTiers: map[int]domain.PricingTier{
+			250: {
+				PromptVolume: 250,
+				Label:        "250",
+				Prices: map[string]*int{
+					"developer":   priceCents(9900),
+					"agency-plus": priceCents(79900),
+					"starter":     priceCents(24900),
+					"growth":      priceCents(49900),
+					"pro":         priceCents(99900),
+				},
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		syncResp: StripePricingCatalogSyncResult{
+			ProductsCreated: 1,
+			PricesCreated:   2,
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "", "", "")
+
+	out, err := svc.SyncStripePricingCatalog(context.Background(), "agency-plus")
+	if err != nil {
+		t.Fatalf("sync stripe pricing catalog: %v", err)
+	}
+	if out.ProductsCreated != 1 || out.PricesCreated != 2 {
+		t.Fatalf("unexpected sync output: %+v", out)
+	}
+	if len(stripe.syncRequest.Products) != 1 {
+		t.Fatalf("expected only selected plan product, got %+v", stripe.syncRequest.Products)
+	}
+	if stripe.syncRequest.Products[0].Plan != "agency-plus" {
+		t.Fatalf("expected agency-plus product, got %+v", stripe.syncRequest.Products[0])
+	}
+	if len(stripe.syncRequest.Prices) != 1 {
+		t.Fatalf("expected non-null admin pricing tier prices, got %d: %+v", len(stripe.syncRequest.Prices), stripe.syncRequest.Prices)
+	}
+
+	var agencyPrice StripePricingCatalogPrice
+	for _, price := range stripe.syncRequest.Prices {
+		if price.Plan == "agency-plus" && price.PromptVolume == 250 {
+			agencyPrice = price
+			break
+		}
+	}
+	if agencyPrice.Plan == "" {
+		t.Fatalf("expected agency-plus price in sync request: %+v", stripe.syncRequest.Prices)
+	}
+	if agencyPrice.UnitAmountCents != 79900 {
+		t.Fatalf("expected agency-plus tier amount 79900, got %d", agencyPrice.UnitAmountCents)
+	}
+	if agencyPrice.MonthlyQuota != 500 || agencyPrice.ModelSelectionLimit != 8 || agencyPrice.MaxProjects != 12 {
+		t.Fatalf("expected plan limits on price metadata, got %+v", agencyPrice)
+	}
+	if agencyPrice.LookupKey != "admin-pricing:agency-plus:250:monthly" {
+		t.Fatalf("unexpected lookup key: %s", agencyPrice.LookupKey)
+	}
+}
+
+func TestSyncStripePricingCatalogDisabled(t *testing.T) {
+	svc := NewService(&fakeRepo{})
+	_, err := svc.SyncStripePricingCatalog(context.Background(), "growth")
+	if !errors.Is(err, ErrStripeDisabled) {
+		t.Fatalf("expected ErrStripeDisabled, got %v", err)
+	}
+}
+
+func TestSyncStripePricingCatalogRejectsMissingPlan(t *testing.T) {
+	svc := NewService(&fakeRepo{})
+	svc.EnableStripe(&fakeStripeProvider{}, StripeCatalog{}, "", "", "")
+	_, err := svc.SyncStripePricingCatalog(context.Background(), "missing-plan")
+	if !errors.Is(err, ErrStripeInvalidRequest) {
+		t.Fatalf("expected ErrStripeInvalidRequest, got %v", err)
+	}
+}
+
 func TestCreateStripeCheckoutSession_Success(t *testing.T) {
 	repo := &fakeRepo{}
 	stripe := &fakeStripeProvider{
@@ -243,6 +392,103 @@ func TestCreateStripeCheckoutSession_Success(t *testing.T) {
 	}
 	if stored.StripeCustomerID != "cus_abc" || stored.StripeSubscriptionID != "sub_abc" {
 		t.Fatalf("expected stripe ids to be saved: %+v", stored)
+	}
+}
+
+func TestCreateStripeCheckoutSession_CustomPlanUsesAdminPricingLookup(t *testing.T) {
+	agencyPrice := priceCents(219900)
+	repo := &fakeRepo{
+		planSettings: map[string]domain.PlanSettings{
+			"agency-plus": {
+				Plan:                    "agency-plus",
+				MonthlyQuota:            500,
+				ModelSelectionLimit:     8,
+				MonthlyModelChangeLimit: 2,
+				MaxProjects:             12,
+			},
+		},
+		pricingTiers: map[int]domain.PricingTier{
+			1000: {
+				PromptVolume: 1000,
+				Label:        "1k",
+				Prices: map[string]*int{
+					"agency-plus": agencyPrice,
+				},
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		checkoutResp: StripeCheckoutSession{
+			ID:  "cs_custom",
+			URL: "https://checkout.stripe.com/c/pay/cs_custom",
+		},
+		priceIDs: map[string]string{
+			"admin-pricing:agency-plus:1000:monthly": "price_agency_plus_1k",
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	out, err := svc.CreateStripeCheckoutSession(context.Background(), CreateStripeCheckoutSessionInput{
+		OrganizationID: 42,
+		Plan:           "agency-plus",
+		BillingCycle:   domain.BillingCycleMonthly,
+		PromptVolume:   1000,
+		Seats:          1,
+		RequestID:      "req_custom",
+	})
+	if err != nil {
+		t.Fatalf("unexpected custom checkout error: %v", err)
+	}
+	if out.SessionID != "cs_custom" {
+		t.Fatalf("unexpected checkout output: %+v", out)
+	}
+	if stripe.priceLookup != "admin-pricing:agency-plus:1000:monthly" {
+		t.Fatalf("expected admin pricing lookup key, got %s", stripe.priceLookup)
+	}
+	if stripe.lastRequest.PriceID != "price_agency_plus_1k" {
+		t.Fatalf("expected custom stripe price id, got %s", stripe.lastRequest.PriceID)
+	}
+	if stripe.lastRequest.MonthlyQuota != 500 {
+		t.Fatalf("expected custom monthly quota 500, got %d", stripe.lastRequest.MonthlyQuota)
+	}
+}
+
+func TestCreateStripeCheckoutSession_CustomPlanRequiresSyncedStripePrice(t *testing.T) {
+	agencyPrice := priceCents(219900)
+	repo := &fakeRepo{
+		planSettings: map[string]domain.PlanSettings{
+			"agency-plus": {Plan: "agency-plus", MonthlyQuota: 500},
+		},
+		pricingTiers: map[int]domain.PricingTier{
+			1000: {
+				PromptVolume: 1000,
+				Label:        "1k",
+				Prices: map[string]*int{
+					"agency-plus": agencyPrice,
+				},
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		checkoutResp: StripeCheckoutSession{
+			ID:  "cs_custom",
+			URL: "https://checkout.stripe.com/c/pay/cs_custom",
+		},
+		priceIDs: map[string]string{},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	_, err := svc.CreateStripeCheckoutSession(context.Background(), CreateStripeCheckoutSessionInput{
+		OrganizationID: 42,
+		Plan:           "agency-plus",
+		BillingCycle:   domain.BillingCycleMonthly,
+		PromptVolume:   1000,
+		Seats:          1,
+	})
+	if !errors.Is(err, ErrStripeInvalidRequest) {
+		t.Fatalf("expected invalid request for missing synced price, got %v", err)
 	}
 }
 

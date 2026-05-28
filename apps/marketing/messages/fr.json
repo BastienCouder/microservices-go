@@ -294,6 +294,19 @@
           "Aide à la stratégie GEO"
         ]
       }
+    },
+    "dynamic": {
+      "description": "Plan configuré depuis l'administration.",
+      "cta": "Choisir {plan}",
+      "features": {
+        "monthlyQuota": "{value} prompts app / mois",
+        "models": "{value} modèles simultanés",
+        "unlimitedModels": "Modèles illimités",
+        "modelChanges": "{value} changements de modèles / mois",
+        "unlimitedModelChanges": "Changements de modèles illimités",
+        "projects": "{value} projets maximum",
+        "unlimitedProjects": "Projets illimités"
+      }
     }
   },
   "cta": {

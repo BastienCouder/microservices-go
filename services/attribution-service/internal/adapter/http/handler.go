@@ -127,19 +127,19 @@ type recordEventRequest struct {
 func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -162,19 +162,19 @@ func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request, projectID 
 func (h *Handler) recordInternalEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *Handler) recordInternalEvent(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request, projectID string) {
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid webhook payload"})
+		writeError(w, http.StatusBadRequest, "invalid webhook payload")
 		return
 	}
 
@@ -211,13 +211,13 @@ func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) recordIngestionEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -240,13 +240,13 @@ func (h *Handler) recordIngestionEvent(w http.ResponseWriter, r *http.Request, p
 func (h *Handler) listEvents(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	limit := 50
@@ -268,14 +268,14 @@ func (h *Handler) listEvents(w http.ResponseWriter, r *http.Request, projectID s
 func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 	organizationID, _ := authenticatedOrganizationID(r)
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -290,18 +290,18 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 func (h *Handler) getTrafficReport(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -353,15 +353,15 @@ func parseRFC3339Optional(value string) (time.Time, error) {
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, usecase.ErrUnauthorized):
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, usecase.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": userFacingDependencyError(err)})
+		writeError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 

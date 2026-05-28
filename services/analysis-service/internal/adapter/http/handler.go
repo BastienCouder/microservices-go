@@ -162,13 +162,13 @@ func (h *Handler) previewOnboardingBrandProfile(w http.ResponseWriter, r *http.R
 		return
 	}
 	if _, ok := authenticatedUserID(r); !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 
 	var req previewOnboardingBrandProfileRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -186,18 +186,18 @@ func (h *Handler) previewOnboardingBrandProfile(w http.ResponseWriter, r *http.R
 func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
 	createdBy, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing user identity"})
+		writeError(w, http.StatusUnauthorized, "missing user identity")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req startAnalysisRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -232,7 +232,7 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectI
 func (h *Handler) listRuns(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -254,7 +254,7 @@ func (h *Handler) listRuns(w http.ResponseWriter, r *http.Request, projectID str
 func (h *Handler) getRun(w http.ResponseWriter, r *http.Request, runID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -280,7 +280,7 @@ type recordResponseRequest struct {
 func (h *Handler) recordResponse(w http.ResponseWriter, r *http.Request, runID string) {
 	var req recordResponseRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -305,7 +305,7 @@ func (h *Handler) recordResponse(w http.ResponseWriter, r *http.Request, runID s
 func (h *Handler) getDashboard(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -320,7 +320,7 @@ func (h *Handler) getDashboard(w http.ResponseWriter, r *http.Request, projectID
 func (h *Handler) getPromptQuotaUsage(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -335,7 +335,7 @@ func (h *Handler) getPromptQuotaUsage(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -360,7 +360,7 @@ func (h *Handler) getPerception(w http.ResponseWriter, r *http.Request, projectI
 func (h *Handler) getOptimizationErrors(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -391,7 +391,7 @@ type updateOptimizeActionStatusRequest struct {
 func (h *Handler) listOptimizeActions(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -406,13 +406,13 @@ func (h *Handler) listOptimizeActions(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) createOptimizeAction(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req createOptimizeActionRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	action, err := h.svc.CreateOptimizeAction(r.Context(), projectID, organizationID, usecase.CreateOptimizeActionInput{
@@ -436,13 +436,13 @@ func (h *Handler) createOptimizeAction(w http.ResponseWriter, r *http.Request, p
 func (h *Handler) updateOptimizeActionStatus(w http.ResponseWriter, r *http.Request, projectID string, actionID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req updateOptimizeActionStatusRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	action, err := h.svc.UpdateOptimizeActionStatus(r.Context(), projectID, organizationID, actionID, req.Status)
@@ -456,7 +456,7 @@ func (h *Handler) updateOptimizeActionStatus(w http.ResponseWriter, r *http.Requ
 func (h *Handler) deleteOptimizeAction(w http.ResponseWriter, r *http.Request, projectID string, actionID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -485,13 +485,13 @@ type analyzeSelectedContentOptimizerRecordsRequest struct {
 func (h *Handler) startContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req startContentOptimizerCrawlRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -515,7 +515,7 @@ func (h *Handler) startContentOptimizerCrawl(w http.ResponseWriter, r *http.Requ
 func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string, jobID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -523,7 +523,7 @@ func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Reques
 	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
 		parsed, err := strconv.Atoi(raw)
 		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid limit"})
+			writeError(w, http.StatusBadRequest, "invalid limit")
 			return
 		}
 		limit = parsed
@@ -545,13 +545,13 @@ func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Reques
 func (h *Handler) analyzeSelectedContentOptimizerRecords(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req analyzeSelectedContentOptimizerRecordsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -566,7 +566,7 @@ func (h *Handler) analyzeSelectedContentOptimizerRecords(w http.ResponseWriter, 
 func (h *Handler) getLatestContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -581,7 +581,7 @@ func (h *Handler) getLatestContentOptimizerCrawl(w http.ResponseWriter, r *http.
 func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -606,13 +606,13 @@ type updateBrandCanonRequest struct {
 func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req updateBrandCanonRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -642,13 +642,13 @@ type createAlertRequest struct {
 func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req createAlertRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	alert, err := h.svc.CreateAlert(r.Context(), projectID, organizationID, usecase.CreateAlertInput{
@@ -667,7 +667,7 @@ func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID 
 func (h *Handler) listAlerts(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -683,7 +683,7 @@ func (h *Handler) listAlerts(w http.ResponseWriter, r *http.Request, projectID s
 func (h *Handler) markAlertRead(w http.ResponseWriter, r *http.Request, alertID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -698,7 +698,7 @@ func (h *Handler) markAlertRead(w http.ResponseWriter, r *http.Request, alertID 
 func (h *Handler) markAllAlertsRead(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -712,7 +712,7 @@ func (h *Handler) markAllAlertsRead(w http.ResponseWriter, r *http.Request, proj
 func (h *Handler) deleteAlert(w http.ResponseWriter, r *http.Request, alertID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		writeError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -726,17 +726,17 @@ func (h *Handler) deleteAlert(w http.ResponseWriter, r *http.Request, alertID st
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, usecase.ErrQuotaExceeded):
-		writeJSON(w, http.StatusTooManyRequests, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusTooManyRequests, err.Error())
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
-		writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusServiceUnavailable, err.Error())
 	case errors.Is(err, usecase.ErrUnauthorized):
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, usecase.ErrNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusNotFound, err.Error())
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 

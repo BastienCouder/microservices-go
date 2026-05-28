@@ -31,10 +31,12 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /billing/public/pricing-tiers", h.listPricingTiers)
 	mux.HandleFunc("POST /billing/plans", h.updatePlanSettings)
 	mux.HandleFunc("POST /billing/pricing-tiers", h.updatePricingTier)
+	mux.HandleFunc("DELETE /billing/pricing-tiers/{prompt_volume}", h.deletePricingTier)
 	mux.HandleFunc("POST /billing/subscriptions", h.upsertSubscription)
 	mux.HandleFunc("GET /billing/quotas/", h.getQuota)
 	mux.HandleFunc("POST /billing/stripe/checkout-session", h.createStripeCheckoutSession)
 	mux.HandleFunc("POST /billing/stripe/customer-portal", h.createStripeCustomerPortalSession)
+	mux.HandleFunc("POST /billing/stripe/pricing-catalog/plans/{plan}/sync", h.syncStripePricingCatalog)
 	mux.HandleFunc("POST /billing/stripe/webhook", h.handleStripeWebhook)
 }
 
@@ -65,16 +67,17 @@ type updatePlanSettingsRequest struct {
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
 	MaxProjects             int    `json:"max_projects"`
+	IsMostChosen            bool   `json:"is_most_chosen"`
 }
 
 type updatePricingTierRequest struct {
-	PromptVolume        int    `json:"prompt_volume"`
-	Label               string `json:"label"`
+	PromptVolume        int             `json:"prompt_volume"`
+	Label               string          `json:"label"`
 	Prices              map[string]*int `json:"prices"`
-	DeveloperPriceCents *int   `json:"developer_price_cents"`
-	StarterPriceCents   *int   `json:"starter_price_cents"`
-	GrowthPriceCents    *int   `json:"growth_price_cents"`
-	ProPriceCents       *int   `json:"pro_price_cents"`
+	DeveloperPriceCents *int            `json:"developer_price_cents"`
+	StarterPriceCents   *int            `json:"starter_price_cents"`
+	GrowthPriceCents    *int            `json:"growth_price_cents"`
+	ProPriceCents       *int            `json:"pro_price_cents"`
 }
 
 type createStripeCheckoutSessionRequest struct {
@@ -83,6 +86,7 @@ type createStripeCheckoutSessionRequest struct {
 	AttributionSource string `json:"attribution_source"`
 	Plan              string `json:"plan"`
 	BillingCycle      string `json:"billing_cycle"`
+	PromptVolume      int    `json:"prompt_volume"`
 	Seats             int    `json:"seats"`
 	CorrectionCredits int    `json:"correction_credits"`
 	SuccessURL        string `json:"success_url"`
@@ -105,7 +109,7 @@ var (
 func (h *Handler) listPlanSettings(w http.ResponseWriter, r *http.Request) {
 	settings, err := h.svc.ListPlanSettings(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	writeJSON(w, http.StatusOK, settings)
@@ -113,14 +117,14 @@ func (h *Handler) listPlanSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
 	if _, err := scopedOrganizationID(r, 0); err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		return
 	}
 
 	var req updatePlanSettingsRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -132,13 +136,14 @@ func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
 		ModelSelectionLimit:     req.ModelSelectionLimit,
 		MonthlyModelChangeLimit: req.MonthlyModelChangeLimit,
 		MaxProjects:             req.MaxProjects,
+		IsMostChosen:            req.IsMostChosen,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPlanSettings) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	writeJSON(w, http.StatusOK, settings)
@@ -147,7 +152,7 @@ func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listPricingTiers(w http.ResponseWriter, r *http.Request) {
 	tiers, err := h.svc.ListPricingTiers(r.Context())
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	writeJSON(w, http.StatusOK, tiers)
@@ -155,14 +160,14 @@ func (h *Handler) listPricingTiers(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 	if _, err := scopedOrganizationID(r, 0); err != nil {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		return
 	}
 
 	var req updatePricingTierRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -177,31 +182,48 @@ func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPricingTier) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 	writeJSON(w, http.StatusOK, tier)
+}
+
+func (h *Handler) deletePricingTier(w http.ResponseWriter, r *http.Request) {
+	promptVolume, err := strconv.Atoi(strings.TrimSpace(r.PathValue("prompt_volume")))
+	if err != nil || promptVolume <= 0 {
+		writeError(w, http.StatusBadRequest, "invalid prompt volume")
+		return
+	}
+	if err := h.svc.DeletePricingTier(r.Context(), promptVolume); err != nil {
+		if errors.Is(err, domain.ErrInvalidPricingTier) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 	var req upsertSubscriptionRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 	organizationID, err := scopedOrganizationID(r, req.OrganizationID)
 	if err != nil {
 		switch {
 		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+			writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		case errors.Is(err, errMismatchedOrganizationScope):
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+			writeError(w, http.StatusForbidden, "forbidden")
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
@@ -209,10 +231,10 @@ func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 	sub, err := h.svc.UpdateSubscriptionEntitlements(r.Context(), organizationID, req.Plan, req.Seats, req.MonthlyQuota)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidSubscription) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -223,24 +245,24 @@ func (h *Handler) getQuota(w http.ResponseWriter, r *http.Request) {
 	orgIDStr := strings.TrimPrefix(r.URL.Path, "/billing/quotas/")
 	orgID, err := strconv.ParseInt(orgIDStr, 10, 64)
 	if err != nil || orgID <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid organization id"})
+		writeError(w, http.StatusBadRequest, "invalid organization id")
 		return
 	}
 	if _, err := scopedOrganizationID(r, orgID); err != nil {
 		switch {
 		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+			writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		case errors.Is(err, errMismatchedOrganizationScope):
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+			writeError(w, http.StatusForbidden, "forbidden")
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
 
 	entitlements, err := h.svc.GetOrganizationEntitlements(r.Context(), orgID)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -251,18 +273,18 @@ func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Req
 	var req createStripeCheckoutSessionRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 	organizationID, err := scopedOrganizationID(r, req.OrganizationID)
 	if err != nil {
 		switch {
 		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+			writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		case errors.Is(err, errMismatchedOrganizationScope):
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+			writeError(w, http.StatusForbidden, "forbidden")
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
@@ -273,6 +295,7 @@ func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Req
 		AttributionSource: req.AttributionSource,
 		Plan:              req.Plan,
 		BillingCycle:      req.BillingCycle,
+		PromptVolume:      req.PromptVolume,
 		Seats:             req.Seats,
 		CorrectionCredits: req.CorrectionCredits,
 		SuccessURL:        req.SuccessURL,
@@ -282,14 +305,14 @@ func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrStripeDisabled):
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "stripe integration is disabled"})
+			writeError(w, http.StatusServiceUnavailable, "stripe integration is disabled")
 		case errors.Is(err, usecase.ErrStripeInvalidRequest),
 			errors.Is(err, usecase.ErrStripeUnsupportedPlan),
 			errors.Is(err, usecase.ErrStripeUnsupportedCycle),
 			errors.Is(err, domain.ErrInvalidSubscription):
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
@@ -301,18 +324,18 @@ func (h *Handler) createStripeCustomerPortalSession(w http.ResponseWriter, r *ht
 	var req createStripeCustomerPortalSessionRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 	organizationID, err := scopedOrganizationID(r, req.OrganizationID)
 	if err != nil {
 		switch {
 		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated organization"})
+			writeError(w, http.StatusUnauthorized, "missing authenticated organization")
 		case errors.Is(err, errMismatchedOrganizationScope):
-			writeJSON(w, http.StatusForbidden, map[string]string{"error": "forbidden"})
+			writeError(w, http.StatusForbidden, "forbidden")
 		default:
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		}
 		return
 	}
@@ -325,13 +348,35 @@ func (h *Handler) createStripeCustomerPortalSession(w http.ResponseWriter, r *ht
 	if err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrStripeDisabled):
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "stripe integration is disabled"})
+			writeError(w, http.StatusServiceUnavailable, "stripe integration is disabled")
 		case errors.Is(err, usecase.ErrStripeInvalidRequest),
 			errors.Is(err, usecase.ErrStripeCustomerMissing),
 			errors.Is(err, domain.ErrSubscriptionMissing):
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			writeError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) syncStripePricingCatalog(w http.ResponseWriter, r *http.Request) {
+	if _, err := scopedOrganizationID(r, 0); err != nil {
+		writeError(w, http.StatusUnauthorized, "missing authenticated organization")
+		return
+	}
+
+	out, err := h.svc.SyncStripePricingCatalog(r.Context(), r.PathValue("plan"))
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrStripeDisabled):
+			writeError(w, http.StatusServiceUnavailable, "stripe integration is disabled")
+		case errors.Is(err, usecase.ErrStripeInvalidRequest):
+			writeError(w, http.StatusBadRequest, err.Error())
+		default:
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}
@@ -343,7 +388,7 @@ func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	payload, err := io.ReadAll(r.Body)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid webhook payload"})
+		writeError(w, http.StatusBadRequest, "invalid webhook payload")
 		return
 	}
 
@@ -351,11 +396,11 @@ func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 	if err := h.svc.HandleStripeWebhook(r.Context(), payload, signature); err != nil {
 		switch {
 		case errors.Is(err, usecase.ErrStripeDisabled):
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "stripe integration is disabled"})
+			writeError(w, http.StatusServiceUnavailable, "stripe integration is disabled")
 		case errors.Is(err, usecase.ErrStripeInvalidSignature):
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid stripe signature"})
+			writeError(w, http.StatusBadRequest, "invalid stripe signature")
 		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}

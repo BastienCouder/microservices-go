@@ -40,6 +40,7 @@ func defaultPlanSettings() []domain.PlanSettings {
 			ModelSelectionLimit:     6,
 			MonthlyModelChangeLimit: 0,
 			MaxProjects:             5,
+			IsMostChosen:            true,
 			UpdatedAt:               now,
 		},
 		{
@@ -69,15 +70,22 @@ func (s *Service) ListPlanSettings(ctx context.Context) ([]domain.PlanSettings, 
 	if err != nil {
 		return nil, fmt.Errorf("list plan settings: %w", err)
 	}
+	storedMostChosenPlan := ""
 	for _, item := range stored {
 		item.Plan = domain.NormalizePlan(item.Plan)
 		if item.Plan == "" {
 			continue
 		}
+		if item.IsMostChosen {
+			storedMostChosenPlan = item.Plan
+		}
 		defaults[item.Plan] = item
 	}
 	plans := make([]domain.PlanSettings, 0, len(defaults))
 	for _, item := range defaults {
+		if storedMostChosenPlan != "" {
+			item.IsMostChosen = item.Plan == storedMostChosenPlan
+		}
 		plans = append(plans, item)
 	}
 	sort.SliceStable(plans, func(left, right int) bool {

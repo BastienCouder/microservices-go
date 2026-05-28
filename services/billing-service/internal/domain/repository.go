@@ -14,5 +14,6 @@ type Repository interface {
 	UpsertPlanSettings(ctx context.Context, settings PlanSettings) error
 	ListPricingTiers(ctx context.Context) ([]PricingTier, error)
 	UpsertPricingTier(ctx context.Context, tier PricingTier) error
+	DeletePricingTier(ctx context.Context, promptVolume int) error
 	RecordStripeWebhookEvent(ctx context.Context, eventID, eventType string, processedAt time.Time) (bool, error)
 }

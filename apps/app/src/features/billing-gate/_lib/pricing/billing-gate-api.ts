@@ -1,17 +1,17 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
 import { storeSelectedOrganizationID } from "@/shared/selection";
-import type { SimulatedPlan } from "@/shared/billing-plan";
 
 type JsonRecord = Record<string, unknown>;
 
 export type BillingCycle = "monthly" | "yearly";
-export type CheckoutPlan = Extract<SimulatedPlan, "starter" | "growth" | "pro">;
+export type CheckoutPlan = string;
 
 type CreateCheckoutInput = {
   organizationId: string;
   plan: CheckoutPlan;
   billingCycle: BillingCycle;
+  promptVolume?: number;
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -104,6 +104,10 @@ export async function createStripeCheckoutSession(
         organization_id: parseNumericOrganizationId(organizationId),
         plan: input.plan,
         billing_cycle: input.billingCycle,
+        prompt_volume:
+          typeof input.promptVolume === "number" && Number.isFinite(input.promptVolume)
+            ? Math.max(0, Math.floor(input.promptVolume))
+            : 0,
         seats: 1,
         success_url: `${window.location.origin}/billing?checkout=success`,
         cancel_url: `${window.location.origin}/billing?checkout=cancel`,

@@ -24,7 +24,7 @@ export function PageHeader({
   actionsClassName,
 }: PageHeaderProps) {
   return (
-    <div className={cn("bg-background md:bg-transparent flex flex-col md:gap-4 lg:flex-row lg:items-start lg:justify-between", className, !actions && "mb-4")}>
+    <div className={cn(" bg-background md:bg-transparent md:flex flex-col md:gap-4 lg:flex-row lg:items-start lg:justify-between hidden", className, !actions && "mb-4")}>
       <div className="space-y-0 px-4 md:px-4">
         <div className="flex items-end gap-2.5 ">
           <h1>

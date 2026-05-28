@@ -294,6 +294,19 @@
           "GEO strategy support"
         ]
       }
+    },
+    "dynamic": {
+      "description": "Plan configured from admin.",
+      "cta": "Choose {plan}",
+      "features": {
+        "monthlyQuota": "{value} app prompts / month",
+        "models": "{value} simultaneous models",
+        "unlimitedModels": "Unlimited models",
+        "modelChanges": "{value} model changes / month",
+        "unlimitedModelChanges": "Unlimited model changes",
+        "projects": "{value} projects maximum",
+        "unlimitedProjects": "Unlimited projects"
+      }
     }
   },
   "cta": {

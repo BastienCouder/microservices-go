@@ -95,9 +95,13 @@ export const apiRoutes = {
     plans: () => "/billing/plans",
     publicPlans: () => "/billing/public/plans",
     pricingTiers: () => "/billing/pricing-tiers",
+    pricingTier: (promptVolume: number) =>
+      `/billing/pricing-tiers/${encodeURIComponent(String(promptVolume))}`,
     publicPricingTiers: () => "/billing/public/pricing-tiers",
     subscriptions: () => "/billing/subscriptions",
     stripeCheckoutSession: () => "/billing/stripe/checkout-session",
+    stripePricingCatalogSync: (plan: string) =>
+      `/billing/stripe/pricing-catalog/plans/${encodeURIComponent(plan)}/sync`,
   },
   analysis: {
     analyze: (projectId: string) => `/analysis/projects/${projectId}/run`,

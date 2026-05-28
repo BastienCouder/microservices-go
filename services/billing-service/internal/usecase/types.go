@@ -22,6 +22,7 @@ type CreateStripeCheckoutSessionInput struct {
 	AttributionSource string
 	Plan              string
 	BillingCycle      string
+	PromptVolume      int
 	Seats             int
 	CorrectionCredits int
 	SuccessURL        string
@@ -90,8 +91,47 @@ type StripeWebhookEvent struct {
 
 type StripeProvider interface {
 	CreateSubscriptionCheckoutSession(ctx context.Context, req StripeCheckoutSessionRequest) (StripeCheckoutSession, error)
+	FindPriceIDByLookupKey(ctx context.Context, lookupKey string) (string, error)
+	SyncPricingCatalog(ctx context.Context, req StripePricingCatalogSyncRequest) (StripePricingCatalogSyncResult, error)
 	CreateCustomerPortalSession(ctx context.Context, customerID, returnURL, requestID string) (string, error)
 	ParseWebhookEvent(payload []byte, signature string) (StripeWebhookEvent, error)
+}
+
+type StripePricingCatalogSyncRequest struct {
+	Products []StripePricingCatalogProduct
+	Prices   []StripePricingCatalogPrice
+}
+
+type StripePricingCatalogProduct struct {
+	ID                      string
+	Plan                    string
+	Name                    string
+	MonthlyQuota            int
+	ModelSelectionLimit     int
+	MonthlyModelChangeLimit int
+	MaxProjects             int
+}
+
+type StripePricingCatalogPrice struct {
+	LookupKey               string
+	ProductID               string
+	Plan                    string
+	TierLabel               string
+	PromptVolume            int
+	UnitAmountCents         int
+	Currency                string
+	Interval                string
+	MonthlyQuota            int
+	ModelSelectionLimit     int
+	MonthlyModelChangeLimit int
+	MaxProjects             int
+}
+
+type StripePricingCatalogSyncResult struct {
+	ProductsCreated int `json:"products_created"`
+	ProductsUpdated int `json:"products_updated"`
+	PricesCreated   int `json:"prices_created"`
+	PricesReused    int `json:"prices_reused"`
 }
 
 type StripeCatalog struct {

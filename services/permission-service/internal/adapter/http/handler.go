@@ -49,13 +49,13 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // SEC-003: 1 MiB body limit
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -67,11 +67,11 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidPermissionCheck) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "invalid"})
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "error"})
 		return
 	}

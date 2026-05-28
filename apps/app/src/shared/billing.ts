@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, toGatewayError } from "@/shared/api/gateway";
 import { normalizeBillingPlan } from "@/shared/billing-plan";
 
 type JsonObject = Record<string, unknown>;
@@ -33,6 +33,7 @@ export type BillingPlanSettings = {
   modelSelectionLimit: number;
   monthlyModelChangeLimit: number;
   maxProjects: number;
+  isMostChosen: boolean;
 };
 
 export type BillingPlanSettingsUpdateInput = BillingPlanSettings & {
@@ -51,6 +52,13 @@ export type BillingPricingTier = {
 
 export type BillingPricingTierUpdateInput = BillingPricingTier & {
   organizationId: string;
+};
+
+export type StripePricingCatalogSyncResult = {
+  productsCreated: number;
+  productsUpdated: number;
+  pricesCreated: number;
+  pricesReused: number;
 };
 
 function asObject(value: unknown): JsonObject {
@@ -103,6 +111,7 @@ export function normalizeBillingPlanSettings(value: unknown): BillingPlanSetting
     modelSelectionLimit: asNumber(payload.model_selection_limit),
     monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
     maxProjects: asNumber(payload.max_projects),
+    isMostChosen: payload.is_most_chosen === true,
   };
 }
 
@@ -176,7 +185,7 @@ export async function loadBillingEntitlements(
   );
 
   if (!result.ok) {
-    throw new Error("Impossible de charger les informations de facturation.");
+    throw toGatewayError(result, "Impossible de charger les informations de facturation.");
   }
 
   return normalizeBillingEntitlements(result.data);
@@ -207,7 +216,7 @@ export async function updateBillingSubscription(
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Impossible de mettre a jour l'abonnement.");
+    throw toGatewayError(result, "Impossible de mettre a jour l'abonnement.");
   }
 }
 
@@ -223,7 +232,7 @@ export async function loadBillingPlanSettings(
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Impossible de charger les plans.");
+    throw toGatewayError(result, "Impossible de charger les plans.");
   }
 
   return (Array.isArray(result.data) ? result.data : [])
@@ -246,11 +255,12 @@ export async function updateBillingPlanSettings(
       model_selection_limit: Math.max(0, Math.floor(input.modelSelectionLimit)),
       monthly_model_change_limit: Math.max(0, Math.floor(input.monthlyModelChangeLimit)),
       max_projects: Math.max(0, Math.floor(input.maxProjects)),
+      is_most_chosen: input.isMostChosen === true,
     }),
   });
 
   if (!result.ok) {
-    throw new Error(result.error || "Impossible de mettre a jour ce plan.");
+    throw toGatewayError(result, "Impossible de mettre a jour ce plan.");
   }
 
   const settings = normalizeBillingPlanSettings(result.data);
@@ -276,7 +286,7 @@ export async function loadBillingPricingTiers(
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Impossible de charger les paliers pricing.");
+    throw toGatewayError(result, "Impossible de charger les paliers pricing.");
   }
 
   return (Array.isArray(result.data) ? result.data : [])
@@ -307,7 +317,7 @@ export async function updateBillingPricingTier(
   );
 
   if (!result.ok) {
-    throw new Error(result.error || "Impossible de mettre a jour ce palier.");
+    throw toGatewayError(result, "Impossible de mettre a jour ce palier.");
   }
 
   const tier = normalizeBillingPricingTier(result.data);
@@ -315,4 +325,51 @@ export async function updateBillingPricingTier(
     throw new Error("Reponse palier invalide.");
   }
   return tier;
+}
+
+export async function deleteBillingPricingTier(
+  apiBaseURL: string,
+  organizationId: string,
+  promptVolume: number,
+): Promise<void> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.billing.pricingTier(promptVolume),
+    {
+      method: "DELETE",
+      organizationId,
+    },
+  );
+
+  if (!result.ok) {
+    throw toGatewayError(result, "Impossible de supprimer ce palier.");
+  }
+}
+
+export async function syncStripePricingCatalog(
+  apiBaseURL: string,
+  organizationId: string,
+  plan: BillingPlanCode,
+): Promise<StripePricingCatalogSyncResult> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.billing.stripePricingCatalogSync(plan),
+    {
+      method: "POST",
+      organizationId,
+      body: JSON.stringify({}),
+    },
+  );
+
+  if (!result.ok) {
+    throw toGatewayError(result, "Impossible de pousser le pricing vers Stripe.");
+  }
+
+  const payload = asObject(result.data);
+  return {
+    productsCreated: asNumber(payload.products_created),
+    productsUpdated: asNumber(payload.products_updated),
+    pricesCreated: asNumber(payload.prices_created),
+    pricesReused: asNumber(payload.prices_reused),
+  };
 }

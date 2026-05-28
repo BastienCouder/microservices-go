@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { gatewayJSON } from "./gateway";
+import { gatewayJSON, toGatewayError } from "./gateway";
 
 const originalFetch = globalThis.fetch;
 
@@ -123,5 +123,76 @@ describe("gatewayJSON", () => {
       details: { error: "auth dependency unavailable" },
     });
     expect(calls).toBe(1);
+  });
+
+  test("normalizes structured API error payloads", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse(400, {
+        error: {
+          code: "invalid_request",
+          message: "invalid subscription: seats must be positive",
+        },
+      })) as typeof fetch;
+
+    const result = await gatewayJSON<unknown>(
+      "https://api.test",
+      "/billing/subscriptions",
+      {
+        method: "POST",
+        retry: { attempts: 0 },
+      },
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(400);
+      expect(result.code).toBe("invalid_request");
+      expect(result.error).toBe("invalid subscription: seats must be positive");
+
+      const error = toGatewayError(result, "fallback");
+      expect(error.name).toBe("GatewayError");
+      expect(error.status).toBe(400);
+      expect(error.code).toBe("invalid_request");
+      expect(error.message).toBe("invalid subscription: seats must be positive");
+    }
+  });
+
+  test("preserves rate limit error codes", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse(429, {
+        error: {
+          code: "rate_limited",
+          message: "rate limit exceeded",
+        },
+      })) as typeof fetch;
+
+    const result = await gatewayJSON<unknown>("https://api.test", "/projects", {
+      method: "GET",
+      retry: { attempts: 0 },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(429);
+      expect(result.code).toBe("rate_limited");
+      expect(result.error).toBe("rate limit exceeded");
+    }
+  });
+
+  test("keeps legacy string error payloads compatible", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse(409, { error: "legacy failure" })) as typeof fetch;
+
+    const result = await gatewayJSON<unknown>("https://api.test", "/organizations/1", {
+      method: "GET",
+      retry: { attempts: 0 },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(409);
+      expect(result.code).toBe(undefined);
+      expect(result.error).toBe("legacy failure");
+    }
   });
 });

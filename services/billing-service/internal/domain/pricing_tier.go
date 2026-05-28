@@ -8,17 +8,21 @@ import (
 var ErrInvalidPricingTier = fmt.Errorf("invalid pricing tier")
 
 type PricingTier struct {
-	PromptVolume        int       `json:"prompt_volume"`
-	Label               string    `json:"label"`
+	PromptVolume        int             `json:"prompt_volume"`
+	Label               string          `json:"label"`
 	Prices              map[string]*int `json:"prices"`
-	DeveloperPriceCents *int      `json:"developer_price_cents"`
-	StarterPriceCents   *int      `json:"starter_price_cents"`
-	GrowthPriceCents    *int      `json:"growth_price_cents"`
-	ProPriceCents       *int      `json:"pro_price_cents"`
-	UpdatedAt           time.Time `json:"updated_at"`
+	DeveloperPriceCents *int            `json:"developer_price_cents"`
+	StarterPriceCents   *int            `json:"starter_price_cents"`
+	GrowthPriceCents    *int            `json:"growth_price_cents"`
+	ProPriceCents       *int            `json:"pro_price_cents"`
+	Deleted             bool            `json:"-"`
+	UpdatedAt           time.Time       `json:"updated_at"`
 }
 
 func (p *PricingTier) Validate() error {
+	if p.Deleted {
+		return nil
+	}
 	p.syncPrices()
 	if p.PromptVolume <= 0 {
 		return fmt.Errorf("%w: prompt volume must be positive", ErrInvalidPricingTier)

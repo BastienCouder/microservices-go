@@ -50,7 +50,7 @@ type executePromptRequest struct {
 func (h *Handler) executePrompt(w http.ResponseWriter, r *http.Request) {
 	var req executePromptRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -80,7 +80,7 @@ type extractBrandRequest struct {
 func (h *Handler) extractBrand(w http.ResponseWriter, r *http.Request) {
 	var req extractBrandRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -98,11 +98,11 @@ func (h *Handler) extractBrand(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrUnknownModel):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, usecase.ErrValidation):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 

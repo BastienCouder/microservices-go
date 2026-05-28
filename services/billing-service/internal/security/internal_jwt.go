@@ -23,6 +23,15 @@ type internalTokenClaims struct {
 	Organization int64  `json:"organization_id,omitempty"`
 }
 
+type apiErrorBody struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type apiErrorResponse struct {
+	Error apiErrorBody `json:"error"`
+}
+
 func NewInternalAuthMiddleware(secret, issuer, audience string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -68,7 +77,7 @@ func NewInternalAuthMiddleware(secret, issuer, audience string) func(http.Handle
 func writeUnauthorized(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid internal authorization"})
+	_ = json.NewEncoder(w).Encode(apiErrorResponse{Error: apiErrorBody{Code: "unauthorized", Message: "invalid internal authorization"}})
 }
 
 func auditDenied(r *http.Request, reason string) {

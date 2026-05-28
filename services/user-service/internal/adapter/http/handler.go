@@ -54,14 +54,14 @@ type createUserRequest struct {
 func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
 	if authIdentityID == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated identity"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated identity")
 		return
 	}
 
 	var req createUserRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -74,10 +74,10 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidUser) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -87,17 +87,17 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
 	if authIdentityID == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated identity"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated identity")
 		return
 	}
 
 	user, err := h.svc.GetUserByAuthIdentityID(r.Context(), authIdentityID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -112,38 +112,38 @@ type updateMeRequest struct {
 func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
 	if authIdentityID == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated identity"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated identity")
 		return
 	}
 
 	current, err := h.svc.GetUserByAuthIdentityID(r.Context(), authIdentityID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	var req updateMeRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
 	user, err := h.svc.UpdateUserProfile(r.Context(), current.ID, req.FirstName, req.LastName)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidUser) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -153,30 +153,30 @@ func (h *Handler) updateMe(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) deleteMe(w http.ResponseWriter, r *http.Request) {
 	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
 	if authIdentityID == "" {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated identity"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated identity")
 		return
 	}
 
 	current, err := h.svc.GetUserByAuthIdentityID(r.Context(), authIdentityID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	if err := h.svc.DeleteUser(r.Context(), current.ID); err != nil {
 		if errors.Is(err, domain.ErrInvalidUser) {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -187,17 +187,17 @@ func (h *Handler) getUserByID(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimPrefix(r.URL.Path, "/users/")
 	id, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil || id <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
 
 	user, err := h.svc.GetUser(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -207,17 +207,17 @@ func (h *Handler) getUserByID(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getUserByAuthIdentityID(w http.ResponseWriter, r *http.Request) {
 	authIdentityID := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/users/by-auth/"))
 	if authIdentityID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid auth identity id"})
+		writeError(w, http.StatusBadRequest, "invalid auth identity id")
 		return
 	}
 
 	user, err := h.svc.GetUserByAuthIdentityID(r.Context(), authIdentityID)
 	if err != nil {
 		if errors.Is(err, domain.ErrUserNotFound) {
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 			return
 		}
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
@@ -234,7 +234,7 @@ func (h *Handler) adminUserAction(w http.ResponseWriter, r *http.Request) {
 
 	userID, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil || userID <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+		writeError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
 
@@ -254,11 +254,11 @@ func (h *Handler) adminUserAction(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, domain.ErrInvalidUser):
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+			writeError(w, http.StatusBadRequest, err.Error())
 		case errors.Is(err, domain.ErrUserNotFound):
-			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			writeError(w, http.StatusNotFound, "user not found")
 		default:
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+			writeError(w, http.StatusInternalServerError, "internal server error")
 		}
 		return
 	}

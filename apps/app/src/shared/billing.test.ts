@@ -6,6 +6,7 @@ import {
   normalizeBillingPricingTier,
   updateBillingPlanSettings,
   updateBillingPricingTier,
+  syncStripePricingCatalog,
   updateBillingSubscription,
 } from "./billing";
 
@@ -56,6 +57,7 @@ describe("billing plan settings", () => {
         model_selection_limit: 12,
         monthly_model_change_limit: 4,
         max_projects: 10,
+        is_most_chosen: true,
       }),
     ).toEqual({
       plan: "pro",
@@ -65,6 +67,7 @@ describe("billing plan settings", () => {
       modelSelectionLimit: 12,
       monthlyModelChangeLimit: 4,
       maxProjects: 10,
+      isMostChosen: true,
     });
   });
 
@@ -87,6 +90,7 @@ describe("billing plan settings", () => {
       modelSelectionLimit: 8,
       monthlyModelChangeLimit: 2,
       maxProjects: 12,
+      isMostChosen: false,
     });
   });
 
@@ -104,6 +108,7 @@ describe("billing plan settings", () => {
           model_selection_limit: 12,
           monthly_model_change_limit: 4,
           max_projects: 15,
+          is_most_chosen: true,
         }),
         {
           status: 200,
@@ -122,6 +127,7 @@ describe("billing plan settings", () => {
         modelSelectionLimit: 12,
         monthlyModelChangeLimit: 4,
         maxProjects: 15,
+        isMostChosen: true,
       });
     } finally {
       globalThis.fetch = originalFetch;
@@ -138,6 +144,7 @@ describe("billing plan settings", () => {
       model_selection_limit: 12,
       monthly_model_change_limit: 4,
       max_projects: 15,
+      is_most_chosen: true,
     });
   });
 });
@@ -244,6 +251,41 @@ describe("billing pricing tiers", () => {
       growth_price_cents: 89900,
       pro_price_cents: 149900,
     });
+  });
+});
+
+describe("stripe pricing catalog sync", () => {
+  test("sends catalog sync with gateway organization scope", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      return new Response(
+        JSON.stringify({
+          products_created: 1,
+          products_updated: 4,
+          prices_created: 20,
+          prices_reused: 1,
+        }),
+        {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        },
+      );
+    }) as typeof fetch;
+
+    try {
+      await syncStripePricingCatalog("https://api.test", "7", "agency-plus");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(
+      "https://api.test/billing/stripe/pricing-catalog/plans/agency-plus/sync",
+    );
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("7");
+    expect(calls[0]?.init?.method).toBe("POST");
   });
 });
 

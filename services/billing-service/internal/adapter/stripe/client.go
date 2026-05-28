@@ -141,6 +141,183 @@ func (c *Client) CreateCustomerPortalSession(ctx context.Context, customerID, re
 	return strings.TrimSpace(resp.URL), nil
 }
 
+func (c *Client) SyncPricingCatalog(ctx context.Context, req usecase.StripePricingCatalogSyncRequest) (usecase.StripePricingCatalogSyncResult, error) {
+	if strings.TrimSpace(c.secretKey) == "" {
+		return usecase.StripePricingCatalogSyncResult{}, usecase.ErrStripeDisabled
+	}
+
+	result := usecase.StripePricingCatalogSyncResult{}
+	for _, product := range req.Products {
+		created, err := c.upsertProduct(ctx, product)
+		if err != nil {
+			return usecase.StripePricingCatalogSyncResult{}, err
+		}
+		if created {
+			result.ProductsCreated++
+		} else {
+			result.ProductsUpdated++
+		}
+	}
+
+	for _, price := range req.Prices {
+		reused, err := c.syncPrice(ctx, price)
+		if err != nil {
+			return usecase.StripePricingCatalogSyncResult{}, err
+		}
+		if reused {
+			result.PricesReused++
+		} else {
+			result.PricesCreated++
+		}
+	}
+	return result, nil
+}
+
+func (c *Client) FindPriceIDByLookupKey(ctx context.Context, lookupKey string) (string, error) {
+	if strings.TrimSpace(c.secretKey) == "" {
+		return "", usecase.ErrStripeDisabled
+	}
+	price, err := c.findPriceByLookupKey(ctx, lookupKey)
+	if err != nil {
+		return "", err
+	}
+	if price == nil || strings.TrimSpace(price.ID) == "" {
+		return "", nil
+	}
+	return strings.TrimSpace(price.ID), nil
+}
+
+func (c *Client) upsertProduct(ctx context.Context, product usecase.StripePricingCatalogProduct) (bool, error) {
+	productID := strings.TrimSpace(product.ID)
+	if productID == "" {
+		return false, fmt.Errorf("%w: stripe product id is required", usecase.ErrStripeInvalidRequest)
+	}
+	form := stripeProductForm(product)
+	if _, err := c.doStripeFormRequest(ctx, "/v1/products/"+url.PathEscape(productID), form, ""); err == nil {
+		return false, nil
+	} else if !isStripeStatus(err, http.StatusNotFound) {
+		return false, fmt.Errorf("update stripe product %s: %w", productID, err)
+	}
+
+	form = stripeProductForm(product)
+	form.Set("id", productID)
+	if _, err := c.doStripeFormRequest(ctx, "/v1/products", form, ""); err != nil {
+		return false, fmt.Errorf("create stripe product %s: %w", productID, err)
+	}
+	return true, nil
+}
+
+func (c *Client) syncPrice(ctx context.Context, price usecase.StripePricingCatalogPrice) (bool, error) {
+	existing, err := c.findPriceByLookupKey(ctx, price.LookupKey)
+	if err != nil {
+		return false, err
+	}
+	if existing != nil &&
+		existing.UnitAmount == int64(price.UnitAmountCents) &&
+		strings.EqualFold(existing.Currency, price.Currency) &&
+		strings.EqualFold(existing.Recurring.Interval, price.Interval) &&
+		expandableID(existing.Product) == strings.TrimSpace(price.ProductID) {
+		return true, nil
+	}
+
+	form := url.Values{}
+	form.Set("product", strings.TrimSpace(price.ProductID))
+	form.Set("currency", strings.ToLower(strings.TrimSpace(price.Currency)))
+	form.Set("unit_amount", strconv.Itoa(price.UnitAmountCents))
+	form.Set("recurring[interval]", strings.TrimSpace(price.Interval))
+	form.Set("lookup_key", strings.TrimSpace(price.LookupKey))
+	form.Set("transfer_lookup_key", "true")
+	form.Set("nickname", stripePriceNickname(price))
+	setStripePricingMetadata(form, price)
+
+	if _, err := c.doStripeFormRequest(ctx, "/v1/prices", form, stripePriceIdempotencyKey(price)); err != nil {
+		return false, fmt.Errorf("create stripe price %s: %w", strings.TrimSpace(price.LookupKey), err)
+	}
+	return false, nil
+}
+
+type stripePriceListItem struct {
+	ID         string          `json:"id"`
+	UnitAmount int64           `json:"unit_amount"`
+	Currency   string          `json:"currency"`
+	Product    json.RawMessage `json:"product"`
+	Recurring  struct {
+		Interval string `json:"interval"`
+	} `json:"recurring"`
+}
+
+func (c *Client) findPriceByLookupKey(ctx context.Context, lookupKey string) (*stripePriceListItem, error) {
+	lookupKey = strings.TrimSpace(lookupKey)
+	if lookupKey == "" {
+		return nil, fmt.Errorf("%w: stripe price lookup key is required", usecase.ErrStripeInvalidRequest)
+	}
+
+	query := url.Values{}
+	query.Set("lookup_keys[0]", lookupKey)
+	query.Set("limit", "1")
+	body, err := c.doStripeRequest(ctx, http.MethodGet, "/v1/prices", query, "")
+	if err != nil {
+		return nil, fmt.Errorf("list stripe price %s: %w", lookupKey, err)
+	}
+
+	var resp struct {
+		Data []stripePriceListItem `json:"data"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("decode stripe price list: %w", err)
+	}
+	if len(resp.Data) == 0 {
+		return nil, nil
+	}
+	return &resp.Data[0], nil
+}
+
+func stripeProductForm(product usecase.StripePricingCatalogProduct) url.Values {
+	form := url.Values{}
+	form.Set("name", strings.TrimSpace(product.Name))
+	form.Set("active", "true")
+	form.Set("metadata[source]", "admin_pricing")
+	form.Set("metadata[plan]", strings.TrimSpace(product.Plan))
+	form.Set("metadata[monthly_quota]", strconv.Itoa(product.MonthlyQuota))
+	form.Set("metadata[model_selection_limit]", strconv.Itoa(product.ModelSelectionLimit))
+	form.Set("metadata[monthly_model_change_limit]", strconv.Itoa(product.MonthlyModelChangeLimit))
+	form.Set("metadata[max_projects]", strconv.Itoa(product.MaxProjects))
+	return form
+}
+
+func setStripePricingMetadata(form url.Values, price usecase.StripePricingCatalogPrice) {
+	form.Set("metadata[source]", "admin_pricing")
+	form.Set("metadata[plan]", strings.TrimSpace(price.Plan))
+	form.Set("metadata[tier_label]", strings.TrimSpace(price.TierLabel))
+	form.Set("metadata[prompt_volume]", strconv.Itoa(price.PromptVolume))
+	form.Set("metadata[monthly_quota]", strconv.Itoa(price.MonthlyQuota))
+	form.Set("metadata[model_selection_limit]", strconv.Itoa(price.ModelSelectionLimit))
+	form.Set("metadata[monthly_model_change_limit]", strconv.Itoa(price.MonthlyModelChangeLimit))
+	form.Set("metadata[max_projects]", strconv.Itoa(price.MaxProjects))
+}
+
+func stripePriceNickname(price usecase.StripePricingCatalogPrice) string {
+	plan := strings.TrimSpace(price.Plan)
+	if plan == "" {
+		plan = "plan"
+	}
+	label := strings.TrimSpace(price.TierLabel)
+	if label == "" {
+		label = strconv.Itoa(price.PromptVolume)
+	}
+	return fmt.Sprintf("%s - %s prompts monthly", plan, label)
+}
+
+func stripePriceIdempotencyKey(price usecase.StripePricingCatalogPrice) string {
+	return fmt.Sprintf(
+		"admin-pricing-price:%s:%d:%d:%s",
+		strings.TrimSpace(price.Plan),
+		price.PromptVolume,
+		price.UnitAmountCents,
+		strings.ToLower(strings.TrimSpace(price.Currency)),
+	)
+}
+
 func (c *Client) ParseWebhookEvent(payload []byte, signature string) (usecase.StripeWebhookEvent, error) {
 	if strings.TrimSpace(c.webhookSecret) == "" {
 		return usecase.StripeWebhookEvent{}, usecase.ErrStripeDisabled
@@ -221,17 +398,27 @@ func (c *Client) ParseWebhookEvent(payload []byte, signature string) (usecase.St
 }
 
 func (c *Client) doStripeFormRequest(ctx context.Context, path string, form url.Values, idempotencyKey string) ([]byte, error) {
+	return c.doStripeRequest(ctx, http.MethodPost, path, form, idempotencyKey)
+}
+
+func (c *Client) doStripeRequest(ctx context.Context, method, path string, form url.Values, idempotencyKey string) ([]byte, error) {
 	endpoint := strings.TrimRight(c.baseURL, "/") + path
 	payload := form.Encode()
+	if strings.EqualFold(method, http.MethodGet) && payload != "" {
+		endpoint += "?" + payload
+		payload = ""
+	}
 
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, method, endpoint, strings.NewReader(payload))
 		if err != nil {
 			return nil, fmt.Errorf("create stripe request: %w", err)
 		}
 		req.Header.Set("Authorization", "Bearer "+c.secretKey)
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if !strings.EqualFold(method, http.MethodGet) {
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		}
 		if strings.TrimSpace(idempotencyKey) != "" {
 			req.Header.Set("Idempotency-Key", idempotencyKey)
 		}
@@ -270,6 +457,15 @@ func (c *Client) doStripeFormRequest(ctx context.Context, path string, form url.
 	return nil, lastErr
 }
 
+type stripeAPIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e stripeAPIError) Error() string {
+	return fmt.Sprintf("stripe api error (%d): %s", e.StatusCode, e.Message)
+}
+
 func parseStripeAPIError(statusCode int, body []byte) error {
 	var payload struct {
 		Error struct {
@@ -281,14 +477,19 @@ func parseStripeAPIError(statusCode int, body []byte) error {
 	if err := json.Unmarshal(body, &payload); err == nil {
 		msg := strings.TrimSpace(payload.Error.Message)
 		if msg != "" {
-			return fmt.Errorf("stripe api error (%d): %s", statusCode, msg)
+			return stripeAPIError{StatusCode: statusCode, Message: msg}
 		}
 	}
 	raw := strings.TrimSpace(string(body))
 	if raw == "" {
 		raw = http.StatusText(statusCode)
 	}
-	return fmt.Errorf("stripe api error (%d): %s", statusCode, raw)
+	return stripeAPIError{StatusCode: statusCode, Message: raw}
+}
+
+func isStripeStatus(err error, statusCode int) bool {
+	var apiErr stripeAPIError
+	return errors.As(err, &apiErr) && apiErr.StatusCode == statusCode
 }
 
 func expandableID(raw json.RawMessage) string {

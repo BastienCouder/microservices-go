@@ -62,14 +62,14 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req createOrganizationRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -85,7 +85,7 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -123,11 +123,11 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 
 	organizationID, err := strconv.ParseInt(parts[0], 10, 64)
 	if err != nil || organizationID <= 0 {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid organization id"})
+		writeError(w, http.StatusBadRequest, "invalid organization id")
 		return
 	}
 	if err := enforceScopedOrganization(r, organizationID); err != nil {
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusForbidden, err.Error())
 		return
 	}
 
@@ -150,7 +150,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "api-keys" && r.Method == http.MethodDelete:
 		keyID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || keyID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid api key id"})
+			writeError(w, http.StatusBadRequest, "invalid api key id")
 			return
 		}
 		h.revokeOrganizationAPIKey(w, r, organizationID, keyID)
@@ -167,7 +167,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodGet:
 		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || invitationID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			writeError(w, http.StatusBadRequest, "invalid invitation id")
 			return
 		}
 		h.getInvitationByID(w, r, organizationID, invitationID)
@@ -175,7 +175,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodPut:
 		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || invitationID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			writeError(w, http.StatusBadRequest, "invalid invitation id")
 			return
 		}
 		h.updateInvitation(w, r, organizationID, invitationID)
@@ -183,7 +183,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "invitations" && r.Method == http.MethodDelete:
 		invitationID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || invitationID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid invitation id"})
+			writeError(w, http.StatusBadRequest, "invalid invitation id")
 			return
 		}
 		h.deleteInvitation(w, r, organizationID, invitationID)
@@ -203,7 +203,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "members" && (r.Method == http.MethodPatch || r.Method == http.MethodPut):
 		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || userID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			writeError(w, http.StatusBadRequest, "invalid user id")
 			return
 		}
 		h.updateMemberRoles(w, r, organizationID, userID)
@@ -211,7 +211,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 3 && parts[1] == "members" && r.Method == http.MethodDelete:
 		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || userID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			writeError(w, http.StatusBadRequest, "invalid user id")
 			return
 		}
 		h.removeMember(w, r, organizationID, userID)
@@ -219,7 +219,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	case len(parts) == 4 && parts[1] == "members" && parts[3] == "roles" && r.Method == http.MethodPost:
 		userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 		if parseErr != nil || userID <= 0 {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+			writeError(w, http.StatusBadRequest, "invalid user id")
 			return
 		}
 		h.assignRole(w, r, organizationID, userID)
@@ -229,7 +229,7 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 	// case len(parts) == 4 && parts[1] == "members" && parts[3] == "team" && r.Method == http.MethodPatch:
 	// 	userID, parseErr := strconv.ParseInt(parts[2], 10, 64)
 	// 	if parseErr != nil || userID <= 0 {
-	// 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user id"})
+	// 		writeError(w, http.StatusBadRequest, "invalid user id")
 	// 		return
 	// 	}
 	// 	h.updateMemberTeam(w, r, organizationID, userID)
@@ -277,14 +277,14 @@ type updateOrganizationRequest struct {
 func (h *Handler) updateOrganization(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req updateOrganizationRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -309,7 +309,7 @@ func (h *Handler) updateOrganization(w http.ResponseWriter, r *http.Request, org
 func (h *Handler) deleteOrganization(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -337,14 +337,14 @@ type createOrganizationAPIKeyRequest struct {
 func (h *Handler) createOrganizationAPIKey(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req createOrganizationAPIKeyRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -379,7 +379,7 @@ func (h *Handler) listOrganizationAPIKeys(w http.ResponseWriter, r *http.Request
 func (h *Handler) revokeOrganizationAPIKey(w http.ResponseWriter, r *http.Request, organizationID, keyID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -425,7 +425,7 @@ func (h *Handler) createTeam(w http.ResponseWriter, r *http.Request, organizatio
 	var req createTeamRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -455,14 +455,14 @@ type addMemberRequest struct {
 func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req addMemberRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -507,20 +507,20 @@ type createInvitationRequest struct {
 func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req createInvitationRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
 	expiresAt, err := parseOptionalRFC3339(req.ExpiresAt)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid expires_at format"})
+		writeError(w, http.StatusBadRequest, "invalid expires_at format")
 		return
 	}
 
@@ -586,19 +586,19 @@ type updateInvitationRequest struct {
 func (h *Handler) updateInvitation(w http.ResponseWriter, r *http.Request, organizationID, invitationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req updateInvitationRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 	expiresAt, err := parseOptionalRFC3339(req.ExpiresAt)
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid expires_at format"})
+		writeError(w, http.StatusBadRequest, "invalid expires_at format")
 		return
 	}
 
@@ -633,7 +633,7 @@ func (h *Handler) updateInvitation(w http.ResponseWriter, r *http.Request, organ
 func (h *Handler) deleteInvitation(w http.ResponseWriter, r *http.Request, organizationID, invitationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -659,7 +659,7 @@ func (h *Handler) deleteInvitation(w http.ResponseWriter, r *http.Request, organ
 func (h *Handler) acceptInvitation(w http.ResponseWriter, r *http.Request, token string) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -687,7 +687,7 @@ func (h *Handler) acceptInvitation(w http.ResponseWriter, r *http.Request, token
 func (h *Handler) refuseInvitation(w http.ResponseWriter, r *http.Request, token string) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -725,14 +725,14 @@ type updateMemberRolesRequest struct {
 //
 // func (h *Handler) updateMemberTeam(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
 // 	if _, ok := authenticatedUserID(r); !ok {
-// 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+// 		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 // 		return
 // 	}
 //
 // 	var req updateMemberTeamRequest
 // 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 // 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+// 		writeError(w, http.StatusBadRequest, "invalid json payload")
 // 		return
 // 	}
 //
@@ -759,14 +759,14 @@ type updateMemberRolesRequest struct {
 func (h *Handler) updateMemberRoles(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req updateMemberRolesRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -793,7 +793,7 @@ func (h *Handler) updateMemberRoles(w http.ResponseWriter, r *http.Request, orga
 func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -818,14 +818,14 @@ func (h *Handler) removeMember(w http.ResponseWriter, r *http.Request, organizat
 
 func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
 	if _, ok := authenticatedUserID(r); !ok {
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing authenticated user"})
+		writeError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req assignRoleRequest
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid json payload"})
+		writeError(w, http.StatusBadRequest, "invalid json payload")
 		return
 	}
 
@@ -856,19 +856,19 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrInvalidMember),
 		errors.Is(err, domain.ErrInvalidRole),
 		errors.Is(err, domain.ErrInvalidInvitation):
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrOrganizationNotFound),
 		errors.Is(err, domain.ErrTeamNotFound),
 		errors.Is(err, domain.ErrMemberNotFound),
 		errors.Is(err, domain.ErrInvitationNotFound):
-		writeJSON(w, http.StatusNotFound, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrInvitationExpired),
 		errors.Is(err, domain.ErrInvitationAlreadyHandled):
-		writeJSON(w, http.StatusConflict, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusConflict, err.Error())
 	case errors.Is(err, domain.ErrInvitationEmailMismatch):
-		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		writeError(w, http.StatusForbidden, err.Error())
 	default:
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal server error"})
+		writeError(w, http.StatusInternalServerError, "internal server error")
 	}
 }
 
