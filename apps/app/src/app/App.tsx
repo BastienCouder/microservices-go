@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Navigate, useLocation } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppToaster } from "@/components/ui/toaster";
@@ -17,6 +17,7 @@ import {
   loadProjectContextHierarchies,
 } from "@/shared/project-context";
 import {
+  keepProjectOnlyContextSearch,
   readProjectIdFromSearch,
   resolveSelectedContextSearch,
   SELECTED_CONTEXT_CHANGE_EVENT,
@@ -71,10 +72,13 @@ async function loadProjectCount(
 
 export default function App() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [selectionVersion, setSelectionVersion] = useState(0);
   const isOnboardingRoute = location.pathname === "/onboarding" || location.pathname.startsWith("/onboarding/");
   const isInvitationRoute = location.pathname === "/invitations" || location.pathname.startsWith("/invitations/");
   const isBillingRoute = location.pathname === "/billing" || location.pathname.startsWith("/billing/");
+  const useCompactProjectContext =
+    location.pathname === "/organizations" || location.pathname === "/account";
   const bypassResolvedContext = isOnboardingRoute || isInvitationRoute || isBillingRoute;
   const baseRouteSearch = useMemo(
     () =>
@@ -123,12 +127,19 @@ export default function App() {
       ),
     [routeProjectContextQuery.data, routeProjectToken],
   );
-  const routeSearch = useMemo(
+  const resolvedRouteSearch = useMemo(
     () =>
       bypassResolvedContext
         ? baseRouteSearch
         : applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext),
     [baseRouteSearch, bypassResolvedContext, resolvedProjectContext],
+  );
+  const routeSearch = useMemo(
+    () =>
+      useCompactProjectContext
+        ? keepProjectOnlyContextSearch(resolvedRouteSearch)
+        : resolvedRouteSearch,
+    [resolvedRouteSearch, useCompactProjectContext],
   );
   const billingOrganizationId = organizations[0]?.id ?? "";
   const billingQuery = useQuery({
@@ -220,6 +231,22 @@ export default function App() {
       projectToken: resolvedProjectContext.projectSlug,
     });
   }, [resolvedProjectContext]);
+
+  useEffect(() => {
+    if (!useCompactProjectContext) return;
+    if (routeSearch === location.search) return;
+
+    navigate(`${location.pathname}${routeSearch}${location.hash}`, {
+      replace: true,
+    });
+  }, [
+    location.hash,
+    location.pathname,
+    location.search,
+    navigate,
+    routeSearch,
+    useCompactProjectContext,
+  ]);
 
   if (!apiBaseURL) {
     return (

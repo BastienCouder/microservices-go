@@ -12,7 +12,7 @@ export function ErrorHubColumnLoading() {
 
 function ErrorHubCardSkeleton() {
   return (
-    <div className="w-full rounded-md bg-background p-4">
+    <div className="w-full rounded-xl bg-background p-4">
       <div className="mb-2.5 flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2">
           <Skeleton className="h-6 w-6 shrink-0 rounded-md" />

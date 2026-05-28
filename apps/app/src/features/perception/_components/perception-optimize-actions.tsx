@@ -46,7 +46,7 @@ export function PerceptionOptimizeActions({
           <EmptyStateCard label={emptyLabel || t("optimizeActionsEmpty")} className="h-[120px] text-sm" />
         ) : (
           drafts.map((draft) => (
-            <div key={draft.id} className="rounded-lg border p-3">
+            <div key={draft.id} className="rounded-xl border p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="font-medium text-sm">{draft.title}</div>
                 <Badge variant="outline" className={cn("shrink-0", getPerceptionPriorityTone(draft.priority))}>
@@ -60,7 +60,7 @@ export function PerceptionOptimizeActions({
                 </Badge>
               </div>
               <p className="mb-2 text-sm">{draft.issue}</p>
-              <div className="rounded-md bg-muted/50 p-2 text-sm">{draft.generatedContent}</div>
+              <div className="rounded-lg bg-muted/50 p-2 text-sm">{draft.generatedContent}</div>
             </div>
           ))
         )}

@@ -23,7 +23,7 @@ export function AccountLayout({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
-        title="Compte utilisateur"
+        title="Compte"
         baseline="Nom, prenom et email du compte connecte."
         actionsVariant="classic"
         className="hidden md:block"

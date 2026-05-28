@@ -34,7 +34,7 @@ export function MobileFiltersHeaderAction() {
       <SheetTrigger asChild>
         <Button
           variant="ghost"
-          className="h-11 rounded-full border border-white/60 bg-white/20 px-4 text-sm font-medium text-foreground shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"
+          className="h-11 rounded-lg border border-white/60 bg-white/20 px-4 text-sm font-medium text-foreground shadow-[0_10px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl"
           aria-label={content.filters}
         >
           <SlidersHorizontal className="h-4 w-4" />

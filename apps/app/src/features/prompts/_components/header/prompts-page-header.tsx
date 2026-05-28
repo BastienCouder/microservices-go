@@ -10,6 +10,7 @@ import { Loader2, Plus, Sparkles } from "lucide-react";
 type PromptsPageHeaderProps = {
   activeCount: number;
   activeCountLoading?: boolean;
+  currentTab: "prompts" | "responses";
   isDemo: boolean;
   generatingPrompts?: boolean;
   onNewPrompt: () => void;
@@ -20,6 +21,7 @@ type PromptsPageHeaderProps = {
 export function PromptsPageHeader({
   activeCount,
   activeCountLoading = false,
+  currentTab,
   isDemo,
   generatingPrompts = false,
   onNewPrompt,
@@ -28,13 +30,15 @@ export function PromptsPageHeader({
 }: PromptsPageHeaderProps) {
   const content = useI18nScope("prompts-workspace");
   const { t } = useScopedI18n("prompts-workspace");
+  const title = currentTab === "responses" ? content.responsesPageTitle : content.promptsPageTitle;
+  const baseline =
+    currentTab === "responses" ? content.responsesPageBaseline : content.promptsPageBaseline;
 
   return (
     <PageHeader
-      title={content.promptsAndResponsesTitle}
-      baseline={content.promptsAndResponsesBaseline}
+      title={title}
+      baseline={baseline}
       actionsVariant="classic"
-      className="mb-3 md:mb-4"
       meta={
         <>
           {activeCountLoading ? (
@@ -45,7 +49,6 @@ export function PromptsPageHeader({
           {isDemo ? <Badge className="bg-amber-100 text-amber-800">{content.demoMode}</Badge> : null}
         </>
       }
-      actionsClassName="grid grid-cols-2 gap-2 translate-y-3 sm:flex md:translate-y-5"
       actions={
         <>
           <Button

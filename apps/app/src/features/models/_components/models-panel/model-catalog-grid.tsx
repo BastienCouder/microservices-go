@@ -57,6 +57,7 @@ export function ModelCatalogGrid({
               onClick={() => onToggleModel(model.id)}
               modelGroup={model.modelGroup}
               size="large"
+              variant="models"
               disabled={disabled}
               disabledLabel={
                 disabledByApiKey

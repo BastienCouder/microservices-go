@@ -54,7 +54,7 @@ export function ErrorHubColumn({
 }: ErrorHubColumnProps) {
   return (
     <section
-      className="relative flex min-h-[420px] flex-col rounded-md bg-muted/20 p-2 lg:min-h-0"
+      className="relative flex min-h-[420px] flex-col rounded-xl bg-muted/20 p-2 lg:min-h-0"
       data-severity={severity}
     >
       {columnIndex !== totalColumns - 1 && (

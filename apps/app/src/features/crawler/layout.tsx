@@ -13,7 +13,11 @@ export const CrawlerLayout = memo(function CrawlerLayout({
 }: CrawlerLayoutProps) {
   return (
     <div className="flex h-auto min-h-full flex-col gap-4">
-      <CrawlPanel apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+      <CrawlPanel
+        key={routeSearch}
+        apiBaseURL={apiBaseURL}
+        routeSearch={routeSearch}
+      />
     </div>
   );
 });

@@ -9,7 +9,7 @@ export function PerceptionLoadingState() {
         <div className="space-y-4 p-2">
           <Card className="border-border/60">
             <CardContent className="space-y-4 p-4">
-              <div className="space-y-3 rounded-md bg-primary/8 p-4">
+              <div className="space-y-3 rounded-xl bg-primary/8 p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-2">
                     <Skeleton className="h-4 w-36" />
@@ -49,9 +49,9 @@ export function PerceptionLoadingState() {
                 <Skeleton className="h-14 w-20 rounded-md" />
               </div>
               <div className="space-y-3">
-                <Skeleton className="h-[84px] w-full rounded-[20px]" />
-                <Skeleton className="h-[84px] w-full rounded-[20px]" />
-                <Skeleton className="h-[84px] w-full rounded-[20px]" />
+                <Skeleton className="h-[84px] w-full rounded-xl" />
+                <Skeleton className="h-[84px] w-full rounded-xl" />
+                <Skeleton className="h-[84px] w-full rounded-xl" />
               </div>
             </CardContent>
           </Card>

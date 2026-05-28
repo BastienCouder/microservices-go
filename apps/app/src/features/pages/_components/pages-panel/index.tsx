@@ -5,21 +5,13 @@ import {
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
-  ChevronDown,
-  Search,
 } from "lucide-react";
 
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
+import { MultiSelectFilterPopover } from "@/components/shared/multi-select-filter-popover";
 import { PageHeader } from "@/components/shared/page-header";
+import { SearchFilterInput } from "@/components/shared/search-filter-input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -178,115 +170,27 @@ function PagesModelsFilter({
     : `${selectedModelIds.length} LLM${
         selectedModelIds.length > 1 ? "s" : ""
       }`;
+  const options = models.map((model) => ({
+    id: model.id,
+    label: model.label,
+    description: "Pages citées par ce modèle",
+    iconSrc: toSafeImageAssetPath(model.iconPath),
+    imageAlt: model.label,
+  }));
 
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="outline"
-          className="h-10 w-full justify-between rounded-full border-border/80 bg-background px-4 text-xs sm:h-8 sm:w-auto sm:min-w-[220px]"
-        >
-          <div className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
-            <span className="shrink-0 text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Models
-            </span>
-            <span className="h-1 w-1 shrink-0 rounded-full bg-muted-foreground/50" />
-            {loading ? (
-              <Skeleton className="h-4 w-24 rounded-full" />
-            ) : (
-              <span className="truncate text-sm font-medium text-foreground">
-                {summaryLabel}
-              </span>
-            )}
-          </div>
-          <ChevronDown className="h-4 w-4 text-muted-foreground" />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-[560px] max-w-[92vw] p-0">
-        <FloatingPanelHeader
-          title="Couverture IA"
-          description="Filtre les pages citées selon les LLMs qui les reprennent."
-        />
-        <div className="grid grid-cols-1 gap-2 px-4 pb-4 pt-1 sm:grid-cols-2">
-          {loading ? (
-            Array.from({ length: 4 }).map((_, index) => (
-              <div
-                key={index}
-                className="relative flex items-start gap-2 rounded-2xl border border-border/70 p-3"
-              >
-                <Skeleton className="h-9 w-9 rounded-xl" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <Skeleton className="h-4 w-28" />
-                  <Skeleton className="h-3 w-40" />
-                </div>
-                <Skeleton className="mt-1 h-2.5 w-2.5 rounded-full" />
-              </div>
-            ))
-          ) : (
-            models.map((model) => {
-              const checked = selectedModelIds.includes(model.id);
-              const highlighted = !allModelsSelected && checked;
-
-              return (
-                <button
-                  key={model.id}
-                  type="button"
-                  onClick={() => toggleModel(model.id)}
-                  className={cn(
-                    "relative flex items-start gap-2 rounded-2xl border p-3 text-left transition-colors",
-                    highlighted
-                      ? "border-primary/30 bg-primary/10"
-                      : "border-border/70 bg-background hover:bg-muted/30",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "mt-0.5 flex h-9 w-9 items-center justify-center rounded-xl border p-2",
-                      highlighted
-                        ? "border-primary/30 bg-primary/10"
-                        : "border-border/50 bg-background",
-                    )}
-                  >
-                    <img
-                      src={toSafeImageAssetPath(model.iconPath)}
-                      alt={model.label}
-                      className="h-full w-full object-contain opacity-85"
-                      decoding="async"
-                    />
-                  </div>
-                  <div className="min-w-0">
-                    <div
-                      className={cn(
-                        "truncate text-sm font-semibold leading-tight",
-                        highlighted ? "text-primary" : "text-foreground",
-                      )}
-                    >
-                      {model.label}
-                    </div>
-                    <div
-                      className={cn(
-                        "line-clamp-1 text-xs leading-snug",
-                        highlighted
-                          ? "text-primary/75"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      Pages citées par ce modèle
-                    </div>
-                  </div>
-                  <div
-                    className={cn(
-                      "ml-auto mt-1 h-2.5 w-2.5 rounded-full",
-                      highlighted ? "bg-primary" : "bg-muted-foreground/30",
-                    )}
-                  />
-                </button>
-              );
-            })
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+    <MultiSelectFilterPopover
+      align="end"
+      label="Models"
+      summaryLabel={summaryLabel}
+      title="Couverture IA"
+      options={options}
+      selectedIds={selectedModelIds}
+      onToggle={toggleModel}
+      className="rounded-full"
+      loading={loading}
+      showIconSlot
+    />
   );
 }
 export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
@@ -331,7 +235,7 @@ export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <PageHeader
-        title="Pages"
+        title="Pages citées"
         baseline="Pilotez les URLs citées par les LLMs, les modèles qui les reprennent et les sites externes qui renforcent votre visibilité."
         actionsVariant="classic"
       />
@@ -339,16 +243,13 @@ export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background">
         <div className="border-b md:px-4 md:py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={viewModel.search}
-                onChange={(event) => viewModel.setSearch(event.target.value)}
-                placeholder="Rechercher par URL, domaine ou modèle"
-                disabled={viewModel.loading}
-                className="pl-9"
-              />
-            </div>
+            <SearchFilterInput
+              value={viewModel.search}
+              onValueChange={viewModel.setSearch}
+              placeholder="Rechercher par URL, domaine ou modèle"
+              disabled={viewModel.loading}
+              className="flex-1"
+            />
 
             <div className="flex flex-col gap-2 sm:flex-row lg:justify-end">
               <PagesModelsFilter

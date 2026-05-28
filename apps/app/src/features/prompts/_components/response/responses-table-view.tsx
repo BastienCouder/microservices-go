@@ -146,12 +146,12 @@ export function ResponsesContent(props: ResponsesViewProps) {
             />
           </div>
 
-            <div className="flex h-10 w-full gap-1 rounded-full border p-1 sm:w-auto">
-              <Button size="sm" variant={props.viewMode === "timeline" ? "default" : "ghost"} className="h-8 flex-1 rounded-full px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("timeline")}>
+            <div className="flex h-10 w-full gap-1 rounded-xl border p-1 sm:w-auto">
+              <Button size="sm" variant={props.viewMode === "timeline" ? "default" : "ghost"} className="h-8 flex-1 rounded-lg px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("timeline")}>
                 <Workflow className="mr-1.5 h-4 w-4" />
                 {content.timeline}
               </Button>
-              <Button size="sm" variant={props.viewMode === "table" ? "default" : "ghost"} className="h-8 flex-1 rounded-full px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("table")}>
+              <Button size="sm" variant={props.viewMode === "table" ? "default" : "ghost"} className="h-8 flex-1 rounded-lg px-3 text-sm sm:flex-none" onClick={() => props.setViewMode("table")}>
                 <Table2 className="mr-1.5 h-4 w-4" />
                 {content.table}
               </Button>

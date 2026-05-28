@@ -8,6 +8,7 @@ import {
   buildScopedHref,
   readOrganizationIdFromSearch,
   readRouteQueryParam,
+  SELECTED_CONTEXT_CHANGE_EVENT,
   readSelectedOrganizationID,
   storeSelectedOrganizationID,
 } from "@/shared/selection";
@@ -169,14 +170,28 @@ export function useOrganizationsPageViewModel({
   }, [routeSection]);
 
   useEffect(() => {
+    const syncSelectedOrganization = () => {
+      setSelectedOrganizationId(readSelectedOrganizationID());
+    };
+
+    window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncSelectedOrganization);
+    window.addEventListener("storage", syncSelectedOrganization);
+    syncSelectedOrganization();
+
+    return () => {
+      window.removeEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncSelectedOrganization);
+      window.removeEventListener("storage", syncSelectedOrganization);
+    };
+  }, []);
+
+  useEffect(() => {
     if (organizations.length === 0) return;
     const nextId = findPreferredOrganizationId(organizations, routeSearch, selectedOrganizationId);
     if (nextId && nextId !== selectedOrganizationId) {
       setSelectedOrganizationId(nextId);
       storeSelectedOrganizationID(nextId);
-      const organization = organizations.find((item) => item.id === nextId);
       navigateIfChanged(
-        buildScopedHref(`/organizations${routeSearch}`, { org: organization?.slug }),
+        buildScopedHref(`/organizations${routeSearch}`, { org: null }),
         { replace: true },
       );
     }
@@ -223,7 +238,7 @@ export function useOrganizationsPageViewModel({
     if (!selectedOrganization) return;
     navigateIfChanged(
       buildScopedHref(`/organizations${routeSearch}`, {
-        org: selectedOrganization.slug,
+        org: null,
         section: null,
       }),
       { replace: true },
@@ -232,9 +247,9 @@ export function useOrganizationsPageViewModel({
 
   useEffect(() => {
     if (!selectedOrganization) return;
-    if (routeOrganizationToken === selectedOrganization.slug) return;
+    if (!routeOrganizationToken) return;
     navigateIfChanged(
-      buildScopedHref(`/organizations${routeSearch}`, { org: selectedOrganization.slug }),
+      buildScopedHref(`/organizations${routeSearch}`, { org: null }),
       { replace: true },
     );
   }, [navigateIfChanged, routeOrganizationToken, routeSearch, selectedOrganization]);
@@ -326,7 +341,7 @@ export function useOrganizationsPageViewModel({
       setActiveTab(value);
       navigateIfChanged(
         buildScopedHref(`/organizations${routeSearch}`, {
-          org: selectedOrganization?.slug,
+          org: null,
           section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
         }),
       );

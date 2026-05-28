@@ -100,11 +100,11 @@ function AxisProgressRow({
   const axisLabel = getPerceptionAxisLabel(point.axis, locale);
 
   return (
-    <div className="rounded-[20px] border border-border/60 bg-background/85 p-3">
+    <div className="rounded-xl border border-border/60 bg-background/85 p-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <div
-            className="grid h-9 w-9 shrink-0 place-items-center text-background rounded-2xl border text-sm font-semibold tabular-nums border-2"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-2 text-sm font-semibold tabular-nums text-background"
             style={{ backgroundColor: point.color }}
           >
             {rank}

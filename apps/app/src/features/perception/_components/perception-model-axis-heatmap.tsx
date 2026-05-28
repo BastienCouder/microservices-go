@@ -65,7 +65,7 @@ export function PerceptionModelAxisHeatmap({
           <div className="space-y-3">
             <div className="space-y-3 lg:hidden">
               {rows.map((row) => (
-                <div key={`mobile-${row.model}`} className="rounded-lg border border-border/50 p-3">
+                <div key={`mobile-${row.model}`} className="rounded-xl border border-border/50 p-3">
                   <div className="mb-2 text-sm font-semibold">{row.model}</div>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {axes.map((axis) => {
@@ -74,7 +74,7 @@ export function PerceptionModelAxisHeatmap({
                       return (
                         <div
                           key={`mobile-${row.model}-${axis.key}`}
-                          className="rounded-md border border-border/40 px-2 py-2"
+                          className="rounded-lg border border-border/40 px-2 py-2"
                           style={scoreToCellStyle(score, axis.key)}
                         >
                           <div className="text-[10px] font-medium text-foreground/80">{axisLabel}</div>
@@ -105,7 +105,7 @@ export function PerceptionModelAxisHeatmap({
               <div className="space-y-2">
                 {rows.map((row) => (
                   <div key={`desktop-${row.model}`} className="grid grid-cols-[120px_1fr] gap-2">
-                    <div className="flex items-center rounded-md bg-muted/40 px-2 py-2 text-sm font-medium">
+                    <div className="flex items-center rounded-lg bg-muted/40 px-2 py-2 text-sm font-medium">
                       <span className="truncate">{row.model}</span>
                     </div>
                     <div
@@ -118,7 +118,7 @@ export function PerceptionModelAxisHeatmap({
                         return (
                           <div
                             key={`desktop-${row.model}-${axis.key}`}
-                            className="min-w-0 rounded-md border border-border/40 px-1 py-2 text-center"
+                            className="min-w-0 rounded-lg border border-border/40 px-1 py-2 text-center"
                             style={scoreToCellStyle(score, axis.key)}
                             title={`${row.model} • ${axisLabel}: ${score}/100`}
                           >

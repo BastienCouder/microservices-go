@@ -154,6 +154,20 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
   return search ? `?${search}` : "";
 }
 
+export function keepProjectOnlyContextSearch(routeSearch: string): string {
+  const params = new URLSearchParams(
+    routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
+  );
+  params.delete("projectId");
+  params.delete("project_id");
+  params.delete("org");
+  params.delete("organizationId");
+  params.delete("organization_id");
+
+  const search = params.toString();
+  return search ? `?${search}` : "";
+}
+
 export function buildScopedHref(
   path: string,
   updates: Record<string, string | null | undefined>,

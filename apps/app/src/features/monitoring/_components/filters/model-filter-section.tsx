@@ -1,4 +1,4 @@
-import { ModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
+import { BooleanModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
@@ -64,9 +64,9 @@ export function ModelFilterSection({
         </Button>
       </div>
 
-      <ModelFilterModeTabs
-        value={showUniqueModelFilters ? "unique" : "grouped"}
-        onValueChange={(value) => onModelFilterModeChange(value === "unique")}
+      <BooleanModelFilterModeTabs
+        showUniqueModelFilters={showUniqueModelFilters}
+        onShowUniqueModelFiltersChange={onModelFilterModeChange}
         listClassName="h-8 w-full"
       />
 

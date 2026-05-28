@@ -1,9 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
+import { ChecklistFilterSection } from "@/components/shared/checklist-filter-section";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
-import { EmptyStateCard } from "../../../../components/shared/empty-state-card";
-import { ToggleMoreButton } from "./toggle-more-button";
 import { SectionTitle } from "@/components/shared/section-title";
 
 const COMPETITORS_COUNT = 3;
@@ -29,65 +25,28 @@ export function CompetitorFilterSection({
   const visibleCompetitors = showAllCompetitors
     ? competitors
     : competitors.slice(0, COMPETITORS_COUNT);
+  const options = visibleCompetitors.map((competitor) => ({
+    id: competitor.name,
+    label: competitor.name,
+    meta: `${competitor.sov.toFixed(1)}%`,
+  }));
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <h4 className="min-w-0 text-sm font-semibold leading-tight text-foreground md:text-base lg:text-sm">
-          <SectionTitle>{content.topCompetitors}</SectionTitle>
-        </h4>
-        <Button
-          variant="ghost"
-          size="sm"
-          className={cn(
-            "h-8 min-w-[6.5rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[5.25rem] lg:px-2",
-            selectedCompetitors.length === 0 && "invisible pointer-events-none",
-          )}
-          onClick={clearCompetitors}
-        >
-          {content.clearCompetitors}
-        </Button>
-      </div>
-
-      <div className="space-y-2">
-        {visibleCompetitors.map((competitor) => {
-          const isSelected = selectedCompetitors.includes(competitor.name);
-
-          return (
-            <label
-              key={competitor.name}
-              className={cn(
-                "flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-3 py-3 lg:py-2",
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : "border-border/60 hover:bg-muted/30",
-              )}
-            >
-              <Checkbox
-                checked={isSelected}
-                onCheckedChange={() => toggleCompetitor(competitor.name)}
-              />
-              <span className="min-w-0 flex-1 truncate text-sm md:text-[15px] lg:text-sm">
-                {competitor.name}
-              </span>
-              <span className="text-[11px] tabular-nums text-muted-foreground md:text-xs lg:text-[11px]">
-                {competitor.sov.toFixed(1)}%
-              </span>
-            </label>
-          );
-        })}
-      </div>
-
-      {competitors.length === 0 ? (
-        <EmptyStateCard label={content.noDataAvailable} />
-      ) : null}
-      {competitors.length > COMPETITORS_COUNT ? (
-        <ToggleMoreButton
-          showAll={showAllCompetitors}
-          hiddenCount={competitors.length - COMPETITORS_COUNT}
-          onToggle={() => setShowAllCompetitors(!showAllCompetitors)}
-        />
-      ) : null}
-    </div>
+    <ChecklistFilterSection
+      headerVariant="title"
+      headerTitle={<SectionTitle>{content.topCompetitors}</SectionTitle>}
+      clearLabel={content.clearCompetitors}
+      clearButtonClassName="min-w-[6.5rem] lg:min-w-[5.25rem]"
+      selectedIds={selectedCompetitors}
+      options={options}
+      onToggle={toggleCompetitor}
+      onClear={clearCompetitors}
+      emptyLabel={content.noDataAvailable}
+      showAll={showAllCompetitors}
+      hiddenCount={Math.max(0, competitors.length - COMPETITORS_COUNT)}
+      onToggleMore={() => setShowAllCompetitors(!showAllCompetitors)}
+      showMoreLabel={content.showMore}
+      showLessLabel={content.showLess}
+    />
   );
 }

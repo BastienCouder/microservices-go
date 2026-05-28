@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 const STEP_CLASS =
-  "group grid grid-cols-[28px_1fr] gap-3 rounded-md";
+  "group grid grid-cols-[28px_1fr] gap-3 rounded-lg";
 const STEP_DOT_CLASS =
   "transition-transform duration-200 ease-out group-hover:scale-125";
 
@@ -44,7 +44,7 @@ export function BrandCanonSummary({
                   <div className="text-base font-semibold leading-tight">{canon.category}</div>
                 </div>
               </div>
-              <div className="mt-2 rounded-md border border-border/60 bg-background/80 px-2.5 py-2">
+              <div className="mt-2 rounded-lg border border-border/60 bg-background/80 px-2.5 py-2">
                 <div className="text-[11px] text-muted-foreground">{t("summaryPositioning")}</div>
                 <p className="mt-0.5 text-[15px] leading-snug text-foreground">{canon.positioning}</p>
               </div>
@@ -100,7 +100,7 @@ export function BrandCanonSummary({
               {canon.features.length > 0 ? (
                 <div className="grid grid-cols-1">
                   {canon.features.map((item) => (
-                    <div key={item} className="flex items-start gap-2 rounded-md bg-background/70 px-2.5 py-1.5">
+                    <div key={item} className="flex items-start gap-2 rounded-lg bg-background/70 px-2.5 py-1.5">
                       <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                       <span className="text-sm leading-snug">{item}</span>
                     </div>

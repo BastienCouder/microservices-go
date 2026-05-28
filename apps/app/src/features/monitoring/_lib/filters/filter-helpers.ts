@@ -24,11 +24,6 @@ type CompetitorMetrics = {
   previousMentionRate: number;
 };
 
-const MODEL_FILTER_LABEL_COLLATOR = new Intl.Collator(undefined, {
-  sensitivity: "base",
-  numeric: true,
-});
-
 function inExplicitRange(
   prompt: Pick<MonitoringPrompt, "createdAt">,
   start: Date,
@@ -90,24 +85,7 @@ export function buildVisibleModelFilterItems(
   models: MonitoringModel[],
   showUniqueModelFilters: boolean,
 ): FilterModelItem[] {
-  const items = buildProjectModelFilterItems(models, showUniqueModelFilters);
-
-  return [...items].sort((left, right) => {
-    const leftLabel = showUniqueModelFilters
-      ? left.displayName || left.groupName || left.id
-      : left.groupName || left.displayName || left.id;
-    const rightLabel = showUniqueModelFilters
-      ? right.displayName || right.groupName || right.id
-      : right.groupName || right.displayName || right.id;
-
-    const compareByLabel = MODEL_FILTER_LABEL_COLLATOR.compare(
-      leftLabel.trim(),
-      rightLabel.trim(),
-    );
-    if (compareByLabel !== 0) return compareByLabel;
-
-    return MODEL_FILTER_LABEL_COLLATOR.compare(left.id, right.id);
-  });
+  return buildProjectModelFilterItems(models, showUniqueModelFilters);
 }
 
 export function buildProjectWithDynamicCompetitors(

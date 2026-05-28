@@ -149,7 +149,7 @@ export const PERCEPTION_TEXT = {
     },
   },
   leftPanel: {
-    title: "Référentiel de marque",
+    title: "Profil de marque",
     tabs: {
       brand: "Marque",
       filters: "Filtres",

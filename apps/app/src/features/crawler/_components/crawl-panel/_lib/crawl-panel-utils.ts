@@ -1,4 +1,7 @@
-import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
+import type {
+  ContentOptimizerCrawlRecord,
+  ContentOptimizerIssue,
+} from "../../../_lib/content-optimizer-api";
 
 export type CrawlColumn = {
   id: string;
@@ -85,6 +88,209 @@ export function primaryIssue(record: ContentOptimizerCrawlRecord) {
         severityRank(right.severity) - severityRank(left.severity),
     )[0] ?? null
   );
+}
+
+export type GeoInsightGroup = {
+  id: string;
+  label: string;
+  description: string;
+  fixTypes: string[];
+};
+
+export const geoInsightGroups: GeoInsightGroup[] = [
+  {
+    id: "understanding",
+    label: "Compréhension IA",
+    description: "Entité, offre, audience et cas d'usage.",
+    fixTypes: [
+      "add_entity_context",
+      "clarify_offer",
+      "add_audience_use_cases",
+    ],
+  },
+  {
+    id: "answer",
+    label: "Réponse générative",
+    description: "Réponse courte et questions directement réutilisables.",
+    fixTypes: ["add_direct_answer", "add_faq"],
+  },
+  {
+    id: "credibility",
+    label: "Crédibilité",
+    description: "Preuves, sources, chiffres et fraîcheur.",
+    fixTypes: ["add_evidence", "add_freshness_signal"],
+  },
+  {
+    id: "structure",
+    label: "Structure contenu",
+    description: "Titres, profondeur, schema et lisibilité.",
+    fixTypes: [
+      "add_title",
+      "improve_title",
+      "add_meta_description",
+      "expand_content",
+      "add_topic_depth",
+      "improve_h1",
+      "improve_headings",
+      "add_schema_markup",
+    ],
+  },
+  {
+    id: "conversion",
+    label: "Maillage & choix",
+    description: "Liens internes, comparaison et parcours suivant.",
+    fixTypes: [
+      "add_internal_links",
+      "add_comparison_context",
+      "create_blog",
+    ],
+  },
+];
+
+export function issuesForGeoInsightGroup(
+  issues: ContentOptimizerIssue[] | undefined,
+  group: GeoInsightGroup,
+): ContentOptimizerIssue[] {
+  const fixTypes = new Set(group.fixTypes);
+  return (issues ?? []).filter((issue) => fixTypes.has(issue.fixType));
+}
+
+export type GeoKpiSummary = {
+  id: string;
+  label: string;
+  value: string;
+  caption: string;
+  tone: "default" | "success" | "warning";
+};
+
+function severityPenalty(severity: string): number {
+  if (severity === "high") return 22;
+  if (severity === "medium") return 12;
+  if (severity === "low") return 6;
+  return 0;
+}
+
+export function computeGeoReadinessScore(
+  record: ContentOptimizerCrawlRecord,
+): number {
+  const httpStatus = record.httpStatus ?? 200;
+
+  if (httpStatus >= 500) return 0;
+
+  const httpPenalty = httpStatus >= 400 ? 35 : 0;
+  const issuePenalty = (record.issues ?? []).reduce(
+    (total, issue) => total + severityPenalty(issue.severity),
+    0,
+  );
+
+  return Math.max(0, 100 - httpPenalty - issuePenalty);
+}
+
+function formatRatio(value: number, total: number): string {
+  if (total === 0) return "0/0";
+  return `${value}/${total}`;
+}
+
+function formatPercent(value: number, total: number): string {
+  if (total === 0) return "0%";
+  return `${Math.round((value / total) * 100)}%`;
+}
+
+function groupReadyCount(
+  records: ContentOptimizerCrawlRecord[],
+  groupId: string,
+): number {
+  const group = geoInsightGroups.find((candidate) => candidate.id === groupId);
+  if (!group) return 0;
+
+  return records.filter(
+    (record) => issuesForGeoInsightGroup(record.issues, group).length === 0,
+  ).length;
+}
+
+export function computeGeoKpiSummaries(
+  records: ContentOptimizerCrawlRecord[],
+): GeoKpiSummary[] {
+  const analyzedRecords = records.filter(
+    (record) => record.status === "completed",
+  );
+  const analyzedCount = analyzedRecords.length;
+  const averageScore =
+    analyzedCount === 0
+      ? 0
+      : Math.round(
+          analyzedRecords.reduce(
+            (total, record) => total + computeGeoReadinessScore(record),
+            0,
+          ) / analyzedCount,
+        );
+  const riskyCount = analyzedRecords.filter(
+    (record) => computePriority(record).rank >= 3,
+  ).length;
+  const understandingReady = groupReadyCount(analyzedRecords, "understanding");
+  const answerReady = groupReadyCount(analyzedRecords, "answer");
+  const credibilityReady = groupReadyCount(analyzedRecords, "credibility");
+
+  return [
+    {
+      id: "geo-score",
+      label: "Score GEO moyen",
+      value: `${averageScore}%`,
+      caption:
+        analyzedCount === 0
+          ? "Aucune page analysée"
+          : `${analyzedCount} page(s) analysée(s)`,
+      tone:
+        averageScore >= 80
+          ? "success"
+          : averageScore >= 55
+            ? "default"
+            : "warning",
+    },
+    {
+      id: "risk-pages",
+      label: "Pages à risque",
+      value: String(riskyCount),
+      caption: "Priorité haute ou critique",
+      tone: riskyCount === 0 ? "success" : "warning",
+    },
+    {
+      id: "understanding-ready",
+      label: "Compréhension OK",
+      value: formatRatio(understandingReady, analyzedCount),
+      caption: `${formatPercent(
+        understandingReady,
+        analyzedCount,
+      )} sans flou entité/offre`,
+      tone:
+        understandingReady === analyzedCount && analyzedCount > 0
+          ? "success"
+          : "default",
+    },
+    {
+      id: "answer-ready",
+      label: "Réponses prêtes",
+      value: formatRatio(answerReady, analyzedCount),
+      caption: `${formatPercent(answerReady, analyzedCount)} avec réponse/FAQ`,
+      tone:
+        answerReady === analyzedCount && analyzedCount > 0
+          ? "success"
+          : "default",
+    },
+    {
+      id: "credibility-ready",
+      label: "Crédibilité OK",
+      value: formatRatio(credibilityReady, analyzedCount),
+      caption: `${formatPercent(
+        credibilityReady,
+        analyzedCount,
+      )} avec preuves fraîches`,
+      tone:
+        credibilityReady === analyzedCount && analyzedCount > 0
+          ? "success"
+          : "default",
+    },
+  ];
 }
 
 export function hostnameFromURL(url: string): string {

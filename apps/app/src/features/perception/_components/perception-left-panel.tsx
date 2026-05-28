@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
-import { ModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
+import { BooleanModelFilterModeTabs } from "@/components/shared/model-filter-mode-tabs";
 import { PeriodFilterPicker } from "@/components/shared/period-filter-picker";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -107,7 +107,7 @@ export function PerceptionLeftPanel({
             canon={canon}
             isDemo={isDemo}
             action={
-              <Button asChild variant="outline"  className="w-full justify-center rounded-full">
+              <Button asChild variant="outline" className="w-full justify-center rounded-lg">
                 <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
                   {t("leftPanelChangeBrand")}
                 </Link>
@@ -224,11 +224,9 @@ function PerceptionFiltersPanel({
           </div>
         </div>
 
-        <ModelFilterModeTabs
-          value={showUniqueModelFilters ? "unique" : "grouped"}
-          onValueChange={(value) => onToggleModelFilterMode(value === "unique")}
-          groupedLabel={t("filtersGroupedMode")}
-          uniqueLabel={t("filtersUniqueMode")}
+        <BooleanModelFilterModeTabs
+          showUniqueModelFilters={showUniqueModelFilters}
+          onShowUniqueModelFiltersChange={onToggleModelFilterMode}
         />
 
         {modelOptions.length === 0 ? (

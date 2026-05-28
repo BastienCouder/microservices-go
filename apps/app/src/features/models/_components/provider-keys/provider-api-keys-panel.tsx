@@ -87,14 +87,14 @@ const ProviderApiKeyCard = memo(function ProviderApiKeyCard({
   return (
     <div
       className={cn(
-        "group flex h-full min-h-[200px] flex-col rounded-2xl border bg-card p-4 transition-all duration-200 hover:shadow-sm",
+        "group flex h-full min-h-[200px] flex-col rounded-xl border bg-card p-4 transition-all duration-200 hover:shadow-sm",
         requirement.hasApiKey
           ? "border-primary/20 bg-primary/[0.02]"
           : "border-border hover:border-border/80",
       )}
     >
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-border p-2">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg border border-border p-2">
           {iconPath ? (
             <img
               src={iconPath}
@@ -292,7 +292,7 @@ export function ProviderApiKeysPanel({
   return (
     <section className={cn(className)}>
       {requirements.length === 0 ? (
-        <p className="mt-4 rounded-md border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
+        <p className="mt-4 rounded-lg border border-dashed border-border/70 px-3 py-3 text-sm text-muted-foreground">
           {texts.empty}
         </p>
       ) : (

@@ -348,7 +348,80 @@ func TestGetContentOptimizerCrawlCanSkipAnalysisForDiscovery(t *testing.T) {
 	}
 }
 
-func TestGetContentOptimizerCrawlKeepsUnselectedPagesFromLatestCrawl(t *testing.T) {
+func TestAnalyzeSelectedContentOptimizerRecordsUsesExistingRecordsWithoutCrawler(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{}
+	verifier := &recordingProjectAccessVerifier{}
+	analyzer := &recordingContentIssueAnalyzer{
+		issues: []ContentOptimizerIssue{{
+			ID:             "ai-issue",
+			Category:       "geo",
+			Severity:       "high",
+			Title:          "Intentions manquantes",
+			Description:    "Le contenu ne couvre pas assez les intentions.",
+			Recommendation: "Ajouter des réponses directes.",
+			FixType:        "ai_add_intent_coverage",
+		}},
+	}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectVerifier:      verifier,
+		ContentCrawler:       crawler,
+		ContentIssueAnalyzer: analyzer,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	result, err := svc.AnalyzeSelectedContentOptimizerRecords(ctx, "project-1", 42, []ContentOptimizerCrawlRecord{
+		{
+			URL:        " https://example.com/pricing ",
+			Status:     "completed",
+			HTTPStatus: 200,
+			Title:      "Pricing",
+			Markdown:   "# Pricing\n\nPlans for teams.",
+		},
+		{
+			URL:        "https://example.com/docs",
+			Status:     "completed",
+			HTTPStatus: 200,
+			Title:      "Docs",
+			Markdown:   "# Docs\n\nHow to use the product.",
+		},
+	})
+	if err != nil {
+		t.Fatalf("analyze selected records: %v", err)
+	}
+
+	if verifier.projectID != "project-1" || verifier.organizationID != 42 {
+		t.Fatalf("expected project access check for project-1/42, got %q/%d", verifier.projectID, verifier.organizationID)
+	}
+	if crawler.startInput.URL != "" || crawler.resultJobID != "" {
+		t.Fatalf("expected no crawler call, got start=%#v resultJobID=%q", crawler.startInput, crawler.resultJobID)
+	}
+	if result.Status != "completed" || result.Total != 2 || result.Finished != 2 {
+		t.Fatalf("unexpected result summary: %#v", result)
+	}
+	if len(result.Records) != 2 {
+		t.Fatalf("expected two analyzed records, got %d", len(result.Records))
+	}
+	if result.Records[0].URL != "https://example.com/pricing" {
+		t.Fatalf("expected trimmed URL, got %q", result.Records[0].URL)
+	}
+	if !hasContentOptimizerIssueFixType(result.Records[0].Issues, "ai_add_intent_coverage") {
+		t.Fatalf("expected AI issue on first selected record, got %#v", result.Records[0].Issues)
+	}
+
+	latest, err := svc.GetLatestContentOptimizerCrawl(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get latest analyzed selection: %v", err)
+	}
+	if latest.JobID != result.ID {
+		t.Fatalf("expected latest selected analysis id %q, got %q", result.ID, latest.JobID)
+	}
+}
+
+func TestGetContentOptimizerCrawlReplacesLatestWithFreshSelectedResult(t *testing.T) {
 	ctx := context.Background()
 	crawler := &recordingContentCrawler{
 		job: ContentOptimizerCrawlJob{ID: "crawl-selected", Status: "running"},
@@ -430,19 +503,14 @@ func TestGetContentOptimizerCrawlKeepsUnselectedPagesFromLatestCrawl(t *testing.
 	if err != nil {
 		t.Fatalf("get latest crawl: %v", err)
 	}
-	if len(latest.Result.Records) != 2 {
-		t.Fatalf("expected selected crawl to keep unselected page, got %#v", latest.Result.Records)
+	if len(latest.Result.Records) != 1 {
+		t.Fatalf("expected latest crawl to contain only fresh selected result, got %#v", latest.Result.Records)
 	}
-
-	recordsByURL := map[string]ContentOptimizerCrawlRecord{}
-	for _, record := range latest.Result.Records {
-		recordsByURL[record.URL] = record
+	if latest.Result.Records[0].URL != "https://example.com/pricing" {
+		t.Fatalf("expected selected page only, got %#v", latest.Result.Records)
 	}
-	if recordsByURL["https://example.com/pricing"].Title != "Pricing new" {
-		t.Fatalf("expected selected page to be refreshed, got %#v", recordsByURL["https://example.com/pricing"])
-	}
-	if recordsByURL["https://example.com/docs"].Title != "Docs" {
-		t.Fatalf("expected unselected page to be kept, got %#v", recordsByURL["https://example.com/docs"])
+	if latest.Result.Records[0].Title != "Pricing new" {
+		t.Fatalf("expected selected page to be refreshed, got %#v", latest.Result.Records[0])
 	}
 }
 
@@ -539,6 +607,10 @@ func TestGetContentOptimizerCrawlReportsDetailedSEOAndGEOIssues(t *testing.T) {
 		"add_direct_answer",
 		"add_evidence",
 		"add_entity_context",
+		"clarify_offer",
+		"add_audience_use_cases",
+		"add_comparison_context",
+		"add_freshness_signal",
 		"create_blog",
 	}
 	for _, fixType := range expectedFixTypes {

@@ -23,17 +23,17 @@ const TrafficPage = lazy(() =>
   })),
 );
 const AdminModelsPage = lazy(() =>
-  import("@/features/admin-models").then((module) => ({
+  import("@/features/admin/admin-models").then((module) => ({
     default: module.AdminModelsPage,
   })),
 );
 const AdminOrganizationsPage = lazy(() =>
-  import("@/features/admin-organizations").then((module) => ({
+  import("@/features/admin/admin-organizations").then((module) => ({
     default: module.AdminOrganizationsPage,
   })),
 );
 const AdminPricingPage = lazy(() =>
-  import("@/features/admin-pricing").then((module) => ({
+  import("@/features/admin/admin-pricing").then((module) => ({
     default: module.AdminPricingPage,
   })),
 );

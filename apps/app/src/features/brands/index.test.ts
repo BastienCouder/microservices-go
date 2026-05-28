@@ -4,8 +4,8 @@ const overviewSource = await Bun.file(new URL("./_components/overview/index.tsx"
 const editorSource = await Bun.file(new URL("./brand-canon/_components/editor/index.tsx", import.meta.url)).text();
 
 describe("brands pages", () => {
-  test("renames the overview page to Identite", () => {
-    expect(overviewSource.includes('title="Identité"')).toBe(true);
+  test("renames the overview page to Profil de marque", () => {
+    expect(overviewSource.includes('title="Profil de marque"')).toBe(true);
   });
 
   test("keeps the overview page scrollable on mobile", () => {

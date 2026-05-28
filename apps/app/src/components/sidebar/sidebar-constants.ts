@@ -17,11 +17,11 @@ export type SidebarItem = {
     | "prompts"
     | "responses"
     | "pages"
+    | "perception"
     | "traffic"
     | "crawler"
     | "contentOptimizer"
     | "errorHub"
-    | "aiAgentReady"
     | "brands"
     | "optimizeActions"
     | "models"
@@ -38,11 +38,11 @@ export const SIDEBAR_LABELS = {
   prompts: "prompts",
   responses: "responses",
   pages: "pages",
+  perception: "perception",
   traffic: "Traffic",
   crawler: "crawler",
   contentOptimizer: "content optimizer",
   errorHub: "error hub",
-  aiAgentReady: "AI agent ready",
   brands: "brands",
   optimizeActions: "optimization",
   models: "models",
@@ -57,22 +57,22 @@ export const SIDEBAR_LABELS = {
 export const MONITORING_ITEMS: SidebarItem[] = [
   { href: "/monitoring", labelKey: "dashboard" },
   { href: "/prompts", labelKey: "prompts" },
+  { href: "/prompts", labelKey: "responses" },
   { href: "/pages", labelKey: "pages" },
+];
+
+export const BRAND_CONTEXT_ITEMS: SidebarItem[] = [
   { href: "/brands", labelKey: "brands" },
   { href: "/models", labelKey: "models" },
-  { href: "/traffic", labelKey: "traffic" },
 ];
 
 export const OPTIMIZATION_ITEMS: SidebarItem[] = [
-  { href: "/crawler", labelKey: "crawler" },
   { href: "/content-optimizer", labelKey: "contentOptimizer" },
+  { href: "/crawler", labelKey: "crawler" },
   { href: "/error-hub", labelKey: "errorHub" },
-  { href: "/ai-agent-ready", labelKey: "aiAgentReady" },
 ];
 
-export const ORGANIZATION_ITEMS: SidebarItem[] = [
-  { href: "/admin/models", labelKey: "adminModels" },
+export const SETTINGS_ITEMS: SidebarItem[] = [
   { href: "/organizations", labelKey: "organizations" },
-  { href: "/billing", labelKey: "billing" },
-  { href: "/settings", labelKey: "settings" },
+  { href: "/account", labelKey: "account" },
 ];

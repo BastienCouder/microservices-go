@@ -4,7 +4,9 @@ import { pushErrorToast, pushInfoToast } from "@/components/ui/toast-actions";
 import { useContentOptimizerViewModel } from "../../_lib/crawl/use-content-optimizer-view-model";
 import { CrawlerPageHeader } from "./_components/crawler-page-header";
 import { CrawlerResultsView } from "./_components/crawler-results-view";
+import { DiscoveredPagesSelectionView } from "./_components/discovered-pages-selection-view";
 import { InitialSetupCard } from "./_components/initial-setup-card";
+import { CrawlPanelTemplate } from "./template";
 import {
   computePriority,
   primaryIssue,
@@ -22,7 +24,10 @@ type CrawlPanelProps = {
 export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
   const reviewingDiscoveredPages =
-    viewModel.phase === "review" && viewModel.discoveredPages.length > 0;
+    (viewModel.phase === "review" ||
+      (viewModel.phase === "discovering" &&
+        viewModel.discoveredPages.length > 0)) &&
+    viewModel.discoveredPages.length > 0;
   const records = reviewingDiscoveredPages
     ? viewModel.discoveredPages
     : viewModel.crawlRecords;
@@ -33,6 +38,28 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+  useEffect(() => {
+    setQuery("");
+    setStatusFilter("all");
+    setSeverityFilter("all");
+    setIssuesOnly(false);
+    setSortKey("priority");
+    setSortDirection("desc");
+  }, [viewModel.organizationId, viewModel.projectId]);
+
+  const filteredDiscoveredRecords = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (normalizedQuery.length === 0) {
+      return records;
+    }
+
+    return records.filter(
+      (record) =>
+        record.url.toLowerCase().includes(normalizedQuery) ||
+        (record.title ?? "").toLowerCase().includes(normalizedQuery),
+    );
+  }, [query, records]);
 
   const filteredRecords = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -106,7 +133,9 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   const reanalyzing = viewModel.discovering || viewModel.crawling;
   const hasAnalysis = viewModel.crawlRecords.length > 0;
   const canUsePageSelection = records.length > 0;
+  const showProjectTransition = viewModel.hydratingProjectScope;
   const showInitialSetup =
+    !showProjectTransition &&
     !viewModel.error &&
     !viewModel.loadingLatest &&
     !hasAnalysis &&
@@ -136,24 +165,16 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   useEffect(() => {
     if (viewModel.discovering) {
       pushInfoToast(
-        "Mise à jour de la liste des pages en cours.",
-        "Les nouvelles pages du site seront ajoutées dès que la découverte est terminée.",
+        "Découverte des pages en cours.",
+        "Les pages détectées seront proposées à la sélection dès que la découverte est terminée.",
       );
     }
   }, [viewModel.discovering]);
 
-  useEffect(() => {
-    if (reviewingDiscoveredPages) {
-      pushInfoToast(
-        `${viewModel.discoveredPages.length} page(s) détectée(s)`,
-        "La liste des pages a été mise à jour. Sélectionne les pages à analyser, puis lance l'analyse depuis le header.",
-      );
-    }
-  }, [reviewingDiscoveredPages, viewModel.discoveredPages.length]);
-
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-      {showInitialSetup ? null : (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-3 p-2 md:p-4">
+      {showProjectTransition ? <CrawlPanelTemplate /> : null}
+      {showProjectTransition || showInitialSetup ? null : (
         <CrawlerPageHeader
           reviewingDiscoveredPages={reviewingDiscoveredPages}
           hasAnalysis={hasAnalysis}
@@ -166,10 +187,11 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
           onDiscover={() => viewModel.discover()}
           onCrawlSelected={() => viewModel.crawlSelected()}
           onAnalyzeSite={handleAnalyzeSiteClick}
+          onReviewSelection={() => viewModel.reviewSelection()}
         />
       )}
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background">
+      <div className={showProjectTransition ? "hidden" : "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-background"}>
         {showInitialSetup ? (
           <InitialSetupCard
             projectName={viewModel.projectName}
@@ -179,29 +201,45 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
             onAnalyzeSite={handleAnalyzeSiteClick}
           />
         ) : (
-          <CrawlerResultsView
-            errorLabel={viewModel.error}
-            loadingLatest={viewModel.loadingLatest}
-            query={query}
-            statusFilter={statusFilter}
-            severityFilter={severityFilter}
-            sortKey={sortKey}
-            sortDirection={sortDirection}
-            records={records}
-            filteredRecords={filteredRecords}
-            selectedRecord={selectedRecord}
-            onQueryChange={setQuery}
-            onStatusFilterChange={setStatusFilter}
-            onSeverityFilterChange={setSeverityFilter}
-            onToggleSort={toggleSort}
-            onSelectRecord={viewModel.setSelectedResultURL}
-            selectable={canUsePageSelection}
-            selectedURLs={viewModel.selectedURLs}
-            selectedCount={viewModel.selectedCount}
-            allSelected={viewModel.allDiscoveredSelected}
-            onTogglePage={viewModel.togglePage}
-            onToggleAll={viewModel.toggleAllPages}
-          />
+          <>
+            {reviewingDiscoveredPages ? (
+              <DiscoveredPagesSelectionView
+                query={query}
+                records={records}
+                filteredRecords={filteredDiscoveredRecords}
+                selectedURLs={viewModel.selectedURLs}
+                selectedCount={viewModel.selectedCount}
+                allSelected={viewModel.allDiscoveredSelected}
+                onQueryChange={setQuery}
+                onTogglePage={viewModel.togglePage}
+                onToggleAll={viewModel.toggleAllPages}
+              />
+            ) : (
+              <CrawlerResultsView
+                errorLabel={viewModel.error}
+                loadingLatest={viewModel.loadingLatest}
+                query={query}
+                statusFilter={statusFilter}
+                severityFilter={severityFilter}
+                sortKey={sortKey}
+                sortDirection={sortDirection}
+                records={records}
+                filteredRecords={filteredRecords}
+                selectedRecord={selectedRecord}
+                onQueryChange={setQuery}
+                onStatusFilterChange={setStatusFilter}
+                onSeverityFilterChange={setSeverityFilter}
+                onToggleSort={toggleSort}
+                onSelectRecord={viewModel.setSelectedResultURL}
+                selectable={canUsePageSelection}
+                selectedURLs={viewModel.selectedURLs}
+                selectedCount={viewModel.selectedCount}
+                allSelected={viewModel.allDiscoveredSelected}
+                onTogglePage={viewModel.togglePage}
+                onToggleAll={viewModel.toggleAllPages}
+              />
+            )}
+          </>
         )}
       </div>
     </div>

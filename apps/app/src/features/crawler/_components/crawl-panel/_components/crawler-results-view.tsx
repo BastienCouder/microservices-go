@@ -23,8 +23,11 @@ import { cn } from "@/shared/utils";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
 import {
   columns,
+  computeGeoKpiSummaries,
   computePriority,
+  geoInsightGroups,
   hostnameFromURL,
+  issuesForGeoInsightGroup,
   pathnameFromURL,
   primaryIssue,
   severityLabel,
@@ -117,6 +120,46 @@ function loadingRows() {
   ));
 }
 
+function CrawlerKpiStrip({
+  records,
+}: {
+  records: ContentOptimizerCrawlRecord[];
+}) {
+  const kpis = computeGeoKpiSummaries(records);
+
+  return (
+    <section
+      className="border-b bg-muted/20 px-4 py-3"
+      aria-label="KPIs GEO du contenu analysé"
+    >
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+        {kpis.map((kpi) => (
+          <div
+            key={kpi.id}
+            className={cn(
+              "rounded-md border bg-background px-3 py-2.5 shadow-sm",
+              kpi.tone === "success" && "border-emerald-200 bg-emerald-50/70",
+              kpi.tone === "warning" && "border-amber-200 bg-amber-50/70",
+            )}
+          >
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              {kpi.label}
+            </p>
+            <div className="mt-1 flex items-end justify-between gap-2">
+              <p className="text-xl font-bold leading-none text-foreground">
+                {kpi.value}
+              </p>
+              <p className="truncate text-right text-[11px] font-medium text-muted-foreground">
+                {kpi.caption}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function CrawlerDetailPane({
   selectedRecord,
 }: {
@@ -159,6 +202,50 @@ function CrawlerDetailPane({
       </div>
 
       <div className="space-y-4 px-4 py-4">
+        <section className="space-y-3">
+          <SectionTitle showIndicator={false}>Diagnostic GEO</SectionTitle>
+          <div className="grid gap-2">
+            {geoInsightGroups.map((group) => {
+              const groupIssues = issuesForGeoInsightGroup(
+                selectedRecord.issues,
+                group,
+              );
+              const hasIssues = groupIssues.length > 0;
+              const topIssue = primaryIssue({
+                ...selectedRecord,
+                issues: groupIssues,
+              });
+
+              return (
+                <div
+                  key={group.id}
+                  className={cn(
+                    "rounded-md border bg-background p-3",
+                    hasIssues && "border-primary/30 bg-primary/5",
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-foreground">
+                        {group.label}
+                      </p>
+                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                        {topIssue?.title ?? group.description}
+                      </p>
+                    </div>
+                    <Badge
+                      variant={hasIssues ? "secondary" : "outline"}
+                      className="h-6 shrink-0 rounded-sm px-2 text-xs font-bold"
+                    >
+                      {hasIssues ? `${groupIssues.length}` : "OK"}
+                    </Badge>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         {(selectedRecord.issues?.length ?? 0) > 0 ? (
           <section className="space-y-4">
             <SectionTitle showIndicator={false}>Points à corriger</SectionTitle>
@@ -250,6 +337,8 @@ export function CrawlerResultsView({
 
   return (
     <>
+    {/*   <CrawlerKpiStrip records={records} /> */}
+
       <div className="border-b px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-1 items-center flex-col gap-3 md:flex-row">
@@ -270,7 +359,6 @@ export function CrawlerResultsView({
               options={STATUS_FILTER_OPTIONS}
               label="Statut"
               title="Statut"
-              description="Filtrer les pages par statut de crawl."
             />
 
             <PeriodFilterPicker
@@ -282,7 +370,6 @@ export function CrawlerResultsView({
               options={SEVERITY_FILTER_OPTIONS}
               label="Sévérité"
               title="Sévérité"
-              description="Filtrer les pages par sévérité des erreurs."
             />
           </div>
 

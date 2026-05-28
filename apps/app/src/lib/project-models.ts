@@ -45,6 +45,11 @@ export type NormalizedModelPayload = {
 
 type JsonRecord = Record<string, unknown>;
 
+const MODEL_FILTER_LABEL_COLLATOR = new Intl.Collator(undefined, {
+  sensitivity: "base",
+  numeric: true,
+});
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
@@ -213,15 +218,21 @@ export function buildProjectModelFilterItems(
     .filter((model) => model.live);
 
   if (showUniqueModelFilters) {
-    return filteredModels.map((model) => ({
-      id: model.id,
-      displayName: model.displayName,
-      groupName: model.groupName || model.displayName || model.id,
-      description: model.description,
-      iconPath: model.iconPath,
-      live: model.live,
-      memberIds: [model.id],
-    }));
+    return filteredModels
+      .map((model) => ({
+        id: model.id,
+        displayName: model.displayName,
+        groupName: model.groupName || model.displayName || model.id,
+        description: model.description,
+        iconPath: model.iconPath,
+        live: model.live,
+        memberIds: [model.id],
+      }))
+      .sort((left, right) =>
+        compareProjectModelFilterItems(left, right, (item) => item.groupName, [
+          (item) => item.displayName,
+        ]),
+      );
   }
 
   const groups = new Map<string, ProjectModelFilterItem>();
@@ -246,7 +257,35 @@ export function buildProjectModelFilterItems(
     current.memberIds.push(model.id);
   }
 
-  return Array.from(groups.values());
+  return Array.from(groups.values()).sort((left, right) =>
+    compareProjectModelFilterItems(left, right, (item) => item.groupName),
+  );
+}
+
+function compareProjectModelFilterItems(
+  left: ProjectModelFilterItem,
+  right: ProjectModelFilterItem,
+  getLabel: (item: ProjectModelFilterItem) => string,
+  fallbackLabels: Array<(item: ProjectModelFilterItem) => string> = [],
+): number {
+  const leftLabel = getLabel(left) || left.displayName || left.groupName || left.id;
+  const rightLabel = getLabel(right) || right.displayName || right.groupName || right.id;
+
+  const compareByLabel = MODEL_FILTER_LABEL_COLLATOR.compare(
+    leftLabel.trim(),
+    rightLabel.trim(),
+  );
+  if (compareByLabel !== 0) return compareByLabel;
+
+  for (const getFallbackLabel of fallbackLabels) {
+    const compareByFallbackLabel = MODEL_FILTER_LABEL_COLLATOR.compare(
+      getFallbackLabel(left).trim(),
+      getFallbackLabel(right).trim(),
+    );
+    if (compareByFallbackLabel !== 0) return compareByFallbackLabel;
+  }
+
+  return MODEL_FILTER_LABEL_COLLATOR.compare(left.id, right.id);
 }
 
 export function buildSelectedProjectModelFilterIds(

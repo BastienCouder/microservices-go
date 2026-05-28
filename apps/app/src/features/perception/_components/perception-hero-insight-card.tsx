@@ -39,7 +39,7 @@ export function PerceptionHeroInsightCard({
   const hasMicroCopy = insight.microCopy.trim() !== "";
 
   return (
-    <section className="relative flex flex-col overflow-hidden rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
+    <section className="relative flex flex-col overflow-hidden rounded-xl bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.16),transparent_34%),radial-gradient(circle_at_74%_72%,rgba(255,255,255,0.08),transparent_28%)] opacity-80" />
         <div className="absolute right-[22%] h-full w-px bg-white/14" />
@@ -82,7 +82,7 @@ export function PerceptionHeroInsightCard({
       <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
         <div
           className={cn(
-            "flex min-h-7 items-center rounded-[10px] px-2 py-1 text-[11px] font-bold md:text-[10px]",
+            "flex min-h-7 items-center rounded-lg px-2 py-1 text-[11px] font-bold md:text-[10px]",
             insight.momentumTone === "up" && "bg-white/20 text-white",
             insight.momentumTone === "down" && "bg-amber-100 text-amber-800",
             insight.momentumTone === "stable" &&

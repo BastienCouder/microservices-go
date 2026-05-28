@@ -203,7 +203,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
               type="button"
               size="sm"
               variant="outline"
-              className="w-full rounded-full sm:w-auto"
+              className="w-full rounded-lg sm:w-auto"
               onClick={(event) => {
                 event.stopPropagation();
                 props.setFocusPromptId(sourcePromptId);
@@ -217,7 +217,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
                 type="button"
                 size="sm"
                 variant="outline"
-                className="w-full rounded-full sm:w-auto"
+                className="w-full rounded-lg sm:w-auto"
                 onClick={(event) => {
                   event.stopPropagation();
                   props.onRunSelect(item.runs[0]!.id);
@@ -271,12 +271,12 @@ export function PromptRowModeSwitch({
   const content = useI18nScope("prompts-workspace");
 
   return (
-    <div className="flex h-10 max-w-full shrink-0 gap-1 rounded-full border p-1">
+    <div className="flex h-10 max-w-full shrink-0 gap-1 rounded-xl border p-1">
       <Button
         type="button"
         size="sm"
         variant={promptRowMode === "global" ? "default" : "ghost"}
-        className="h-8 rounded-full px-2 text-xs sm:px-3 sm:text-sm"
+        className="h-8 rounded-lg px-2 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("global")}
       >
         <Layers3 className="mr-1.5 h-4 w-4" />
@@ -286,7 +286,7 @@ export function PromptRowModeSwitch({
         type="button"
         size="sm"
         variant={promptRowMode === "model" ? "default" : "ghost"}
-        className="h-8 rounded-full px-2 text-xs sm:px-3 sm:text-sm"
+        className="h-8 rounded-lg px-2 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("model")}
       >
         <Bot className="mr-1.5 h-4 w-4" />
@@ -314,7 +314,7 @@ export function RunSelectedButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-9 rounded-full px-3 text-sm"
+      className="h-9 rounded-lg px-3 text-sm"
       disabled={disabled}
       onClick={runSelectedPrompts}
     >

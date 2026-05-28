@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { DateRange } from "react-day-picker";
-import { ChevronDown, SlidersHorizontal, Search } from "lucide-react";
+import { ResponsiveFiltersToolbar } from "@/components/shared/responsive-filters-toolbar";
+import { SearchFilterInput } from "@/components/shared/search-filter-input";
 import { Button } from "@/components/ui/button";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Input } from "@/components/ui/input";
 import { DatePickerWithRange } from "@/components/shared/date-range-picker";
 import { cn } from "@/lib/utils";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
@@ -77,21 +76,17 @@ export function PromptsFiltersToolbar({
   competitorsLoading = false,
 }: PromptsFiltersToolbarProps) {
   const content = useI18nScope("prompts-workspace");
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
   const showResponsesPeriodFilter = currentTab === "responses";
 
-  const filtersContent = (
+  const renderFilters = () => (
     <>
-      <div className="relative w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]">
-        <Search className="absolute left-3.5 top-1/2 h-5 w-5 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          className="h-10 pl-11 text-sm"
-          placeholder={content.searchPromptsPlaceholder}
-        />
-      </div>
+      <SearchFilterInput
+        value={search}
+        onValueChange={setSearch}
+        placeholder={content.searchPromptsPlaceholder}
+        className="w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]"
+      />
 
       {showResponsesPeriodFilter ? (
         <DatePickerWithRange
@@ -133,7 +128,7 @@ export function PromptsFiltersToolbar({
         variant="outline"
         aria-pressed={showArchived}
         className={cn(
-          "h-8 shrink-0 rounded-full px-4 text-sm font-medium transition-colors",
+          "h-8 shrink-0 rounded-lg px-4 text-sm font-medium transition-colors",
           showArchived
             ? "border-primary bg-primary/10 text-primary"
             : "border-border/80 text-foreground hover:border-primary hover:bg-primary/10 hover:text-primary",
@@ -148,7 +143,7 @@ export function PromptsFiltersToolbar({
         <Button
           size="xs"
           variant="ghost"
-          className="h-10 justify-center rounded-full px-4 text-xs"
+          className="h-10 justify-center rounded-lg px-4 text-xs"
           onClick={clearFilters}
         >
           {content.clearAll}
@@ -158,31 +153,8 @@ export function PromptsFiltersToolbar({
   );
 
   return (
-    <>
-      <Collapsible open={filtersOpen} onOpenChange={setFiltersOpen} className="mt-5 md:hidden">
-        <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className="flex h-11 w-full items-center justify-between rounded-2xl px-4"
-          >
-            <span className="inline-flex items-center gap-2 text-sm font-medium">
-              <SlidersHorizontal className="h-4 w-4" />
-              {content.filters}
-            </span>
-            <ChevronDown
-              className={cn("h-4 w-4 transition-transform", filtersOpen && "rotate-180")}
-            />
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-          <div className="mt-3 flex flex-col gap-2">{filtersContent}</div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      <div className="mt-5 hidden flex-col gap-2 md:flex md:flex-row md:flex-wrap md:items-center">
-        {filtersContent}
-      </div>
-    </>
+    <ResponsiveFiltersToolbar label={content.filters}>
+      {renderFilters}
+    </ResponsiveFiltersToolbar>
   );
 }

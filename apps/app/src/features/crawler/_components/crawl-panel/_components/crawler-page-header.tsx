@@ -16,6 +16,7 @@ type CrawlerPageHeaderProps = {
   onDiscover: () => void;
   onCrawlSelected: () => void;
   onAnalyzeSite: () => void;
+  onReviewSelection: () => void;
 };
 
 export function CrawlerPageHeader({
@@ -30,28 +31,48 @@ export function CrawlerPageHeader({
   onDiscover,
   onCrawlSelected,
   onAnalyzeSite,
+  onReviewSelection,
 }: CrawlerPageHeaderProps) {
   return (
     <PageHeader
-      title="Crawler"
-      baseline="Résultats du dernier crawl avec erreurs SEO/GEO et actions recommandées."
+      title="Audit du site"
+      baseline="Workflow: 1. découvrir les URLs avec Cloudflare, 2. choisir les pages, 3. analyser le contenu sélectionné."
       actions={
         <div className="flex flex-wrap items-center gap-2">
           {reviewingDiscoveredPages ? (
-            <Button
-              type="button"
-              onClick={onCrawlSelected}
-              disabled={!canCrawlSelected || reanalyzing}
-            >
-              <RefreshCw
-                className={cn("h-4 w-4", reanalyzing && "animate-spin")}
-              />
-              {reanalyzing
-                ? "Analyse en cours"
-                : "Analyser les pages sélectionnées"}
-            </Button>
+            <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onDiscover}
+                disabled={!canDiscover || discovering}
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", discovering && "animate-spin")}
+                />
+                {discovering ? "Actualisation..." : "Actualiser les URLs"}
+              </Button>
+              <Button
+                type="button"
+                onClick={onCrawlSelected}
+                disabled={!canCrawlSelected || reanalyzing}
+              >
+                <RefreshCw
+                  className={cn("h-4 w-4", reanalyzing && "animate-spin")}
+                />
+                {reanalyzing ? "Analyse en cours" : "Analyser la sélection"}
+              </Button>
+            </>
           ) : hasAnalysis ? (
             <>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onReviewSelection}
+                disabled={loadingLatest || reanalyzing}
+              >
+                Modifier la sélection
+              </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -61,22 +82,18 @@ export function CrawlerPageHeader({
                 <RefreshCw
                   className={cn("h-4 w-4", discovering && "animate-spin")}
                 />
-                {discovering
-                  ? "Mise à jour en cours"
-                  : "Mettre à jour la liste des pages"}
+                {discovering ? "Actualisation..." : "Actualiser les URLs"}
               </Button>
               <Button
                 type="button"
                 onClick={onCrawlSelected}
                 disabled={!canCrawlSelected || loadingLatest || reanalyzing}
-                aria-label="Analyser les pages sélectionnées"
+                aria-label="Analyser la sélection"
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
                 />
-                {reanalyzing
-                  ? "Analyse en cours"
-                  : "Analyser les pages sélectionnées"}
+                {reanalyzing ? "Analyse en cours" : "Analyser la sélection"}
               </Button>
             </>
           ) : (

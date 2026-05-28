@@ -12,8 +12,8 @@ export function PerceptionThreeColumnLayout({
   right,
 }: PerceptionThreeColumnLayoutProps) {
   const leftClassName = right
-    ? "col-span-12 rounded-md bg-background p-2 md:col-span-4 xl:col-span-3 xl:h-full xl:overflow-hidden"
-    : "col-span-12 rounded-md bg-background p-2 md:col-span-5 xl:col-span-4 xl:h-full xl:overflow-hidden";
+    ? "col-span-12 rounded-xl bg-background p-2 md:col-span-4 xl:col-span-3 xl:h-full xl:overflow-hidden"
+    : "col-span-12 rounded-xl bg-background p-2 md:col-span-5 xl:col-span-4 xl:h-full xl:overflow-hidden";
   const centerClassName = right
     ? "col-span-12 border-b md:col-span-8 xl:col-span-6 xl:h-full xl:overflow-hidden xl:border-b-0"
     : "col-span-12 md:col-span-7 xl:col-span-8 xl:h-full xl:overflow-hidden";

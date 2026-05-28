@@ -94,7 +94,6 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           options={PERIOD_OPTIONS}
           label="Période"
           title="Période"
-          description="Choisis la fenêtre GA4 à analyser."
         />
       </div>
 
@@ -114,7 +113,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
       <PageHeader
-        title="Traffic"
+        title="Trafic"
         baseline="Visites provenant de moteurs IA lorsque Google Analytics 4 peut identifier la source."
         className="hidden md:block"
       />

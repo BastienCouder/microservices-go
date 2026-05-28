@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
@@ -35,6 +36,19 @@ type Client struct {
 	apiToken   string
 	baseURL    string
 	httpClient *http.Client
+	mu         sync.RWMutex
+	nextMulti  int64
+	multiJobs  map[string]multiCrawlJob
+}
+
+type multiCrawlJob struct {
+	ID       string
+	Children []multiCrawlChild
+}
+
+type multiCrawlChild struct {
+	ID  string
+	URL string
 }
 
 func NewClient(cfg Config) (*Client, error) {
@@ -59,6 +73,7 @@ func NewClient(cfg Config) (*Client, error) {
 		apiToken:   apiToken,
 		baseURL:    baseURL,
 		httpClient: httpClient,
+		multiJobs:  make(map[string]multiCrawlJob),
 	}, nil
 }
 
@@ -71,6 +86,54 @@ func normalizeAPIToken(value string) string {
 }
 
 func (c *Client) StartCrawl(ctx context.Context, input usecase.ContentOptimizerCrawlStartInput) (usecase.ContentOptimizerCrawlJob, error) {
+	if len(input.Options.IncludePatterns) > 0 {
+		return c.startSelectedURLCrawls(ctx, input)
+	}
+	return c.startSingleCrawl(ctx, input)
+}
+
+func (c *Client) startSelectedURLCrawls(ctx context.Context, input usecase.ContentOptimizerCrawlStartInput) (usecase.ContentOptimizerCrawlJob, error) {
+	children := make([]multiCrawlChild, 0, len(input.Options.IncludePatterns))
+	for _, selectedURL := range input.Options.IncludePatterns {
+		selectedURL = strings.TrimSpace(selectedURL)
+		if selectedURL == "" {
+			continue
+		}
+
+		childInput := input
+		childInput.URL = selectedURL
+		childInput.Limit = 1
+		childInput.Depth = 1
+		childInput.Options.IncludePatterns = nil
+		childInput.Options.ExcludePatterns = nil
+
+		job, err := c.startSingleCrawl(ctx, childInput)
+		if err != nil {
+			return usecase.ContentOptimizerCrawlJob{}, err
+		}
+		children = append(children, multiCrawlChild{ID: job.ID, URL: selectedURL})
+	}
+	if len(children) == 0 {
+		return usecase.ContentOptimizerCrawlJob{}, &apiError{
+			operation:  "start",
+			message:    "selected crawl requires at least one URL",
+			validation: true,
+		}
+	}
+
+	c.mu.Lock()
+	c.nextMulti++
+	jobID := "multi-" + strconv.FormatInt(c.nextMulti, 10)
+	c.multiJobs[jobID] = multiCrawlJob{
+		ID:       jobID,
+		Children: append([]multiCrawlChild(nil), children...),
+	}
+	c.mu.Unlock()
+
+	return usecase.ContentOptimizerCrawlJob{ID: jobID, Status: "running"}, nil
+}
+
+func (c *Client) startSingleCrawl(ctx context.Context, input usecase.ContentOptimizerCrawlStartInput) (usecase.ContentOptimizerCrawlJob, error) {
 	body := map[string]any{
 		"url":           input.URL,
 		"limit":         input.Limit,
@@ -108,6 +171,91 @@ func (c *Client) StartCrawl(ctx context.Context, input usecase.ContentOptimizerC
 }
 
 func (c *Client) GetCrawl(ctx context.Context, jobID string, input usecase.ContentOptimizerCrawlResultInput) (usecase.ContentOptimizerCrawlResult, error) {
+	if job, ok := c.multiCrawlJob(jobID); ok {
+		return c.getSelectedURLCrawls(ctx, job, input)
+	}
+	return c.getSingleCrawl(ctx, jobID, input)
+}
+
+func (c *Client) multiCrawlJob(jobID string) (multiCrawlJob, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	job, ok := c.multiJobs[strings.TrimSpace(jobID)]
+	if !ok {
+		return multiCrawlJob{}, false
+	}
+	job.Children = append([]multiCrawlChild(nil), job.Children...)
+	return job, true
+}
+
+func (c *Client) getSelectedURLCrawls(ctx context.Context, job multiCrawlJob, input usecase.ContentOptimizerCrawlResultInput) (usecase.ContentOptimizerCrawlResult, error) {
+	records := make([]usecase.ContentOptimizerCrawlRecord, 0, len(job.Children))
+	browserSecondsUsed := 0.0
+	finished := 0
+	running := false
+	errored := false
+
+	childInput := input
+	childInput.Limit = 1
+	childInput.Cursor = ""
+
+	for _, child := range job.Children {
+		result, err := c.getSingleCrawl(ctx, child.ID, childInput)
+		if err != nil {
+			return usecase.ContentOptimizerCrawlResult{}, err
+		}
+
+		browserSecondsUsed += result.BrowserSecondsUsed
+		if isCloudflareTerminalJobStatus(result.Status) {
+			finished++
+		} else {
+			running = true
+		}
+		if strings.EqualFold(strings.TrimSpace(result.Status), "errored") {
+			errored = true
+		}
+
+		for _, record := range result.Records {
+			if strings.TrimSpace(record.URL) == "" {
+				record.URL = child.URL
+			}
+			records = append(records, record)
+		}
+	}
+
+	limit := input.Limit
+	if limit > 0 && len(records) > limit {
+		records = records[:limit]
+	}
+
+	status := "completed"
+	if running {
+		status = "running"
+	} else if errored && len(records) == 0 {
+		status = "errored"
+	}
+
+	return usecase.ContentOptimizerCrawlResult{
+		ID:                 job.ID,
+		Status:             status,
+		BrowserSecondsUsed: browserSecondsUsed,
+		Total:              len(job.Children),
+		Finished:           finished,
+		Records:            records,
+	}, nil
+}
+
+func isCloudflareTerminalJobStatus(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "completed", "errored", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user":
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Client) getSingleCrawl(ctx context.Context, jobID string, input usecase.ContentOptimizerCrawlResultInput) (usecase.ContentOptimizerCrawlResult, error) {
 	query := url.Values{}
 	if input.Cursor != "" {
 		query.Set("cursor", input.Cursor)
@@ -162,7 +310,9 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, query url.Va
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("send cloudflare crawl request: %w", err)
+		return &apiError{
+			message: "send cloudflare crawl request: " + err.Error(),
+		}
 	}
 	defer resp.Body.Close()
 
@@ -176,7 +326,9 @@ func (c *Client) doJSON(ctx context.Context, method, rawURL string, query url.Va
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
-		return fmt.Errorf("decode cloudflare crawl response: %w", err)
+		return &apiError{
+			message: "decode cloudflare crawl response: " + err.Error(),
+		}
 	}
 	return nil
 }

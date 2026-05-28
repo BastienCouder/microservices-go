@@ -232,7 +232,7 @@ export function BulkStatusButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-9 rounded-full px-3 text-sm"
+      className="h-9 rounded-lg px-3 text-sm"
       disabled={disabled}
       onClick={onClick}
     >

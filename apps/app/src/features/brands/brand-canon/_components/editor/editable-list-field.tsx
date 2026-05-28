@@ -11,7 +11,6 @@ import { sanitizeList } from "../../_lib/brand-canon-utils";
 
 export function EditableListField({
   label,
-  description,
   value,
   onChange,
   placeholder,
@@ -19,7 +18,6 @@ export function EditableListField({
   emptyLabel,
 }: {
   label: string;
-  description: string;
   value: string[];
   onChange: (next: string[]) => void;
   placeholder: string;
@@ -49,10 +47,7 @@ export function EditableListField({
 
   return (
     <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
-      <div className="space-y-1">
-        <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
-        <p className="text-xs leading-5 text-muted-foreground">{description}</p>
-      </div>
+      <div className="mb-2 text-sm font-medium text-primary">{label}</div>
 
       {items.length === 0 ? (
         <EmptyStateCard label={emptyLabel} />

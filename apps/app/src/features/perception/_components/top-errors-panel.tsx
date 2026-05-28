@@ -153,7 +153,7 @@ export function TopErrorsPanel({
             open={selectedError !== null}
             onOpenChange={handleDetailsOpenChange}
           >
-            <DrawerContent className="h-[94vh] rounded-t-[32px] border-none bg-white">
+            <DrawerContent className="h-[94vh] rounded-t-xl border-none bg-white">
               <DrawerHeader className="sr-only">
                 <DrawerTitle>{selectedError.title}</DrawerTitle>
                 <DrawerDescription>
@@ -241,7 +241,7 @@ function ErrorTextBlock({
       <div className="text-xs font-bold tracking-widest text-primary">
         {label}
       </div>
-      <div className="rounded-2xl border border-slate-100 px-4 py-4 text-sm leading-7 text-foreground/90 [overflow-wrap:anywhere]">
+      <div className="rounded-xl border border-slate-100 px-4 py-4 text-sm leading-7 text-foreground/90 [overflow-wrap:anywhere]">
         {children}
       </div>
     </div>
@@ -691,7 +691,7 @@ export function PerceptionTopErrorCard({
     : null;
 
   return (
-    <div className="group w-full rounded-md bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20">
+    <div className="group w-full rounded-xl bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20">
       <button
         type="button"
         className="block w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
@@ -701,7 +701,7 @@ export function PerceptionTopErrorCard({
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
             {primaryModel ? (
-              <div className="rounded-md border border-border/50 bg-white p-1">
+              <div className="rounded-lg border border-border/50 bg-white p-1">
                 {hasMultipleModels ? (
                   <span
                     className={cn(
@@ -768,7 +768,7 @@ export function PerceptionTopErrorCard({
           <div className="mb-3">
             <Badge
               variant="outline"
-              className="inline-flex max-w-full items-center gap-1.5 rounded-md border-border/70 bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-foreground"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border-border/70 bg-muted/20 px-2.5 py-1 text-[11px] font-medium text-foreground"
               title={`${contextMeta.label}: ${contextMeta.value}`}
             >
               <span className="shrink-0 text-muted-foreground">

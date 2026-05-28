@@ -20,7 +20,7 @@ export function ProviderApiKeysPanelTemplate() {
       {Array.from({ length: 3 }).map((_, index) => (
         <div
           key={`provider-keys-skeleton-${index}`}
-          className="flex min-h-[200px] flex-col rounded-2xl border bg-card p-4"
+          className="flex min-h-[200px] flex-col rounded-xl border bg-card p-4"
         >
           <div className="mb-4 flex items-start justify-between gap-3">
             <Skeleton className="size-12 rounded-xl" />
@@ -46,7 +46,7 @@ export function CatalogTemplate() {
       {Array.from({ length: 16 }).map((_, index) => (
         <div
           key={`models-panel-skeleton-${index}`}
-          className="flex h-[172px] flex-col justify-between rounded-2xl border bg-card p-4"
+          className="flex h-[172px] flex-col justify-between rounded-xl border bg-card p-4"
         >
           <div className="space-y-3">
             <Skeleton className="h-6 w-28 rounded-md" />

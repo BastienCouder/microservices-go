@@ -76,7 +76,7 @@ export function ResponseFilterToggle({
       variant="outline"
       aria-pressed={active}
       className={cn(
-        "h-9 rounded-full px-4 text-sm font-medium transition-all",
+        "h-9 rounded-lg px-4 text-sm font-medium transition-all",
         active ? toneClasses.active : toneClasses.inactive,
       )}
       onClick={onToggle}

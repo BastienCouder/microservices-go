@@ -42,12 +42,7 @@ export function CompetitorEditor({
 
   return (
     <div className="space-y-4 rounded-xl border border-border/60 bg-muted/10 p-4">
-      <div className="space-y-1">
-        <div className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{t("competitorsTitle")}</div>
-        <p className="text-xs leading-5 text-muted-foreground">
-          {t("competitorsDescription")}
-        </p>
-      </div>
+      <div className="mb-2 text-sm font-medium text-primary">{t("competitorsTitle")}</div>
 
       {value.length === 0 ? (
         <EmptyStateCard label={t("competitorsEmpty")} />

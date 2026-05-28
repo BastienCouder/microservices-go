@@ -296,11 +296,11 @@ function SidebarComponent({
       contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       errorHub: buildScopedHref("/error-hub", { project }),
       aiAgentReady: buildScopedHref("/ai-agent-ready", { project }),
-      organizations: buildScopedHref("/organizations", { org }),
+      organizations: buildScopedHref("/organizations", { project }),
       adminOrganizations: "/admin/organizations",
       adminPricing: buildScopedHref("/admin/pricing", { org }),
       adminModels: buildScopedHref("/admin/models", { org }),
-      account: "/account",
+      account: buildScopedHref("/account", { project }),
       addProject: buildCreateProjectOnboardingHref(),
     };
   }, [activeProject, activeOrg, selectedOrgId]);
@@ -358,7 +358,7 @@ function SidebarComponent({
     ORGANIZATION_VIEW_TABS.map(({ value }) => [
       value,
       buildScopedHref("/organizations", {
-        org: activeOrg?.slug ?? activeProject?.organizationSlug,
+        project: activeProject?.slug,
         section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
       }),
     ]),
@@ -387,25 +387,24 @@ function SidebarComponent({
       items: [item(links.perception, content.perception)],
     },
     {
-      title: content.projectSettings,
-      indent: true,
-      items: [
-        item(links.crawler, content.crawler),
-        item(links.brands, content.brands),
-        item(links.models, content.models),
-      ],
-    },
-    {
       title: content.optimizeActions,
       indent: true,
       items: [
         item(links.contentOptimizer, content.contentOptimizer),
+        item(links.crawler, content.crawler),
         item(links.errorHub, content.errorHub),
-       
       ],
     },
     {
       items: [item(links.traffic, content.traffic)],
+    },
+    {
+      title: content.projectSettings,
+      indent: true,
+      items: [
+        item(links.brands, content.brands),
+        item(links.models, content.models),
+      ],
     },
     {
       title: content.settings,
@@ -459,7 +458,7 @@ function SidebarComponent({
     {
       title: content.account,
       items: [
-        item("/account", content.account, undefined, currentPath === "/account"),
+        item(links.account, content.account, undefined, currentPath === "/account"),
       ],
     },
   ];

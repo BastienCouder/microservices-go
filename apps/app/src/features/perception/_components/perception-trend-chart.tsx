@@ -150,7 +150,7 @@ function PerceptionTrendTooltip({
         <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {t("trendTooltipMeasurement")}
         </div>
-        <div className="rounded-full border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground">
+        <div className="rounded-lg border border-border/60 bg-muted/25 px-2 py-0.5 text-[11px] font-medium text-foreground">
           {label}
         </div>
       </div>
@@ -161,7 +161,7 @@ function PerceptionTrendTooltip({
           const barValue = Math.max(0, Math.min(100, value));
           const metric = getTrendTooltipMetric(item.name, t);
           return (
-            <div key={item.name} className="rounded-lg border border-border/50 bg-muted/15 p-2">
+            <div key={item.name} className="rounded-xl border border-border/50 bg-muted/15 p-2">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5">
@@ -200,7 +200,7 @@ function TrendDefinitionCard({
   description: string;
 }) {
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/15 p-3">
+    <div className="rounded-xl border border-border/60 bg-muted/15 p-3">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
         {title}

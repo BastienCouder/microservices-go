@@ -79,7 +79,7 @@ export function ErrorHubDetailsPanel({
   if (isMobile) {
     return (
       <Drawer open={selectedError !== null} onOpenChange={onOpenChange}>
-        <DrawerContent className="h-[94vh] rounded-t-[32px] border-none bg-white">
+        <DrawerContent className="h-[94vh] rounded-t-xl border-none bg-white">
           <DrawerHeader className="sr-only">
             <DrawerTitle>{selectedError.title}</DrawerTitle>
             <DrawerDescription>{sheetDescription}</DrawerDescription>

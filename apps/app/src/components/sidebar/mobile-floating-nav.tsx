@@ -8,16 +8,15 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import {
   buildScopedHref,
-  readOrganizationIdFromSearch,
   readProjectIdFromSearch,
-  readSelectedOrganizationID,
   readSelectedProjectToken,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import {
+  BRAND_CONTEXT_ITEMS,
   MONITORING_ITEMS,
   OPTIMIZATION_ITEMS,
-  ORGANIZATION_ITEMS,
+  SETTINGS_ITEMS,
   SIDEBAR_LABELS,
 } from "./sidebar-constants";
 
@@ -48,8 +47,6 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
   const [open, setOpen] = useState(false);
   const activeProjectToken =
     readProjectIdFromSearch(location.search) || readSelectedProjectToken();
-  const activeOrganizationToken =
-    readOrganizationIdFromSearch(location.search) || readSelectedOrganizationID();
 
   const navigationItems = useMemo(
     () => [
@@ -62,16 +59,19 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
         href: buildScopedHref(item.href, { project: activeProjectToken }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      ...ORGANIZATION_ITEMS.map((item) => ({
+      { href: buildScopedHref("/traffic", { project: activeProjectToken }), label: content.traffic },
+      ...BRAND_CONTEXT_ITEMS.map((item) => ({
+        href: buildScopedHref(item.href, { project: activeProjectToken }),
+        label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
+      })),
+      ...SETTINGS_ITEMS.map((item) => ({
         href: buildScopedHref(item.href, {
-          org: activeOrganizationToken,
           project: activeProjectToken,
         }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      { href: "/account", label: formatMobileLabel(content.account || SIDEBAR_LABELS.account) },
     ],
-    [activeOrganizationToken, activeProjectToken, content],
+    [activeProjectToken, content],
   );
 
   return (

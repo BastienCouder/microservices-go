@@ -34,15 +34,14 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
       <PageHeader
-        title="Identité"
+        title="Profil de marque"
         baseline="Toutes les informations essentielles de la marque sont réunies sur un seul écran pour être relues rapidement."
         actionsVariant="classic"
         className="gap-3 md:gap-4"
-        actionsClassName="flex-row items-center justify-start translate-y-0 md:translate-y-5"
         actions={
           <Button asChild variant="default" className="w-auto max-w-full whitespace-nowrap">
             <Link to={buildBrandCanonLocation(routeSearch)}>
-              Modifier l'identité
+              Modifier le profil de marque
             </Link>
           </Button>
         }
@@ -123,7 +122,7 @@ function BrandField({
 
   return (
     <div className="h-full rounded-xl border border-border/60 bg-background/80 p-4">
-      <div className="text-[11px] uppercase tracking-[0.08em] text-muted-foreground">{label}</div>
+      <div className="text-sm font-bold text-primary">{label}</div>
       {safeValue ? (
         <div className={multiline ? "mt-2 whitespace-pre-wrap break-words text-sm leading-relaxed" : "mt-2 break-words text-sm font-medium"}>
           {safeValue}

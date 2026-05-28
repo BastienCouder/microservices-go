@@ -56,7 +56,7 @@ export function InitialSetupCard({
                 disabled={!canReanalyze || reanalyzing}
                 className="min-w-44"
               >
-                {reanalyzing ? "Découverte en cours" : "Crawler les URLs"}
+                {reanalyzing ? "Découverte en cours" : "Découvrir les URLs"}
               </Button>
             </div>
           </OnboardingStep>

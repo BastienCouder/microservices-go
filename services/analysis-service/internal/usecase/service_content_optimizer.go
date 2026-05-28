@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -106,16 +107,6 @@ func (s *Service) StartContentOptimizerCrawl(
 	if err != nil {
 		return ContentOptimizerCrawlJob{}, err
 	}
-	if isScopedContentOptimizerCrawl(normalized) && strings.TrimSpace(job.ID) != "" {
-		s.mu.Lock()
-		if s.contentCrawlScopes == nil {
-			s.contentCrawlScopes = make(map[string]contentOptimizerCrawlScope)
-		}
-		s.contentCrawlScopes[contentOptimizerCrawlJobScopeKey(projectID, organizationID, job.ID)] = contentOptimizerCrawlScope{
-			IncludePatterns: append([]string(nil), normalized.Options.IncludePatterns...),
-		}
-		s.mu.Unlock()
-	}
 	return job, nil
 }
 
@@ -165,6 +156,38 @@ func (s *Service) GetContentOptimizerCrawl(
 	return result, nil
 }
 
+func (s *Service) AnalyzeSelectedContentOptimizerRecords(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	records []ContentOptimizerCrawlRecord,
+) (ContentOptimizerCrawlResult, error) {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return ContentOptimizerCrawlResult{}, err
+	}
+	normalizedRecords := normalizeSelectedContentOptimizerRecords(records)
+	if len(normalizedRecords) == 0 {
+		return ContentOptimizerCrawlResult{}, fmt.Errorf("%w: at least one selected record is required", ErrValidation)
+	}
+	if len(normalizedRecords) > maxContentCrawlLimit {
+		return ContentOptimizerCrawlResult{}, fmt.Errorf("%w: selected records cannot exceed %d", ErrValidation, maxContentCrawlLimit)
+	}
+
+	jobID := "selected-analysis-" + strconv.FormatInt(s.now().UTC().UnixNano(), 10)
+	result := ContentOptimizerCrawlResult{
+		ID:       jobID,
+		Status:   "completed",
+		Total:    len(normalizedRecords),
+		Finished: len(normalizedRecords),
+		Records:  normalizedRecords,
+	}
+	result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
+	if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
+		return ContentOptimizerCrawlResult{}, err
+	}
+	return result, nil
+}
+
 func (s *Service) GetLatestContentOptimizerCrawl(
 	ctx context.Context,
 	projectID string,
@@ -186,6 +209,26 @@ func (s *Service) GetLatestContentOptimizerCrawl(
 	return out, nil
 }
 
+func normalizeSelectedContentOptimizerRecords(records []ContentOptimizerCrawlRecord) []ContentOptimizerCrawlRecord {
+	normalized := make([]ContentOptimizerCrawlRecord, 0, len(records))
+	seen := make(map[string]struct{}, len(records))
+	for _, record := range records {
+		record.URL = strings.TrimSpace(record.URL)
+		if record.URL == "" {
+			continue
+		}
+		if _, ok := seen[record.URL]; ok {
+			continue
+		}
+		seen[record.URL] = struct{}{}
+		if strings.TrimSpace(record.Status) == "" {
+			record.Status = "completed"
+		}
+		normalized = append(normalized, record)
+	}
+	return normalized
+}
+
 func (s *Service) saveLatestContentOptimizerCrawl(
 	ctx context.Context,
 	projectID string,
@@ -204,13 +247,6 @@ func (s *Service) saveLatestContentOptimizerCrawl(
 	if current, ok := s.contentCrawls[key]; ok && current != nil && !current.CreatedAt.IsZero() {
 		createdAt = current.CreatedAt
 	}
-	scopeKey := contentOptimizerCrawlJobScopeKey(projectID, organizationID, jobID)
-	scope, hasScope := s.contentCrawlScopes[scopeKey]
-	if hasScope && shouldMergeScopedContentOptimizerCrawl(scope) {
-		if current, ok := s.contentCrawls[key]; ok && current != nil {
-			result = mergeContentOptimizerCrawlResults(current.Result, result)
-		}
-	}
 	s.contentCrawls[key] = &ContentOptimizerCrawlSnapshot{
 		ProjectID:      strings.TrimSpace(projectID),
 		OrganizationID: organizationID,
@@ -223,7 +259,6 @@ func (s *Service) saveLatestContentOptimizerCrawl(
 		s.restoreLocked(backup)
 		return err
 	}
-	delete(s.contentCrawlScopes, scopeKey)
 	return nil
 }
 
@@ -353,66 +388,6 @@ func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 	return fmt.Sprintf("%d|%s", organizationID, strings.TrimSpace(projectID))
 }
 
-func contentOptimizerCrawlJobScopeKey(projectID string, organizationID int64, jobID string) string {
-	return fmt.Sprintf("%s|%s", contentOptimizerCrawlKey(projectID, organizationID), strings.TrimSpace(jobID))
-}
-
-func isScopedContentOptimizerCrawl(input ContentOptimizerCrawlStartInput) bool {
-	return len(input.Options.IncludePatterns) > 0
-}
-
-func shouldMergeScopedContentOptimizerCrawl(scope contentOptimizerCrawlScope) bool {
-	return len(scope.IncludePatterns) > 0
-}
-
-func mergeContentOptimizerCrawlResults(previous ContentOptimizerCrawlResult, next ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
-	merged := copyContentOptimizerCrawlResult(next)
-	nextByURL := make(map[string]ContentOptimizerCrawlRecord, len(next.Records))
-	for _, record := range next.Records {
-		urlKey := strings.TrimSpace(record.URL)
-		if urlKey == "" {
-			continue
-		}
-		nextByURL[urlKey] = record
-	}
-
-	records := make([]ContentOptimizerCrawlRecord, 0, len(previous.Records)+len(next.Records))
-	seen := make(map[string]struct{}, len(previous.Records)+len(next.Records))
-	for _, record := range previous.Records {
-		urlKey := strings.TrimSpace(record.URL)
-		if urlKey == "" {
-			records = append(records, record)
-			continue
-		}
-		if replacement, ok := nextByURL[urlKey]; ok {
-			records = append(records, replacement)
-		} else {
-			records = append(records, record)
-		}
-		seen[urlKey] = struct{}{}
-	}
-	for _, record := range next.Records {
-		urlKey := strings.TrimSpace(record.URL)
-		if urlKey == "" {
-			records = append(records, record)
-			continue
-		}
-		if _, ok := seen[urlKey]; ok {
-			continue
-		}
-		records = append(records, record)
-		seen[urlKey] = struct{}{}
-	}
-	merged.Records = records
-	if len(records) > merged.Total {
-		merged.Total = len(records)
-	}
-	if len(records) > merged.Finished {
-		merged.Finished = len(records)
-	}
-	return merged
-}
-
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
 	result.Records = append([]ContentOptimizerCrawlRecord(nil), result.Records...)
 	for index := range result.Records {
@@ -485,7 +460,7 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 			Severity:       "high",
 			Title:          "Page inaccessible pendant le crawl",
 			Description:    "La page ne peut pas etre analysee correctement tant qu'elle retourne une erreur ou un statut non complete.",
-			Recommendation: fmt.Sprintf("Verifier %s: retourner un statut 200, supprimer les redirections inutiles, puis autoriser le User-Agent CloudflareBrowserRenderingCrawler/1.0.", record.URL),
+			Recommendation: fmt.Sprintf("Verifier %s: retourner un statut 200 et supprimer les redirections inutiles avant de lancer l'analyse de contenu.", record.URL),
 			FixType:        "fix_http_status",
 		})
 	}
@@ -641,6 +616,54 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		})
 	}
 
+	if !containsAny(lowerContent, "fonctionnalite", "fonctionnalité", "fonctionnalites", "fonctionnalités", "benefice", "bénéfice", "avantage", "offre", "solution", "service", "produit", "prix", "tarif") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_offer_clarity"),
+			Category:       "geo",
+			Severity:       "medium",
+			Title:          "Offre peu explicite",
+			Description:    "La page ne decrit pas assez clairement ce qui est propose, avec quelles fonctionnalites et quels benefices.",
+			Recommendation: fmt.Sprintf("Ajouter un bloc \"Ce que propose %s\" avec 3 a 5 fonctionnalites, les benefices associes et les criteres qui differencient l'offre.", strings.ToLower(topic)),
+			FixType:        "clarify_offer",
+		})
+	}
+
+	if !containsAny(lowerContent, "pour les", "pour qui", "equipe", "équipes", "pme", "startup", "independant", "indépendant", "marketing", "sales", "agence", "cas d'usage", "use case", "utilisateurs") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_audience_use_cases"),
+			Category:       "geo",
+			Severity:       "medium",
+			Title:          "Audience et cas d'usage incomplets",
+			Description:    "La page ne donne pas assez de contexte sur les utilisateurs cibles et les situations dans lesquelles recommander l'offre.",
+			Recommendation: fmt.Sprintf("Ajouter une section \"Pour qui\" avec 3 audiences cibles et 3 cas d'usage concrets pour %s.", strings.ToLower(topic)),
+			FixType:        "add_audience_use_cases",
+		})
+	}
+
+	if !containsAny(lowerContent, "alternative", "comparatif", "compare", "comparaison", "versus", "vs", "difference", "différence", "criteres", "critères", "choisir") {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_comparison_context"),
+			Category:       "geo",
+			Severity:       "low",
+			Title:          "Contexte de comparaison absent",
+			Description:    "Les moteurs generatifs recommandent mieux une offre quand les criteres de choix et alternatives sont explicites.",
+			Recommendation: fmt.Sprintf("Ajouter un bloc \"Comment choisir\" ou \"Comparaison\" qui explique quand choisir %s, quand choisir une alternative et quels criteres regarder.", strings.ToLower(topic)),
+			FixType:        "add_comparison_context",
+		})
+	}
+
+	if !contentOptimizerHasFreshnessSignals(lowerContent) {
+		issues = append(issues, ContentOptimizerIssue{
+			ID:             contentOptimizerIssueID(record.URL, "missing_freshness_signal"),
+			Category:       "geo",
+			Severity:       "low",
+			Title:          "Fraicheur du contenu peu visible",
+			Description:    "La page ne donne pas de signal clair sur la date de mise a jour ou la recence des informations.",
+			Recommendation: fmt.Sprintf("Ajouter une date de mise a jour ou une mention de version pour rendre les informations sur %s plus fiables dans les reponses IA.", strings.ToLower(topic)),
+			FixType:        "add_freshness_signal",
+		})
+	}
+
 	if !containsAny(lowerHTML, "schema.org", "application/ld+json", "\"@type\"", "\"@context\"") {
 		issues = append(issues, ContentOptimizerIssue{
 			ID:             contentOptimizerIssueID(record.URL, "missing_schema_markup"),
@@ -719,6 +742,13 @@ func contentOptimizerHasEvidenceSignals(lowerContent string) bool {
 				return true
 			}
 		}
+	}
+	return false
+}
+
+func contentOptimizerHasFreshnessSignals(lowerContent string) bool {
+	if containsAny(lowerContent, "mis a jour", "mis à jour", "derniere mise", "dernière mise", "version", "actualise", "actualisé", "2024", "2025", "2026") {
+		return true
 	}
 	return false
 }

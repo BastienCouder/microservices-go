@@ -182,12 +182,12 @@ export function ErrorHubKanban({
   return (
     <div className="flex h-auto min-h-full flex-col px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:overflow-hidden lg:px-0 lg:pb-0 lg:pt-0">
       <PageHeader
-        title="Error hub"
+        title="Problèmes détectés"
         baseline="Centre de triage des erreurs de l'application"
         actionsVariant="classic"
       />
 
-      <div className="rounded-md bg-background px-3 pb-3 md:px-4 md:pb-4">
+      <div className="rounded-xl bg-background px-3 pb-3 md:px-4 md:pb-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
           <div className="min-w-0 flex-1">
             <ErrorHubFiltersToolbar

@@ -23,7 +23,6 @@ func NewService() *Service {
 		alertsByProject:     make(map[string][]string),
 		brandCanonByProject: make(map[string]*BrandCanon),
 		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
-		contentCrawlScopes:  make(map[string]contentOptimizerCrawlScope),
 		optimizeActions:     make(map[string]*OptimizeAction),
 		actionsByProject:    make(map[string][]string),
 	}
@@ -170,9 +169,6 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.alertsByProject = nonNilSliceMap(state.AlertsByProject)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
-	if s.contentCrawlScopes == nil {
-		s.contentCrawlScopes = make(map[string]contentOptimizerCrawlScope)
-	}
 	s.optimizeActions = nonNilOptimizeActionMap(state.OptimizeActions)
 	s.actionsByProject = nonNilSliceMap(state.ActionsByProject)
 }

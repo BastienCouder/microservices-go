@@ -119,15 +119,15 @@ export function BrandCanonEditorPanel({
             <CardContent className="space-y-4 pb-6">
               <div className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-2">
-                  <Field label={t("fieldBrand")} hint={t("fieldBrandHint")}>
+                  <Field label={t("fieldBrand")}>
                     <Input value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
                   </Field>
-                  <Field label={t("fieldCategory")} hint={t("fieldCategoryHint")}>
+                  <Field label={t("fieldCategory")}>
                     <Input value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
                   </Field>
                 </div>
 
-                <Field label={t("fieldPositioning")} hint={t("fieldPositioningHint")}>
+                <Field label={t("fieldPositioning")}>
                   <Textarea
                     value={canonDraft.positioning}
                     onChange={(e) => update("positioning", e.target.value)}
@@ -138,7 +138,6 @@ export function BrandCanonEditorPanel({
                 <div className="grid gap-4 xl:grid-cols-2">
                   <EditableListField
                     label={t("fieldUseCases")}
-                    description={t("fieldUseCasesDescription")}
                     value={canonDraft.useCases}
                     onChange={(next) => update("useCases", next)}
                     placeholder={t("fieldUseCasesPlaceholder")}
@@ -147,7 +146,6 @@ export function BrandCanonEditorPanel({
                   />
                   <EditableListField
                     label={t("fieldFeatures")}
-                    description={t("fieldFeaturesDescription")}
                     value={canonDraft.features}
                     onChange={(next) => update("features", next)}
                     placeholder={t("fieldFeaturesPlaceholder")}
@@ -186,26 +184,13 @@ export function BrandCanonEditorPanel({
 
 function FieldShell({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="space-y-2 rounded-xl border border-border/60 bg-muted/10 p-4">
-      <label className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">{label}</label>
+    <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
+      <label className="mb-2 block text-sm font-medium text-primary">{label}</label>
       {children}
     </div>
   );
 }
 
-function Field({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  children: ReactNode;
-}) {
-  return (
-    <FieldShell label={label}>
-      {hint ? <p className="text-xs leading-5 text-muted-foreground">{hint}</p> : null}
-      {children}
-    </FieldShell>
-  );
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <FieldShell label={label}>{children}</FieldShell>;
 }

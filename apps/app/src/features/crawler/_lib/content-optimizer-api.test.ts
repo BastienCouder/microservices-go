@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  analyzeSelectedContentOptimizerRecords,
   getContentOptimizerCrawl,
   getLatestContentOptimizerCrawl,
   getProjectWebsiteURL,
@@ -119,6 +120,55 @@ describe("content optimizer api", () => {
           "https://example.com/pricing",
         ],
       },
+    });
+  });
+
+  test("analyzes selected discovered records without starting a new crawl", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    globalThis.fetch = (async (input, init) => {
+      calls.push({ url: String(input), init });
+      return jsonResponse(200, {
+        success: true,
+        data: {
+          id: "selected-analysis-1",
+          status: "completed",
+          total: 2,
+          finished: 2,
+          records: [
+            { url: "https://example.com/", status: "completed" },
+            { url: "https://example.com/pricing", status: "completed" },
+          ],
+        },
+      });
+    }) as typeof fetch;
+
+    const result = await analyzeSelectedContentOptimizerRecords("http://api.test", {
+      projectId: "prj_1",
+      organizationId: "42",
+      records: [
+        { url: "https://example.com/", status: "completed", markdown: "# Home" },
+        {
+          url: "https://example.com/pricing",
+          status: "completed",
+          markdown: "# Pricing",
+        },
+      ],
+    });
+
+    expect(result.id).toBe("selected-analysis-1");
+    expect(calls[0]?.url).toBe(
+      "http://api.test/analysis/projects/prj_1/content-optimizer/analyze",
+    );
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      records: [
+        { url: "https://example.com/", status: "completed", markdown: "# Home" },
+        {
+          url: "https://example.com/pricing",
+          status: "completed",
+          markdown: "# Pricing",
+        },
+      ],
     });
   });
 

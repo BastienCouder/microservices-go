@@ -37,10 +37,7 @@ export function TrafficEngineFilter({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(92vw,32rem)] p-0">
-        <FloatingPanelHeader
-          title="Moteurs"
-          description="Filtre le rapport GA4 sur les moteurs détectés dans cette page."
-        />
+        <FloatingPanelHeader title="Moteurs" />
         <div className="grid max-h-[360px] grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
           {options.map((engine) => {
             const label = engine === "all" ? "Tous les moteurs" : engine;

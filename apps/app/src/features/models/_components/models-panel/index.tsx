@@ -49,10 +49,10 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
-        title="Modeles"
+        title="IA configurées"
         baseline="Choisissez directement les modeles actifs pour le projet."
         actionsVariant="classic"
-        className="rounded-md rounded-bl-none rounded-br-none"
+        className="rounded-xl rounded-bl-none rounded-br-none"
         meta={
           <>
             {viewModel.loading ? (
@@ -76,7 +76,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
         }
       />
 
-      <div className="flex flex-1 flex-col rounded-md rounded-tr-none rounded-tl-none md:rounded-md bg-background">
+      <div className="flex flex-1 flex-col rounded-xl rounded-tr-none rounded-tl-none md:rounded-xl bg-background">
         {viewModel.isDeveloperPlan ? (
           <div className="border-b px-4 py-4 md:px-6">
             {viewModel.loadingProviderCredentials || viewModel.loadingCatalog ? (

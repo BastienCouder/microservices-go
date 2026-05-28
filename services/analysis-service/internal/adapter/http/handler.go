@@ -100,6 +100,8 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getLatestContentOptimizerCrawl(w, r, projectID)
 	case len(parts) == 4 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodGet:
 		h.getContentOptimizerCrawl(w, r, projectID, parts[3])
+	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "analyze" && r.Method == http.MethodPost:
+		h.analyzeSelectedContentOptimizerRecords(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
 		h.getBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
@@ -476,6 +478,10 @@ type startContentOptimizerCrawlRequest struct {
 	CrawlPurposes []string                             `json:"crawlPurposes"`
 }
 
+type analyzeSelectedContentOptimizerRecordsRequest struct {
+	Records []usecase.ContentOptimizerCrawlRecord `json:"records"`
+}
+
 func (h *Handler) startContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -529,6 +535,27 @@ func (h *Handler) getContentOptimizerCrawl(w http.ResponseWriter, r *http.Reques
 		Status:       r.URL.Query().Get("status"),
 		SkipAnalysis: strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("analyze")), "false"),
 	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) analyzeSelectedContentOptimizerRecords(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "missing organization identity"})
+		return
+	}
+
+	var req analyzeSelectedContentOptimizerRecordsRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
+		return
+	}
+
+	result, err := h.svc.AnalyzeSelectedContentOptimizerRecords(r.Context(), projectID, organizationID, req.Records)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return

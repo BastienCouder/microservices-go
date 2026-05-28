@@ -54,8 +54,13 @@ export const ModelCard = memo(function ModelCard({
     large: {
       gap: "gap-4",
       padding: "px-4 py-4",
-      rounded: "rounded-[24px]", 
-      iconSize: { container: "h-12 w-12", image: 28, padding: "p-2", rounded: "rounded-2xl" },
+      rounded: isModelsVariant ? "rounded-xl" : "rounded-[24px]",
+      iconSize: {
+        container: "h-12 w-12",
+        image: 28,
+        padding: "p-2",
+        rounded: isModelsVariant ? "rounded-lg" : "rounded-2xl",
+      },
       selector: { size: "h-4 w-4", rounded: "rounded-full", border: "border-2" },
       text: { group: "text-[1.02rem]", name: "text-sm" },
       position: { selector: "right-3 top-3", content: "pr-5", spacing: "space-y-1.5" }

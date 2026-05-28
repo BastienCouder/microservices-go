@@ -21,7 +21,7 @@ export function OpportunitiesPanel({
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
-          <SectionTitle>Priorités SEO IA</SectionTitle>
+          <SectionTitle>Besoins GEO détectés</SectionTitle>
         </CardTitle>
         <CardDescription>
           Actions à fort levier à partir des citations observées.

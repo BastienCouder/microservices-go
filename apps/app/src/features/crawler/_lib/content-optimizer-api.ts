@@ -79,6 +79,12 @@ export type GetContentOptimizerCrawlInput = {
   analyze?: boolean;
 };
 
+export type AnalyzeSelectedContentOptimizerRecordsInput = {
+  projectId: string;
+  organizationId?: string;
+  records: ContentOptimizerCrawlRecord[];
+};
+
 function encodePathSegment(value: string): string {
   return encodeURIComponent(value.trim());
 }
@@ -338,6 +344,42 @@ export async function getContentOptimizerCrawl(
           organizationId: input.organizationId,
           signal,
           retry: { delayMs: 500 },
+        },
+      );
+    }
+  }
+
+  return unwrapGatewayData(response);
+}
+
+export async function analyzeSelectedContentOptimizerRecords(
+  apiBaseURL: string,
+  input: AnalyzeSelectedContentOptimizerRecordsInput,
+  signal?: AbortSignal,
+): Promise<ContentOptimizerCrawlResult> {
+  const body = JSON.stringify({ records: input.records });
+  let response = await gatewayJSON<ContentOptimizerCrawlResult>(
+    apiBaseURL,
+    `/analysis/projects/${encodePathSegment(input.projectId)}/content-optimizer/analyze`,
+    {
+      method: "POST",
+      organizationId: input.organizationId,
+      signal,
+      body,
+    },
+  );
+
+  if (shouldRetryWithResolvedProjectId(response)) {
+    const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
+    if (resolvedProjectId !== input.projectId) {
+      response = await gatewayJSON<ContentOptimizerCrawlResult>(
+        apiBaseURL,
+        `/analysis/projects/${encodePathSegment(resolvedProjectId)}/content-optimizer/analyze`,
+        {
+          method: "POST",
+          organizationId: input.organizationId,
+          signal,
+          body,
         },
       );
     }

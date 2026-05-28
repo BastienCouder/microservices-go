@@ -1,17 +1,9 @@
-import { useState } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
-
 import {
   PeriodFilterPicker,
 } from "@/components/shared/period-filter-picker";
+import { ResponsiveFiltersToolbar } from "@/components/shared/responsive-filters-toolbar";
 import { Button } from "@/components/ui/button";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import type { ProjectModelMeta } from "@/lib/project-models";
-import { cn } from "@/lib/utils";
 
 import { ErrorHubCompetitorsFilter } from "./filters/error-hub-competitors-filter";
 import { ErrorHubModelsFilter } from "./filters/error-hub-models-filter";
@@ -52,9 +44,7 @@ type ErrorHubFiltersToolbarProps = {
 };
 
 export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
-  const [filtersOpen, setFiltersOpen] = useState(false);
-
-  const filtersContent = (
+  const renderFilters = () => (
     <>
       <ErrorHubSearchFilter
         search={props.search}
@@ -68,7 +58,6 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         options={PERIOD_OPTIONS}
         label="Période"
         title="Période"
-        description="Filtrer les erreurs par période."
       />
 
       <PeriodFilterPicker
@@ -80,7 +69,6 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         options={ACTION_STATUS_OPTIONS}
         label="Statut"
         title="Statut"
-        description="Afficher les actions en cours ou terminées."
       />
 
       <PeriodFilterPicker
@@ -90,7 +78,6 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         options={SOURCE_OPTIONS}
         label="Source"
         title="Source"
-        description="Filtrer les erreurs par origine."
       />
 
       <ErrorHubModelsFilter
@@ -116,7 +103,7 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         <Button
           size="xs"
           variant="ghost"
-          className="h-10 justify-center rounded-full px-4 text-xs"
+          className="h-10 justify-center rounded-lg px-4 text-xs"
           onClick={props.clearFilters}
         >
           Réinitialiser
@@ -126,39 +113,8 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
   );
 
   return (
-    <>
-      <Collapsible
-        open={filtersOpen}
-        onOpenChange={setFiltersOpen}
-        className="mt-5 md:hidden"
-      >
-        <CollapsibleTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className="flex h-11 w-full items-center justify-between rounded-2xl px-4"
-          >
-            <span className="inline-flex items-center gap-2 text-sm font-medium">
-              <SlidersHorizontal className="h-4 w-4" />
-              Filtres
-            </span>
-            <ChevronDown
-              className={cn(
-                "h-4 w-4 transition-transform",
-                filtersOpen && "rotate-180",
-              )}
-            />
-          </Button>
-        </CollapsibleTrigger>
-
-        <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-          <div className="mt-3 flex flex-col gap-2">{filtersContent}</div>
-        </CollapsibleContent>
-      </Collapsible>
-
-      <div className="mt-5 hidden flex-col gap-2 md:flex md:flex-row md:flex-wrap md:items-center">
-        {filtersContent}
-      </div>
-    </>
+    <ResponsiveFiltersToolbar label="Filtres">
+      {renderFilters}
+    </ResponsiveFiltersToolbar>
   );
 }

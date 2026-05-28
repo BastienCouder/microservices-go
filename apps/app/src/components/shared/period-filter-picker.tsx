@@ -25,7 +25,6 @@ type PeriodFilterPickerProps = {
   options: readonly PeriodFilterOption[];
   label?: string;
   title?: string;
-  description?: string;
   date?: DateRange | undefined;
   onDateChange?: (value: DateRange | undefined) => void;
   customValue?: string;
@@ -56,7 +55,6 @@ export function PeriodFilterPicker({
   options,
   label,
   title,
-  description,
   date,
   onDateChange,
   customValue = "custom",
@@ -73,7 +71,6 @@ export function PeriodFilterPicker({
 
   const effectiveLabel = label ?? content.period;
   const effectiveTitle = title ?? content.period;
-  const effectiveDescription = description ?? content.chooseRange;
 
   const handleOptionClick = useCallback(
     (nextValue: string) => {
@@ -113,7 +110,7 @@ export function PeriodFilterPicker({
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="h-8 w-full justify-between rounded-full border-border/80 bg-background px-4 text-xs"
+            className="h-8 w-full justify-between rounded-lg border-border/80 bg-background px-4 text-xs"
           >
             <span className="flex min-w-0 items-center gap-2 overflow-hidden text-left">
               <span className="h-1 w-1 shrink-0 rounded-full bg-primary/50" />
@@ -125,11 +122,8 @@ export function PeriodFilterPicker({
           </Button>
         </PopoverTrigger>
 
-        <PopoverContent align="start" className="w-[min(92vw,24rem)] p-0">
-          <FloatingPanelHeader
-            title={effectiveTitle}
-            description={effectiveDescription}
-          />
+        <PopoverContent align="start" className="w-[min(92vw,24rem)] rounded-xl p-0">
+          <FloatingPanelHeader title={effectiveTitle} />
 
           <div className="space-y-3 px-4 pb-4 pt-1">
             <div className="grid grid-cols-2 gap-2 space-y-1">
@@ -142,7 +136,7 @@ export function PeriodFilterPicker({
                     type="button"
                     onClick={() => handleOptionClick(option.value)}
                     className={cn(
-                      "flex w-full items-center justify-between rounded-2xl border px-3 py-2.5 text-left text-sm font-medium transition-colors",
+                      "flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left text-sm font-medium transition-colors",
                       active
                         ? "border-primary/30 bg-primary/10 text-primary shadow-[inset_0_0_0_1px_rgba(59,130,246,0.12)]"
                         : "border-border/70 bg-background text-foreground hover:border-border hover:bg-muted/40",
@@ -163,7 +157,7 @@ export function PeriodFilterPicker({
             </div>
 
             {showCustomDates ? (
-              <div className="rounded-2xl border border-border/70 bg-muted/20 p-3">
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <Input
                     type="date"

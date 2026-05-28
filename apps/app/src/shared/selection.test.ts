@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  keepProjectOnlyContextSearch,
   resolveSelectedContextSearch,
   storeLastSelectedProjectToken,
   storeSelectedOrganizationID,
@@ -102,5 +103,13 @@ describe("selection storage", () => {
     expect(resolveSelectedContextSearch("")).toBe(
       "?project=fe&organizationId=org-1",
     );
+  });
+
+  test("keeps compact project-only context for organization and account urls", () => {
+    expect(
+      keepProjectOnlyContextSearch(
+        "?project=kahier&projectId=prj-354&org=nike&organizationId=org-1&section=members",
+      ),
+    ).toBe("?project=kahier&section=members");
   });
 });
