@@ -153,7 +153,7 @@ describe("billing pricing tiers", () => {
   test("normalizes null prices as custom/unavailable", () => {
     expect(
       normalizeBillingPricingTier({
-        prompt_volume: 1000,
+        credit_volume: 1000,
         label: "1k",
         prices: {
           developer: 24900,
@@ -169,6 +169,7 @@ describe("billing pricing tiers", () => {
       }),
     ).toEqual({
       promptVolume: 1000,
+      creditVolume: 1000,
       label: "1k",
       prices: {
         developer: 24900,
@@ -216,6 +217,7 @@ describe("billing pricing tiers", () => {
       await updateBillingPricingTier("https://api.test", {
         organizationId: "7",
         promptVolume: 1000,
+        creditVolume: 1000,
         label: "1k",
         prices: {
           developer: 24900,
@@ -238,6 +240,7 @@ describe("billing pricing tiers", () => {
     expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("7");
     expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
       prompt_volume: 1000,
+      credit_volume: 1000,
       label: "1k",
       prices: {
         developer: 24900,

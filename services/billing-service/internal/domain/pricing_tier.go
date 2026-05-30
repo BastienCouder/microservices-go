@@ -9,6 +9,7 @@ var ErrInvalidPricingTier = fmt.Errorf("invalid pricing tier")
 
 type PricingTier struct {
 	PromptVolume        int             `json:"prompt_volume"`
+	CreditVolume        int             `json:"credit_volume,omitempty"`
 	Label               string          `json:"label"`
 	Prices              map[string]*int `json:"prices"`
 	DeveloperPriceCents *int            `json:"developer_price_cents"`
@@ -24,8 +25,9 @@ func (p *PricingTier) Validate() error {
 		return nil
 	}
 	p.syncPrices()
+	p.syncCreditVolume()
 	if p.PromptVolume <= 0 {
-		return fmt.Errorf("%w: prompt volume must be positive", ErrInvalidPricingTier)
+		return fmt.Errorf("%w: credit volume must be positive", ErrInvalidPricingTier)
 	}
 	if p.Label == "" {
 		return fmt.Errorf("%w: label is required", ErrInvalidPricingTier)
@@ -36,6 +38,15 @@ func (p *PricingTier) Validate() error {
 		}
 	}
 	return nil
+}
+
+func (p *PricingTier) syncCreditVolume() {
+	if p.CreditVolume > 0 && p.PromptVolume <= 0 {
+		p.PromptVolume = p.CreditVolume
+	}
+	if p.PromptVolume > 0 {
+		p.CreditVolume = p.PromptVolume
+	}
 }
 
 func (p *PricingTier) syncPrices() {

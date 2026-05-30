@@ -1,6 +1,7 @@
 package http
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -107,5 +108,28 @@ func TestAgentReadyScanRoutesUseCanonicalPathsOnly(t *testing.T) {
 	legacyItem := httptest.NewRequest(http.MethodGet, "/api/scan/scan-1", nil)
 	if isAgentReadyScanItemRequest(legacyItem) {
 		t.Fatal("expected legacy scan item route to be removed")
+	}
+}
+
+func TestAgentReadyScanCollectionListsRecoverableScanIDs(t *testing.T) {
+	h := &Handler{scanStore: newAgentReadyScanStore()}
+	scanID := h.scanStore.create(agentReadyScanRequest{URL: "https://example.com", Mode: "content-site"})
+
+	req := httptest.NewRequest(http.MethodGet, "/analysis/agent-ready/scans?url=https://example.com", nil)
+	resp := httptest.NewRecorder()
+
+	h.handleAgentReadyScan(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", resp.Code, resp.Body.String())
+	}
+	var payload struct {
+		Items []agentReadyScanResult `json:"items"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(payload.Items) != 1 || payload.Items[0].ScanID != scanID {
+		t.Fatalf("expected listed scan id %s, got %+v", scanID, payload.Items)
 	}
 }

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Menu, X } from "lucide-react";
 import { LocaleSwitcher } from "@/app/[locale]/_components/locale-switcher";
 import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
+import Image from "next/image";
 
 export function Navigation() {
   const t = useTranslations("navigation");
@@ -85,7 +86,9 @@ export function Navigation() {
         >
           {/* Logo */}
           <Link href={getLocalizedPathname(locale, "/")} className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>Visia</span>
+            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl" : "text-2xl"}`}>
+              <Image src="/logos/logo.svg" alt="Visia" width={100} height={50} />
+            </span>
           </Link>
 
           {/* Desktop Navigation */}

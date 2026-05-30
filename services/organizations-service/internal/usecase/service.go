@@ -141,6 +141,25 @@ func (s *Service) ListOrganizationAPIKeys(ctx context.Context, organizationID in
 	return keys, nil
 }
 
+func (s *Service) ValidateOrganizationAPIKey(ctx context.Context, rawKey string) (*domain.OrganizationAPIKey, error) {
+	trimmed := strings.TrimSpace(rawKey)
+	if trimmed == "" {
+		return nil, fmt.Errorf("%w: api key is required", domain.ErrInvalidOrganization)
+	}
+	key, err := s.repo.GetAPIKeyByHash(ctx, hashOrganizationAPIKey(trimmed))
+	if err != nil {
+		return nil, fmt.Errorf("validate organization api key: %w", err)
+	}
+	now := s.now().UTC()
+	if err := s.repo.MarkAPIKeyLastUsed(ctx, key.ID, now); err != nil {
+		return nil, fmt.Errorf("mark organization api key used: %w", err)
+	}
+	key.Key = ""
+	key.KeyHash = ""
+	key.LastUsedAt = &now
+	return key, nil
+}
+
 func (s *Service) RevokeOrganizationAPIKey(ctx context.Context, organizationID, keyID int64) error {
 	if organizationID <= 0 || keyID <= 0 {
 		return fmt.Errorf("%w: invalid organization or api key id", domain.ErrInvalidOrganization)

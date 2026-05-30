@@ -58,7 +58,7 @@ export function SidebarPromptPlanProgress({
   if (!canLoadQuota) {
     return (
       <SidebarPromptPlanStatus>
-        {content.promptQuotaUnavailable}
+        {content.creditQuotaUnavailable}
       </SidebarPromptPlanStatus>
     );
   }
@@ -66,7 +66,7 @@ export function SidebarPromptPlanProgress({
   if (promptQuotaQuery.isFetching && !data) {
     return (
       <SidebarPromptPlanStatus>
-        {content.promptQuotaLoading}
+        {content.creditQuotaLoading}
       </SidebarPromptPlanStatus>
     );
   }
@@ -74,7 +74,7 @@ export function SidebarPromptPlanProgress({
   if (promptQuotaQuery.isError || !data?.hasQuota || !data) {
     return (
       <SidebarPromptPlanStatus>
-        {content.promptQuotaUnavailable}
+        {content.creditQuotaUnavailable}
       </SidebarPromptPlanStatus>
     );
   }

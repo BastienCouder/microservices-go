@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -445,7 +446,8 @@ func (s *StateStore) loadCompetitors(ctx context.Context, state *persistedState)
 
 func (s *StateStore) loadModels(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, display_name, provider, group_name, icon_key, provider_model_id, is_active, supports_live_search
+		SELECT id, display_name, provider, group_name, icon_key, provider_model_id, is_active, supports_live_search,
+			credit_cost, input_price_per_million, output_price_per_million, openrouter_pricing
 		FROM ai_models
 		ORDER BY display_name ASC, id ASC
 	`)
@@ -456,9 +458,12 @@ func (s *StateStore) loadModels(ctx context.Context, state *persistedState) erro
 
 	for rows.Next() {
 		var (
-			item    usecase.AIModel
-			group   *string
-			iconKey *string
+			item        usecase.AIModel
+			group       *string
+			iconKey     *string
+			inputPrice  sql.NullFloat64
+			outputPrice sql.NullFloat64
+			rawPricing  []byte
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -469,8 +474,28 @@ func (s *StateStore) loadModels(ctx context.Context, state *persistedState) erro
 			&item.ModelID,
 			&item.IsActive,
 			&item.SupportsLiveSearch,
+			&item.CreditCost,
+			&inputPrice,
+			&outputPrice,
+			&rawPricing,
 		); err != nil {
 			return fmt.Errorf("scan model: %w", err)
+		}
+		if item.CreditCost < 1 {
+			item.CreditCost = 1
+		}
+		if inputPrice.Valid {
+			value := inputPrice.Float64
+			item.InputPricePerMillion = &value
+		}
+		if outputPrice.Valid {
+			value := outputPrice.Float64
+			item.OutputPricePerMillion = &value
+		}
+		if len(rawPricing) > 0 {
+			if err := json.Unmarshal(rawPricing, &item.OpenRouterPricing); err != nil {
+				return fmt.Errorf("decode model openrouter pricing: %w", err)
+			}
 		}
 		item.Group = stringValue(group)
 		item.IconKey = stringValue(iconKey)
@@ -704,10 +729,25 @@ func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) erro
 func insertProjectModelsCatalog(ctx context.Context, tx pgx.Tx, models map[string]usecase.AIModel) error {
 	for _, modelID := range sortedModelIDs(models) {
 		model := models[modelID]
+		creditCost := model.CreditCost
+		if creditCost < 1 {
+			creditCost = 1
+		}
+		var rawPricing []byte
+		if len(model.OpenRouterPricing) > 0 {
+			payload, err := json.Marshal(model.OpenRouterPricing)
+			if err != nil {
+				return fmt.Errorf("encode ai model %s openrouter pricing: %w", model.ID, err)
+			}
+			rawPricing = payload
+		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO ai_models (id, provider, display_name, group_name, icon_key, provider_model_id, is_active, supports_live_search, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
-		`, model.ID, model.Provider, model.Label, nullIfEmptyOrFallback(model.Group, model.Provider), nullIfEmptyOrFallback(model.IconKey, model.Provider), nullIfEmptyOrFallback(model.ModelID, model.ID), model.IsActive, model.SupportsLiveSearch); err != nil {
+			INSERT INTO ai_models (
+				id, provider, display_name, group_name, icon_key, provider_model_id, is_active, supports_live_search,
+				credit_cost, input_price_per_million, output_price_per_million, openrouter_pricing, created_at, updated_at
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, NOW(), NOW())
+		`, model.ID, model.Provider, model.Label, nullIfEmptyOrFallback(model.Group, model.Provider), nullIfEmptyOrFallback(model.IconKey, model.Provider), nullIfEmptyOrFallback(model.ModelID, model.ID), model.IsActive, model.SupportsLiveSearch, creditCost, model.InputPricePerMillion, model.OutputPricePerMillion, rawPricing); err != nil {
 			return fmt.Errorf("insert ai model %s: %w", model.ID, err)
 		}
 	}

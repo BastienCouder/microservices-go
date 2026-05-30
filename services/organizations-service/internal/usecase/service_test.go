@@ -174,6 +174,27 @@ func (f *fakeRepo) ListAPIKeys(_ context.Context, organizationID int64) ([]domai
 	return out, nil
 }
 
+func (f *fakeRepo) GetAPIKeyByHash(_ context.Context, keyHash string) (*domain.OrganizationAPIKey, error) {
+	for _, key := range f.apiKeys {
+		if key.KeyHash == keyHash && key.RevokedAt == nil {
+			clone := key
+			return &clone, nil
+		}
+	}
+	return nil, domain.ErrOrganizationNotFound
+}
+
+func (f *fakeRepo) MarkAPIKeyLastUsed(_ context.Context, keyID int64, lastUsedAt time.Time) error {
+	key, ok := f.apiKeys[keyID]
+	if !ok || key.RevokedAt != nil {
+		return domain.ErrOrganizationNotFound
+	}
+	lastUsedAt = lastUsedAt.UTC()
+	key.LastUsedAt = &lastUsedAt
+	f.apiKeys[keyID] = key
+	return nil
+}
+
 func (f *fakeRepo) RevokeAPIKey(_ context.Context, organizationID, keyID int64, revokedAt time.Time) error {
 	key, ok := f.apiKeys[keyID]
 	if !ok || key.OrganizationID != organizationID || key.RevokedAt != nil {
@@ -627,6 +648,40 @@ func TestCreateOrganizationAPIKeyReturnsSecretOnceAndListHidesIt(t *testing.T) {
 	}
 	if keys[0].Name != "Production" {
 		t.Fatalf("expected name Production, got %q", keys[0].Name)
+	}
+}
+
+func TestValidateOrganizationAPIKeyReturnsScopedMetadataAndMarksLastUsed(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	organization, err := svc.CreateOrganization(context.Background(), "Acme", 42)
+	if err != nil {
+		t.Fatalf("create organization: %v", err)
+	}
+	created, err := svc.CreateOrganizationAPIKey(context.Background(), organization.ID, "Production")
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+
+	validated, err := svc.ValidateOrganizationAPIKey(context.Background(), created.Key)
+	if err != nil {
+		t.Fatalf("validate api key: %v", err)
+	}
+
+	if validated.OrganizationID != organization.ID {
+		t.Fatalf("expected organization %d, got %d", organization.ID, validated.OrganizationID)
+	}
+	if validated.ID != created.ID {
+		t.Fatalf("expected api key id %d, got %d", created.ID, validated.ID)
+	}
+	if validated.Key != "" || validated.KeyHash != "" {
+		t.Fatalf("validated api key must not expose secret material: %+v", validated)
+	}
+	if validated.LastUsedAt == nil || !validated.LastUsedAt.Equal(now) {
+		t.Fatalf("expected last used at to be marked, got %+v", validated.LastUsedAt)
 	}
 }
 

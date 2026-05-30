@@ -31,10 +31,10 @@ export function DevelopersSection() {
       label: t("examples.mcp.label"),
       code: t.raw("examples.mcp.code") as string,
     },
-    {
+    /* {
       label: t("examples.webhooks.label"),
       code: t.raw("examples.webhooks.code") as string,
-    },
+    }, */
   ];
 
   const features = [
@@ -46,10 +46,10 @@ export function DevelopersSection() {
       title: t("features.mcp.title"),
       description: t("features.mcp.description"),
     },
-    {
+/*     {
       title: t("features.webhooks.title"),
       description: t("features.webhooks.description"),
-    },
+    }, */
     {
       title: t("features.export.title"),
       description: t("features.export.description"),

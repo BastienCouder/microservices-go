@@ -320,7 +320,7 @@ export function AdminOrganizationsPage({
           queryKey: ["prompt-quota", apiBaseURL, variables.organizationId],
         }),
       ]);
-      pushSuccessToast("Quota de prompts mis a jour.");
+      pushSuccessToast("Quota de crédits mis a jour.");
     },
     onError: (error, _variables, context) => {
       if (context?.previousRows) {
@@ -364,7 +364,7 @@ export function AdminOrganizationsPage({
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
         title="Admin organisations"
-        baseline="Gerez les plans et le nombre de prompts mensuels autorises par organisation."
+        baseline="Gerez les plans et le nombre de crédits mensuels autorises par organisation."
         actionsVariant="classic"
         className="mb-3 md:mb-4"
         meta={
@@ -372,7 +372,7 @@ export function AdminOrganizationsPage({
             <Badge variant="default">
               {manageableOrganizations.length} organisations
             </Badge>
-            <Badge variant="outline">Quotas prompts</Badge>
+            <Badge variant="outline">Quotas crédits</Badge>
           </>
         }
         actions={
@@ -441,9 +441,9 @@ export function AdminOrganizationsPage({
             <div className="flex min-w-0 flex-col gap-1 px-3 text-xs text-muted-foreground md:px-0 lg:text-right">
               <span className="inline-flex items-center gap-1 font-medium text-foreground">
                 <ShieldCheck className="size-3.5 text-primary" />
-                Quotas prompts
+                Quotas crédits
               </span>
-              <span>Les changements se repercutent sur la page Prompts sans refresh.</span>
+              <span>Les changements se repercutent sur l'usage de crédits sans refresh.</span>
             </div>
           </div>
         </div>
@@ -467,7 +467,7 @@ export function AdminOrganizationsPage({
                       <TableHead className="min-w-[220px]">Projets</TableHead>
                       <TableHead className="min-w-[240px]">Utilisateurs</TableHead>
                       <TableHead className="w-[180px]">Plan</TableHead>
-                      <TableHead className="w-[260px]">Quota prompts</TableHead>
+                      <TableHead className="w-[260px]">Quota crédits</TableHead>
                       <TableHead className="w-[140px] text-right">Action</TableHead>
                     </TableRow>
                   </TableHeader>

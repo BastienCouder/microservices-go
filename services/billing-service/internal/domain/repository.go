@@ -12,6 +12,8 @@ type Repository interface {
 	GetByOrganizationID(ctx context.Context, organizationID int64) (*Subscription, error)
 	ListPlanSettings(ctx context.Context) ([]PlanSettings, error)
 	UpsertPlanSettings(ctx context.Context, settings PlanSettings) error
+	GetCreditCostSettings(ctx context.Context) (CreditCostSettings, error)
+	UpsertCreditCostSettings(ctx context.Context, settings CreditCostSettings) error
 	ListPricingTiers(ctx context.Context) ([]PricingTier, error)
 	UpsertPricingTier(ctx context.Context, tier PricingTier) error
 	DeletePricingTier(ctx context.Context, promptVolume int) error

@@ -80,6 +80,126 @@ func TestGatewayProtectsUsersWhenUnauthorized(t *testing.T) {
 	}
 }
 
+func TestGatewayPublicAPIRoutesWithAPIKeyAndOrganizationScope(t *testing.T) {
+	const rawKey = "org_test_key"
+	var projectPath string
+	var projectOrg string
+	var authCalls atomic.Int64
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth/validate" {
+			authCalls.Add(1)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer authUpstream.Close()
+
+	organizationsUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/api-keys/validate" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected organizations request: %s %s", r.Method, r.URL.Path)
+		}
+		var req map[string]string
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Fatalf("decode validation request: %v", err)
+		}
+		if req["api_key"] != rawKey {
+			t.Fatalf("expected raw key to be validated, got %q", req["api_key"])
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":11,"organizationId":7,"name":"Production","prefix":"org_test"}`))
+	}))
+	defer organizationsUpstream.Close()
+
+	billingUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/billing/quotas/7" || r.Method != http.MethodGet {
+			t.Fatalf("unexpected billing request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := r.Header.Get("X-Organization-ID"); got != "7" {
+			t.Fatalf("expected organization scope on billing request, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"organization_id":7,"plan":"developer","subscription_status":"active","is_paid":true}`))
+	}))
+	defer billingUpstream.Close()
+
+	projectUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		projectPath = r.URL.Path
+		projectOrg = r.Header.Get("X-Organization-ID")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"success":true,"data":[]}`))
+	}))
+	defer projectUpstream.Close()
+
+	h, err := NewHandlerWithGRPCAndServices(
+		projectUpstream.URL,
+		authUpstream.URL,
+		organizationsUpstream.URL,
+		projectUpstream.URL,
+		"",
+		billingUpstream.URL,
+		projectUpstream.URL,
+		projectUpstream.URL,
+		projectUpstream.URL,
+		projectUpstream.URL,
+		projectUpstream.URL,
+		100,
+		"test-secret",
+		"api-gateway",
+		nil,
+		nil,
+		grpctls.ClientConfig{AllowInsecure: true},
+	)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	req.Header.Set("Authorization", "Bearer "+rawKey)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if authCalls.Load() != 0 {
+		t.Fatalf("expected public API key auth to bypass browser auth, got %d auth calls", authCalls.Load())
+	}
+	if projectPath != "/projects" {
+		t.Fatalf("expected upstream project path /projects, got %q", projectPath)
+	}
+	if projectOrg != "7" {
+		t.Fatalf("expected project organization scope 7, got %q", projectOrg)
+	}
+}
+
+func TestGatewayPublicAPIRejectsMissingAPIKey(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	h, err := NewHandler(upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, upstream.URL, 100, "test-secret", "api-gateway")
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/projects", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestGatewayProxyAuth(t *testing.T) {
 	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/auth/validate" {

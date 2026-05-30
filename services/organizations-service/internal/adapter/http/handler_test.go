@@ -63,6 +63,27 @@ func (stubRepo) ListAPIKeys(_ context.Context, organizationID int64) ([]domain.O
 	}, nil
 }
 
+func (stubRepo) GetAPIKeyByHash(_ context.Context, keyHash string) (*domain.OrganizationAPIKey, error) {
+	if keyHash == "" {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	return &domain.OrganizationAPIKey{
+		ID:             1,
+		OrganizationID: 7,
+		Name:           "Production",
+		Prefix:         "org_12345678",
+		KeyHash:        keyHash,
+		CreatedAt:      time.Now().UTC(),
+	}, nil
+}
+
+func (stubRepo) MarkAPIKeyLastUsed(_ context.Context, keyID int64, _ time.Time) error {
+	if keyID <= 0 {
+		return domain.ErrOrganizationNotFound
+	}
+	return nil
+}
+
 func (stubRepo) RevokeAPIKey(_ context.Context, organizationID, keyID int64, _ time.Time) error {
 	if organizationID <= 0 || keyID <= 0 {
 		return domain.ErrOrganizationNotFound
@@ -187,6 +208,49 @@ func (s stubProjectLister) ListProjectsByOrganization(_ context.Context, organiz
 func newTestHandler() *Handler {
 	svc := usecase.NewService(stubRepo{})
 	return NewHandler(svc, nil)
+}
+
+func TestValidateOrganizationAPIKeyEndpointReturnsScopedMetadata(t *testing.T) {
+	h := newTestHandler()
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/internal/api-keys/validate", bytes.NewBufferString(`{"api_key":"org_secret"}`))
+	resp := httptest.NewRecorder()
+	mux.ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", resp.Code, resp.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload["organizationId"] != float64(7) {
+		t.Fatalf("expected organizationId 7, got %+v", payload)
+	}
+	if _, ok := payload["key"]; ok {
+		t.Fatalf("validation response must not expose raw key: %+v", payload)
+	}
+	if _, ok := payload["keyHash"]; ok {
+		t.Fatalf("validation response must not expose key hash: %+v", payload)
+	}
+}
+
+func TestCreateOrganizationAPIKeyAllowsPublicAPIKeyActor(t *testing.T) {
+	h := newTestHandler()
+
+	req := httptest.NewRequest(http.MethodPost, "/organizations/1/api-keys", bytes.NewBufferString(`{"name":"Automation"}`))
+	req.Header.Set("X-Organization-ID", "1")
+	req.Header.Set("X-Public-API-Key-ID", "99")
+	resp := httptest.NewRecorder()
+
+	h.organizationRoutes(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d body=%s", resp.Code, resp.Body.String())
+	}
 }
 
 func TestOrganizationRoutesRejectMismatchedScopedOrganization(t *testing.T) {

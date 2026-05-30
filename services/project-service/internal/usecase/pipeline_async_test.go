@@ -636,6 +636,11 @@ func TestRunManualAnalysisExecutesPromptAndRecordsResponse(t *testing.T) {
 	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
 		t.Fatalf("save provider credential: %v", err)
 	}
+	svc.mu.Lock()
+	model := svc.models["gpt-oss-20b-free"]
+	model.CreditCost = 2
+	svc.models["gpt-oss-20b-free"] = model
+	svc.mu.Unlock()
 
 	result, err := svc.RunManualAnalysis(ctx, project.ID, 42, 7, RunManualAnalysisInput{
 		RequestID: "manual-request-1",
@@ -653,6 +658,12 @@ func TestRunManualAnalysisExecutesPromptAndRecordsResponse(t *testing.T) {
 	}
 	if analysisSpy.startCalls != 1 {
 		t.Fatalf("expected one analysis start call, got %d", analysisSpy.startCalls)
+	}
+	if analysisSpy.lastStartReq.ModelCreditCostSum != 2 {
+		t.Fatalf("expected model credit cost sum 2, got %d", analysisSpy.lastStartReq.ModelCreditCostSum)
+	}
+	if analysisSpy.lastStartReq.RequestedCredits != 2 {
+		t.Fatalf("expected requested credits 2, got %d", analysisSpy.lastStartReq.RequestedCredits)
 	}
 	if iaSpy.execCalls != 1 {
 		t.Fatalf("expected one ia execution, got %d", iaSpy.execCalls)

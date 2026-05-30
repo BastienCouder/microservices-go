@@ -23,22 +23,22 @@ export function HowItWorksSection() {
 
   const steps: Step[] = [
     {
-      number: "I",
+      number: "01",
       title: t("steps.0.title"),
       description: t("steps.0.description"),
     },
     {
-      number: "II",
+      number: "02",
       title: t("steps.1.title"),
       description: t("steps.1.description"),
     },
     {
-      number: "III",
+      number: "03",
       title: t("steps.2.title"),
       description: t("steps.2.description"),
     },
     {
-      number: "IV",
+      number: "04",
       title: t("steps.3.title"),
       description: t("steps.3.description"),
     },
@@ -68,8 +68,8 @@ export function HowItWorksSection() {
 
   return (
     <section id="how-it-works" ref={sectionRef} className="relative bg-background text-primary overflow-hidden py-16 sm:py-20 lg:py-28">
-      <div className="absolute inset-0 opacity-[0.03] text-primary pointer-events-none">
-        <div
+     {/*   <div className="absolute inset-0 opacity-[0.03] text-primary pointer-events-none">
+       <div
           className="absolute inset-0"
           style={{
             backgroundImage: `repeating-linear-gradient(
@@ -81,7 +81,7 @@ export function HowItWorksSection() {
           )`,
           }}
         />
-      </div>
+      </div> */}
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="mb-16 lg:mb-24">
@@ -139,13 +139,13 @@ export function HowItWorksSection() {
                   <div className="w-2 lg:w-3 h-2 lg:h-3 rounded-full bg-foreground/20" />
                   <div className="w-2 lg:w-3 h-2 lg:h-3 rounded-full bg-foreground/20" />
                 </div>
-                <span className="text-xs font-mono text-foreground/40">Visia.js</span>
-              </div>
-
-              <div className="px-4 lg:px-6 py-3 lg:py-4 border-t border-foreground/10 flex items-center gap-3">
+                 <div className="flex items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
                 <span className="text-xs font-mono text-foreground/40">{t("status")}</span>
               </div>
+              </div>
+
+            
             </div>
           </div>
         </div>
@@ -162,5 +162,7 @@ export function HowItWorksSection() {
         }
       `}</style>
     </section>
+
+    
   );
 }

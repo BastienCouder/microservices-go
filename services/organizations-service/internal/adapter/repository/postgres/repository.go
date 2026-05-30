@@ -310,6 +310,39 @@ func (r *Repository) ListAPIKeys(ctx context.Context, organizationID int64) ([]d
 	return keys, nil
 }
 
+func (r *Repository) GetAPIKeyByHash(ctx context.Context, keyHash string) (*domain.OrganizationAPIKey, error) {
+	key, err := scanOrganizationAPIKey(r.db.QueryRow(ctx, `
+		SELECT id, organization_id, name, prefix, key_hash, created_at, last_used_at, revoked_at
+		FROM organization_api_keys
+		WHERE key_hash = $1
+		  AND revoked_at IS NULL
+		LIMIT 1
+	`, keyHash))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrOrganizationNotFound
+		}
+		return nil, fmt.Errorf("get organization api key by hash: %w", err)
+	}
+	return &key, nil
+}
+
+func (r *Repository) MarkAPIKeyLastUsed(ctx context.Context, keyID int64, lastUsedAt time.Time) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE organization_api_keys
+		SET last_used_at = $2
+		WHERE id = $1
+		  AND revoked_at IS NULL
+	`, keyID, toPgTimestamptz(lastUsedAt))
+	if err != nil {
+		return fmt.Errorf("mark organization api key last used: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrOrganizationNotFound
+	}
+	return nil
+}
+
 func (r *Repository) RevokeAPIKey(ctx context.Context, organizationID, keyID int64, revokedAt time.Time) error {
 	tag, err := r.db.Exec(ctx, `
 		UPDATE organization_api_keys

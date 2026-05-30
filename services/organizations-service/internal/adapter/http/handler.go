@@ -28,6 +28,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /organizations", h.createOrganization)
 	mux.HandleFunc("GET /organizations/me", h.listMyOrganizations)
+	mux.HandleFunc("POST /internal/api-keys/validate", h.validateOrganizationAPIKey)
 	mux.HandleFunc("/organizations/", h.organizationRoutes)
 	mux.HandleFunc("/invitations/", h.invitationRoutes)
 }
@@ -334,11 +335,33 @@ type createOrganizationAPIKeyRequest struct {
 	Name string `json:"name"`
 }
 
+type validateOrganizationAPIKeyRequest struct {
+	APIKey string `json:"api_key"`
+}
+
+func (h *Handler) validateOrganizationAPIKey(w http.ResponseWriter, r *http.Request) {
+	var req validateOrganizationAPIKeyRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json payload")
+		return
+	}
+
+	key, err := h.svc.ValidateOrganizationAPIKey(r.Context(), req.APIKey)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, key)
+}
+
 func (h *Handler) createOrganizationAPIKey(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing authenticated user")
-		return
+		if _, publicOK := publicAPIKeyID(r); !publicOK {
+			writeError(w, http.StatusUnauthorized, "missing authenticated user")
+			return
+		}
 	}
 
 	var req createOrganizationAPIKeyRequest
@@ -351,19 +374,31 @@ func (h *Handler) createOrganizationAPIKey(w http.ResponseWriter, r *http.Reques
 	key, err := h.svc.CreateOrganizationAPIKey(r.Context(), organizationID, req.Name)
 	if err != nil {
 		h.writeDomainError(w, err)
-		auditSecurityEvent("organization_api_key_create", map[string]any{
+		payload := map[string]any{
 			"organization_id": organizationID,
-			"user_id":         authUserID,
 			"result":          "error",
-		})
+		}
+		if authUserID > 0 {
+			payload["user_id"] = authUserID
+		}
+		if apiKeyID, publicOK := publicAPIKeyID(r); publicOK {
+			payload["api_key_id"] = apiKeyID
+		}
+		auditSecurityEvent("organization_api_key_create", payload)
 		return
 	}
-	auditSecurityEvent("organization_api_key_create", map[string]any{
+	payload := map[string]any{
 		"organization_id": organizationID,
-		"user_id":         authUserID,
 		"api_key_id":      key.ID,
 		"result":          "success",
-	})
+	}
+	if authUserID > 0 {
+		payload["user_id"] = authUserID
+	}
+	if actorAPIKeyID, publicOK := publicAPIKeyID(r); publicOK {
+		payload["actor_api_key_id"] = actorAPIKeyID
+	}
+	auditSecurityEvent("organization_api_key_create", payload)
 	writeJSON(w, http.StatusCreated, key)
 }
 
@@ -379,26 +414,40 @@ func (h *Handler) listOrganizationAPIKeys(w http.ResponseWriter, r *http.Request
 func (h *Handler) revokeOrganizationAPIKey(w http.ResponseWriter, r *http.Request, organizationID, keyID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing authenticated user")
-		return
+		if _, publicOK := publicAPIKeyID(r); !publicOK {
+			writeError(w, http.StatusUnauthorized, "missing authenticated user")
+			return
+		}
 	}
 
 	if err := h.svc.RevokeOrganizationAPIKey(r.Context(), organizationID, keyID); err != nil {
 		h.writeDomainError(w, err)
-		auditSecurityEvent("organization_api_key_revoke", map[string]any{
+		payload := map[string]any{
 			"organization_id": organizationID,
-			"user_id":         authUserID,
 			"api_key_id":      keyID,
 			"result":          "error",
-		})
+		}
+		if authUserID > 0 {
+			payload["user_id"] = authUserID
+		}
+		if actorAPIKeyID, publicOK := publicAPIKeyID(r); publicOK {
+			payload["actor_api_key_id"] = actorAPIKeyID
+		}
+		auditSecurityEvent("organization_api_key_revoke", payload)
 		return
 	}
-	auditSecurityEvent("organization_api_key_revoke", map[string]any{
+	payload := map[string]any{
 		"organization_id": organizationID,
-		"user_id":         authUserID,
 		"api_key_id":      keyID,
 		"result":          "success",
-	})
+	}
+	if authUserID > 0 {
+		payload["user_id"] = authUserID
+	}
+	if actorAPIKeyID, publicOK := publicAPIKeyID(r); publicOK {
+		payload["actor_api_key_id"] = actorAPIKeyID
+	}
+	auditSecurityEvent("organization_api_key_revoke", payload)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -880,6 +929,18 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func authenticatedUserID(r *http.Request) (int64, bool) {
 	raw := strings.TrimSpace(r.Header.Get("X-Authenticated-User-ID"))
+	if raw == "" {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
+func publicAPIKeyID(r *http.Request) (int64, bool) {
+	raw := strings.TrimSpace(r.Header.Get("X-Public-API-Key-ID"))
 	if raw == "" {
 		return 0, false
 	}

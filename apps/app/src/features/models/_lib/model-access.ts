@@ -23,6 +23,10 @@ export type ModelCatalogItem = {
   icon: string;
   isActive: boolean;
   supportsLiveSearch: boolean;
+  creditCost: number;
+  inputPricePerMillion: number | null;
+  outputPricePerMillion: number | null;
+  openRouterPricing: Record<string, unknown> | null;
 };
 
 export type LLMProviderCredentialStatus = {

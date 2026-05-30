@@ -144,11 +144,13 @@ func (h *Handler) alertRoutesWithPrefix(w http.ResponseWriter, r *http.Request, 
 }
 
 type startAnalysisRequest struct {
-	RequestID   string               `json:"requestId"`
-	PromptIDs   []string             `json:"promptIds"`
-	PromptTexts []usecase.PromptText `json:"promptTexts"`
-	ModelIDs    []string             `json:"modelIds"`
-	RunType     string               `json:"runType"`
+	RequestID          string               `json:"requestId"`
+	PromptIDs          []string             `json:"promptIds"`
+	PromptTexts        []usecase.PromptText `json:"promptTexts"`
+	ModelIDs           []string             `json:"modelIds"`
+	ModelCreditCostSum int                  `json:"modelCreditCostSum"`
+	RequestedCredits   int                  `json:"requestedCredits"`
+	RunType            string               `json:"runType"`
 }
 
 type previewOnboardingBrandProfileRequest struct {
@@ -214,13 +216,15 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectI
 	}
 
 	result, err := h.svc.StartAnalysis(r.Context(), usecase.StartAnalysisInput{
-		RequestID:      req.RequestID,
-		OrganizationID: organizationID,
-		CreatedBy:      createdBy,
-		ProjectID:      projectID,
-		PromptTexts:    promptTexts,
-		ModelIDs:       req.ModelIDs,
-		RunType:        req.RunType,
+		RequestID:          req.RequestID,
+		OrganizationID:     organizationID,
+		CreatedBy:          createdBy,
+		ProjectID:          projectID,
+		PromptTexts:        promptTexts,
+		ModelIDs:           req.ModelIDs,
+		ModelCreditCostSum: req.ModelCreditCostSum,
+		RequestedCredits:   req.RequestedCredits,
+		RunType:            req.RunType,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)

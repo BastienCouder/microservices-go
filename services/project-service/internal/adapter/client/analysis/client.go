@@ -3,6 +3,7 @@ package analysis
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -143,9 +144,22 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 	for _, prompt := range req.PromptTexts {
 		promptTexts = append(promptTexts, &analysisv1.PromptText{Id: prompt.ID, Text: prompt.Text})
 	}
+	modelCreditCostSum := req.ModelCreditCostSum
+	if modelCreditCostSum <= 0 {
+		modelCreditCostSum = 1
+	}
+	requestedCredits := req.RequestedCredits
+	if requestedCredits <= 0 {
+		requestedCredits = len(req.PromptTexts) * modelCreditCostSum
+	}
 	var grpcResp *analysisv1.StartAnalysisResponse
 	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 900*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
-		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		callCtx := metadata.AppendToOutgoingContext(
+			attemptCtx,
+			"authorization", "Bearer "+token,
+			"x-model-credit-cost-sum", strconv.Itoa(modelCreditCostSum),
+			"x-requested-credits", strconv.Itoa(requestedCredits),
+		)
 		resp, callErr := c.client.StartAnalysis(callCtx, &analysisv1.StartAnalysisRequest{
 			RequestId:   req.RequestID,
 			UserId:      req.CreatedBy,

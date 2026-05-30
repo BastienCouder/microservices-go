@@ -29,8 +29,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /billing/public/plans", h.listPlanSettings)
 	mux.HandleFunc("GET /billing/pricing-tiers", h.listPricingTiers)
 	mux.HandleFunc("GET /billing/public/pricing-tiers", h.listPricingTiers)
+	mux.HandleFunc("GET /billing/credit-cost-settings", h.getCreditCostSettings)
 	mux.HandleFunc("POST /billing/plans", h.updatePlanSettings)
 	mux.HandleFunc("POST /billing/pricing-tiers", h.updatePricingTier)
+	mux.HandleFunc("POST /billing/credit-cost-settings", h.updateCreditCostSettings)
 	mux.HandleFunc("DELETE /billing/pricing-tiers/{prompt_volume}", h.deletePricingTier)
 	mux.HandleFunc("POST /billing/subscriptions", h.upsertSubscription)
 	mux.HandleFunc("GET /billing/quotas/", h.getQuota)
@@ -72,12 +74,23 @@ type updatePlanSettingsRequest struct {
 
 type updatePricingTierRequest struct {
 	PromptVolume        int             `json:"prompt_volume"`
+	CreditVolume        int             `json:"credit_volume"`
 	Label               string          `json:"label"`
 	Prices              map[string]*int `json:"prices"`
 	DeveloperPriceCents *int            `json:"developer_price_cents"`
 	StarterPriceCents   *int            `json:"starter_price_cents"`
 	GrowthPriceCents    *int            `json:"growth_price_cents"`
 	ProPriceCents       *int            `json:"pro_price_cents"`
+}
+
+type creditCostRulePayload struct {
+	MinPricePerMillion float64 `json:"min_price_per_million"`
+	CreditCost         int     `json:"credit_cost"`
+}
+
+type updateCreditCostSettingsRequest struct {
+	DefaultCreditCost int                     `json:"default_credit_cost"`
+	Rules             []creditCostRulePayload `json:"rules"`
 }
 
 type createStripeCheckoutSessionRequest struct {
@@ -158,6 +171,15 @@ func (h *Handler) listPricingTiers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tiers)
 }
 
+func (h *Handler) getCreditCostSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.svc.GetCreditCostSettings(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
 func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 	if _, err := scopedOrganizationID(r, 0); err != nil {
 		writeError(w, http.StatusUnauthorized, "missing authenticated organization")
@@ -173,6 +195,7 @@ func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 
 	tier, err := h.svc.UpdatePricingTier(r.Context(), domain.PricingTier{
 		PromptVolume:        req.PromptVolume,
+		CreditVolume:        req.CreditVolume,
 		Label:               strings.TrimSpace(req.Label),
 		Prices:              req.Prices,
 		DeveloperPriceCents: req.DeveloperPriceCents,
@@ -191,10 +214,46 @@ func (h *Handler) updatePricingTier(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, tier)
 }
 
+func (h *Handler) updateCreditCostSettings(w http.ResponseWriter, r *http.Request) {
+	if _, err := scopedOrganizationID(r, 0); err != nil {
+		writeError(w, http.StatusUnauthorized, "missing authenticated organization")
+		return
+	}
+
+	var req updateCreditCostSettingsRequest
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid json payload")
+		return
+	}
+
+	rules := make([]domain.CreditCostRule, 0, len(req.Rules))
+	for _, rule := range req.Rules {
+		rules = append(rules, domain.CreditCostRule{
+			MinPricePerMillion: rule.MinPricePerMillion,
+			CreditCost:         rule.CreditCost,
+		})
+	}
+
+	settings, err := h.svc.UpdateCreditCostSettings(r.Context(), domain.CreditCostSettings{
+		DefaultCreditCost: req.DefaultCreditCost,
+		Rules:             rules,
+	})
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidCreditCostSettings) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	writeJSON(w, http.StatusOK, settings)
+}
+
 func (h *Handler) deletePricingTier(w http.ResponseWriter, r *http.Request) {
 	promptVolume, err := strconv.Atoi(strings.TrimSpace(r.PathValue("prompt_volume")))
 	if err != nil || promptVolume <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid prompt volume")
+		writeError(w, http.StatusBadRequest, "invalid credit volume")
 		return
 	}
 	if err := h.svc.DeletePricingTier(r.Context(), promptVolume); err != nil {

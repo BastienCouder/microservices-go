@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import {
   buildProjectModelFilterItems,
+  normalizeModelPayload,
   type ProjectModelMeta,
 } from "./project-models";
 
@@ -62,5 +63,38 @@ describe("project model filters", () => {
       "Alpha 10",
       "Aardvark 2",
     ]);
+  });
+});
+
+describe("project model payloads", () => {
+  test("normalizes model credit cost from API payloads", () => {
+    expect(
+      normalizeModelPayload({
+        id: "anthropic-claude-opus-4-5",
+        displayName: "Claude Opus 4.5",
+        provider: "anthropic",
+        groupName: "Anthropic",
+        providerModelId: "anthropic/claude-opus-4.5",
+        creditCost: 2,
+        inputPricePerMillion: 5,
+        outputPricePerMillion: 25,
+        openRouterPricing: { prompt: "0.000005", completion: "0.000025" },
+      })?.creditCost,
+    ).toBe(2);
+
+    const model = normalizeModelPayload({
+      id: "anthropic-claude-opus-4-5",
+      providerModelId: "anthropic/claude-opus-4.5",
+      inputPricePerMillion: 5,
+      outputPricePerMillion: 25,
+      openRouterPricing: { prompt: "0.000005", completion: "0.000025" },
+    });
+
+    expect(model?.inputPricePerMillion).toBe(5);
+    expect(model?.outputPricePerMillion).toBe(25);
+    expect(model?.openRouterPricing).toEqual({
+      prompt: "0.000005",
+      completion: "0.000025",
+    });
   });
 });

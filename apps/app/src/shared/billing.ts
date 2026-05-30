@@ -42,6 +42,7 @@ export type BillingPlanSettingsUpdateInput = BillingPlanSettings & {
 
 export type BillingPricingTier = {
   promptVolume: number;
+  creditVolume: number;
   label: string;
   prices: BillingPriceMap;
   developerPriceCents: number | null;
@@ -51,6 +52,20 @@ export type BillingPricingTier = {
 };
 
 export type BillingPricingTierUpdateInput = BillingPricingTier & {
+  organizationId: string;
+};
+
+export type BillingCreditCostRule = {
+  minPricePerMillion: number;
+  creditCost: number;
+};
+
+export type BillingCreditCostSettings = {
+  defaultCreditCost: number;
+  rules: BillingCreditCostRule[];
+};
+
+export type BillingCreditCostSettingsUpdateInput = BillingCreditCostSettings & {
   organizationId: string;
 };
 
@@ -133,7 +148,8 @@ function asNullablePriceMap(value: unknown): BillingPriceMap {
 
 export function normalizeBillingPricingTier(value: unknown): BillingPricingTier | null {
   const payload = asObject(value);
-  const promptVolume = asNumber(payload.prompt_volume);
+  const creditVolume = asNumber(payload.credit_volume) || asNumber(payload.prompt_volume);
+  const promptVolume = creditVolume;
   if (promptVolume <= 0) return null;
 
   const prices = asNullablePriceMap(payload.prices);
@@ -148,6 +164,7 @@ export function normalizeBillingPricingTier(value: unknown): BillingPricingTier 
 
   return {
     promptVolume,
+    creditVolume,
     label: asString(payload.label) || String(promptVolume),
     prices: {
       ...prices,
@@ -166,6 +183,31 @@ export function normalizeBillingPricingTier(value: unknown): BillingPricingTier 
     starterPriceCents,
     growthPriceCents,
     proPriceCents,
+  };
+}
+
+export function normalizeBillingCreditCostSettings(value: unknown): BillingCreditCostSettings {
+  const payload = asObject(value);
+  const rules = Array.isArray(payload.rules)
+    ? payload.rules
+        .map((entry) => {
+          const item = asObject(entry);
+          const minPricePerMillion =
+            typeof item.min_price_per_million === "number" &&
+            Number.isFinite(item.min_price_per_million) &&
+            item.min_price_per_million >= 0
+              ? item.min_price_per_million
+              : 0;
+          const creditCost = asNumber(item.credit_cost);
+          if (creditCost <= 0) return null;
+          return { minPricePerMillion, creditCost };
+        })
+        .filter((rule): rule is BillingCreditCostRule => rule !== null)
+    : [];
+
+  return {
+    defaultCreditCost: Math.max(1, asNumber(payload.default_credit_cost) || 1),
+    rules,
   };
 }
 
@@ -294,6 +336,55 @@ export async function loadBillingPricingTiers(
     .filter((tier): tier is BillingPricingTier => tier !== null);
 }
 
+export async function loadBillingCreditCostSettings(
+  apiBaseURL: string,
+  organizationId: string,
+  options?: { signal?: AbortSignal },
+): Promise<BillingCreditCostSettings> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.billing.creditCostSettings(),
+    {
+      method: "GET",
+      organizationId,
+      signal: options?.signal,
+    },
+  );
+
+  if (!result.ok) {
+    throw toGatewayError(result, "Impossible de charger les regles de credits.");
+  }
+
+  return normalizeBillingCreditCostSettings(result.data);
+}
+
+export async function updateBillingCreditCostSettings(
+  apiBaseURL: string,
+  input: BillingCreditCostSettingsUpdateInput,
+): Promise<BillingCreditCostSettings> {
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.billing.creditCostSettings(),
+    {
+      method: "POST",
+      organizationId: input.organizationId,
+      body: JSON.stringify({
+        default_credit_cost: Math.max(1, Math.floor(input.defaultCreditCost)),
+        rules: input.rules.map((rule) => ({
+          min_price_per_million: Math.max(0, rule.minPricePerMillion),
+          credit_cost: Math.max(1, Math.floor(rule.creditCost)),
+        })),
+      }),
+    },
+  );
+
+  if (!result.ok) {
+    throw toGatewayError(result, "Impossible de mettre a jour les regles de credits.");
+  }
+
+  return normalizeBillingCreditCostSettings(result.data);
+}
+
 export async function updateBillingPricingTier(
   apiBaseURL: string,
   input: BillingPricingTierUpdateInput,
@@ -306,6 +397,7 @@ export async function updateBillingPricingTier(
       organizationId: input.organizationId,
       body: JSON.stringify({
         prompt_volume: Math.max(1, Math.floor(input.promptVolume)),
+        credit_volume: Math.max(1, Math.floor(input.creditVolume || input.promptVolume)),
         label: input.label,
         prices: input.prices,
         developer_price_cents: input.developerPriceCents,

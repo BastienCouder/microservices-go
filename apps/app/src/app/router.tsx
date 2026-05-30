@@ -7,6 +7,8 @@ import { ModelsPage } from "@/features/models/index";
 import { PerceptionPage } from "@/features/perception";
 import { PromptsPage } from "@/features/prompts/index";
 
+
+
 const OnboardingPage = lazy(() =>
   import("@/features/onboarding").then((module) => ({
     default: module.OnboardingPage,

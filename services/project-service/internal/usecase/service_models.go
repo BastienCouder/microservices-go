@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -80,7 +80,7 @@ type openRouterModelPayload struct {
 	Name                string                        `json:"name"`
 	ContextLength       int                           `json:"context_length"`
 	Architecture        openRouterArchitecturePayload `json:"architecture"`
-	Pricing             map[string]string             `json:"pricing"`
+	Pricing             map[string]any                `json:"pricing"`
 	SupportedParameters []string                      `json:"supported_parameters"`
 }
 
@@ -274,6 +274,11 @@ func (s *Service) SeedDefaultModels(ctx context.Context) ([]AIModel, error) {
 }
 
 func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouterModelsInput) (SyncOpenRouterModelsResult, error) {
+	creditCostSettings, err := s.loadCreditCostSettings(ctx)
+	if err != nil {
+		return SyncOpenRouterModelsResult{}, err
+	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, openRouterModelsURL, nil)
 	if err != nil {
 		return SyncOpenRouterModelsResult{}, fmt.Errorf("create openrouter models request: %w", err)
@@ -310,7 +315,7 @@ func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouter
 	seenProviderModelIDs := make(map[string]struct{}, len(candidates))
 	for _, candidate := range candidates {
 		seenProviderModelIDs[strings.TrimSpace(candidate.ID)] = struct{}{}
-		model, created, err := s.openRouterModelToCatalogModelLocked(candidate, input.ActivateImported)
+		model, created, err := s.openRouterModelToCatalogModelLocked(candidate, input.ActivateImported, creditCostSettings)
 		if err != nil {
 			return SyncOpenRouterModelsResult{}, err
 		}
@@ -399,6 +404,10 @@ func (s *Service) UpdateModel(ctx context.Context, modelID string, input UpdateA
 		candidate.ModelID = current.ModelID
 		candidate.IsActive = current.IsActive
 		candidate.SupportsLiveSearch = current.SupportsLiveSearch
+		candidate.CreditCost = current.CreditCost
+		candidate.InputPricePerMillion = current.InputPricePerMillion
+		candidate.OutputPricePerMillion = current.OutputPricePerMillion
+		candidate.OpenRouterPricing = cloneOpenRouterPricing(current.OpenRouterPricing)
 		if input.Label != nil {
 			candidate.Label = strings.TrimSpace(*input.Label)
 		}
@@ -454,10 +463,13 @@ func (s *Service) UpdateModel(ctx context.Context, modelID string, input UpdateA
 }
 
 func (s *Service) buildModelLocked(modelID string, mutate func(candidate *AIModel)) (AIModel, error) {
-	candidate := AIModel{ID: strings.TrimSpace(modelID)}
+	candidate := AIModel{ID: strings.TrimSpace(modelID), CreditCost: 1}
 	mutate(&candidate)
 	candidate.Source = normalizeAIModelSource(candidate)
 	candidate.IconPath = modelIconPath(candidate.IconKey)
+	if candidate.CreditCost <= 0 {
+		candidate.CreditCost = 1
+	}
 
 	if candidate.ID == "" {
 		return AIModel{}, fmt.Errorf("%w: model id is required", ErrValidation)
@@ -568,24 +580,122 @@ func openRouterModelIsFree(model openRouterModelPayload) bool {
 		return true
 	}
 
-	prompt, okPrompt := parseOpenRouterPrice(model.Pricing["prompt"])
-	completion, okCompletion := parseOpenRouterPrice(model.Pricing["completion"])
-	if okPrompt && okCompletion && prompt == 0 && completion == 0 {
+	input, okInput := openRouterPricePerMillionOK(model.Pricing, "input", "prompt")
+	output, okOutput := openRouterPricePerMillionOK(model.Pricing, "output", "completion")
+	if okInput && okOutput && input != nil && output != nil && *input == 0 && *output == 0 {
 		return true
 	}
 	return false
 }
 
-func parseOpenRouterPrice(raw string) (float64, bool) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
+func parseOpenRouterPrice(raw any) (float64, bool) {
+	switch value := raw.(type) {
+	case string:
+		value = strings.TrimSpace(value)
+		if value == "" {
+			return 0, false
+		}
+		parsed, err := strconv.ParseFloat(value, 64)
+		if err != nil {
+			return 0, false
+		}
+		return parsed, true
+	case float64:
+		if !isFinitePrice(value) {
+			return 0, false
+		}
+		return value, true
+	case int:
+		return float64(value), true
+	default:
 		return 0, false
 	}
-	value, err := strconv.ParseFloat(raw, 64)
-	if err != nil {
-		return 0, false
+}
+
+func isFinitePrice(value float64) bool {
+	return value == value && value >= 0
+}
+
+func defaultCreditCostSettings() CreditCostSettings {
+	return CreditCostSettings{
+		DefaultCreditCost: 1,
+		Rules: []CreditCostRule{
+			{MinPricePerMillion: 20, CreditCost: 4},
+			{MinPricePerMillion: 10, CreditCost: 3},
+			{MinPricePerMillion: 5, CreditCost: 2},
+		},
 	}
-	return value, true
+}
+
+func normalizeCreditCostSettings(settings CreditCostSettings) CreditCostSettings {
+	normalized := settings
+	if normalized.DefaultCreditCost <= 0 {
+		normalized.DefaultCreditCost = 1
+	}
+	rules := make([]CreditCostRule, 0, len(settings.Rules))
+	for _, rule := range settings.Rules {
+		if rule.MinPricePerMillion < 0 || rule.CreditCost <= 0 {
+			continue
+		}
+		rules = append(rules, rule)
+	}
+	sort.SliceStable(rules, func(i, j int) bool {
+		if rules[i].MinPricePerMillion == rules[j].MinPricePerMillion {
+			return rules[i].CreditCost > rules[j].CreditCost
+		}
+		return rules[i].MinPricePerMillion > rules[j].MinPricePerMillion
+	})
+	normalized.Rules = rules
+	return normalized
+}
+
+func openRouterCreditCostFromPricing(pricing map[string]any, settings CreditCostSettings) int {
+	settings = normalizeCreditCostSettings(settings)
+	inputPricePerMillion, outputPricePerMillion := openRouterPricingPerMillion(pricing)
+	pricePerMillionTokens := 0.0
+	if inputPricePerMillion != nil {
+		pricePerMillionTokens = *inputPricePerMillion
+	}
+	if pricePerMillionTokens <= 0 && outputPricePerMillion != nil {
+		pricePerMillionTokens = *outputPricePerMillion
+	}
+	if pricePerMillionTokens <= 0 {
+		return settings.DefaultCreditCost
+	}
+	for _, rule := range settings.Rules {
+		if pricePerMillionTokens >= rule.MinPricePerMillion {
+			return rule.CreditCost
+		}
+	}
+	return settings.DefaultCreditCost
+}
+
+func openRouterPricingPerMillion(pricing map[string]any) (*float64, *float64) {
+	input := openRouterPricePerMillion(pricing, "input", "prompt")
+	output := openRouterPricePerMillion(pricing, "output", "completion")
+	return input, output
+}
+
+func openRouterPricePerMillion(pricing map[string]any, keys ...string) *float64 {
+	value, _ := openRouterPricePerMillionOK(pricing, keys...)
+	if value == nil {
+		return nil
+	}
+	return cloneFloat64(*value)
+}
+
+func openRouterPricePerMillionOK(pricing map[string]any, keys ...string) (*float64, bool) {
+	for _, key := range keys {
+		pricePerToken, ok := parseOpenRouterPrice(pricing[key])
+		if ok {
+			return cloneFloat64(pricePerToken * 1_000_000), true
+		}
+	}
+	return nil, false
+}
+
+func cloneFloat64(value float64) *float64 {
+	return &value
 }
 
 func openRouterVariantAllowed(model openRouterModelPayload, variant string) bool {
@@ -788,7 +898,18 @@ func openRouterProviderAllowed(modelID string, providers []string) bool {
 	return false
 }
 
-func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPayload, activateImported bool) (AIModel, bool, error) {
+func (s *Service) loadCreditCostSettings(ctx context.Context) (CreditCostSettings, error) {
+	if s.billingClient == nil {
+		return defaultCreditCostSettings(), nil
+	}
+	settings, err := s.billingClient.GetCreditCostSettings(ctx)
+	if err != nil {
+		return CreditCostSettings{}, fmt.Errorf("load billing credit cost settings: %w", err)
+	}
+	return normalizeCreditCostSettings(settings), nil
+}
+
+func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPayload, activateImported bool, creditCostSettings CreditCostSettings) (AIModel, bool, error) {
 	provider := normalizeOpenRouterProvider(openRouterProviderFromID(payload.ID))
 	if provider == "" {
 		return AIModel{}, false, fmt.Errorf("%w: openrouter provider is required", ErrValidation)
@@ -813,6 +934,7 @@ func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPay
 	displayName := openRouterDisplayName(payload.Name, payload.ID)
 	groupName := openRouterGroupName(payload.Name, provider)
 	iconKey := openRouterIconKey(provider)
+	inputPricePerMillion, outputPricePerMillion := openRouterPricingPerMillion(payload.Pricing)
 	isActive := activateImported
 	if existing, ok := s.models[existingID]; ok {
 		isActive = existing.IsActive
@@ -827,11 +949,26 @@ func (s *Service) openRouterModelToCatalogModelLocked(payload openRouterModelPay
 		candidate.Source = AIModelSourceOpenRouter
 		candidate.IsActive = isActive
 		candidate.SupportsLiveSearch = openRouterSupportsParameter(payload.SupportedParameters, "tools")
+		candidate.CreditCost = openRouterCreditCostFromPricing(payload.Pricing, creditCostSettings)
+		candidate.InputPricePerMillion = inputPricePerMillion
+		candidate.OutputPricePerMillion = outputPricePerMillion
+		candidate.OpenRouterPricing = cloneOpenRouterPricing(payload.Pricing)
 	})
 	if err != nil {
 		return AIModel{}, false, err
 	}
 	return model, created, nil
+}
+
+func cloneOpenRouterPricing(pricing map[string]any) map[string]any {
+	if len(pricing) == 0 {
+		return nil
+	}
+	clone := make(map[string]any, len(pricing))
+	for key, value := range pricing {
+		clone[key] = value
+	}
+	return clone
 }
 
 func findModelByProviderModelID(models map[string]AIModel, provider, providerModelID string) (AIModel, bool) {

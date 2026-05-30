@@ -65,6 +65,10 @@ export function normalizeCatalogItem(value: unknown): ModelCatalogItem | null {
     icon: model.iconPath,
     isActive: model.isActive,
     supportsLiveSearch: model.supportsLiveSearch,
+    creditCost: model.creditCost,
+    inputPricePerMillion: model.inputPricePerMillion,
+    outputPricePerMillion: model.outputPricePerMillion,
+    openRouterPricing: model.openRouterPricing,
   };
 }
 

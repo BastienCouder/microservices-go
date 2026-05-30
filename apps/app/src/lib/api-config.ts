@@ -95,6 +95,7 @@ export const apiRoutes = {
     plans: () => "/billing/plans",
     publicPlans: () => "/billing/public/plans",
     pricingTiers: () => "/billing/pricing-tiers",
+    creditCostSettings: () => "/billing/credit-cost-settings",
     pricingTier: (promptVolume: number) =>
       `/billing/pricing-tiers/${encodeURIComponent(String(promptVolume))}`,
     publicPricingTiers: () => "/billing/public/pricing-tiers",

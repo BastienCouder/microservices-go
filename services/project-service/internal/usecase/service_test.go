@@ -18,6 +18,7 @@ type mutableProjectStore struct {
 
 type fakeBillingClient struct {
 	entitlements BillingEntitlements
+	creditCosts  CreditCostSettings
 	err          error
 }
 
@@ -38,6 +39,16 @@ func (f *fakeBillingClient) GetOrganizationEntitlements(_ context.Context, _ int
 		return BillingEntitlements{}, f.err
 	}
 	return f.entitlements, nil
+}
+
+func (f *fakeBillingClient) GetCreditCostSettings(_ context.Context) (CreditCostSettings, error) {
+	if f.err != nil {
+		return CreditCostSettings{}, f.err
+	}
+	if f.creditCosts.DefaultCreditCost <= 0 {
+		return defaultCreditCostSettings(), nil
+	}
+	return f.creditCosts, nil
 }
 
 func TestProjectFlowCreateFinalize(t *testing.T) {
@@ -713,7 +724,7 @@ func TestSyncOpenRouterModelsImportsAvailableModels(t *testing.T) {
 					"id": "anthropic/claude-3.5-sonnet",
 					"name": "Anthropic: Claude 3.5 Sonnet",
 					"context_length": 200000,
-					"pricing": {"prompt": "0.000003"},
+					"pricing": {"input": "0.000005", "output": "0.000025"},
 					"supported_parameters": ["tools"]
 				},
 				{
@@ -770,8 +781,95 @@ func TestSyncOpenRouterModelsImportsAvailableModels(t *testing.T) {
 	if !imported.SupportsLiveSearch {
 		t.Fatalf("expected tools support to be captured")
 	}
+	if imported.CreditCost != 2 {
+		t.Fatalf("expected credit cost 2, got %d", imported.CreditCost)
+	}
+	if imported.InputPricePerMillion == nil || imported.OutputPricePerMillion == nil || *imported.InputPricePerMillion != 5 || *imported.OutputPricePerMillion != 25 {
+		t.Fatalf("expected input/output prices 5/25, got %v/%v", imported.InputPricePerMillion, imported.OutputPricePerMillion)
+	}
+	if imported.OpenRouterPricing["input"] != "0.000005" || imported.OpenRouterPricing["output"] != "0.000025" {
+		t.Fatalf("expected raw OpenRouter pricing to be preserved, got %#v", imported.OpenRouterPricing)
+	}
 	if _, ok := byProviderModelID["mistral/tiny-paid"]; ok {
 		t.Fatalf("expected filtered model to be skipped")
+	}
+}
+
+func TestOpenRouterCreditCostFromPricingUsesInputPricePerMillion(t *testing.T) {
+	tests := []struct {
+		name    string
+		pricing map[string]any
+		want    int
+	}{
+		{
+			name:    "free models still cost the minimum credit",
+			pricing: map[string]any{"input": "0", "output": "0"},
+			want:    1,
+		},
+		{
+			name:    "medium priced models cost one credit",
+			pricing: map[string]any{"input": "0.000004", "output": "0.000020"},
+			want:    1,
+		},
+		{
+			name:    "high priced five dollar models cost two credits",
+			pricing: map[string]any{"input": "0.000005", "output": "0.000025"},
+			want:    2,
+		},
+		{
+			name:    "premium models cost three credits",
+			pricing: map[string]any{"input": "0.000012"},
+			want:    3,
+		},
+		{
+			name:    "ultra premium models cost four credits",
+			pricing: map[string]any{"input": "0.000022"},
+			want:    4,
+		},
+		{
+			name:    "legacy prompt price is a fallback when input price is missing",
+			pricing: map[string]any{"prompt": "0.000006"},
+			want:    2,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := openRouterCreditCostFromPricing(tt.pricing, defaultCreditCostSettings()); got != tt.want {
+				t.Fatalf("expected %d credits, got %d", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestOpenRouterCreditCostFromPricingUsesBillingThresholds(t *testing.T) {
+	settings := CreditCostSettings{
+		DefaultCreditCost: 1,
+		Rules: []CreditCostRule{
+			{MinPricePerMillion: 8, CreditCost: 5},
+			{MinPricePerMillion: 3, CreditCost: 2},
+		},
+	}
+
+	if got := openRouterCreditCostFromPricing(map[string]any{"input": "0.000005"}, settings); got != 2 {
+		t.Fatalf("expected 2 credits for $5 / 1M, got %d", got)
+	}
+	if got := openRouterCreditCostFromPricing(map[string]any{"input": "0.000009"}, settings); got != 5 {
+		t.Fatalf("expected 5 credits for $9 / 1M, got %d", got)
+	}
+}
+
+func TestOpenRouterPricingPerMillionCapturesInputAndOutput(t *testing.T) {
+	inputPrice, outputPrice := openRouterPricingPerMillion(map[string]any{
+		"input":  "0.000005",
+		"output": "0.000025",
+	})
+
+	if inputPrice == nil || *inputPrice != 5 {
+		t.Fatalf("expected input price 5, got %v", inputPrice)
+	}
+	if outputPrice == nil || *outputPrice != 25 {
+		t.Fatalf("expected output price 25, got %v", outputPrice)
 	}
 }
 
@@ -1016,17 +1114,17 @@ func TestFilterOpenRouterModelsCanFilterFreeModels(t *testing.T) {
 		{
 			ID:      "google/gemma-3-4b-it:free",
 			Name:    "Google: Gemma 3 4B (free)",
-			Pricing: map[string]string{"prompt": "0", "completion": "0"},
+			Pricing: map[string]any{"prompt": "0", "completion": "0"},
 		},
 		{
 			ID:      "openai/gpt-oss-20b:free",
 			Name:    "OpenAI: gpt-oss-20b (free)",
-			Pricing: map[string]string{"prompt": "0.000000", "completion": "0.000000"},
+			Pricing: map[string]any{"prompt": "0.000000", "completion": "0.000000"},
 		},
 		{
 			ID:      "anthropic/claude-3.5-sonnet",
 			Name:    "Anthropic: Claude 3.5 Sonnet",
-			Pricing: map[string]string{"prompt": "0.000003", "completion": "0.000015"},
+			Pricing: map[string]any{"prompt": "0.000003", "completion": "0.000015"},
 		},
 	}
 

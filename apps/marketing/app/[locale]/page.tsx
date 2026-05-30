@@ -15,6 +15,7 @@ import { FooterSection } from "@/app/[locale]/_components/footer-section";
 import { defaultLocale, isLocale, type Locale } from "@/src/i18n/config";
 import { buildLocalizedMetadata } from "@/src/site/config";
 import { getTranslations } from "next-intl/server";
+import VisiaDashboardShell from "./_components/visia-dashboard";
 
 export async function generateMetadata({
   params,
@@ -38,6 +39,11 @@ export default function Home() {
     <main className="relative min-h-screen overflow-x-hidden noise-overlay">
       <Navigation />
       <HeroSection />
+       <VisiaDashboardShell
+      appName="VISIA."
+      brandName="visia"
+
+    />
       <FeaturesSection />
       <HowItWorksSection />
       <InfrastructureSection />

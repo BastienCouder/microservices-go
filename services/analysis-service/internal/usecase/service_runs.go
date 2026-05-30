@@ -115,6 +115,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	}
 
 	now := s.now().UTC()
+	requestedCredits := requestedCreditCount(len(normalizedPrompts), input.ModelCreditCostSum, input.RequestedCredits)
 	if s.billingQuota != nil {
 		monthlyQuota, found, err := s.billingQuota.GetMonthlyQuota(ctx, input.OrganizationID)
 		if err != nil {
@@ -122,14 +123,13 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 			return StartAnalysisResult{}, err
 		}
 		if found && monthlyQuota > 0 {
-			usedPrompts := s.currentMonthlyPromptUsageLocked(input.OrganizationID, now)
-			requestedPrompts := len(normalizedPrompts)
-			if usedPrompts+requestedPrompts > monthlyQuota {
+			usedCredits := s.currentMonthlyCreditUsageLocked(input.OrganizationID, now)
+			if usedCredits+requestedCredits > monthlyQuota {
 				s.mu.Unlock()
 				return StartAnalysisResult{}, fmt.Errorf(
-					"%w: monthly prompt quota reached (%d/%d)",
+					"%w: monthly credit quota reached (%d/%d)",
 					ErrQuotaExceeded,
-					usedPrompts,
+					usedCredits,
 					monthlyQuota,
 				)
 			}
@@ -147,6 +147,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 		Status:             "running",
 		PromptsCount:       len(normalizedPrompts),
 		ModelsCount:        len(normalizedModels),
+		CreditsCount:       requestedCredits,
 		ExpectedResponses:  expectedResponses,
 		CompletedResponses: 0,
 		CreatedAt:          now,
@@ -462,19 +463,22 @@ func (s *Service) GetPromptQuotaUsage(ctx context.Context, projectID string, org
 		return PromptQuotaUsage{}, err
 	}
 
-	usedPrompts := s.currentMonthlyPromptUsageLocked(organizationID, now)
-	remainingPrompts := 0
+	usedCredits := s.currentMonthlyCreditUsageLocked(organizationID, now)
+	remainingCredits := 0
 	if hasQuota {
-		remainingPrompts = max(0, monthlyQuota-usedPrompts)
+		remainingCredits = max(0, monthlyQuota-usedCredits)
 	}
 
 	return PromptQuotaUsage{
 		HasQuota:         hasQuota,
-		UsedPrompts:      usedPrompts,
+		UsedPrompts:      usedCredits,
+		UsedCredits:      usedCredits,
 		MonthlyQuota:     monthlyQuota,
-		RemainingPrompts: remainingPrompts,
+		MonthlyCredits:   monthlyQuota,
+		RemainingPrompts: remainingCredits,
+		RemainingCredits: remainingCredits,
 		CurrentMonth:     now.Format("2006-01"),
-		IsLimitReached:   hasQuota && usedPrompts >= monthlyQuota,
+		IsLimitReached:   hasQuota && usedCredits >= monthlyQuota,
 	}, nil
 }
 

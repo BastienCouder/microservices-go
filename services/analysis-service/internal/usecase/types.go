@@ -29,6 +29,7 @@ type AnalysisRun struct {
 	Status             string    `json:"status"`
 	PromptsCount       int       `json:"promptsCount"`
 	ModelsCount        int       `json:"modelsCount"`
+	CreditsCount       int       `json:"creditsCount"`
 	ExpectedResponses  int       `json:"expectedResponses"`
 	CompletedResponses int       `json:"completedResponses"`
 	VisibilityScore    int       `json:"visibilityScore"`
@@ -60,13 +61,15 @@ type AIResponse struct {
 }
 
 type StartAnalysisInput struct {
-	RequestID      string
-	OrganizationID int64
-	CreatedBy      int64
-	ProjectID      string
-	PromptTexts    []PromptText
-	ModelIDs       []string
-	RunType        string
+	RequestID          string
+	OrganizationID     int64
+	CreatedBy          int64
+	ProjectID          string
+	PromptTexts        []PromptText
+	ModelIDs           []string
+	ModelCreditCostSum int
+	RequestedCredits   int
+	RunType            string
 }
 
 type StartAnalysisResult struct {
@@ -97,8 +100,11 @@ type DashboardData struct {
 type PromptQuotaUsage struct {
 	HasQuota         bool   `json:"hasQuota"`
 	UsedPrompts      int    `json:"usedPrompts"`
+	UsedCredits      int    `json:"usedCredits"`
 	MonthlyQuota     int    `json:"monthlyQuota"`
+	MonthlyCredits   int    `json:"monthlyCredits"`
 	RemainingPrompts int    `json:"remainingPrompts"`
+	RemainingCredits int    `json:"remainingCredits"`
 	CurrentMonth     string `json:"currentMonth"`
 	IsLimitReached   bool   `json:"isLimitReached"`
 }

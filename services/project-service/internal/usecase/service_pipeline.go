@@ -312,6 +312,12 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 	if runType == "" {
 		runType = "manual"
 	}
+	modelCreditCosts, err := s.modelCreditCosts(ctx, effectiveModelIDs)
+	if err != nil {
+		return AnalysisStartResponse{}, err
+	}
+	modelCreditCostTotal := modelCreditCostSum(effectiveModelIDs, modelCreditCosts)
+	requestedCredits := requestedCreditsForPrompts(prompts, effectiveModelIDs, modelCreditCosts)
 
 	log.Printf(
 		"prompt_analysis.start project_id=%s organization_id=%d run_type=%s request_id=%s prompts=%d models=%v competitors=%d",
@@ -325,13 +331,15 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 	)
 
 	startResp, err := s.analysisClient.StartAnalysis(ctx, AnalysisStartRequest{
-		RequestID:      requestID,
-		OrganizationID: project.OrganizationID,
-		CreatedBy:      project.CreatedBy,
-		ProjectID:      project.ID,
-		PromptTexts:    prompts,
-		ModelIDs:       effectiveModelIDs,
-		RunType:        runType,
+		RequestID:          requestID,
+		OrganizationID:     project.OrganizationID,
+		CreatedBy:          project.CreatedBy,
+		ProjectID:          project.ID,
+		PromptTexts:        prompts,
+		ModelIDs:           effectiveModelIDs,
+		ModelCreditCostSum: modelCreditCostTotal,
+		RequestedCredits:   requestedCredits,
+		RunType:            runType,
 	})
 	if err != nil {
 		log.Printf(
@@ -472,4 +480,57 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		effectiveModelIDs,
 	)
 	return startResp, nil
+}
+
+func (s *Service) modelCreditCosts(ctx context.Context, modelIDs []string) (map[string]int, error) {
+	normalized := normalizeModelIDs(modelIDs)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	costs := make(map[string]int, len(normalized))
+	for _, modelID := range normalized {
+		model, ok := s.models[modelID]
+		if !ok || model.CreditCost <= 0 {
+			costs[modelID] = 1
+			continue
+		}
+		costs[modelID] = model.CreditCost
+	}
+	return costs, nil
+}
+
+func modelCreditCostSum(modelIDs []string, costs map[string]int) int {
+	total := 0
+	for _, modelID := range normalizeModelIDs(modelIDs) {
+		total += modelCreditCost(modelID, costs)
+	}
+	if total <= 0 {
+		return 1
+	}
+	return total
+}
+
+func requestedCreditsForPrompts(prompts []AnalysisPromptText, fallbackModelIDs []string, costs map[string]int) int {
+	total := 0
+	for _, prompt := range prompts {
+		modelIDs := normalizeModelIDs(prompt.ModelIDs)
+		if len(modelIDs) == 0 {
+			modelIDs = normalizeModelIDs(fallbackModelIDs)
+		}
+		total += modelCreditCostSum(modelIDs, costs)
+	}
+	return total
+}
+
+func modelCreditCost(modelID string, costs map[string]int) int {
+	if costs != nil {
+		if cost := costs[strings.TrimSpace(modelID)]; cost > 0 {
+			return cost
+		}
+	}
+	return 1
 }

@@ -280,6 +280,10 @@ func isSameUTCMonth(left, right time.Time) bool {
 }
 
 func (s *Service) currentMonthlyPromptUsageLocked(organizationID int64, now time.Time) int {
+	return s.currentMonthlyCreditUsageLocked(organizationID, now)
+}
+
+func (s *Service) currentMonthlyCreditUsageLocked(organizationID int64, now time.Time) int {
 	total := 0
 	for _, run := range s.runs {
 		if run == nil || run.OrganizationID != organizationID {
@@ -288,7 +292,31 @@ func (s *Service) currentMonthlyPromptUsageLocked(organizationID int64, now time
 		if !isSameUTCMonth(run.CreatedAt, now) {
 			continue
 		}
-		total += run.PromptsCount
+		total += runCreditCount(run)
 	}
 	return total
+}
+
+func runCreditCount(run *AnalysisRun) int {
+	if run == nil {
+		return 0
+	}
+	if run.CreditsCount > 0 {
+		return run.CreditsCount
+	}
+	return max(0, run.PromptsCount)
+}
+
+func requestedCreditCount(promptCount, modelCreditCostSum, requestedCredits int) int {
+	if requestedCredits > 0 {
+		return requestedCredits
+	}
+	promptCount = max(0, promptCount)
+	if promptCount == 0 {
+		return 0
+	}
+	if modelCreditCostSum <= 0 {
+		modelCreditCostSum = 1
+	}
+	return promptCount * modelCreditCostSum
 }

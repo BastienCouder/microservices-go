@@ -27,11 +27,13 @@ type Handler struct {
 	authURL              string
 	userURL              string
 	organizationsURL     string
+	billingURL           string
 	projectURL           string
 	permissionGRPC       *permissionGRPCClient
 	httpClient           *http.Client
 	scanStore            *agentReadyScanStore
 	rateLimiter          *rateLimiter
+	publicAPI            PublicAPIConfig
 	authBreaker          *circuitBreaker
 	authBulkhead         *bulkhead
 	userBreaker          *circuitBreaker
@@ -92,6 +94,36 @@ func NewHandlerWithGRPCAndServices(
 	internalJWTSecret, internalJWTIssuer string,
 	corsAllowedOrigins, trustedProxyCIDRs []string,
 	permissionGRPCTLS grpctls.ClientConfig,
+) (*Handler, error) {
+	return NewHandlerWithGRPCAndServicesAndPublicAPI(
+		userServiceURL,
+		authServiceURL,
+		organizationsServiceURL,
+		permissionServiceURL,
+		permissionServiceGRPCAddr,
+		billingServiceURL,
+		notificationServiceURL,
+		projectServiceURL,
+		analysisServiceURL,
+		iaServiceURL,
+		attributionServiceURL,
+		rateLimitRPM,
+		internalJWTSecret,
+		internalJWTIssuer,
+		corsAllowedOrigins,
+		trustedProxyCIDRs,
+		permissionGRPCTLS,
+		DefaultPublicAPIConfig(),
+	)
+}
+
+func NewHandlerWithGRPCAndServicesAndPublicAPI(
+	userServiceURL, authServiceURL, organizationsServiceURL, permissionServiceURL, permissionServiceGRPCAddr, billingServiceURL, notificationServiceURL, projectServiceURL, analysisServiceURL, iaServiceURL, attributionServiceURL string,
+	rateLimitRPM int,
+	internalJWTSecret, internalJWTIssuer string,
+	corsAllowedOrigins, trustedProxyCIDRs []string,
+	permissionGRPCTLS grpctls.ClientConfig,
+	publicAPI PublicAPIConfig,
 ) (*Handler, error) {
 	userProxy, err := newProxy(userServiceURL)
 	if err != nil {
@@ -212,6 +244,7 @@ func NewHandlerWithGRPCAndServices(
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
 		organizationsURL:   strings.TrimRight(organizationsServiceURL, "/"),
+		billingURL:         strings.TrimRight(billingServiceURL, "/"),
 		projectURL:         strings.TrimRight(projectServiceURL, "/"),
 		permissionGRPC:     permissionGRPC,
 		httpClient: &http.Client{
@@ -232,6 +265,7 @@ func NewHandlerWithGRPCAndServices(
 		internalJWTIssuer:    internalJWTIssuer,
 		corsAllowedOrigins:   allowedOriginSet,
 		trustedProxyNets:     trustedProxyNets,
+		publicAPI:            publicAPI.withDefaults(),
 	}
 	h.routes = h.buildRoutes()
 	return h, nil

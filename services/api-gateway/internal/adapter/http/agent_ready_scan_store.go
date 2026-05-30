@@ -3,6 +3,7 @@ package http
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"sort"
 	"sync"
 )
 
@@ -48,6 +49,19 @@ func (s *agentReadyScanStore) get(id string) (agentReadyScanResult, bool) {
 	defer s.mu.RUnlock()
 	result, ok := s.scans[id]
 	return result, ok
+}
+
+func (s *agentReadyScanStore) list() []agentReadyScanResult {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	results := make([]agentReadyScanResult, 0, len(s.scans))
+	for _, result := range s.scans {
+		results = append(results, result)
+	}
+	sort.Slice(results, func(left, right int) bool {
+		return results[left].ScanID > results[right].ScanID
+	})
+	return results
 }
 
 func newAgentReadyScanID() string {

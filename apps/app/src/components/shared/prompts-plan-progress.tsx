@@ -46,7 +46,7 @@ export function PromptsPlanProgress({
         />
 
         <div className={cn("shrink-0 text-xs font-medium", compact && "truncate", usageClassName)}>
-          {t("planPromptUsage", {
+          {t("planCreditUsage", {
             used: promptPlanUsage.usedPrompts,
             limit: promptPlanUsage.limit,
           })}

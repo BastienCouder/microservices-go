@@ -42,6 +42,8 @@ export const appQueryKeys = {
     ["billing", "plans", apiBaseURL, organizationId] as const,
   billingPricingTiers: (apiBaseURL: string, organizationId: string) =>
     ["billing", "pricing-tiers", apiBaseURL, organizationId] as const,
+  billingCreditCostSettings: (apiBaseURL: string, organizationId: string) =>
+    ["billing", "credit-cost-settings", apiBaseURL, organizationId] as const,
   projectModels: (apiBaseURL: string, organizationId: string, projectId: string) =>
     ["models", "project", apiBaseURL, organizationId, projectId] as const,
   llmProviderCredentials: (

@@ -92,3 +92,60 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 		MaxProjects:             payload.MaxProjects,
 	}, nil
 }
+
+func (c *Client) GetCreditCostSettings(ctx context.Context) (usecase.CreditCostSettings, error) {
+	token, err := security.SignInternalJWT(
+		c.jwtSecret,
+		c.jwtIssuer,
+		"billing-service",
+		"project-service",
+		security.OutboundTokenClaims{},
+	)
+	if err != nil {
+		return usecase.CreditCostSettings{}, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/billing/credit-cost-settings", nil)
+	if err != nil {
+		return usecase.CreditCostSettings{}, fmt.Errorf("create billing request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return usecase.CreditCostSettings{}, fmt.Errorf("send billing request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(raw))
+		if message == "" {
+			message = http.StatusText(resp.StatusCode)
+		}
+		return usecase.CreditCostSettings{}, fmt.Errorf("billing service error (%d): %s", resp.StatusCode, message)
+	}
+
+	var payload struct {
+		DefaultCreditCost int `json:"default_credit_cost"`
+		Rules             []struct {
+			MinPricePerMillion float64 `json:"min_price_per_million"`
+			CreditCost         int     `json:"credit_cost"`
+		} `json:"rules"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return usecase.CreditCostSettings{}, fmt.Errorf("decode billing response: %w", err)
+	}
+
+	settings := usecase.CreditCostSettings{
+		DefaultCreditCost: payload.DefaultCreditCost,
+		Rules:             make([]usecase.CreditCostRule, 0, len(payload.Rules)),
+	}
+	for _, rule := range payload.Rules {
+		settings.Rules = append(settings.Rules, usecase.CreditCostRule{
+			MinPricePerMillion: rule.MinPricePerMillion,
+			CreditCost:         rule.CreditCost,
+		})
+	}
+	return settings, nil
+}

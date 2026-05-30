@@ -222,10 +222,10 @@ func (s *Service) persistLocked(ctx context.Context) error {
 
 func (s *Service) seedDefaultModels() {
 	defaults := []AIModel{
-		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", Source: AIModelSourceOpenRouter, IsActive: true},
-		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", Source: AIModelSourceOpenRouter, IsActive: true},
-		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it", Source: AIModelSourceOpenRouter, IsActive: true},
-		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it", Source: AIModelSourceOpenRouter, IsActive: true},
+		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
 	}
 	for _, model := range defaults {
 		s.models[model.ID] = model
@@ -310,6 +310,9 @@ func (s *Service) migrateLegacyModelReferencesLocked(legacyModelID, canonicalMod
 func (s *Service) normalizeModelSourcesLocked() {
 	for modelID, model := range s.models {
 		model.Source = normalizeAIModelSource(model)
+		if model.CreditCost <= 0 {
+			model.CreditCost = 1
+		}
 		s.models[modelID] = model
 	}
 }

@@ -4,8 +4,11 @@ import { gatewayJSON } from "@/shared/api/gateway";
 export type PromptQuotaUsageData = {
   hasQuota: boolean;
   usedPrompts: number;
+  usedCredits: number;
   monthlyQuota: number;
+  monthlyCredits: number;
   remainingPrompts: number;
+  remainingCredits: number;
   currentMonth: string;
   isLimitReached: boolean;
 };
@@ -49,11 +52,29 @@ function unwrapSuccessEnvelope(value: unknown): unknown {
 function normalizePromptQuotaUsage(value: unknown): PromptQuotaUsageData {
   const payload = asObject(value);
 
+  const usedCredits = Math.max(
+    0,
+    Math.floor(asNumber(payload.usedCredits) || asNumber(payload.usedPrompts)),
+  );
+  const monthlyCredits = Math.max(
+    0,
+    Math.floor(asNumber(payload.monthlyCredits) || asNumber(payload.monthlyQuota)),
+  );
+  const remainingCredits = Math.max(
+    0,
+    Math.floor(
+      asNumber(payload.remainingCredits) || asNumber(payload.remainingPrompts),
+    ),
+  );
+
   return {
     hasQuota: asBool(payload.hasQuota),
-    usedPrompts: Math.max(0, Math.floor(asNumber(payload.usedPrompts))),
-    monthlyQuota: Math.max(0, Math.floor(asNumber(payload.monthlyQuota))),
-    remainingPrompts: Math.max(0, Math.floor(asNumber(payload.remainingPrompts))),
+    usedPrompts: usedCredits,
+    usedCredits,
+    monthlyQuota: monthlyCredits,
+    monthlyCredits,
+    remainingPrompts: remainingCredits,
+    remainingCredits,
     currentMonth: asString(payload.currentMonth),
     isLimitReached: asBool(payload.isLimitReached),
   };

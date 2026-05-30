@@ -41,6 +41,11 @@ const EMPTY_MODEL_CATALOG: ModelCatalogItem[] = [];
 const EMPTY_PROVIDER_CREDENTIALS: LLMProviderCredentialStatus[] = [];
 const ONBOARDING_MODEL_SELECTION_LIMIT = 3;
 
+function formatCreditCost(creditCost: number) {
+  const normalized = Math.max(1, Math.floor(creditCost));
+  return `${normalized} credit${normalized > 1 ? "s" : ""}`;
+}
+
 function sameStringArray(left: string[], right: string[]): boolean {
   return (
     left.length === right.length &&
@@ -474,6 +479,7 @@ export function StepModels({
               modelGroup={model.modelGroup}
               size="large"
               disabled={disabled}
+              metaLabel={formatCreditCost(model.creditCost)}
               disabledLabel={
                 disabledByApiKey
                   ? t("modelsDeveloperModelDisabled")

@@ -170,7 +170,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadRuns(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, expected_responses, completed_responses, visibility_score, created_at, updated_at
+		SELECT id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, credits_count, expected_responses, completed_responses, visibility_score, created_at, updated_at
 		FROM analysis_runs
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -194,6 +194,7 @@ func (s *StateStore) loadRuns(ctx context.Context, state *persistedState) error 
 			&item.Status,
 			&item.PromptsCount,
 			&item.ModelsCount,
+			&item.CreditsCount,
 			&item.ExpectedResponses,
 			&item.CompletedResponses,
 			&item.VisibilityScore,
@@ -452,9 +453,9 @@ func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase
 		run := runs[runID]
 		requestID := requestIDs[runID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO analysis_runs (id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, expected_responses, completed_responses, visibility_score, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-		`, run.ID, run.ProjectID, run.OrganizationID, run.CreatedBy, nullableString(requestID), run.RunType, run.Status, run.PromptsCount, run.ModelsCount, run.ExpectedResponses, run.CompletedResponses, run.VisibilityScore, run.CreatedAt, run.UpdatedAt); err != nil {
+			INSERT INTO analysis_runs (id, project_id, organization_id, created_by, request_id, run_type, status, prompts_count, models_count, credits_count, expected_responses, completed_responses, visibility_score, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		`, run.ID, run.ProjectID, run.OrganizationID, run.CreatedBy, nullableString(requestID), run.RunType, run.Status, run.PromptsCount, run.ModelsCount, run.CreditsCount, run.ExpectedResponses, run.CompletedResponses, run.VisibilityScore, run.CreatedAt, run.UpdatedAt); err != nil {
 			return fmt.Errorf("insert analysis run %s: %w", run.ID, err)
 		}
 	}

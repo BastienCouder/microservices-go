@@ -13,6 +13,8 @@ type Repository interface {
 	ListOrganizationsByUser(ctx context.Context, userID int64) ([]Membership, error)
 	CreateAPIKey(ctx context.Context, key *OrganizationAPIKey) error
 	ListAPIKeys(ctx context.Context, organizationID int64) ([]OrganizationAPIKey, error)
+	GetAPIKeyByHash(ctx context.Context, keyHash string) (*OrganizationAPIKey, error)
+	MarkAPIKeyLastUsed(ctx context.Context, keyID int64, lastUsedAt time.Time) error
 	RevokeAPIKey(ctx context.Context, organizationID, keyID int64, revokedAt time.Time) error
 	CreateTeam(ctx context.Context, team *Team) error
 	ListTeams(ctx context.Context, organizationID int64) ([]Team, error)

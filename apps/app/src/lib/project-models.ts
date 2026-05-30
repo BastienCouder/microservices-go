@@ -41,6 +41,10 @@ export type NormalizedModelPayload = {
   isActive: boolean;
   isEnabledForProject: boolean;
   supportsLiveSearch: boolean;
+  creditCost: number;
+  inputPricePerMillion: number | null;
+  outputPricePerMillion: number | null;
+  openRouterPricing: Record<string, unknown> | null;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -67,6 +71,26 @@ function getString(value: unknown): string {
 
 function getBool(value: unknown): boolean {
   return value === true;
+}
+
+function getNumber(value: unknown): number {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number.parseFloat(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  return 0;
+}
+
+function getNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  const parsed = getNumber(value);
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : null;
+}
+
+function getRecord(value: unknown): Record<string, unknown> | null {
+  return isRecord(value) ? value : null;
 }
 
 function getIDString(value: unknown): string {
@@ -137,6 +161,19 @@ export function normalizeModelPayload(value: unknown): NormalizedModelPayload | 
       getField(value, ["isEnabledForProject", "IsEnabledForProject"]),
     ),
     supportsLiveSearch,
+    creditCost: Math.max(
+      1,
+      Math.floor(getNumber(getField(value, ["creditCost", "CreditCost"]))),
+    ),
+    inputPricePerMillion: getNullableNumber(
+      getField(value, ["inputPricePerMillion", "InputPricePerMillion"]),
+    ),
+    outputPricePerMillion: getNullableNumber(
+      getField(value, ["outputPricePerMillion", "OutputPricePerMillion"]),
+    ),
+    openRouterPricing: getRecord(
+      getField(value, ["openRouterPricing", "OpenRouterPricing"]),
+    ),
   };
 }
 

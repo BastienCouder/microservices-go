@@ -13,9 +13,10 @@ import (
 )
 
 type memoryRepo struct {
-	subs         map[int64]*domain.Subscription
-	planSettings map[string]domain.PlanSettings
-	pricingTiers map[int]domain.PricingTier
+	subs               map[int64]*domain.Subscription
+	planSettings       map[string]domain.PlanSettings
+	creditCostSettings domain.CreditCostSettings
+	pricingTiers       map[int]domain.PricingTier
 }
 
 func (m *memoryRepo) Upsert(_ context.Context, subscription *domain.Subscription) error {
@@ -93,6 +94,15 @@ func (m *memoryRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanS
 		}
 	}
 	m.planSettings[settings.Plan] = settings
+	return nil
+}
+
+func (m *memoryRepo) GetCreditCostSettings(_ context.Context) (domain.CreditCostSettings, error) {
+	return m.creditCostSettings, nil
+}
+
+func (m *memoryRepo) UpsertCreditCostSettings(_ context.Context, settings domain.CreditCostSettings) error {
+	m.creditCostSettings = settings
 	return nil
 }
 

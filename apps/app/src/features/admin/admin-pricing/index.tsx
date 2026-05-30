@@ -23,12 +23,16 @@ import {
 } from "@/features/organizations/_lib/shared/organization-page-api";
 import {
   deleteBillingPricingTier,
+  loadBillingCreditCostSettings,
   loadBillingPlanSettings,
   loadBillingPricingTiers,
   syncStripePricingCatalog,
+  updateBillingCreditCostSettings,
   updateBillingPlanSettings,
   updateBillingPricingTier,
   type BillingPlanCode,
+  type BillingCreditCostSettings,
+  type BillingCreditCostRule,
   type BillingPlanSettings,
   type BillingPricingTier,
   type BillingPriceMap,
@@ -60,6 +64,11 @@ type NewPricingDraft = PlanLimitDraft & {
   label: string;
   price: string;
   prices: Record<string, string>;
+};
+
+type CreditCostRuleDraft = {
+  minPricePerMillion: string;
+  creditCost: string;
 };
 
 const CORE_PLAN_ORDER = ["developer", "starter", "growth", "pro"] as const;
@@ -160,6 +169,55 @@ function emptyPlanSettings(plan: BillingPlanCode): BillingPlanSettings {
   };
 }
 
+function defaultCreditCostSettingsDraft(): {
+  defaultCreditCost: string;
+  rules: CreditCostRuleDraft[];
+} {
+  return {
+    defaultCreditCost: "1",
+    rules: [
+      { minPricePerMillion: "20", creditCost: "4" },
+      { minPricePerMillion: "10", creditCost: "3" },
+      { minPricePerMillion: "5", creditCost: "2" },
+    ],
+  };
+}
+
+function creditCostSettingsDraftFromSettings(settings: BillingCreditCostSettings) {
+  return {
+    defaultCreditCost: String(Math.max(1, settings.defaultCreditCost || 1)),
+    rules: settings.rules.map((rule) => ({
+      minPricePerMillion: String(rule.minPricePerMillion),
+      creditCost: String(rule.creditCost),
+    })),
+  };
+}
+
+function normalizeCreditCostSettingsDraft(draft: {
+  defaultCreditCost: string;
+  rules: CreditCostRuleDraft[];
+}): BillingCreditCostSettings {
+  const rules = draft.rules
+    .map((rule) => {
+      const minPrice = Number.parseFloat(rule.minPricePerMillion.trim().replace(",", "."));
+      const creditCost = Number.parseInt(rule.creditCost, 10);
+      if (!Number.isFinite(minPrice) || minPrice < 0 || !Number.isFinite(creditCost) || creditCost <= 0) {
+        return null;
+      }
+      return {
+        minPricePerMillion: minPrice,
+        creditCost,
+      } satisfies BillingCreditCostRule;
+    })
+    .filter((rule): rule is BillingCreditCostRule => rule !== null)
+    .sort((left, right) => right.minPricePerMillion - left.minPricePerMillion);
+
+  return {
+    defaultCreditCost: toPositiveInteger(draft.defaultCreditCost, 1),
+    rules,
+  };
+}
+
 function nextPromptVolume(tiers: BillingPricingTier[]) {
   const maxPromptVolume = Math.max(0, ...tiers.map((tier) => tier.promptVolume));
   if (maxPromptVolume <= 0) return 100;
@@ -213,6 +271,7 @@ function normalizeTierDraft(draft: TierDraft): BillingPricingTier {
 
   return {
     promptVolume,
+    creditVolume: promptVolume,
     label: draft.label.trim() || formatPrompts(promptVolume),
     prices,
     developerPriceCents: prices.developer ?? null,
@@ -242,6 +301,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const [volumeIndex, setVolumeIndex] = useState(2);
   const [tierDrafts, setTierDrafts] = useState<Record<number, TierDraft>>({});
   const [planDrafts, setPlanDrafts] = useState<Record<string, PlanLimitDraft>>({});
+  const [creditCostDraft, setCreditCostDraft] = useState(defaultCreditCostSettingsDraft);
   const [newPricingDraft, setNewPricingDraft] = useState<NewPricingDraft>(() =>
     emptyNewPricingDraft(),
   );
@@ -259,6 +319,10 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const organizationId = adminOrganization?.id ?? "";
   const plansQueryKey = appQueryKeys.billingPlans(apiBaseURL, organizationId);
   const tiersQueryKey = appQueryKeys.billingPricingTiers(apiBaseURL, organizationId);
+  const creditCostSettingsQueryKey = appQueryKeys.billingCreditCostSettings(
+    apiBaseURL,
+    organizationId,
+  );
 
   const plansQuery = useQuery({
     queryKey: plansQueryKey,
@@ -271,6 +335,12 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     enabled: apiBaseURL.trim() !== "" && organizationId !== "",
     queryFn: ({ signal }) =>
       loadBillingPricingTiers(apiBaseURL, organizationId, { signal }),
+  });
+  const creditCostSettingsQuery = useQuery({
+    queryKey: creditCostSettingsQueryKey,
+    enabled: apiBaseURL.trim() !== "" && organizationId !== "",
+    queryFn: ({ signal }) =>
+      loadBillingCreditCostSettings(apiBaseURL, organizationId, { signal }),
   });
 
   const plans = plansQuery.data ?? EMPTY_PLANS;
@@ -307,11 +377,16 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   }, [organizationsQuery.error]);
 
   useEffect(() => {
-    const error = plansQuery.error || tiersQuery.error;
+    const error = plansQuery.error || tiersQuery.error || creditCostSettingsQuery.error;
     if (error instanceof Error) {
       pushErrorToast(error, "Impossible de charger le pricing.");
     }
-  }, [plansQuery.error, tiersQuery.error]);
+  }, [plansQuery.error, tiersQuery.error, creditCostSettingsQuery.error]);
+
+  useEffect(() => {
+    if (!creditCostSettingsQuery.data) return;
+    setCreditCostDraft(creditCostSettingsDraftFromSettings(creditCostSettingsQuery.data));
+  }, [creditCostSettingsQuery.data]);
 
   useEffect(() => {
     setTierDrafts((current) => {
@@ -455,6 +530,27 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     },
   });
 
+  const updateCreditCostSettingsMutation = useMutation({
+    mutationFn: async (settings: BillingCreditCostSettings) => {
+      if (!organizationId) throw new Error("Organisation admin introuvable.");
+      return updateBillingCreditCostSettings(apiBaseURL, {
+        organizationId,
+        ...settings,
+      });
+    },
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: creditCostSettingsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all") }),
+        queryClient.invalidateQueries({ queryKey: appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active") }),
+      ]);
+      pushSuccessToast("Règles de crédits mises à jour.");
+    },
+    onError: (error) => {
+      pushErrorToast(error, "Impossible de mettre à jour les règles de crédits.");
+    },
+  });
+
   const updateTierDraft = (patch: Partial<TierDraft>) => {
     if (!selectedTier) return;
     setTierDrafts((current) => ({
@@ -490,6 +586,15 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
         ...(current[plan] ?? planLimitDraftFromSettings(settings)),
         ...patch,
       },
+    }));
+  };
+
+  const updateCreditCostRuleDraft = (index: number, patch: Partial<CreditCostRuleDraft>) => {
+    setCreditCostDraft((current) => ({
+      ...current,
+      rules: current.rules.map((rule, ruleIndex) =>
+        ruleIndex === index ? { ...rule, ...patch } : rule,
+      ),
     }));
   };
 
@@ -594,7 +699,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     if (tiers.some((tier) => tier.promptVolume === promptVolume)) {
       pushErrorToast(
         new Error("Palier déjà existant."),
-        "Ce volume de prompts existe déjà. Choisis un nouveau volume.",
+        "Ce volume de crédits existe déjà. Choisis un nouveau volume.",
       );
       return;
     }
@@ -630,16 +735,35 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     );
   };
 
+  const saveCreditCostSettings = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const normalized = normalizeCreditCostSettingsDraft(creditCostDraft);
+    if (normalized.rules.length === 0) {
+      pushErrorToast(
+        new Error("Aucune règle valide."),
+        "Ajoute au moins une règle de seuil valide.",
+      );
+      return;
+    }
+    updateCreditCostSettingsMutation.mutate(normalized);
+  };
+
   const isLoading =
-    organizationsQuery.isLoading || plansQuery.isLoading || tiersQuery.isLoading;
+    organizationsQuery.isLoading ||
+    plansQuery.isLoading ||
+    tiersQuery.isLoading ||
+    creditCostSettingsQuery.isLoading;
   const isFetching =
-    organizationsQuery.isFetching || plansQuery.isFetching || tiersQuery.isFetching;
+    organizationsQuery.isFetching ||
+    plansQuery.isFetching ||
+    tiersQuery.isFetching ||
+    creditCostSettingsQuery.isFetching;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
         title="Tarification admin"
-        baseline="Gérez dynamiquement les paliers de prompts, les plans et les limites associées."
+        baseline="Gérez dynamiquement les paliers de crédits, les plans et les limites associées."
         actionsVariant="classic"
         className="mb-2 md:mb-3"
         meta={
@@ -673,6 +797,110 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
           ) : (
             <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]">
               <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
+                <form
+                  onSubmit={saveCreditCostSettings}
+                  className="rounded-lg border border-border/70 bg-card p-3"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
+                        Règles coût crédits
+                      </p>
+                      <h2 className="text-base font-semibold text-foreground">
+                        Seuils OpenRouter
+                      </h2>
+                    </div>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={updateCreditCostSettingsMutation.isPending}
+                    >
+                      {updateCreditCostSettingsMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
+                    </Button>
+                  </div>
+
+                  <Field
+                    id="credit-cost-default"
+                    label="Crédits par défaut"
+                    value={creditCostDraft.defaultCreditCost}
+                    type="number"
+                    min={1}
+                    step="1"
+                    helper="Utilisé si aucun prix input/output n'est disponible"
+                    onChange={(defaultCreditCost) =>
+                      setCreditCostDraft((current) => ({ ...current, defaultCreditCost }))
+                    }
+                  />
+
+                  <div className="mt-3 space-y-2">
+                    {creditCostDraft.rules.map((rule, index) => (
+                      <div
+                        key={`credit-rule-${index}`}
+                        className="grid gap-2 rounded-md border border-border/70 p-2 sm:grid-cols-[minmax(0,1fr)_140px_auto]"
+                      >
+                        <Field
+                          id={`credit-rule-min-price-${index}`}
+                          label="Prix min / 1M"
+                          value={rule.minPricePerMillion}
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          onChange={(minPricePerMillion) =>
+                            updateCreditCostRuleDraft(index, { minPricePerMillion })
+                          }
+                        />
+                        <Field
+                          id={`credit-rule-cost-${index}`}
+                          label="Crédits"
+                          value={rule.creditCost}
+                          type="number"
+                          min={1}
+                          step="1"
+                          onChange={(creditCost) =>
+                            updateCreditCostRuleDraft(index, { creditCost })
+                          }
+                        />
+                        <div className="flex items-end">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            disabled={creditCostDraft.rules.length <= 1}
+                            onClick={() =>
+                              setCreditCostDraft((current) => ({
+                                ...current,
+                                rules: current.rules.filter((_, ruleIndex) => ruleIndex !== index),
+                              }))
+                            }
+                          >
+                            Supprimer
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setCreditCostDraft((current) => ({
+                          ...current,
+                          rules: [
+                            ...current.rules,
+                            { minPricePerMillion: "0", creditCost: String(Math.max(1, Number.parseInt(current.defaultCreditCost, 10) || 1)) },
+                          ],
+                        }))
+                      }
+                    >
+                      Ajouter une règle
+                    </Button>
+                  </div>
+                </form>
+
                 {selectedTier && selectedTierDraft && normalizedSelectedTier ? (
                   <form
                     onSubmit={saveTier}
@@ -684,7 +912,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                           Palier sélectionné
                         </p>
                         <h2 className="text-xl font-semibold text-primary">
-                          {formatPrompts(normalizedSelectedTier.promptVolume)} prompts
+                          {formatPrompts(normalizedSelectedTier.promptVolume)} crédits
                         </h2>
                       </div>
                       <div className="flex gap-2">
@@ -718,7 +946,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                         />
                         <Field
                           id="pricing-tier-volume"
-                          label="Prompts"
+                          label="Crédits"
                           value={selectedTierDraft.promptVolume}
                           type="number"
                           min={1}
@@ -756,7 +984,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                           >
                             <div className="text-sm font-medium">{tier.label}</div>
                             <div className="mt-1 text-[10px] font-mono uppercase">
-                              prompts
+                              crédits
                             </div>
                           </Button>
                         );
@@ -786,7 +1014,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                   />
                   <Field
                     id="new-pricing-volume"
-                    label="Prompts"
+                    label="Crédits"
                     value={newPricingDraft.promptVolume}
                     type="number"
                     min={1}
@@ -819,7 +1047,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                   <Field
                     id="new-pricing-monthly-quota"
-                    label="Quota prompts app"
+                    label="Crédits inclus / mois"
                     value={newPricingDraft.monthlyQuota}
                     type="number"
                     min={1}
@@ -926,7 +1154,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
                           Plans et prix du palier
                         </h2>
                         <p className="text-xs text-muted-foreground">
-                          {formatPrompts(normalizedSelectedTier.promptVolume)} prompts suivis
+                          {formatPrompts(normalizedSelectedTier.promptVolume)} crédits inclus
                         </p>
                       </div>
                     </div>
@@ -1047,7 +1275,7 @@ function PlanCard({
           {formatPrice(currentPrice)}
         </span>
         <span className="text-xs text-muted-foreground">
-          {formatPrompts(tier.promptVolume)} prompts
+          {formatPrompts(tier.promptVolume)} crédits
         </span>
       </div>
 
@@ -1067,7 +1295,7 @@ function PlanCard({
       <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
         <Field
           id={`${plan}-monthly-quota`}
-          label="Quota prompts app"
+          label="Crédits inclus / mois"
           value={planDraft.monthlyQuota}
           type="number"
           min={1}

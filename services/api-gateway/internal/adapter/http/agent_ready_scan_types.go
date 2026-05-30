@@ -15,6 +15,7 @@ type agentReadyScanRequest struct {
 type agentReadyQueuedResponse struct {
 	ScanID string `json:"scan_id"`
 	Status string `json:"status"`
+	URL    string `json:"url"`
 }
 
 type agentReadyScanResult struct {

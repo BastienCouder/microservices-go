@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -207,6 +208,66 @@ DO UPDATE SET
 	return nil
 }
 
+func (r *Repository) GetCreditCostSettings(ctx context.Context) (domain.CreditCostSettings, error) {
+	row := r.db.QueryRow(ctx, `
+SELECT default_credit_cost, rules_json::text AS rules_json, updated_at
+FROM billing_credit_cost_settings
+WHERE singleton = TRUE`)
+
+	var (
+		defaultCreditCost int
+		rulesRaw          string
+		updatedAt         pgtype.Timestamptz
+	)
+	if err := row.Scan(&defaultCreditCost, &rulesRaw, &updatedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.CreditCostSettings{}, nil
+		}
+		return domain.CreditCostSettings{}, fmt.Errorf("get billing credit cost settings: %w", err)
+	}
+	rules, err := decodeCreditCostRules(rulesRaw)
+	if err != nil {
+		return domain.CreditCostSettings{}, fmt.Errorf("decode billing credit cost rules: %w", err)
+	}
+	settings := domain.CreditCostSettings{
+		DefaultCreditCost: defaultCreditCost,
+		Rules:             rules,
+		UpdatedAt:         fromPgTimestamptz(updatedAt),
+	}
+	if err := settings.Validate(); err != nil {
+		return domain.CreditCostSettings{}, fmt.Errorf("normalize billing credit cost settings: %w", err)
+	}
+	return settings, nil
+}
+
+func (r *Repository) UpsertCreditCostSettings(ctx context.Context, settings domain.CreditCostSettings) error {
+	rulesJSON, err := encodeCreditCostRules(settings.Rules)
+	if err != nil {
+		return fmt.Errorf("encode billing credit cost rules: %w", err)
+	}
+	_, err = r.db.Exec(ctx, `
+INSERT INTO billing_credit_cost_settings (
+  singleton,
+  default_credit_cost,
+  rules_json,
+  updated_at
+)
+VALUES (TRUE, $1, $2::jsonb, $3)
+ON CONFLICT (singleton)
+DO UPDATE SET
+  default_credit_cost = EXCLUDED.default_credit_cost,
+  rules_json = EXCLUDED.rules_json,
+  updated_at = EXCLUDED.updated_at`,
+		settings.DefaultCreditCost,
+		rulesJSON,
+		toPgTimestamptz(settings.UpdatedAt),
+	)
+	if err != nil {
+		return fmt.Errorf("upsert billing credit cost settings: %w", err)
+	}
+	return nil
+}
+
 func (r *Repository) ListPricingTiers(ctx context.Context) ([]domain.PricingTier, error) {
 	rows, err := r.db.Query(ctx, `
 SELECT
@@ -367,6 +428,29 @@ func (r *Repository) RecordStripeWebhookEvent(ctx context.Context, eventID, even
 		return false, fmt.Errorf("record stripe webhook event: %w", err)
 	}
 	return rowsAffected > 0, nil
+}
+
+func encodeCreditCostRules(rules []domain.CreditCostRule) (string, error) {
+	if len(rules) == 0 {
+		return "[]", nil
+	}
+	payload, err := json.Marshal(rules)
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+func decodeCreditCostRules(raw string) ([]domain.CreditCostRule, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var rules []domain.CreditCostRule
+	if err := json.Unmarshal([]byte(raw), &rules); err != nil {
+		return nil, err
+	}
+	return rules, nil
 }
 
 func toPgTimestamptz(value time.Time) pgtype.Timestamptz {

@@ -10,6 +10,11 @@ import type {
   ModelCatalogItem,
 } from "../../_lib/model-access";
 
+function formatCreditCost(creditCost: number) {
+  const normalized = Math.max(1, Math.floor(creditCost));
+  return `${normalized} credit${normalized > 1 ? "s" : ""}`;
+}
+
 type ModelCatalogGridProps = {
   models: ModelCatalogItem[];
   selectedModelIdSet: Set<string>;
@@ -59,6 +64,7 @@ export function ModelCatalogGrid({
               size="large"
               variant="models"
               disabled={disabled}
+              metaLabel={formatCreditCost(model.creditCost)}
               disabledLabel={
                 disabledByApiKey
                   ? "Cle API requise"

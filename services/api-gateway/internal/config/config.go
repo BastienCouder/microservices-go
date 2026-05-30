@@ -22,6 +22,13 @@ type Config struct {
 	IAServiceURL                string
 	AttributionServiceURL       string
 	RateLimitRPM                int
+	PublicAPIEnabled            bool
+	PublicAPIRateLimitRPM       int
+	PublicAPIBurst              int
+	PublicAPIAllowedPlans       []string
+	PublicAPIKeyHeader          string
+	PublicAPIKeyPrefix          string
+	PublicAPIDefaultKeyScopes   []string
 	InternalJWTSecret           string
 	InternalJWTIssuer           string
 	CORSAllowedOrigins          []string
@@ -93,6 +100,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	publicAPIEnabled, err := optionalBoolEnv("PUBLIC_API_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
+	publicAPIRateLimitRPM, err := optionalPositiveIntEnv("PUBLIC_API_RATE_LIMIT_RPM", 0)
+	if err != nil {
+		return Config{}, err
+	}
+	publicAPIBurst, err := optionalPositiveIntEnv("PUBLIC_API_BURST", 0)
+	if err != nil {
+		return Config{}, err
+	}
 	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
@@ -127,6 +146,13 @@ func Load() (Config, error) {
 		IAServiceURL:                iaServiceURL,
 		AttributionServiceURL:       attributionServiceURL,
 		RateLimitRPM:                rateLimitRPM,
+		PublicAPIEnabled:            publicAPIEnabled,
+		PublicAPIRateLimitRPM:       publicAPIRateLimitRPM,
+		PublicAPIBurst:              publicAPIBurst,
+		PublicAPIAllowedPlans:       optionalCSVEnv("PUBLIC_API_ALLOWED_PLANS"),
+		PublicAPIKeyHeader:          optionalEnv("PUBLIC_API_KEY_HEADER"),
+		PublicAPIKeyPrefix:          optionalEnv("PUBLIC_API_KEY_PREFIX"),
+		PublicAPIDefaultKeyScopes:   optionalCSVEnv("PUBLIC_API_DEFAULT_KEY_SCOPES"),
 		InternalJWTSecret:           internalJWTSecret,
 		InternalJWTIssuer:           internalJWTIssuer,
 		CORSAllowedOrigins:          corsAllowedOrigins,
@@ -174,6 +200,18 @@ func requiredPositiveIntEnv(key string) (int, error) {
 	parsed, err := strconv.Atoi(value)
 	if err != nil || parsed <= 0 {
 		return 0, fmt.Errorf("invalid required environment variable %s: must be a positive integer", key)
+	}
+	return parsed, nil
+}
+
+func optionalPositiveIntEnv(key string, fallback int) (int, error) {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback, nil
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		return 0, fmt.Errorf("invalid optional environment variable %s: must be a positive integer", key)
 	}
 	return parsed, nil
 }

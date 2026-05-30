@@ -11,7 +11,6 @@ export const MonitoringLayout = memo(function MonitoringLayout() {
   return (
     <div className="flex h-auto min-h-full flex-col gap-4 px-3 pb-6 pt-3 md:px-4 lg:m-4 lg:h-full lg:min-h-0 lg:gap-3 lg:px-0 lg:pb-0 lg:pt-0">
       <MobileFiltersHeaderAction />
-
       <div className="m-0 grid h-auto min-h-full grid-cols-12 gap-4 lg:h-full lg:min-h-0 lg:grid-rows-[minmax(0,3fr)_minmax(0,1fr)] xl:grid-rows-1">
         <div className="hidden h-auto overflow-visible rounded-md bg-background p-2 lg:col-span-4 lg:row-start-1 lg:block lg:h-full lg:overflow-hidden xl:col-span-3">
           <FiltersPanel />

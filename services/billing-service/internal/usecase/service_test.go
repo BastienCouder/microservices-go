@@ -10,10 +10,11 @@ import (
 )
 
 type fakeRepo struct {
-	subs            map[int64]*domain.Subscription
-	planSettings    map[string]domain.PlanSettings
-	pricingTiers    map[int]domain.PricingTier
-	processedEvents map[string]bool
+	subs               map[int64]*domain.Subscription
+	planSettings       map[string]domain.PlanSettings
+	creditCostSettings domain.CreditCostSettings
+	pricingTiers       map[int]domain.PricingTier
+	processedEvents    map[string]bool
 }
 
 func (f *fakeRepo) Upsert(_ context.Context, subscription *domain.Subscription) error {
@@ -101,6 +102,15 @@ func (f *fakeRepo) UpsertPlanSettings(_ context.Context, settings domain.PlanSet
 	return nil
 }
 
+func (f *fakeRepo) GetCreditCostSettings(_ context.Context) (domain.CreditCostSettings, error) {
+	return f.creditCostSettings, nil
+}
+
+func (f *fakeRepo) UpsertCreditCostSettings(_ context.Context, settings domain.CreditCostSettings) error {
+	f.creditCostSettings = settings
+	return nil
+}
+
 func (f *fakeRepo) ListPricingTiers(_ context.Context) ([]domain.PricingTier, error) {
 	items := make([]domain.PricingTier, 0, len(f.pricingTiers))
 	for _, item := range f.pricingTiers {
@@ -127,6 +137,47 @@ func (f *fakeRepo) DeletePricingTier(_ context.Context, promptVolume int) error 
 		Deleted:      true,
 	}
 	return nil
+}
+
+func TestGetCreditCostSettingsReturnsDefaultsWhenRepositoryEmpty(t *testing.T) {
+	svc := NewService(&fakeRepo{})
+
+	settings, err := svc.GetCreditCostSettings(context.Background())
+	if err != nil {
+		t.Fatalf("get credit cost settings: %v", err)
+	}
+	if settings.DefaultCreditCost != 1 {
+		t.Fatalf("expected default credit cost 1, got %d", settings.DefaultCreditCost)
+	}
+	if len(settings.Rules) != 3 {
+		t.Fatalf("expected 3 default rules, got %d", len(settings.Rules))
+	}
+}
+
+func TestUpdateCreditCostSettingsPersistsSortedRules(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := NewService(repo)
+
+	settings, err := svc.UpdateCreditCostSettings(context.Background(), domain.CreditCostSettings{
+		DefaultCreditCost: 1,
+		Rules: []domain.CreditCostRule{
+			{MinPricePerMillion: 5, CreditCost: 2},
+			{MinPricePerMillion: 20, CreditCost: 4},
+			{MinPricePerMillion: 10, CreditCost: 3},
+		},
+	})
+	if err != nil {
+		t.Fatalf("update credit cost settings: %v", err)
+	}
+	if len(settings.Rules) != 3 {
+		t.Fatalf("expected 3 rules, got %d", len(settings.Rules))
+	}
+	if settings.Rules[0].MinPricePerMillion != 20 {
+		t.Fatalf("expected highest threshold first, got %#v", settings.Rules)
+	}
+	if repo.creditCostSettings.Rules[0].MinPricePerMillion != 20 {
+		t.Fatalf("expected stored rules sorted, got %#v", repo.creditCostSettings.Rules)
+	}
 }
 
 type fakeStripeProvider struct {

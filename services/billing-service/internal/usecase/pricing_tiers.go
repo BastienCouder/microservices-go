@@ -49,6 +49,7 @@ func (s *Service) ListPricingTiers(ctx context.Context) ([]domain.PricingTier, e
 				delete(defaults, tier.PromptVolume)
 				continue
 			}
+			tier.CreditVolume = tier.PromptVolume
 			defaults[tier.PromptVolume] = tier
 		}
 	}
@@ -77,7 +78,7 @@ func (s *Service) UpdatePricingTier(ctx context.Context, tier domain.PricingTier
 
 func (s *Service) DeletePricingTier(ctx context.Context, promptVolume int) error {
 	if promptVolume <= 0 {
-		return fmt.Errorf("%w: prompt volume must be positive", domain.ErrInvalidPricingTier)
+		return fmt.Errorf("%w: credit volume must be positive", domain.ErrInvalidPricingTier)
 	}
 	if err := s.repo.DeletePricingTier(ctx, promptVolume); err != nil {
 		return fmt.Errorf("delete pricing tier: %w", err)

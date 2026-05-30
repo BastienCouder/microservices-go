@@ -24,7 +24,7 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
-	h, err := httpadapter.NewHandlerWithGRPCAndServices(
+	h, err := httpadapter.NewHandlerWithGRPCAndServicesAndPublicAPI(
 		cfg.UserServiceURL,
 		cfg.AuthServiceURL,
 		cfg.OrganizationsServiceURL,
@@ -47,6 +47,15 @@ func main() {
 			CertFile:      cfg.PermissionGRPCTLSCertFile,
 			KeyFile:       cfg.PermissionGRPCTLSKeyFile,
 			ServerName:    cfg.PermissionGRPCTLSServerName,
+		},
+		httpadapter.PublicAPIConfig{
+			Enabled:       cfg.PublicAPIEnabled,
+			RateLimitRPM:  cfg.PublicAPIRateLimitRPM,
+			Burst:         cfg.PublicAPIBurst,
+			AllowedPlans:  cfg.PublicAPIAllowedPlans,
+			APIKeyHeader:  cfg.PublicAPIKeyHeader,
+			APIKeyPrefix:  cfg.PublicAPIKeyPrefix,
+			DefaultScopes: cfg.PublicAPIDefaultKeyScopes,
 		},
 	)
 	if err != nil {

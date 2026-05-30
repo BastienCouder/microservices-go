@@ -12,6 +12,7 @@ type ModelCardProps = {
   size?: "small" | "medium" | "large";
   disabled?: boolean;
   disabledLabel?: string;
+  metaLabel?: string;
   variant?: "default" | "monitoring" | "models";
 };
 
@@ -25,6 +26,7 @@ export const ModelCard = memo(function ModelCard({
   size = "small",
   disabled = false,
   disabledLabel,
+  metaLabel,
   variant = "default",
 }: ModelCardProps) {
   const safeIcon = toSafeImageAssetPath(icon);
@@ -68,7 +70,7 @@ export const ModelCard = memo(function ModelCard({
   };
 
   const config = sizeConfig[size];
-  const label = [modelGroup, name, description, disabledLabel]
+  const label = [modelGroup, name, description, metaLabel, disabledLabel]
     .filter(Boolean)
     .join(" · ");
 
@@ -145,6 +147,11 @@ export const ModelCard = memo(function ModelCard({
         {disabledLabel ? (
           <div className="mt-2 w-fit rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs font-medium text-muted-foreground">
             {disabledLabel}
+          </div>
+        ) : null}
+        {metaLabel ? (
+          <div className="mt-2 w-fit rounded-full border border-border/70 bg-background px-2 py-0.5 text-xs font-medium text-foreground">
+            {metaLabel}
           </div>
         ) : null}
       </div>

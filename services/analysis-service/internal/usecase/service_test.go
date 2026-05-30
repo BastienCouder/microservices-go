@@ -183,6 +183,48 @@ func TestStartAnalysisRejectsWhenMonthlyQuotaIsReached(t *testing.T) {
 	}
 }
 
+func TestStartAnalysisConsumesCreditsFromModelCreditCostSum(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota: staticBillingQuotaProvider{monthlyQuota: 3},
+	})
+	if err != nil {
+		t.Fatalf("new service with dependencies: %v", err)
+	}
+	svc.now = func() time.Time {
+		return time.Date(2026, time.April, 15, 10, 0, 0, 0, time.UTC)
+	}
+
+	_, err = svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID:     42,
+		CreatedBy:          7,
+		ProjectID:          "project-1",
+		PromptTexts:        []PromptText{{ID: "prompt-1", Text: "Quel CRM choisir ?"}},
+		ModelIDs:           []string{"claude-opus-4-5"},
+		ModelCreditCostSum: 2,
+		RunType:            "manual",
+	})
+	if err != nil {
+		t.Fatalf("start first credit run: %v", err)
+	}
+
+	_, err = svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID:     42,
+		CreatedBy:          7,
+		ProjectID:          "project-1",
+		PromptTexts:        []PromptText{{ID: "prompt-2", Text: "Comparer Acme et HubSpot"}},
+		ModelIDs:           []string{"claude-opus-4-5"},
+		ModelCreditCostSum: 2,
+		RunType:            "manual",
+	})
+	if err == nil {
+		t.Fatal("expected quota error, got nil")
+	}
+	if !errors.Is(err, ErrQuotaExceeded) {
+		t.Fatalf("expected ErrQuotaExceeded, got %v", err)
+	}
+}
+
 func TestStartAnalysisAllowsIdempotentReplayEvenWhenQuotaIsReached(t *testing.T) {
 	ctx := context.Background()
 	svc, err := NewServiceWithDependencies(ctx, Dependencies{

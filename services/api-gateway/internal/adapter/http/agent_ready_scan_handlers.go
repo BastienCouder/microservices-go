@@ -24,6 +24,8 @@ func (h *Handler) handleAgentReadyScan(w stdhttp.ResponseWriter, r *stdhttp.Requ
 	switch {
 	case r.Method == stdhttp.MethodPost && isAgentReadyScanCollectionRequest(r):
 		h.createAgentReadyScan(w, r)
+	case r.Method == stdhttp.MethodGet && isAgentReadyScanCollectionRequest(r):
+		h.listAgentReadyScans(w, r)
 	case r.Method == stdhttp.MethodGet && isAgentReadyScanItemRequest(r):
 		h.getAgentReadyScan(w, r)
 	default:
@@ -49,6 +51,28 @@ func (h *Handler) createAgentReadyScan(w stdhttp.ResponseWriter, r *stdhttp.Requ
 	writeJSON(w, stdhttp.StatusAccepted, agentReadyQueuedResponse{
 		ScanID: scanID,
 		Status: "queued",
+		URL:    "/v1/agent-ready/scans/" + scanID,
+	})
+}
+
+func (h *Handler) listAgentReadyScans(w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	results := h.scanStore.list()
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	urlFilter := strings.TrimSpace(r.URL.Query().Get("url"))
+	filtered := make([]agentReadyScanResult, 0, len(results))
+	for _, result := range results {
+		if status != "" && result.Status != status {
+			continue
+		}
+		if urlFilter != "" && result.URL != urlFilter {
+			continue
+		}
+		filtered = append(filtered, result)
+	}
+	writeJSON(w, stdhttp.StatusOK, map[string]any{
+		"items":       filtered,
+		"next_cursor": nil,
+		"has_more":    false,
 	})
 }
 

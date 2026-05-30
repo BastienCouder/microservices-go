@@ -60,6 +60,18 @@ type AdminModelsTemplateProps = {
 
 const EMPTY_MODEL_CATALOG: ModelCatalogItem[] = [];
 
+function formatPricePerMillion(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "-";
+  return `$${value.toLocaleString("fr-FR", {
+    maximumFractionDigits: 4,
+  })}`;
+}
+
+function formatOpenRouterPricing(pricing: Record<string, unknown> | null) {
+  if (!pricing || Object.keys(pricing).length === 0) return "-";
+  return JSON.stringify(pricing);
+}
+
 export function AdminModelsTemplate({
   apiBaseURL,
   routeSearch,
@@ -177,6 +189,7 @@ export function AdminModelsTemplate({
       syncOpenRouterModelCatalog(apiBaseURL, organizationId, {
         minContext: Number.parseInt(minContext, 10) || undefined,
         supportsTools: toolsOnly,
+        onlyFree,
         variant,
         providers: provider === "all" ? [] : [provider],
         searchQuery: search,
@@ -378,6 +391,10 @@ export function AdminModelsTemplate({
                     <TableHead>Modele</TableHead>
                     <TableHead>Provider</TableHead>
                     <TableHead>Model ID</TableHead>
+                    <TableHead>OpenRouter pricing</TableHead>
+                    <TableHead className="text-right">Input / 1M</TableHead>
+                    <TableHead className="text-right">Output / 1M</TableHead>
+                    <TableHead className="text-center">Credits</TableHead>
                     <TableHead className="text-center">Tools</TableHead>
                     <TableHead className="w-[140px] text-right">Statut</TableHead>
                   </TableRow>
@@ -424,6 +441,22 @@ export function AdminModelsTemplate({
                           <span className="block max-w-[320px] truncate text-muted-foreground">
                             {model.providerModelId}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <code className="block max-w-[360px] truncate rounded bg-muted px-2 py-1 text-xs text-muted-foreground">
+                            {formatOpenRouterPricing(model.openRouterPricing)}
+                          </code>
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatPricePerMillion(model.inputPricePerMillion)}
+                        </TableCell>
+                        <TableCell className="text-right text-muted-foreground">
+                          {formatPricePerMillion(model.outputPricePerMillion)}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge variant="secondary">
+                            {model.creditCost} / appel
+                          </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           {model.supportsLiveSearch ? (

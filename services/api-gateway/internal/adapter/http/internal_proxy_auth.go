@@ -2,6 +2,7 @@ package http
 
 import (
 	"net/http"
+	"strconv"
 )
 
 func (h *Handler) serveProxyWithInternalAuth(
@@ -22,5 +23,14 @@ func (h *Handler) serveProxyWithInternalAuth(
 	r2.Header.Del("X-Authenticated-User-ID")
 	r2.Header.Del("X-Organization-ID")
 	r2.Header.Set("Authorization", "Bearer "+token)
+	if claims.IdentityID != "" {
+		r2.Header.Set("X-Authenticated-Identity-ID", claims.IdentityID)
+	}
+	if claims.UserID > 0 {
+		r2.Header.Set("X-Authenticated-User-ID", strconv.FormatInt(claims.UserID, 10))
+	}
+	if claims.Organization > 0 {
+		r2.Header.Set("X-Organization-ID", strconv.FormatInt(claims.Organization, 10))
+	}
 	next.ServeHTTP(w, r2)
 }

@@ -142,6 +142,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 			handler: h.withAuth(http.HandlerFunc(h.handleAgentReadyScan), "api-gateway", "analysis"),
 			service: "api-gateway",
 		},
+		{match: isPublicAPIRequest, handler: http.HandlerFunc(h.handlePublicAPI), service: "public-api"},
 		{match: isAppEntryRequest, handler: http.HandlerFunc(h.handleAppEntry), service: "api-gateway"},
 		{match: isOnboardingBootstrapRequest, handler: http.HandlerFunc(h.handleOnboardingBootstrap), service: "api-gateway"},
 		{match: isOnboardingModelCatalogRequest, handler: onboardingModelCatalogHandler, service: "project-service"},

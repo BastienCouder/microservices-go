@@ -194,16 +194,20 @@ type Competitor struct {
 }
 
 type AIModel struct {
-	ID                 string `json:"id"`
-	Label              string `json:"displayName"`
-	Provider           string `json:"provider"`
-	Group              string `json:"groupName"`
-	IconKey            string `json:"-"`
-	IconPath           string `json:"iconPath"`
-	ModelID            string `json:"providerModelId"`
-	Source             string `json:"source,omitempty"`
-	IsActive           bool   `json:"isActive"`
-	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
+	ID                    string         `json:"id"`
+	Label                 string         `json:"displayName"`
+	Provider              string         `json:"provider"`
+	Group                 string         `json:"groupName"`
+	IconKey               string         `json:"-"`
+	IconPath              string         `json:"iconPath"`
+	ModelID               string         `json:"providerModelId"`
+	Source                string         `json:"source,omitempty"`
+	IsActive              bool           `json:"isActive"`
+	SupportsLiveSearch    bool           `json:"supportsLiveSearch"`
+	CreditCost            int            `json:"creditCost"`
+	InputPricePerMillion  *float64       `json:"inputPricePerMillion,omitempty"`
+	OutputPricePerMillion *float64       `json:"outputPricePerMillion,omitempty"`
+	OpenRouterPricing     map[string]any `json:"openRouterPricing,omitempty"`
 }
 
 type CreateAIModelInput struct {
@@ -421,6 +425,16 @@ type BillingEntitlements struct {
 	MaxProjects             int    `json:"maxProjects"`
 }
 
+type CreditCostRule struct {
+	MinPricePerMillion float64 `json:"minPricePerMillion"`
+	CreditCost         int     `json:"creditCost"`
+}
+
+type CreditCostSettings struct {
+	DefaultCreditCost int              `json:"defaultCreditCost"`
+	Rules             []CreditCostRule `json:"rules"`
+}
+
 type ProjectModelSelectionChangeUsage struct {
 	Month string `json:"month"`
 	Count int    `json:"count"`
@@ -439,13 +453,15 @@ type AnalysisPromptRun struct {
 }
 
 type AnalysisStartRequest struct {
-	RequestID      string
-	OrganizationID int64
-	CreatedBy      int64
-	ProjectID      string
-	PromptTexts    []AnalysisPromptText
-	ModelIDs       []string
-	RunType        string
+	RequestID          string
+	OrganizationID     int64
+	CreatedBy          int64
+	ProjectID          string
+	PromptTexts        []AnalysisPromptText
+	ModelIDs           []string
+	ModelCreditCostSum int
+	RequestedCredits   int
+	RunType            string
 }
 
 type AnalysisStartResponse struct {
@@ -547,6 +563,7 @@ type AttributionClient interface {
 
 type BillingClient interface {
 	GetOrganizationEntitlements(ctx context.Context, organizationID int64) (BillingEntitlements, error)
+	GetCreditCostSettings(ctx context.Context) (CreditCostSettings, error)
 }
 
 type StateStore interface {
