@@ -217,7 +217,6 @@ export function StepBrand({
           className="min-h-[86px] text-sm"
           value={brandShortDescription}
           onChange={(event) => setBrandShortDescription(event.target.value)}
-          placeholder={t("brandShortDescriptionPlaceholder")}
         />
       </OnboardingField>
 
@@ -230,7 +229,6 @@ export function StepBrand({
           id="brand-industry"
           value={industry}
           onChange={(event) => setIndustry(event.target.value)}
-          placeholder={t("brandIndustryPlaceholder")}
         />
       </OnboardingField>
 

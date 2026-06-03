@@ -52,6 +52,7 @@ import {
   readOrganizationIdFromSearch,
   readSelectedOrganizationID,
 } from "@/shared/selection";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 
 type AdminModelsTemplateProps = {
   apiBaseURL: string;
@@ -107,12 +108,6 @@ export function AdminModelsTemplate({
   });
 
   const catalog = catalogQuery.data ?? EMPTY_MODEL_CATALOG;
-  useEffect(() => {
-    if (catalogQuery.error instanceof Error) {
-      pushErrorToast(catalogQuery.error, "Impossible de charger le catalogue.");
-    }
-  }, [catalogQuery.error]);
-
   const providerOptions = useMemo(
     () =>
       Array.from(
@@ -161,17 +156,10 @@ export function AdminModelsTemplate({
             model.id === updatedModel.id ? updatedModel : model,
           ),
       );
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: appQueryKeys.modelsCatalog(
-            apiBaseURL,
-            organizationId,
-            "active",
-          ),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
-        }),
+      await invalidateQueryKeys(queryClient, [
+        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "active"),
+        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
+        appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
       ]);
       pushSuccessToast(
         `${updatedModel.name} est maintenant ${
@@ -198,17 +186,10 @@ export function AdminModelsTemplate({
         purgeMissingModels,
       }),
     onSuccess: async (result) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: appQueryKeys.modelsCatalog(
-            apiBaseURL,
-            organizationId,
-            "active",
-          ),
-        }),
+      await invalidateQueryKeys(queryClient, [
+        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
+        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "active"),
+        appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
       ]);
       pushSuccessToast(
         `OpenRouter synchronise : ${result.imported} modeles importes (${result.created} nouveaux, ${result.updated} mis a jour, ${result.purged} purges).`,

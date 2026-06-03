@@ -9,7 +9,7 @@ import (
 
 	iav1 "github.com/bastiencouder/microservices-go/contracts/gen/go/ia/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
-	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -147,7 +147,7 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromptInput) (usecase.IAExecutePromptResult, error) {
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "project-service", security.OutboundTokenClaims{})
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "project-service", internalauth.Claims{})
 	if err != nil {
 		return usecase.IAExecutePromptResult{}, fmt.Errorf("sign internal jwt: %w", err)
 	}

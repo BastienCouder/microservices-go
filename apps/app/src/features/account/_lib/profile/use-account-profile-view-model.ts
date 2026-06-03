@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import type { UserProfile } from "@/shared/models";
 import { buildAccountProfileViewData } from "./account-profile-view-data";
 
@@ -28,19 +28,14 @@ async function updateAccountProfile(
     method: "PATCH",
     body: JSON.stringify(input),
   });
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de mettre a jour le compte.");
-  }
-  return response.data;
+  return requireGatewayResult(response, "Impossible de mettre a jour le compte.");
 }
 
 async function deleteAccount(apiBaseURL: string): Promise<void> {
   const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.users.deleteMe(), {
     method: "DELETE",
   });
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de supprimer le compte.");
-  }
+  requireGatewayResult(response, "Impossible de supprimer le compte.");
 }
 
 export function useAccountProfileViewModel({

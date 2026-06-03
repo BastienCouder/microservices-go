@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { isDeveloperBillingPlan } from "@/shared/billing-plan";
-import { findBySlugOrId } from "@/shared/public-slugs";
+import { resolveProjectTokenToContext } from "@/shared/project-token-resolution";
 
 import {
   createProviderCredentialLookup,
@@ -24,6 +24,7 @@ import { useProjectModelSelection } from "./use-project-model-selection";
 const EMPTY_PROJECTS: ModelsProjectSummary[] = [];
 const EMPTY_MODEL_CATALOG: ModelCatalogItem[] = [];
 const EMPTY_PROVIDER_CREDENTIALS: LLMProviderCredentialStatus[] = [];
+const PROJECT_TOKEN_CONTEXT_CACHE_VERSION = "v2";
 
 type UseModelsPanelDataOptions = {
   apiBaseURL: string;
@@ -31,31 +32,93 @@ type UseModelsPanelDataOptions = {
   hintedProjectToken: string;
 };
 
+type ResolvedSelectedProject = {
+  selectedProjectId: string;
+  hasMissingHintedProject: boolean;
+};
+
+export function resolveSelectedProjectForModels(
+  projects: Array<Pick<ModelsProjectSummary, "id" | "slug">>,
+  hintedProjectToken: string,
+): ResolvedSelectedProject {
+  const normalizedHint = hintedProjectToken.trim();
+  if (normalizedHint === "") {
+    return {
+      selectedProjectId: projects[0]?.id ?? "",
+      hasMissingHintedProject: false,
+    };
+  }
+
+  const matchedProject = projects.find((project) => project.id === normalizedHint);
+  if (!matchedProject) {
+    return {
+      selectedProjectId: "",
+      hasMissingHintedProject: true,
+    };
+  }
+
+  return {
+    selectedProjectId: matchedProject.id,
+    hasMissingHintedProject: false,
+  };
+}
+
 export function useModelsPanelData({
   apiBaseURL,
   organizationId,
   hintedProjectToken,
 }: UseModelsPanelDataOptions) {
-  const hasRequiredScope = apiBaseURL.trim() !== "" && organizationId !== "";
-  const projectsCatalogQuery = useQuery({
-    queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId),
-    enabled: hasRequiredScope,
+  const normalizedHintedProjectToken = hintedProjectToken.trim();
+  const resolvedProjectContextQuery = useQuery({
+    queryKey: [
+      "project-token-context",
+      PROJECT_TOKEN_CONTEXT_CACHE_VERSION,
+      apiBaseURL,
+      organizationId,
+      normalizedHintedProjectToken,
+    ],
+    enabled: apiBaseURL.trim() !== "" && normalizedHintedProjectToken !== "",
     queryFn: ({ signal }) =>
-      loadProjectsAndCatalog(apiBaseURL, organizationId, { signal }),
+      resolveProjectTokenToContext(apiBaseURL, {
+        projectToken: normalizedHintedProjectToken,
+        organizationId,
+        signal,
+      }),
+  });
+  const effectiveOrganizationId =
+    resolvedProjectContextQuery.data?.organizationId ||
+    organizationId;
+  const hasRequiredScope =
+    apiBaseURL.trim() !== "" && effectiveOrganizationId !== "";
+  const projectsCatalogQuery = useQuery({
+    queryKey: appQueryKeys.modelsProjectCatalog(
+      apiBaseURL,
+      effectiveOrganizationId,
+    ),
+    enabled: hasRequiredScope,
+    refetchOnMount: "always",
+    queryFn: ({ signal }) =>
+      loadProjectsAndCatalog(apiBaseURL, effectiveOrganizationId, { signal }),
   });
   const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, effectiveOrganizationId),
     enabled: hasRequiredScope,
     queryFn: ({ signal }) =>
-      loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
+      loadBillingEntitlements(apiBaseURL, effectiveOrganizationId, { signal }),
   });
 
   const projects = projectsCatalogQuery.data?.projects ?? EMPTY_PROJECTS;
   const catalog = projectsCatalogQuery.data?.catalog ?? EMPTY_MODEL_CATALOG;
-  const selectedProjectId = useMemo(() => {
-    if (!organizationId) return "";
-    return findBySlugOrId(projects, hintedProjectToken)?.id || projects[0]?.id || "";
-  }, [hintedProjectToken, organizationId, projects]);
+  const selectedProjectResolution = useMemo(() => {
+    if (!effectiveOrganizationId) {
+      return {
+        selectedProjectId: "",
+        hasMissingHintedProject: false,
+      };
+    }
+    return resolveSelectedProjectForModels(projects, hintedProjectToken);
+  }, [effectiveOrganizationId, hintedProjectToken, projects]);
+  const { selectedProjectId, hasMissingHintedProject } = selectedProjectResolution;
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
@@ -76,14 +139,14 @@ export function useModelsPanelData({
   const providerCredentialsQuery = useQuery({
     queryKey: appQueryKeys.llmProviderCredentials(
       apiBaseURL,
-      organizationId,
+      effectiveOrganizationId,
       selectedProjectId,
     ),
     enabled: isDeveloperPlan && hasRequiredScope && selectedProjectId !== "",
     queryFn: ({ signal }) =>
       loadLLMProviderCredentials(
         apiBaseURL,
-        organizationId,
+        effectiveOrganizationId,
         selectedProjectId,
         signal,
       ),
@@ -134,12 +197,12 @@ export function useModelsPanelData({
   const projectModelsQuery = useQuery({
     queryKey: appQueryKeys.projectModels(
       apiBaseURL,
-      organizationId,
+      effectiveOrganizationId,
       selectedProjectId,
     ),
     enabled: hasRequiredScope && selectedProjectId !== "",
     queryFn: ({ signal }) =>
-      loadProjectModels(apiBaseURL, organizationId, selectedProjectId, signal),
+      loadProjectModels(apiBaseURL, effectiveOrganizationId, selectedProjectId, signal),
   });
   const { selectedModelIds, setSelectedModelIds } = useProjectModelSelection({
     projectId: selectedProjectId,
@@ -153,13 +216,35 @@ export function useModelsPanelData({
     [selectedModelIds],
   );
   const loading =
+    (normalizedHintedProjectToken !== "" &&
+      resolvedProjectContextQuery.isLoading &&
+      !resolvedProjectContextQuery.data) ||
     projectsCatalogQuery.isLoading ||
     (projectsCatalogQuery.isFetching && !projectsCatalogQuery.data) ||
     (selectedProjectId !== "" &&
       (projectModelsQuery.isLoading ||
         (projectModelsQuery.isFetching && !projectModelsQuery.data)));
   const queryError = useMemo(() => {
-    if (!organizationId) return null;
+    if (!effectiveOrganizationId) {
+      if (
+        normalizedHintedProjectToken !== "" &&
+        resolvedProjectContextQuery.isFetched &&
+        !resolvedProjectContextQuery.data
+      ) {
+        return "Le projet demande est introuvable.";
+      }
+      if (normalizedHintedProjectToken === "" && !organizationId) {
+        return null;
+      }
+      return null;
+    }
+    if (
+      hasMissingHintedProject &&
+      !projectsCatalogQuery.isLoading &&
+      !projectsCatalogQuery.isFetching
+    ) {
+      return "Le projet demande est introuvable dans cette organisation.";
+    }
     if (projectsCatalogQuery.error instanceof Error && !projectsCatalogQuery.data) {
       return projectsCatalogQuery.error.message;
     }
@@ -172,15 +257,25 @@ export function useModelsPanelData({
     }
     return null;
   }, [
+    effectiveOrganizationId,
+    hasMissingHintedProject,
     organizationId,
+    normalizedHintedProjectToken,
+    projectsCatalogQuery.isFetching,
+    projectsCatalogQuery.isLoading,
     projectModelsQuery.data,
     projectModelsQuery.error,
     projectsCatalogQuery.data,
     projectsCatalogQuery.error,
-      selectedProjectId,
+    resolvedProjectContextQuery.data,
+    resolvedProjectContextQuery.isFetched,
+    selectedProjectId,
   ]);
 
   const loadingCatalog =
+    ((normalizedHintedProjectToken !== "" &&
+      resolvedProjectContextQuery.isLoading &&
+      !resolvedProjectContextQuery.data)) ||
     projectsCatalogQuery.isLoading ||
     (projectsCatalogQuery.isFetching && !projectsCatalogQuery.data);
   const loadingPlan =
@@ -198,8 +293,10 @@ export function useModelsPanelData({
   return {
     catalog,
     catalogById,
+    effectiveOrganizationId,
     selectedProjectId,
     selectedProject,
+    hasMissingHintedProject,
     planLabel,
     selectionLimit,
     isDeveloperPlan,

@@ -2,13 +2,13 @@ package project
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	internaljwt "github.com/bastiencouder/microservices-go/contracts/pkg/internaljwt"
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/usecase"
 )
@@ -73,18 +73,6 @@ func (c *Client) ListProjectsByOrganization(ctx context.Context, organizationID 
 		return nil, fmt.Errorf("project service error (%d): %s", resp.StatusCode, message)
 	}
 
-	var envelope struct {
-		Data json.RawMessage `json:"data"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
-		return nil, fmt.Errorf("decode project response: %w", err)
-	}
-
-	rawProjects := envelope.Data
-	if len(rawProjects) == 0 {
-		rawProjects = []byte("[]")
-	}
-
 	var items []struct {
 		ID                string `json:"id"`
 		OrganizationID    int64  `json:"organizationId"`
@@ -92,8 +80,8 @@ func (c *Client) ListProjectsByOrganization(ctx context.Context, organizationID 
 		AttributionSource string `json:"attributionSource"`
 		CreatedAt         string `json:"createdAt"`
 	}
-	if err := json.Unmarshal(rawProjects, &items); err != nil {
-		return nil, fmt.Errorf("decode projects payload: %w", err)
+	if err := httpjson.DecodeSuccessData(resp.Body, &items); err != nil {
+		return nil, fmt.Errorf("decode project response: %w", err)
 	}
 
 	projects := make([]usecase.ProjectSummary, 0, len(items))

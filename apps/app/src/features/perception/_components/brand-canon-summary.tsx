@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
-import type { BrandCanon } from "@/lib/perception-data";
+import type { BrandCanon } from "../_lib/shared/perception-data";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 

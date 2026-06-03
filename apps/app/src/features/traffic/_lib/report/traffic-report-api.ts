@@ -1,11 +1,15 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import {
   attachStableSlugs,
   findBySlugOrId,
   slugifyPublicName,
 } from "@/shared/public-slugs";
-import { readRouteQueryParam } from "@/shared/selection";
+import {
+  readOptionalProjectTokenFromSearch,
+  readOrganizationIdFromSearch,
+  readRouteQueryParam,
+} from "@/shared/selection";
 import type {
   TrafficPeriod,
   TrafficPropertyQuota,
@@ -92,14 +96,6 @@ function getField<T = unknown>(obj: JsonObject, keys: string[]): T | undefined {
   return undefined;
 }
 
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  const obj = asObject(value);
-  if (getField<boolean>(obj, ["success"]) === true && "data" in obj) {
-    return obj.data;
-  }
-  return value;
-}
-
 function unwrapRequiredEnvelope<T>(
   result: Awaited<ReturnType<typeof gatewayJSON<T>>>,
   scope: TrafficRequestScope,
@@ -107,7 +103,7 @@ function unwrapRequiredEnvelope<T>(
   if (!result.ok) {
     throw new TrafficRequestError(scope, result.status, result.error);
   }
-  return unwrapSuccessEnvelope(result.data);
+  return unwrapGatewayPayload(result.data);
 }
 
 function encodeProjectPathSegment(projectId: string): string {
@@ -115,7 +111,7 @@ function encodeProjectPathSegment(projectId: string): string {
 }
 
 function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
-  const payload = unwrapSuccessEnvelope(value);
+  const payload = unwrapGatewayPayload(value);
   if (!Array.isArray(payload)) return [];
 
   const candidates = payload.flatMap((value) => {
@@ -195,18 +191,10 @@ export function getTrafficQueryContext(routeSearch: string): {
   organizationId: string | null;
   period: TrafficPeriod;
 } {
-  const projectId = (
-    readRouteQueryParam(routeSearch, "projectId") ||
-    readRouteQueryParam(routeSearch, "project_id") ||
-    readRouteQueryParam(routeSearch, "project")
-  ).trim();
-  const organizationId = (
-    readRouteQueryParam(routeSearch, "organizationId") ||
-    readRouteQueryParam(routeSearch, "organization_id") ||
-    readRouteQueryParam(routeSearch, "org")
-  ).trim();
+  const projectId = readOptionalProjectTokenFromSearch(routeSearch);
+  const organizationId = readOrganizationIdFromSearch(routeSearch) || null;
   const period = normalizeTrafficPeriod(readRouteQueryParam(routeSearch, "period"));
-  return { projectId: projectId || null, organizationId: organizationId || null, period };
+  return { projectId, organizationId, period };
 }
 
 function periodDays(period: TrafficPeriod): number {
@@ -335,7 +323,7 @@ function normalizeTrafficDataSource(value: unknown): TrafficReport["dataSource"]
 }
 
 export function normalizeTrafficReport(value: unknown): TrafficReport {
-  const payload = asObject(unwrapSuccessEnvelope(value));
+  const payload = asObject(unwrapGatewayPayload(value));
   const dateRange = asObject(getField(payload, ["dateRange", "DateRange"]));
   return {
     projectId: asString(getField(payload, ["projectId", "ProjectID"])).trim(),
@@ -357,7 +345,7 @@ export function normalizeTrafficReport(value: unknown): TrafficReport {
 }
 
 export function normalizeTrafficImpactIntegrations(value: unknown): TrafficImpactIntegrations {
-  const payload = asObject(unwrapSuccessEnvelope(value));
+  const payload = asObject(unwrapGatewayPayload(value));
   const ga4 = asObject(getField(payload, ["ga4", "GA4"]));
   return {
     projectId: asString(getField(payload, ["projectId", "ProjectID"])).trim(),
@@ -679,7 +667,7 @@ function normalizeTrafficGA4OAuthProperty(value: unknown): TrafficGA4OAuthProper
 }
 
 function normalizeTrafficGA4OAuthProperties(value: unknown): TrafficGA4OAuthProperty[] {
-  return asArray(unwrapSuccessEnvelope(value))
+  return asArray(unwrapGatewayPayload(value))
     .map(normalizeTrafficGA4OAuthProperty)
     .filter((property) => property.propertyId !== "");
 }

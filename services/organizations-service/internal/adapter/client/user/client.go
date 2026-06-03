@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	internaljwt "github.com/bastiencouder/microservices-go/contracts/pkg/internaljwt"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
 )
@@ -91,7 +91,7 @@ func (c *Client) UserProfile(ctx context.Context, userID int64) (usecase.UserPro
 		FirstName string `json:"firstName"`
 		LastName  string `json:"lastName"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 		return usecase.UserProfile{}, fmt.Errorf("decode user response: %w", err)
 	}
 	return usecase.UserProfile{

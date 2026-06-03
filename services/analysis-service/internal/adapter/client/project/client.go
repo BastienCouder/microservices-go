@@ -9,7 +9,7 @@ import (
 
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
-	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -138,8 +138,8 @@ func (c *Client) EnsureProjectAccessible(ctx context.Context, projectID string, 
 		return fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
 	}
 
-	claims := security.OutboundTokenClaims{Organization: organizationID}
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
+	claims := internalauth.Claims{Organization: organizationID}
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
 	if err != nil {
 		return fmt.Errorf("sign internal jwt: %w", err)
 	}
@@ -180,8 +180,8 @@ func (c *Client) ListProjectCompetitors(ctx context.Context, projectID string, o
 		return nil, fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
 	}
 
-	claims := security.OutboundTokenClaims{Organization: organizationID}
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
+	claims := internalauth.Claims{Organization: organizationID}
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
 	if err != nil {
 		return nil, fmt.Errorf("sign internal jwt: %w", err)
 	}
@@ -227,8 +227,8 @@ func (c *Client) ListProjectEnabledModels(ctx context.Context, projectID string,
 		return nil, fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
 	}
 
-	claims := security.OutboundTokenClaims{Organization: organizationID}
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
+	claims := internalauth.Claims{Organization: organizationID}
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", claims)
 	if err != nil {
 		return nil, fmt.Errorf("sign internal jwt: %w", err)
 	}

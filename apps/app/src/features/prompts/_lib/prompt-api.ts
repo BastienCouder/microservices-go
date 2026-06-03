@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayResult,
+  unwrapGatewayPayload,
+} from "@/shared/api/gateway";
 import { normalizePromptPage, normalizeProjectPromptRecord, PROMPTS_CATALOG_PAGE_SIZE } from "./prompt-normalizers";
 import type { PromptItem, PromptPageResult, PromptSchedule, ProjectPromptRecord } from "./types";
 
@@ -22,11 +26,9 @@ export async function loadPromptPage(
     },
   );
 
-  if (!response.ok) {
-    throw new Error("Impossible de charger les prompts.");
-  }
-
-  return normalizePromptPage(response.data);
+  return normalizePromptPage(
+    requireGatewayResult(response, "Impossible de charger les prompts."),
+  );
 }
 
 export async function loadAllPromptPages(
@@ -79,9 +81,7 @@ export async function patchPromptModels(
     body: JSON.stringify({ modelIds }),
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible de mettre a jour la couverture IA du prompt.");
-  }
+  requireGatewayResult(response, "Impossible de mettre a jour la couverture IA du prompt.");
 }
 
 export async function patchPromptSchedule(
@@ -96,17 +96,7 @@ export async function patchPromptSchedule(
     body: JSON.stringify({ schedule }),
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible de mettre a jour la cadence d'analyse du prompt.");
-  }
-}
-
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  if (typeof value !== "object" || value === null) return value;
-  if ((value as { success?: unknown }).success === true && "data" in value) {
-    return (value as { data: unknown }).data;
-  }
-  return value;
+  requireGatewayResult(response, "Impossible de mettre a jour la cadence d'analyse du prompt.");
 }
 
 export async function createProjectPrompt(
@@ -121,11 +111,9 @@ export async function createProjectPrompt(
     body: JSON.stringify({ prompts: [text] }),
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible de creer le prompt.");
-  }
-
-  const payload = unwrapSuccessEnvelope(response.data);
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(response, "Impossible de creer le prompt."),
+  );
   const rawItems = Array.isArray(payload)
     ? payload
     : typeof payload === "object" && payload !== null && Array.isArray((payload as { prompts?: unknown[] }).prompts)
@@ -158,11 +146,9 @@ export async function generateProjectPrompts(
     },
   );
 
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de generer les prompts.");
-  }
-
-  const payload = unwrapSuccessEnvelope(response.data);
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(response, "Impossible de generer les prompts."),
+  );
   const rawItems = Array.isArray(payload)
     ? payload
     : typeof payload === "object" && payload !== null && Array.isArray((payload as { items?: unknown[] }).items)
@@ -192,9 +178,7 @@ export async function patchPrompt(
     body: JSON.stringify(input),
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible d'enregistrer le prompt.");
-  }
+  requireGatewayResult(response, "Impossible d'enregistrer le prompt.");
 }
 
 export async function deleteProjectPrompt(
@@ -207,7 +191,5 @@ export async function deleteProjectPrompt(
     organizationId,
   });
 
-  if (!response.ok) {
-    throw new Error("Impossible de supprimer le prompt.");
-  }
+  requireGatewayResult(response, "Impossible de supprimer le prompt.");
 }

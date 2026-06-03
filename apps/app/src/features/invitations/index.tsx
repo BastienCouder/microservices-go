@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 
 type InvitationAcceptPageProps = {
   apiBaseURL: string;
@@ -27,37 +29,48 @@ type AcceptState =
 export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) {
   const { token = "" } = useParams();
   const invitationToken = useMemo(() => token.trim(), [token]);
+  const queryClient = useQueryClient();
   const [state, setState] = useState<AcceptState>({
     status: "confirm",
     message: "Confirmez l'invitation pour rejoindre le projet.",
   });
 
-  const acceptInvitation = useCallback(async () => {
-    if (!invitationToken) {
-      setState({ status: "error", message: "Invitation introuvable." });
-      return;
-    }
+  const acceptInvitationMutation = useMutation({
+    mutationFn: async () => {
+      if (!invitationToken) {
+        throw new Error("Invitation introuvable.");
+      }
 
-    setState({ status: "loading", message: "Acceptation de l'invitation..." });
-    const response = await gatewayJSON<unknown>(
-      apiBaseURL,
-      apiRoutes.organizations.acceptInvitation(invitationToken),
-      { method: "POST" },
-    );
-
-    if (!response.ok) {
+      const response = await gatewayJSON<unknown>(
+        apiBaseURL,
+        apiRoutes.organizations.acceptInvitation(invitationToken),
+        { method: "POST" },
+      );
+      requireGatewayResult(response, "Impossible d'accepter cette invitation.");
+    },
+    onMutate: () => {
+      setState({ status: "loading", message: "Acceptation de l'invitation..." });
+    },
+    onSuccess: async () => {
+      await invalidateQueryKeys(queryClient, [
+        ["organizations", apiBaseURL],
+        ["organizations", "project-context-hierarchies", apiBaseURL],
+      ]);
+      setState({
+        status: "success",
+        message: "Invitation acceptee. Le projet est maintenant disponible.",
+      });
+    },
+    onError: (error) => {
       setState({
         status: "error",
-        message: response.error || "Impossible d'accepter cette invitation.",
+        message:
+          error instanceof Error
+            ? error.message
+            : "Impossible d'accepter cette invitation.",
       });
-      return;
-    }
-
-    setState({
-      status: "success",
-      message: "Invitation acceptee. Le projet est maintenant disponible.",
-    });
-  }, [apiBaseURL, invitationToken]);
+    },
+  });
 
   useEffect(() => {
     if (state.status === "success") {
@@ -68,7 +81,7 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
     }
   }, [state.message, state.status]);
 
-  const isLoading = state.status === "loading";
+  const isLoading = acceptInvitationMutation.isPending || state.status === "loading";
 
   return (
     <main className="mx-auto flex min-h-[calc(100vh-8rem)] w-full max-w-xl items-center px-4 py-8">
@@ -91,7 +104,11 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
                 <Button asChild variant="outline" disabled={isLoading}>
                   <Link to="/organizations">Annuler</Link>
                 </Button>
-                <Button type="button" onClick={acceptInvitation} disabled={isLoading}>
+                <Button
+                  type="button"
+                  onClick={() => acceptInvitationMutation.mutate()}
+                  disabled={isLoading}
+                >
                   {state.status === "error" ? <RotateCw data-icon="inline-start" /> : null}
                   {isLoading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
                   {state.status === "error" ? "Reessayer" : "Confirmer"}

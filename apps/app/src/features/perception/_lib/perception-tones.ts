@@ -1,4 +1,4 @@
-import type { OptimizePriority } from "@/lib/perception-data";
+import type { OptimizePriority } from "./shared/perception-data";
 
 export function getPerceptionPriorityTone(priority: OptimizePriority) {
   if (priority === "high") return "border-transparent bg-destructive/10 text-destructive";

@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayData,
+  unwrapGatewayPayload,
+} from "@/shared/api/gateway";
 import { attachStableSlugs } from "@/shared/public-slugs";
 
 type JsonRecord = Record<string, unknown>;
@@ -15,15 +19,8 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
 
-function unwrapData(value: unknown): unknown {
-  if (isRecord(value) && value.success === true && "data" in value) {
-    return value.data;
-  }
-  return value;
-}
-
 function getArray(value: unknown): unknown[] {
-  const payload = unwrapData(value);
+  const payload = unwrapGatewayPayload(value);
   return Array.isArray(payload) ? payload : [];
 }
 
@@ -35,17 +32,6 @@ function getIDString(value: unknown): string {
 
 function getString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-async function requireGatewayData<T>(
-  promise: Promise<GatewayResult<T>>,
-  message: string,
-): Promise<T> {
-  const response = await promise;
-  if (!response.ok) {
-    throw new Error(response.error || message);
-  }
-  return response.data;
 }
 
 function normalizeMembership(value: unknown): { organizationId: string; role: string } | null {
@@ -64,7 +50,8 @@ function normalizeOrganization(
   value: unknown,
   fallback: { organizationId: string; role: string },
 ): Omit<UserOrganizationSummary, "slug"> {
-  const record = isRecord(unwrapData(value)) ? (unwrapData(value) as JsonRecord) : {};
+  const payload = unwrapGatewayPayload(value);
+  const record = isRecord(payload) ? (payload as JsonRecord) : {};
   return {
     id: getIDString(record.id ?? record.ID) || fallback.organizationId,
     name: getString(record.name ?? record.Name) || `Organisation ${fallback.organizationId}`,

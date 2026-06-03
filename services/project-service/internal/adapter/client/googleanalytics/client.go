@@ -23,6 +23,7 @@ import (
 const (
 	defaultHTTPTimeout      = 10 * time.Second
 	analyticsEditScope      = "https://www.googleapis.com/auth/analytics.edit"
+	analyticsReadOnlyScope  = "https://www.googleapis.com/auth/analytics.readonly"
 	googleAuthorizationURL  = "https://accounts.google.com/o/oauth2/v2/auth"
 	googleTokenURL          = "https://oauth2.googleapis.com/token"
 	googleAccountSummaryURL = "https://analyticsadmin.googleapis.com/v1beta/accountSummaries"
@@ -55,7 +56,7 @@ func (c *Client) AuthorizationURL(state, redirectURI string) (string, error) {
 	values.Set("client_id", c.clientID)
 	values.Set("redirect_uri", redirectURI)
 	values.Set("response_type", "code")
-	values.Set("scope", analyticsEditScope)
+	values.Set("scope", strings.Join([]string{analyticsEditScope, analyticsReadOnlyScope}, " "))
 	values.Set("access_type", "offline")
 	values.Set("prompt", "consent")
 	values.Set("include_granted_scopes", "true")

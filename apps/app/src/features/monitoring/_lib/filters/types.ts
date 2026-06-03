@@ -2,7 +2,7 @@ import type {
   MonitoringData,
   MonitoringModel as MonitoringModelData,
   MonitoringPrompt as MonitoringPromptData,
-} from "@/hooks/use-monitoring-data";
+} from "../shared/monitoring-data";
 
 export type FilterModelItem = {
   id: string;

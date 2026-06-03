@@ -2,8 +2,8 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"strconv"
 
@@ -28,15 +28,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "notification-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "notification-service"})
 }
 
 func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "notification-service"})
+		httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "notification-service"})
 		return
 	}
-	writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "notification-service"})
+	httpjson.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "notification-service"})
 }
 
 type sendNotificationRequest struct {
@@ -48,19 +48,18 @@ type sendNotificationRequest struct {
 
 func (h *Handler) send(w http.ResponseWriter, r *http.Request) {
 	var req sendNotificationRequest
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json payload")
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
 		return
 	}
 
 	notification, err := h.svc.Send(r.Context(), req.Channel, req.Recipient, req.Subject, req.Message)
 	if err != nil {
 		if errors.Is(err, domain.ErrInvalidNotification) {
-			writeError(w, http.StatusBadRequest, err.Error())
+			httpjson.WriteValidationError(w)
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 		return
 	}
 
@@ -74,7 +73,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 	if limitStr != "" {
 		parsed, err := strconv.Atoi(limitStr)
 		if err != nil || parsed <= 0 {
-			writeError(w, http.StatusBadRequest, "invalid limit")
+			httpjson.WriteError(w, http.StatusBadRequest, "invalid limit")
 			return
 		}
 		limit = parsed
@@ -85,7 +84,7 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 
 	notifications, err := h.svc.List(r.Context(), limit)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 		return
 	}
 
@@ -93,7 +92,5 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	httpjson.WriteSuccess(w, status, value)
 }

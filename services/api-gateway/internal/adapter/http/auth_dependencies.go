@@ -2,12 +2,13 @@ package http
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"time"
+
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 )
 
 func (h *Handler) validateAuth(ctx context.Context, cookieHeader, sessionToken string) (string, error) {
@@ -45,7 +46,7 @@ func (h *Handler) validateAuth(ctx context.Context, cookieHeader, sessionToken s
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("auth status=%d", resp.StatusCode)
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 			return false, true, err
 		}
 		if payload.IdentityID == "" {
@@ -89,7 +90,7 @@ func (h *Handler) resolveUserID(ctx context.Context, identityID string) (int64, 
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("user status=%d", resp.StatusCode)
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 			return false, true, err
 		}
 		if payload.ID <= 0 {
@@ -133,7 +134,7 @@ func (h *Handler) resolveOrganizationID(ctx context.Context, userID int64) (int6
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("organizations status=%d", resp.StatusCode)
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 			return false, true, err
 		}
 		if len(payload) == 0 {

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHmac } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -88,6 +88,22 @@ type SeedContentCrawlRecord = {
   html?: string;
 };
 
+type RuntimeSeedPlan = {
+  cleanupProjectIDs: string[];
+  projectId: string;
+  liveRequestId: string;
+  crawlJobId: string;
+  prompts: PromptSeed[];
+  competitors: CompetitorSeed[];
+  runs: SeedRun[];
+  alerts: SeedAlert[];
+};
+
+type IDAllocator = {
+  next: (prefix: string) => string;
+  current: () => number;
+};
+
 type SuccessEnvelope<T> = {
   success: boolean;
   data: T;
@@ -128,10 +144,13 @@ const POSTGRES_EXEC = [...COMPOSE_ARGS, "exec", "-T", "postgres"];
 
 const ORGANIZATION_NAME = process.env.SEED_ORG_NAME ?? "Nike";
 const TEAM_NAME = process.env.SEED_TEAM_NAME ?? "Global Digital Marketing";
-const PROJECT_ID = process.env.SEED_PROJECT_ID ?? "nike";
+const EXPLICIT_PROJECT_ID = process.env.SEED_PROJECT_ID?.trim() ?? "";
+const LEGACY_SEED_PROJECT_IDS = ["nike"] as const;
 const PROJECT_NAME = process.env.SEED_PROJECT_NAME ?? "Nike";
 const PROJECT_DOMAIN = process.env.SEED_PROJECT_DOMAIN ?? "nike.com";
 const PROJECT_WEBSITE = process.env.SEED_PROJECT_WEBSITE ?? "https://www.nike.com";
+const PROJECT_BRAND_DESCRIPTION =
+  "Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception.";
 const SEED_AUTH_ID = process.env.SEED_AUTH_ID?.trim() ?? "";
 const SEED_USER_ID = process.env.SEED_USER_ID?.trim() ?? "";
 const SEED_BILLING_PLAN = readBillingPlan(process.env.SEED_BILLING_PLAN);
@@ -148,7 +167,7 @@ const SEED_INTERNAL_JWT_SECRET_FILE = process.env.SEED_INTERNAL_JWT_SECRET_FILE?
 const SEED_OPENROUTER_API_KEY_FILE = process.env.SEED_OPENROUTER_API_KEY_FILE?.trim() || "deployments/secrets/openrouter_api_key.txt";
 const SEED_INTERNAL_JWT_ISSUER = process.env.SEED_INTERNAL_JWT_ISSUER?.trim() || "api-gateway";
 const SEED_INTERNAL_JWT_SUBJECT = process.env.SEED_INTERNAL_JWT_SUBJECT?.trim() || "seed-nike-backend";
-const SEED_LIVE_REQUEST_ID = process.env.SEED_LIVE_REQUEST_ID?.trim() || `${PROJECT_ID}-live-seed`;
+const SEED_LIVE_REQUEST_ID_OVERRIDE = process.env.SEED_LIVE_REQUEST_ID?.trim() ?? "";
 
 const NOW = new Date().toISOString();
 const EARLIER = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
@@ -298,6 +317,37 @@ function defaultMonthlyQuotaForPlan(plan: BillingPlan): number {
   return 1_000_000;
 }
 
+export function createIDAllocator(startSeq: number): IDAllocator {
+  let seq = Math.max(0, Math.trunc(startSeq));
+  return {
+    next(prefix: string) {
+      seq += 1;
+      return createScopedID(prefix);
+    },
+    current() {
+      return seq;
+    },
+  };
+}
+
+export function createScopedID(prefix: string): string {
+  return `${prefix}_${randomUUID()}`;
+}
+
+function isScopedUUIDID(value: string, prefix: string): boolean {
+  return new RegExp(`^${prefix}_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, "i").test(
+    value.trim(),
+  );
+}
+
+function dedupeStrings(values: readonly string[]): string[] {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function buildLiveRequestID(projectID: string): string {
+  return SEED_LIVE_REQUEST_ID_OVERRIDE || `${projectID}-live-seed`;
+}
+
 function isoDaysAgo(daysAgo: number, minuteOffset = 0): string {
   const date = new Date();
   date.setUTCDate(date.getUTCDate() - daysAgo);
@@ -310,11 +360,16 @@ function buildProjectURL(path: string): string {
   return path === "/" ? baseURL : `${baseURL}${path}`;
 }
 
-function pickCompetitorPair(runIndex: number, promptIndex: number, modelIndex: number): [CompetitorSeed, CompetitorSeed] {
-  const first = COMPETITORS[(runIndex + promptIndex) % COMPETITORS.length]!;
-  let second = COMPETITORS[(runIndex + promptIndex + modelIndex + 1) % COMPETITORS.length]!;
+function pickCompetitorPair(
+  runIndex: number,
+  promptIndex: number,
+  modelIndex: number,
+  competitors: readonly CompetitorSeed[],
+): [CompetitorSeed, CompetitorSeed] {
+  const first = competitors[(runIndex + promptIndex) % competitors.length]!;
+  let second = competitors[(runIndex + promptIndex + modelIndex + 1) % competitors.length]!;
   if (second.id === first.id) {
-    second = COMPETITORS[(runIndex + promptIndex + modelIndex + 2) % COMPETITORS.length]!;
+    second = competitors[(runIndex + promptIndex + modelIndex + 2) % competitors.length]!;
   }
   return [first, second];
 }
@@ -618,6 +673,47 @@ async function ensureOrganization(user: UserRecord): Promise<OrganizationSeed> {
   return { id: orgID, name: ORGANIZATION_NAME, teamID };
 }
 
+async function findExistingSeedProjectIDs(user: UserRecord, organization: OrganizationSeed): Promise<string[]> {
+  const raw = await psql(
+    "projectsvc",
+    `
+      select id
+      from projects
+      where organization_id = ${organization.id}
+        and created_by = ${user.id}
+        and website_url = ${quoteLiteral(PROJECT_WEBSITE)}
+        and brand_name = ${quoteLiteral(PROJECT_NAME)}
+        and brand_description = ${quoteLiteral(PROJECT_BRAND_DESCRIPTION)}
+      order by created_at asc, id asc;
+    `,
+    { quiet: true },
+  );
+
+  return raw
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+async function resolveRuntimeSeedPlan(user: UserRecord, organization: OrganizationSeed): Promise<RuntimeSeedPlan> {
+  const existingSeedProjectIDs = await findExistingSeedProjectIDs(user, organization);
+  const reusableProjectID = EXPLICIT_PROJECT_ID
+    ? ""
+    : existingSeedProjectIDs.find((value) => isScopedUUIDID(value, "prj")) ?? "";
+
+  return buildRuntimeSeedPlan({
+    projectSeqStart: 0,
+    analysisSeqStart: 0,
+    explicitProjectID: EXPLICIT_PROJECT_ID,
+    reusableProjectID,
+    cleanupProjectIDs: dedupeStrings([
+      ...LEGACY_SEED_PROJECT_IDS,
+      ...existingSeedProjectIDs,
+      EXPLICIT_PROJECT_ID,
+    ]),
+  });
+}
+
 async function seedBillingSubscription(organization: OrganizationSeed) {
   await psql(
     "billsvc",
@@ -739,12 +835,13 @@ function sqlTextArray(values: readonly string[]): string {
   return `array[${values.map((value) => quoteLiteral(value)).join(", ")}]`;
 }
 
-function buildSeedRuns(): SeedRun[] {
+function buildSeedRuns(projectID: string, prompts: PromptSeed[], competitors: CompetitorSeed[], allocator: IDAllocator): SeedRun[] {
   return RUN_SNAPSHOTS.map((run, runIndex) => {
+    const runID = allocator.next("run");
     const createdAt = isoDaysAgo(run.daysAgo, runIndex * 9);
-    const promptRuns = PROMPTS.map((prompt, promptIndex) => ({
-      id: `seed-prun-${runIndex + 1}-${promptIndex + 1}`,
-      runId: run.id,
+    const promptRuns = prompts.map((prompt, promptIndex) => ({
+      id: allocator.next("prun"),
+      runId: runID,
       promptId: prompt.id,
       promptText: prompt.text,
       createdAt: isoDaysAgo(run.daysAgo, runIndex * 9 + promptIndex + 1),
@@ -752,8 +849,8 @@ function buildSeedRuns(): SeedRun[] {
 
     const responses = promptRuns.flatMap((promptRun, promptIndex) =>
       MODELS.map((model, modelIndex) => {
-        const prompt = PROMPTS[promptIndex]!;
-        const [firstCompetitor, secondCompetitor] = pickCompetitorPair(runIndex, promptIndex, modelIndex);
+        const prompt = prompts[promptIndex]!;
+        const [firstCompetitor, secondCompetitor] = pickCompetitorPair(runIndex, promptIndex, modelIndex, competitors);
         const competitorNames = [firstCompetitor.name, secondCompetitor.name];
         const competitorPressure =
           competitorNames.includes("Puma")
@@ -800,8 +897,8 @@ function buildSeedRuns(): SeedRun[] {
             )
           : [];
         return {
-          id: `seed-resp-${runIndex + 1}-${promptIndex + 1}-${modelIndex + 1}`,
-          runId: run.id,
+          id: allocator.next("resp"),
+          runId: runID,
           promptRunId: promptRun.id,
           modelId: model.id,
           rawResponse: buildResponseText(
@@ -825,8 +922,8 @@ function buildSeedRuns(): SeedRun[] {
     );
 
     return {
-      id: run.id,
-      requestId: run.requestId,
+      id: runID,
+      requestId: `seed:${projectID}:run:${String(runIndex + 1).padStart(2, "0")}`,
       createdAt,
       visibilityScore: run.visibilityScore,
       promptRuns,
@@ -834,8 +931,6 @@ function buildSeedRuns(): SeedRun[] {
     };
   });
 }
-
-const SEED_RUNS = buildSeedRuns();
 const SEED_ALERTS: SeedAlert[] = [
   {
     id: "seed-alert-01",
@@ -870,6 +965,53 @@ const SEED_ALERTS: SeedAlert[] = [
     createdAt: isoDaysAgo(5, 35),
   },
 ];
+
+export function buildRuntimeSeedPlan({
+  projectSeqStart,
+  analysisSeqStart,
+  explicitProjectID,
+  reusableProjectID,
+  cleanupProjectIDs = [],
+}: {
+  projectSeqStart: number;
+  analysisSeqStart: number;
+  explicitProjectID?: string;
+  reusableProjectID?: string;
+  cleanupProjectIDs?: string[];
+}): RuntimeSeedPlan {
+  const explicitProject = explicitProjectID?.trim() ?? "";
+  const reusableProject = reusableProjectID?.trim() ?? "";
+  const reusableScopedProjectID = isScopedUUIDID(reusableProject, "prj") ? reusableProject : "";
+  const projectAllocator = createIDAllocator(projectSeqStart);
+  const projectId = explicitProject || reusableScopedProjectID || projectAllocator.next("prj");
+  const prompts = PROMPTS.map((prompt) => ({
+    ...prompt,
+    id: projectAllocator.next("prm"),
+  }));
+  const competitors = COMPETITORS.map((competitor) => ({
+    ...competitor,
+    id: projectAllocator.next("cmp"),
+  }));
+
+  const analysisAllocator = createIDAllocator(analysisSeqStart);
+  const runs = buildSeedRuns(projectId, prompts, competitors, analysisAllocator);
+  const alerts = SEED_ALERTS.map((alert) => ({
+    ...alert,
+    id: analysisAllocator.next("alt"),
+  }));
+
+  return {
+    cleanupProjectIDs: dedupeStrings([...cleanupProjectIDs, projectId]),
+    projectId,
+    liveRequestId: buildLiveRequestID(projectId),
+    crawlJobId: `seed-crawl-${projectId}`,
+    prompts,
+    competitors,
+    runs,
+    alerts,
+  };
+}
+
 const SEED_CONTENT_CRAWL_RECORDS: SeedContentCrawlRecord[] = [
   {
     url: "https://www.nike.com",
@@ -908,27 +1050,22 @@ const SEED_CONTENT_CRAWL_RECORDS: SeedContentCrawlRecord[] = [
   },
 ];
 
-async function resetProjectRelationalData() {
-  const managedModelIDs = MODELS.map((model) => model.id);
+async function resetProjectRelationalData(plan: RuntimeSeedPlan) {
+  const projectIDs = sqlTextArray(plan.cleanupProjectIDs);
   await psql(
     "projectsvc",
     `
       delete from outbox_events
-      where payload -> 'project' ->> 'id' = ${quoteLiteral(PROJECT_ID)}
-         or payload ->> 'projectId' = ${quoteLiteral(PROJECT_ID)};
+      where payload -> 'project' ->> 'id' = any(${projectIDs})
+         or payload ->> 'projectId' = any(${projectIDs});
 
       delete from projects
-      where id = ${quoteLiteral(PROJECT_ID)};
-
-      update ai_models
-      set is_active = id = any(${sqlTextArray(managedModelIDs)}),
-          updated_at = ${quoteLiteral(NOW)}
-      where is_active is distinct from (id = any(${sqlTextArray(managedModelIDs)}));
+      where id = any(${projectIDs});
     `,
   );
 }
 
-async function seedProjectRelational(user: UserRecord, organization: OrganizationSeed) {
+async function seedProjectRelational(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan) {
   const modelStatements = MODELS.map(
     (model) => `
       insert into ai_models (id, provider, display_name, group_name, icon_key, provider_model_id, is_active, supports_live_search, created_at, updated_at)
@@ -956,17 +1093,22 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
     `,
   ).join("\n");
 
-  const promptStatements = PROMPTS.map(
+  const promptStatements = plan.prompts.map(
     (prompt) => `
-      insert into prompts (id, project_id, text, intent, language, country, is_active, created_at, updated_at)
+      insert into prompts (id, project_id, text, intent, language, country, is_active, status, schedule_mode, schedule_cron, schedule_timezone, kind, created_at, updated_at)
       values (
         ${quoteLiteral(prompt.id)},
-        ${quoteLiteral(PROJECT_ID)},
+        ${quoteLiteral(plan.projectId)},
         ${quoteLiteral(prompt.text)},
         ${quoteLiteral(prompt.intent)},
         'fr',
         'FR',
         true,
+        'active',
+        'global',
+        '0 */6 * * *',
+        'UTC',
+        'monitoring',
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
       )
@@ -975,16 +1117,21 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
         text = excluded.text,
         intent = excluded.intent,
         is_active = excluded.is_active,
+        status = excluded.status,
+        schedule_mode = excluded.schedule_mode,
+        schedule_cron = excluded.schedule_cron,
+        schedule_timezone = excluded.schedule_timezone,
+        kind = excluded.kind,
         updated_at = excluded.updated_at;
     `,
   ).join("\n");
 
-  const competitorStatements = COMPETITORS.map(
+  const competitorStatements = plan.competitors.map(
     (competitor) => `
       insert into competitors (id, project_id, name, domain, website_url, is_active, created_at, updated_at)
       values (
         ${quoteLiteral(competitor.id)},
-        ${quoteLiteral(PROJECT_ID)},
+        ${quoteLiteral(plan.projectId)},
         ${quoteLiteral(competitor.name)},
         ${quoteLiteral(competitor.domain)},
         ${quoteLiteral(competitor.websiteUrl)},
@@ -1006,7 +1153,7 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
     (model) => `
       insert into project_models (project_id, model_id, is_enabled, created_at, updated_at)
       values (
-        ${quoteLiteral(PROJECT_ID)},
+        ${quoteLiteral(plan.projectId)},
         ${quoteLiteral(model.id)},
         true,
         ${quoteLiteral(EARLIER)},
@@ -1018,15 +1165,25 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
     `,
   ).join("\n");
 
+  const promptModelStatements = plan.prompts.flatMap((prompt) =>
+    MODELS.map(
+      (model) => `
+        insert into prompt_models (prompt_id, model_id, created_at, updated_at)
+        values (
+          ${quoteLiteral(prompt.id)},
+          ${quoteLiteral(model.id)},
+          ${quoteLiteral(EARLIER)},
+          ${quoteLiteral(NOW)}
+        )
+        on conflict (prompt_id, model_id) do update set
+          updated_at = excluded.updated_at;
+      `,
+    ),
+  ).join("\n");
+
   await psql(
     "projectsvc",
     `
-      insert into project_service_meta (id, seq, updated_at)
-      values (1, 100, ${quoteLiteral(NOW)})
-      on conflict (id) do update set
-        seq = greatest(project_service_meta.seq, excluded.seq),
-        updated_at = excluded.updated_at;
-
       ${modelStatements}
 
       insert into projects (
@@ -1041,23 +1198,21 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
         industry,
         primary_language,
         country,
-        status,
         created_at,
         updated_at
       )
       values (
-        ${quoteLiteral(PROJECT_ID)},
+        ${quoteLiteral(plan.projectId)},
         ${organization.id},
         ${user.id},
         ${quoteLiteral(PROJECT_NAME)},
         ${quoteLiteral(PROJECT_DOMAIN)},
         ${quoteLiteral(PROJECT_WEBSITE)},
         ${quoteLiteral(PROJECT_NAME)},
-        ${quoteLiteral("Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception.")},
+        ${quoteLiteral(PROJECT_BRAND_DESCRIPTION)},
         ${quoteLiteral("Sportswear / footwear")},
         'fr',
         'FR',
-        'active',
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
       )
@@ -1072,18 +1227,18 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
         industry = excluded.industry,
         primary_language = excluded.primary_language,
         country = excluded.country,
-        status = excluded.status,
         updated_at = excluded.updated_at;
 
       ${promptStatements}
       ${competitorStatements}
       ${projectModelStatements}
+      ${promptModelStatements}
     `,
   );
 }
 
-async function seedAnalysisRelational(user: UserRecord, organization: OrganizationSeed) {
-  const runStatements = SEED_RUNS.map((run) => `
+async function seedAnalysisRelational(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan) {
+  const runStatements = plan.runs.map((run) => `
     insert into analysis_runs (
       id,
       project_id,
@@ -1102,13 +1257,13 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
     )
     values (
       ${quoteLiteral(run.id)},
-      ${quoteLiteral(PROJECT_ID)},
+      ${quoteLiteral(plan.projectId)},
       ${organization.id},
       ${user.id},
       ${quoteLiteral(run.requestId)},
       'manual',
       'completed',
-      ${PROMPTS.length},
+      ${plan.prompts.length},
       ${MODELS.length},
       ${run.responses.length},
       ${run.responses.length},
@@ -1132,7 +1287,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
       updated_at = excluded.updated_at;
   `).join("\n");
 
-  const promptRunStatements = SEED_RUNS.flatMap((run) =>
+  const promptRunStatements = plan.runs.flatMap((run) =>
     run.promptRuns.map((promptRun) => `
       insert into prompt_runs (id, run_id, prompt_id, prompt_text, created_at)
       values (
@@ -1150,7 +1305,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
     `),
   ).join("\n");
 
-  const responseStatements = SEED_RUNS.flatMap((run) =>
+  const responseStatements = plan.runs.flatMap((run) =>
     run.responses.map((response) => {
       const citedURLs = JSON.stringify(response.citedUrls).replaceAll("'", "''");
       return `
@@ -1195,7 +1350,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
     }),
   ).join("\n");
 
-  const alertStatements = SEED_ALERTS.map((alert) => `
+  const alertStatements = plan.alerts.map((alert) => `
     insert into alerts (
       id,
       project_id,
@@ -1209,7 +1364,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
     )
     values (
       ${quoteLiteral(alert.id)},
-      ${quoteLiteral(PROJECT_ID)},
+      ${quoteLiteral(plan.projectId)},
       ${quoteLiteral(alert.alertType)},
       ${quoteLiteral(alert.severity)},
       ${quoteLiteral(alert.title)},
@@ -1232,12 +1387,6 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
   await psql(
     "analysissvc",
     `
-      insert into analysis_service_meta (id, seq, updated_at)
-      values (1, 100, ${quoteLiteral(NOW)})
-      on conflict (id) do update set
-        seq = greatest(analysis_service_meta.seq, excluded.seq),
-        updated_at = excluded.updated_at;
-
       ${runStatements}
       ${promptRunStatements}
       ${responseStatements}
@@ -1246,10 +1395,10 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
   );
 }
 
-async function seedContentOptimizerCrawl(organization: OrganizationSeed) {
+async function seedContentOptimizerCrawl(organization: OrganizationSeed, plan: RuntimeSeedPlan) {
   const completedRecords = SEED_CONTENT_CRAWL_RECORDS.filter((record) => record.status === "completed").length;
   const result = {
-    id: "seed-crawl-nike",
+    id: plan.crawlJobId,
     status: "completed",
     browserSecondsUsed: 0,
     total: SEED_CONTENT_CRAWL_RECORDS.length,
@@ -1270,9 +1419,9 @@ async function seedContentOptimizerCrawl(organization: OrganizationSeed) {
         updated_at
       )
       values (
-        ${quoteLiteral(PROJECT_ID)},
+        ${quoteLiteral(plan.projectId)},
         ${organization.id},
-        'seed-crawl-nike',
+        ${quoteLiteral(plan.crawlJobId)},
         '${resultJSON}'::jsonb,
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
@@ -1287,21 +1436,25 @@ async function seedContentOptimizerCrawl(organization: OrganizationSeed) {
   console.log(`  content optimizer pages=${SEED_CONTENT_CRAWL_RECORDS.length} completed=${completedRecords}`);
 }
 
-async function resetAnalysisDataForProject() {
+async function resetAnalysisDataForProjects(projectIDs: readonly string[]) {
+  const projectIDArray = sqlTextArray(projectIDs);
   await psql(
     "analysissvc",
     `
       delete from content_optimizer_crawls
-      where project_id = ${quoteLiteral(PROJECT_ID)};
+      where project_id = any(${projectIDArray});
 
       delete from brand_canon
-      where project_id = ${quoteLiteral(PROJECT_ID)};
+      where project_id = any(${projectIDArray});
 
       delete from alerts
-      where project_id = ${quoteLiteral(PROJECT_ID)};
+      where project_id = any(${projectIDArray});
+
+      delete from optimize_actions
+      where project_id = any(${projectIDArray});
 
       delete from analysis_runs
-      where project_id = ${quoteLiteral(PROJECT_ID)};
+      where project_id = any(${projectIDArray});
     `,
   );
 }
@@ -1323,7 +1476,7 @@ async function ensureIAServiceProviderMode() {
   await waitForReady("ia-service", SEED_IA_BASE_URL);
 }
 
-async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed): Promise<LiveSeedResult> {
+async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan): Promise<LiveSeedResult> {
   await waitForReady("analysis-service", SEED_ANALYSIS_BASE_URL);
   await waitForReady("ia-service", SEED_IA_BASE_URL);
 
@@ -1346,10 +1499,10 @@ async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed
   });
 
   const startResult = await postJSON<StartAnalysisResponse>(
-    `${SEED_ANALYSIS_BASE_URL.replace(/\/$/, "")}/analysis/projects/${PROJECT_ID}/analyze`,
+    `${SEED_ANALYSIS_BASE_URL.replace(/\/$/, "")}/analysis/projects/${plan.projectId}/analyze`,
     {
-      requestId: SEED_LIVE_REQUEST_ID,
-      promptTexts: PROMPTS.map((prompt) => ({ id: prompt.id, text: prompt.text })),
+      requestId: plan.liveRequestId,
+      promptTexts: plan.prompts.map((prompt) => ({ id: prompt.id, text: prompt.text })),
       modelIds: MODELS.map((model) => model.id),
       runType: "manual",
     },
@@ -1359,7 +1512,7 @@ async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed
   const promptRunsByPromptId = new Map(startResult.promptRuns.map((item) => [item.promptId, item]));
   let responsesRecorded = 0;
 
-  for (const prompt of PROMPTS) {
+  for (const prompt of plan.prompts) {
     const promptRun = promptRunsByPromptId.get(prompt.id);
     if (!promptRun) {
       throw new Error(`Prompt run manquant pour ${prompt.id}`);
@@ -1373,7 +1526,7 @@ async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed
           promptText: prompt.text,
           modelId: model.id,
           brandName: PROJECT_NAME,
-          competitors: COMPETITORS.map((competitor) => competitor.name),
+          competitors: plan.competitors.map((competitor) => competitor.name),
         },
         iaToken,
       );
@@ -1408,7 +1561,7 @@ async function main() {
   console.log(`SEED_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}`);
   console.log(`SEED_COMPOSE_FILES=${COMPOSE_FILES.join(",")}`);
   console.log(`SEED_ORG_NAME=${ORGANIZATION_NAME}`);
-  console.log(`SEED_PROJECT_ID=${PROJECT_ID}`);
+  console.log(`SEED_PROJECT_ID=${EXPLICIT_PROJECT_ID || "<auto>"}`);
   console.log(`SEED_ANALYSIS_MODE=${SEED_ANALYSIS_MODE}`);
 
   if (SEED_ANALYSIS_MODE === "live") {
@@ -1423,49 +1576,53 @@ async function main() {
   const organization = await ensureOrganization(user);
   console.log(`  organization.id=${organization.id} team.id=${organization.teamID}`);
 
+  logStep("Resolve coherent runtime ids for the seed");
+  const seedPlan = await resolveRuntimeSeedPlan(user, organization);
+  console.log(`  project.id=${seedPlan.projectId} cleanup=${seedPlan.cleanupProjectIDs.join(", ")}`);
+
   logStep("Create or update billing subscription seed in billsvc");
   await seedBillingSubscription(organization);
 
   logStep("Reset existing project seed in projectsvc");
-  await resetProjectRelationalData();
+  await resetProjectRelationalData(seedPlan);
 
   logStep("Create clean relational project seed in projectsvc");
-  await seedProjectRelational(user, organization);
+  await seedProjectRelational(user, organization, seedPlan);
 
   logStep("Reset existing analysis seed in analysissvc");
-  await resetAnalysisDataForProject();
+  await resetAnalysisDataForProjects(seedPlan.cleanupProjectIDs);
 
   let liveResult: LiveSeedResult | null = null;
   if (SEED_ANALYSIS_MODE === "live") {
     logStep("Create live OpenRouter analysis run");
-    liveResult = await seedAnalysisLive(user, organization);
+    liveResult = await seedAnalysisLive(user, organization, seedPlan);
   } else {
     logStep("Create clean relational analysis seed in analysissvc");
-    await seedAnalysisRelational(user, organization);
+    await seedAnalysisRelational(user, organization, seedPlan);
   }
 
   logStep("Create content optimizer crawl seed in analysissvc");
-  await seedContentOptimizerCrawl(organization);
+  await seedContentOptimizerCrawl(organization, seedPlan);
 
   console.log("\nSeed terminé.");
   console.log(`- organization: ${ORGANIZATION_NAME} (#${organization.id})`);
   console.log(`- team: ${TEAM_NAME} (#${organization.teamID})`);
   console.log(`- billing: ${SEED_BILLING_PLAN} / ${SEED_BILLING_SEATS} seat(s) / ${SEED_BILLING_MONTHLY_QUOTA} quota`);
-  console.log(`- projectId: ${PROJECT_ID}`);
-  console.log(`- seeded prompts: ${PROMPTS.length}`);
-  console.log(`- seeded competitors: ${COMPETITORS.length}`);
+  console.log(`- projectId: ${seedPlan.projectId}`);
+  console.log(`- seeded prompts: ${seedPlan.prompts.length}`);
+  console.log(`- seeded competitors: ${seedPlan.competitors.length}`);
   console.log(`- seeded content optimizer pages: ${SEED_CONTENT_CRAWL_RECORDS.length}`);
   if (SEED_ANALYSIS_MODE === "live" && liveResult) {
     console.log(`- live run id: ${liveResult.runId}`);
     console.log(`- live responses recorded: ${liveResult.responsesRecorded}`);
   } else {
-    console.log(`- seeded runs: ${SEED_RUNS.length}`);
-    console.log(`- seeded responses: ${SEED_RUNS.reduce((total, run) => total + run.responses.length, 0)}`);
+    console.log(`- seeded runs: ${seedPlan.runs.length}`);
+    console.log(`- seeded responses: ${seedPlan.runs.reduce((total, run) => total + run.responses.length, 0)}`);
   }
   console.log(`- owner auth identity: ${user.authIdentityID}`);
-  console.log(`- dashboard: /dashboard?projectId=${PROJECT_ID}`);
-  console.log(`- prompts: /prompts?projectId=${PROJECT_ID}`);
-  console.log(`- perception: /perception?projectId=${PROJECT_ID}`);
+  console.log(`- dashboard: /dashboard?projectId=${seedPlan.projectId}`);
+  console.log(`- prompts: /prompts?projectId=${seedPlan.projectId}`);
+  console.log(`- perception: /perception?projectId=${seedPlan.projectId}`);
 }
 
 const currentFilePath = fileURLToPath(import.meta.url);

@@ -16,21 +16,18 @@ import (
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
-const singletonStateID = 1
-
 type persistedState struct {
-	Seq                   int64                                                      `json:"seq"`
-	Projects              map[string]*usecase.Project                                `json:"projects"`
-	Prompts               map[string]*usecase.Prompt                                 `json:"prompts"`
-	Competitors           map[string]*usecase.Competitor                             `json:"competitors"`
-	Models                map[string]usecase.AIModel                                 `json:"models"`
-	ProjectModels         map[string]map[string]bool                                 `json:"projectModels"`
-	ProjectMembers        map[string]map[int64]*usecase.ProjectMember                `json:"projectMembers"`
-	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage        `json:"modelSelectionChanges"`
-	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations              `json:"impactIntegrations"`
-	ProviderCredentials   map[string]map[string]*usecase.LLMProviderCredentialRecord `json:"providerCredentials"`
-	Outbox                map[string]*usecase.OutboxEvent                            `json:"outbox"`
-	OutboxOrder           []string                                                   `json:"outboxOrder"`
+	Seq                   int64                                               `json:"seq"`
+	Projects              map[string]*usecase.Project                         `json:"projects"`
+	Prompts               map[string]*usecase.Prompt                          `json:"prompts"`
+	Competitors           map[string]*usecase.Competitor                      `json:"competitors"`
+	Models                map[string]usecase.AIModel                          `json:"models"`
+	ProjectModels         map[string]map[string]bool                          `json:"projectModels"`
+	ProjectMembers        map[string]map[int64]*usecase.ProjectMember         `json:"projectMembers"`
+	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
+	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations       `json:"impactIntegrations"`
+	Outbox                map[string]*usecase.OutboxEvent                     `json:"outbox"`
+	OutboxOrder           []string                                            `json:"outboxOrder"`
 }
 
 type StateStore struct {
@@ -56,21 +53,8 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		ProjectMembers:        make(map[string]map[int64]*usecase.ProjectMember),
 		ModelSelectionChanges: make(map[string]usecase.ProjectModelSelectionChangeUsage),
 		ImpactIntegrations:    make(map[string]*usecase.ProjectImpactIntegrations),
-		ProviderCredentials:   make(map[string]map[string]*usecase.LLMProviderCredentialRecord),
 		Outbox:                make(map[string]*usecase.OutboxEvent),
 		OutboxOrder:           make([]string, 0),
-	}
-
-	err := s.db.QueryRow(ctx, `
-		SELECT seq
-		FROM project_service_meta
-		WHERE id = $1
-	`, singletonStateID).Scan(&state.Seq)
-	if err != nil {
-		if isNoRows(err) {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("select project meta: %w", err)
 	}
 
 	if err := s.loadProjects(ctx, &state); err != nil {
@@ -83,9 +67,6 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 	if err := s.loadPromptModels(ctx, &state); err != nil {
-		return nil, false, err
-	}
-	if err := s.loadPromptModelSchedules(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadCompetitors(ctx, &state); err != nil {
@@ -103,11 +84,12 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadImpactIntegrations(ctx, &state); err != nil {
 		return nil, false, err
 	}
-	if err := s.loadProviderCredentials(ctx, &state); err != nil {
-		return nil, false, err
-	}
 	if err := s.loadOutbox(ctx, &state); err != nil {
 		return nil, false, err
+	}
+
+	if len(state.Projects) == 0 && len(state.Prompts) == 0 && len(state.Competitors) == 0 && len(state.Models) == 0 {
+		return nil, false, nil
 	}
 
 	payload, err := json.Marshal(state)
@@ -133,23 +115,12 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		}
 	}()
 
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO project_service_meta (id, seq, updated_at)
-		VALUES ($1, $2, NOW())
-		ON CONFLICT (id)
-		DO UPDATE SET seq = EXCLUDED.seq, updated_at = NOW()
-	`, singletonStateID, state.Seq); err != nil {
-		return fmt.Errorf("upsert project meta: %w", err)
-	}
-
 	for _, statement := range []string{
 		`DELETE FROM outbox_events`,
-		`DELETE FROM prompt_model_schedules`,
 		`DELETE FROM prompt_models`,
 		`DELETE FROM project_models`,
 		`DELETE FROM project_model_selection_changes`,
 		`DELETE FROM project_impact_integrations`,
-		`DELETE FROM project_llm_provider_credentials`,
 		`DELETE FROM project_members`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
@@ -176,9 +147,6 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	if err := insertPromptModels(ctx, tx, state.Prompts); err != nil {
 		return err
 	}
-	if err := insertPromptModelSchedules(ctx, tx, state.Prompts); err != nil {
-		return err
-	}
 	if err := insertCompetitors(ctx, tx, state.Competitors); err != nil {
 		return err
 	}
@@ -189,9 +157,6 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := s.insertImpactIntegrations(ctx, tx, state.ImpactIntegrations); err != nil {
-		return err
-	}
-	if err := s.insertProviderCredentials(ctx, tx, state.ProviderCredentials, state.Projects); err != nil {
 		return err
 	}
 	if err := insertOutboxEvents(ctx, tx, state.Outbox, state.OutboxOrder); err != nil {
@@ -373,36 +338,6 @@ func (s *StateStore) loadPromptModels(ctx context.Context, state *persistedState
 			continue
 		}
 		prompt.ModelIDs = append(prompt.ModelIDs, modelID)
-	}
-	return rows.Err()
-}
-
-func (s *StateStore) loadPromptModelSchedules(ctx context.Context, state *persistedState) error {
-	rows, err := s.db.Query(ctx, `
-		SELECT prompt_id, model_id, cron_expr
-		FROM prompt_model_schedules
-		ORDER BY prompt_id ASC, model_id ASC
-	`)
-	if err != nil {
-		return fmt.Errorf("select prompt model schedules: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var promptID string
-		var modelID string
-		var cronExpr string
-		if err := rows.Scan(&promptID, &modelID, &cronExpr); err != nil {
-			return fmt.Errorf("scan prompt model schedule: %w", err)
-		}
-		prompt := state.Prompts[promptID]
-		if prompt == nil {
-			continue
-		}
-		if prompt.Schedule.ModelCrons == nil {
-			prompt.Schedule.ModelCrons = map[string]string{}
-		}
-		prompt.Schedule.ModelCrons[modelID] = cronExpr
 	}
 	return rows.Err()
 }
@@ -653,47 +588,6 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 	return rows.Err()
 }
 
-func (s *StateStore) loadProviderCredentials(ctx context.Context, state *persistedState) error {
-	rows, err := s.db.Query(ctx, `
-		SELECT project_id, provider, api_key_ciphertext, updated_at
-		FROM project_llm_provider_credentials
-		ORDER BY project_id ASC, provider ASC
-	`)
-	if err != nil {
-		return fmt.Errorf("select llm provider credentials: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			projectID        string
-			provider         string
-			apiKeyCiphertext string
-			updatedAt        time.Time
-		)
-		if err := rows.Scan(&projectID, &provider, &apiKeyCiphertext, &updatedAt); err != nil {
-			return fmt.Errorf("scan llm provider credential: %w", err)
-		}
-		apiKey, err := s.codec.Decrypt(apiKeyCiphertext)
-		if err != nil {
-			return fmt.Errorf("decrypt llm provider credential %s/%s: %w", projectID, provider, err)
-		}
-		if state.ProviderCredentials == nil {
-			state.ProviderCredentials = make(map[string]map[string]*usecase.LLMProviderCredentialRecord)
-		}
-		if state.ProviderCredentials[projectID] == nil {
-			state.ProviderCredentials[projectID] = make(map[string]*usecase.LLMProviderCredentialRecord)
-		}
-		record := usecase.LLMProviderCredentialRecord{
-			APIKey:    apiKey,
-			HasAPIKey: strings.TrimSpace(apiKey) != "",
-			UpdatedAt: updatedAt,
-		}
-		state.ProviderCredentials[projectID][provider] = &record
-	}
-	return rows.Err()
-}
-
 func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, event_type, status, payload, sort_order, created_at, updated_at
@@ -818,26 +712,6 @@ func insertPromptModels(ctx context.Context, tx pgx.Tx, prompts map[string]*usec
 	return nil
 }
 
-func insertPromptModelSchedules(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.Prompt) error {
-	for _, promptID := range sortedPromptIDs(prompts) {
-		prompt := prompts[promptID]
-		modelIDs := make([]string, 0, len(prompt.Schedule.ModelCrons))
-		for modelID := range prompt.Schedule.ModelCrons {
-			modelIDs = append(modelIDs, modelID)
-		}
-		sort.Strings(modelIDs)
-		for _, modelID := range modelIDs {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO prompt_model_schedules (prompt_id, model_id, cron_expr, created_at, updated_at)
-				VALUES ($1, $2, $3, NOW(), NOW())
-			`, prompt.ID, modelID, prompt.Schedule.ModelCrons[modelID]); err != nil {
-				return fmt.Errorf("insert prompt model schedule %s/%s: %w", prompt.ID, modelID, err)
-			}
-		}
-	}
-	return nil
-}
-
 func insertCompetitors(ctx context.Context, tx pgx.Tx, competitors map[string]*usecase.Competitor) error {
 	for _, competitorID := range sortedCompetitorIDs(competitors) {
 		competitor := competitors[competitorID]
@@ -869,60 +743,6 @@ func insertProjectSelections(ctx context.Context, tx pgx.Tx, selections map[stri
 				VALUES ($1, $2, $3, NOW(), NOW())
 			`, projectID, modelID, selections[projectID][modelID]); err != nil {
 				return fmt.Errorf("insert project model %s/%s: %w", projectID, modelID, err)
-			}
-		}
-	}
-	return nil
-}
-
-func (s *StateStore) insertProviderCredentials(
-	ctx context.Context,
-	tx pgx.Tx,
-	items map[string]map[string]*usecase.LLMProviderCredentialRecord,
-	projects map[string]*usecase.Project,
-) error {
-	projectIDs := make([]string, 0, len(items))
-	for projectID := range items {
-		projectIDs = append(projectIDs, projectID)
-	}
-	sort.Strings(projectIDs)
-
-	for _, projectID := range projectIDs {
-		project, exists := projects[projectID]
-		if !exists || project == nil {
-			continue
-		}
-		providers := make([]string, 0, len(items[projectID]))
-		for provider := range items[projectID] {
-			providers = append(providers, provider)
-		}
-		sort.Strings(providers)
-
-		for _, provider := range providers {
-			record := items[projectID][provider]
-			apiKey := ""
-			if record != nil {
-				apiKey = strings.TrimSpace(record.APIKey)
-			}
-			if apiKey == "" {
-				continue
-			}
-			apiKeyCiphertext, err := s.codec.Encrypt(apiKey)
-			if err != nil {
-				return fmt.Errorf("encrypt llm provider credential %s/%s: %w", projectID, provider, err)
-			}
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO project_llm_provider_credentials (
-					project_id,
-					organization_id,
-					provider,
-					api_key_ciphertext,
-					updated_at,
-					created_at
-				)
-				VALUES ($1, $2, $3, $4, $5, NOW())
-			`, projectID, project.OrganizationID, provider, apiKeyCiphertext, record.UpdatedAt); err != nil {
-				return fmt.Errorf("insert llm provider credential %s/%s: %w", projectID, provider, err)
 			}
 		}
 	}

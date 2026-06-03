@@ -1,6 +1,6 @@
 import type { DateRange } from "react-day-picker";
 
-import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "./monitoring-data";
 
 import type { MonitoringFiltersSnapshot } from "./use-monitoring-filters";
 

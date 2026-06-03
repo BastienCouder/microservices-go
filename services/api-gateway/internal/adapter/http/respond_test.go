@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestWriteJSONErrorUsesStructuredPayload(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	writeJSONError(rec, http.StatusTooManyRequests, "rate limit exceeded")
+	writeJSONError(rec, http.StatusTooManyRequests, httpjson.RateLimitExceededMessage)
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d body=%s", rec.Code, rec.Body.String())
@@ -28,7 +29,7 @@ func TestWriteJSONErrorUsesStructuredPayload(t *testing.T) {
 	if payload.Error.Code != "rate_limited" {
 		t.Fatalf("expected rate_limited code, got %q", payload.Error.Code)
 	}
-	if payload.Error.Message != "rate limit exceeded" {
+	if payload.Error.Message != httpjson.RateLimitExceededMessage {
 		t.Fatalf("expected rate limit message, got %q", payload.Error.Message)
 	}
 }

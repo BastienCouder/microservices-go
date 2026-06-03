@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { pushErrorToast } from "@/components/ui/toast-actions";
-import type { OptimizationError } from "@/lib/optimization-errors-data";
+import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
 import {
   buildProjectModelLookup,
 } from "@/lib/project-models";
@@ -17,12 +18,14 @@ import { ErrorHubDetailsPanel } from "./error-hub-details-panel";
 import { ErrorHubFiltersToolbar } from "./error-hub-filters-toolbar";
 import {
   type ActionStatusFilter,
+  type ErrorHubBoardView,
   type PeriodFilter,
   type SourceFilter,
 } from "../_lib/error-hub-types";
 import {
   getErrorContextMeta,
   getFilteredErrors,
+  groupErrorsByActionStatus,
   getMonitoringOriginBadge,
   groupErrorsBySeverity,
   listAvailableModels,
@@ -72,6 +75,7 @@ export function ErrorHubKanban({
   const [period, setPeriod] = useState<PeriodFilter>("all");
   const [actionStatusFilter, setActionStatusFilter] =
     useState<ActionStatusFilter>("all");
+  const [boardView, setBoardView] = useState<ErrorHubBoardView>("severity");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
     initialSourceFilter ?? "all",
   );
@@ -119,8 +123,11 @@ export function ErrorHubKanban({
   );
 
   const columns = useMemo(
-    () => groupErrorsBySeverity(filteredErrors, actionStatusesByErrorId),
-    [actionStatusesByErrorId, filteredErrors],
+    () =>
+      boardView === "status"
+        ? groupErrorsByActionStatus(filteredErrors, actionStatusesByErrorId)
+        : groupErrorsBySeverity(filteredErrors, actionStatusesByErrorId),
+    [actionStatusesByErrorId, boardView, filteredErrors],
   );
 
   const allCompetitorsSelected = selectedCompetitors.length === 0;
@@ -180,7 +187,7 @@ export function ErrorHubKanban({
     getErrorContextMeta(error, locale);
 
   return (
-  <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
         title="Problèmes détectés"
         baseline="Centre de triage des erreurs de l'application"
@@ -188,33 +195,51 @@ export function ErrorHubKanban({
       />
 
       <div className="rounded-xl bg-background px-3 pb-3 md:px-4 md:pb-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
-          <div className="min-w-0 flex-1">
-            <ErrorHubFiltersToolbar
-              actionStatusFilter={actionStatusFilter}
-              allCompetitorsSelected={allCompetitorsSelected}
-              allModelsSelected={allModelsSelected}
-              availableCompetitors={competitors}
-              availableModels={availableModels}
-              clearFilters={clearFilters}
-              competitorsPopoverOpen={competitorsPopoverOpen}
-              hasActiveFilters={hasActiveFilters}
-              modelsPopoverOpen={modelsPopoverOpen}
-              period={period}
-              projectModelLookup={projectModelLookup}
-              search={search}
-              selectedCompetitors={selectedCompetitors}
-              selectedModels={selectedModels}
-              setCompetitorsPopoverOpen={setCompetitorsPopoverOpen}
-              setActionStatusFilter={setActionStatusFilter}
-              setModelsPopoverOpen={setModelsPopoverOpen}
-              setPeriod={setPeriod}
-              setSearch={setSearch}
-              setSourceFilter={setSourceFilter}
-              sourceFilter={sourceFilter}
-              toggleCompetitor={toggleCompetitor}
-              toggleModel={toggleModel}
-            />
+        <div className="flex flex-col gap-3 md:gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
+            <div className="min-w-0 flex-1 space-y-4">
+              <ErrorHubFiltersToolbar
+                actionStatusFilter={actionStatusFilter}
+                allCompetitorsSelected={allCompetitorsSelected}
+                allModelsSelected={allModelsSelected}
+                availableCompetitors={competitors}
+                availableModels={availableModels}
+                clearFilters={clearFilters}
+                competitorsPopoverOpen={competitorsPopoverOpen}
+                hasActiveFilters={hasActiveFilters}
+                modelsPopoverOpen={modelsPopoverOpen}
+                period={period}
+                projectModelLookup={projectModelLookup}
+                search={search}
+                selectedCompetitors={selectedCompetitors}
+                selectedModels={selectedModels}
+                setCompetitorsPopoverOpen={setCompetitorsPopoverOpen}
+                setActionStatusFilter={setActionStatusFilter}
+                setModelsPopoverOpen={setModelsPopoverOpen}
+                setPeriod={setPeriod}
+                setSearch={setSearch}
+                setSourceFilter={setSourceFilter}
+                sourceFilter={sourceFilter}
+                toggleCompetitor={toggleCompetitor}
+                toggleModel={toggleModel}
+              />
+                <Tabs
+                value={boardView}
+                onValueChange={(value) =>
+                  setBoardView(value as ErrorHubBoardView)
+                }
+                className="w-full md:w-auto"
+              >
+                <TabsList className="h-10 w-full md:w-auto">
+                  <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
+                    Par sévérité
+                  </TabsTrigger>
+                  <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
+                    Par statut
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
         </div>
       </div>
@@ -223,9 +248,10 @@ export function ErrorHubKanban({
         <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
           {columns.map((column, columnIndex) => (
             <ErrorHubColumn
-              key={column.severity}
+              key={column.id}
               {...column}
               actionStatusesByErrorId={actionStatusesByErrorId}
+              columnId={column.id}
               columnIndex={columnIndex}
               emptyLabel={persistError}
               generatedIds={generatedIds}

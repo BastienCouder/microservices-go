@@ -1,0 +1,100 @@
+package http
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strings"
+
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/domain"
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/usecase"
+)
+
+type Handler struct {
+	svc        *usecase.Service
+	readyCheck func(context.Context) error
+}
+
+func NewHandler(svc *usecase.Service, readyCheck func(context.Context) error) *Handler {
+	return &Handler{svc: svc, readyCheck: readyCheck}
+}
+
+func (h *Handler) Register(mux *http.ServeMux) {
+	mux.HandleFunc("GET /health", h.health)
+	mux.HandleFunc("GET /ready", h.ready)
+	mux.HandleFunc("POST /__RESOURCE_NAME__", h.create)
+	mux.HandleFunc("GET /__RESOURCE_NAME__/", h.getByID)
+}
+
+func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "__SERVICE_NAME__"})
+}
+
+func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "__SERVICE_NAME__"})
+		return
+	}
+	writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "__SERVICE_NAME__"})
+}
+
+type createRequest struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) create(w http.ResponseWriter, r *http.Request) {
+	var req createRequest
+	if err := decodeJSON(w, r, &req); err != nil {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid json payload")
+		return
+	}
+
+	result, err := h.svc.Create(r.Context(), usecase.CreateInput{Name: req.Name})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, result)
+}
+
+func (h *Handler) getByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimSpace(strings.TrimPrefix(r.URL.Path, "/__RESOURCE_NAME__/"))
+	if id == "" || strings.Contains(id, "/") {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+
+	result, err := h.svc.Get(r.Context(), id)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, domain.ErrValidation):
+		httpjson.WriteError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domain.ErrNotFound):
+		httpjson.WriteError(w, http.StatusNotFound, err.Error())
+	default:
+		httpjson.WriteError(w, http.StatusInternalServerError, "internal server error")
+	}
+}
+
+func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	decoder := json.NewDecoder(r.Body)
+	return decoder.Decode(out)
+}
+
+func writeJSON(w http.ResponseWriter, status int, payload any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(payload)
+}

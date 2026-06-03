@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -17,13 +15,14 @@ import (
 	iav1 "github.com/bastiencouder/microservices-go/contracts/gen/go/ia/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/http"
 	openai "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openai"
 	openrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openrouter"
 	providerrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/router"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/ia-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
 )
 
@@ -32,7 +31,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(); ok {
+	if code, ok := serviceboot.RunHealthcheckMode(); ok {
 		os.Exit(code)
 	}
 
@@ -89,22 +88,11 @@ func main() {
 
 	httpServer := httpsrv.NewServer(
 		cfg.HTTPAddr,
-		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")(mux),
+		internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")(mux),
 		httpsrv.WithReadTimeout(10*time.Second),
 		httpsrv.WithWriteTimeout(20*time.Second),
 	)
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.HandleFunc("GET /metrics", metricsHandler)
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("ia-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "ia-service")
 
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
 		AllowInsecure:     cfg.GRPCAllowInsecure,
@@ -116,7 +104,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure grpc tls: %v", err)
 	}
-	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")))
+	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(internalauth.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "ia-service")))
 	grpcServer := grpc.NewServer(grpcServerOptions...)
 	iav1.RegisterIAServiceServer(grpcServer, g)
 
@@ -154,18 +142,4 @@ func main() {
 		log.Printf("shutdown error: %v", err)
 	}
 	grpcServer.GracefulStop()
-}
-
-func runHealthcheckMode() (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	return 0, true
-}
-
-func metricsHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	_, _ = fmt.Fprintln(w, "# HELP service_up Service health indicator.")
-	_, _ = fmt.Fprintln(w, "# TYPE service_up gauge")
-	_, _ = fmt.Fprintln(w, "service_up 1")
 }

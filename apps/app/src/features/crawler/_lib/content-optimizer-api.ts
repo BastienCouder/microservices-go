@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  unwrapGatewayPayload,
+  type GatewayResult,
+} from "@/shared/api/gateway";
 import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 export type ContentOptimizerCrawlJob = {
@@ -93,11 +97,7 @@ function unwrapGatewayData<T>(response: GatewayResult<unknown>): T {
   if (!response.ok) {
     throw new Error(normalizeContentOptimizerError(response.error));
   }
-  const payload = response.data;
-  if (payload && typeof payload === "object" && "data" in payload) {
-    return (payload as { data: T }).data;
-  }
-  return payload as T;
+  return unwrapGatewayPayload(response.data) as T;
 }
 
 function shouldRetryWithResolvedProjectId(response: GatewayResult<unknown>): boolean {

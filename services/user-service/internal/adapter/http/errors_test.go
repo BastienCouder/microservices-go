@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,15 +38,15 @@ func TestUserHandlerWritesStructuredNotFoundError(t *testing.T) {
 	if payload.Error.Code != "not_found" {
 		t.Fatalf("expected not_found code, got %q", payload.Error.Code)
 	}
-	if payload.Error.Message != "user not found" {
-		t.Fatalf("expected user not found message, got %q", payload.Error.Message)
+	if payload.Error.Message != httpjson.NotFoundMessage {
+		t.Fatalf("expected not found message %q, got %q", httpjson.NotFoundMessage, payload.Error.Message)
 	}
 }
 
 func TestUserWriteErrorUsesRateLimitedCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	writeError(rec, http.StatusTooManyRequests, "rate limit exceeded")
+	httpjson.WriteError(rec, http.StatusTooManyRequests, "rate limit exceeded")
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d body=%s", rec.Code, rec.Body.String())

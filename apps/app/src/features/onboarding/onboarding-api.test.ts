@@ -63,4 +63,35 @@ describe("createOnboardingProject", () => {
     expect(result.organizationId).toBe("42");
     expect(result.warnings).toEqual([]);
   });
+
+  test("uses the brand name as the default organization name", async () => {
+    let requestBody: Record<string, unknown> = {};
+    globalThis.fetch = (async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return jsonResponse(201, {
+        success: true,
+        data: {
+          projectId: "prj_299",
+          organizationId: 42,
+          projectSlug: "acme",
+        },
+      });
+    }) as typeof fetch;
+
+    await createOnboardingProject("http://api.test", {
+      organizationId: "",
+      organizationName: "",
+      brandName: "Acme",
+      websiteUrl: "https://acme.test",
+      attributionSource: "",
+      brandDescription: "",
+      industry: "",
+      competitors: [],
+      prompts: [],
+      modelIds: ["gpt-oss-120b-free"],
+    });
+
+    expect(requestBody.organizationId).toBe("");
+    expect(requestBody.organizationName).toBe("Acme");
+  });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimizationErrors } from "../perception/core/use-optimization-errors";
+import { useOptimizationErrors } from "../perception/_lib/shared/use-optimization-errors";
 import { ErrorHubKanban } from "./_components/error-hub-kanban";
 import { readSourceFilterFromSearch } from "./_lib/error-hub-utils";
 

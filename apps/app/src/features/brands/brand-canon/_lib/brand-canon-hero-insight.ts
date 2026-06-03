@@ -1,7 +1,7 @@
 import type {
   PerceptionRadarPoint,
   PerceptionTrendPoint,
-} from "@/lib/perception-data";
+} from "@/features/perception/_lib/shared/perception-data";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 import { getPerceptionAxisLabel } from "@/features/perception/_lib";
 

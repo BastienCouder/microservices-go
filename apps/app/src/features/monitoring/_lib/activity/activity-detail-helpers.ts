@@ -1,4 +1,4 @@
-import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "../shared/monitoring-data";
 
 export function getAlertTypeLabel(
   value: string | undefined,

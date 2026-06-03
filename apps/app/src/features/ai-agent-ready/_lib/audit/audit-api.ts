@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayResult,
+  unwrapGatewayPayload,
+} from "@/shared/api/gateway";
 import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 import type {
@@ -101,14 +105,9 @@ export async function getAgentReadyProjectSummary(
     }
   }
 
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-
-  const payload =
-    response.data && typeof response.data === "object" && "data" in response.data
-      ? (response.data as { data: unknown }).data
-      : response.data;
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(response, "Impossible de charger le projet de scan."),
+  );
 
   return {
     name: readProjectName(payload),
@@ -126,10 +125,7 @@ export async function startAgentReadyScan(
     retry: { attempts: 0 },
   });
 
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-  return response.data;
+  return requireGatewayResult(response, "Impossible de lancer le scan.");
 }
 
 export async function getAgentReadyScan(
@@ -143,10 +139,7 @@ export async function getAgentReadyScan(
     { method: "GET", retry: { delayMs: 200 }, signal },
   );
 
-  if (!response.ok) {
-    throw new Error(response.error);
-  }
-  return response.data;
+  return requireGatewayResult(response, "Impossible de charger le scan.");
 }
 
 export async function pollAgentReadyScan(

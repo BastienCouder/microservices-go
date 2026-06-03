@@ -1,13 +1,15 @@
 import type {
   OptimizationError,
-} from "@/lib/optimization-errors-data";
+} from "@/features/perception/_lib/shared/optimization-errors-data";
 import {
   toProjectModelVisual,
   type ProjectModelMeta,
 } from "@/lib/project-models";
 import {
   SEVERITY_COLUMNS,
+  STATUS_COLUMNS,
   type ActionStatusFilter,
+  type ErrorHubStatusColumnId,
   type PeriodFilter,
   type SourceFilter,
 } from "./error-hub-types";
@@ -32,11 +34,48 @@ function getActionStatusRank(status: string | undefined) {
   return 1;
 }
 
+function getSeverityRank(severity: OptimizationError["severity"]) {
+  if (severity === "high") return 0;
+  if (severity === "medium") return 1;
+  return 2;
+}
+
 function sortErrorsByActionStatus(
   errors: OptimizationError[],
   actionStatusesByErrorId: ReadonlyMap<string, string>,
 ) {
   return [...errors].sort((left, right) => {
+    const rankDiff =
+      getActionStatusRank(actionStatusesByErrorId.get(left.id)) -
+      getActionStatusRank(actionStatusesByErrorId.get(right.id));
+
+    if (rankDiff !== 0) return rankDiff;
+
+    if (left.source !== right.source) {
+      return left.source.localeCompare(right.source);
+    }
+
+    const leftResource = (left.resource ?? "").trim().toLowerCase();
+    const rightResource = (right.resource ?? "").trim().toLowerCase();
+
+    if (leftResource !== rightResource) {
+      return leftResource.localeCompare(rightResource);
+    }
+
+    return left.title.localeCompare(right.title);
+  });
+}
+
+function sortErrorsBySeverity(
+  errors: OptimizationError[],
+  actionStatusesByErrorId: ReadonlyMap<string, string>,
+) {
+  return [...errors].sort((left, right) => {
+    const severityDiff =
+      getSeverityRank(left.severity) - getSeverityRank(right.severity);
+
+    if (severityDiff !== 0) return severityDiff;
+
     const rankDiff =
       getActionStatusRank(actionStatusesByErrorId.get(left.id)) -
       getActionStatusRank(actionStatusesByErrorId.get(right.id));
@@ -66,6 +105,32 @@ export function groupErrorsBySeverity(
     ...column,
     errors: sortErrorsByActionStatus(
       errors.filter((error) => error.severity === column.severity),
+      actionStatusesByErrorId,
+    ),
+  }));
+}
+
+function matchesStatusColumn(
+  status: string | undefined,
+  columnId: ErrorHubStatusColumnId,
+) {
+  if (columnId === "todo") {
+    return status !== "processing" && status !== "done";
+  }
+
+  return status === columnId;
+}
+
+export function groupErrorsByActionStatus(
+  errors: OptimizationError[],
+  actionStatusesByErrorId: ReadonlyMap<string, string>,
+) {
+  return STATUS_COLUMNS.map((column) => ({
+    ...column,
+    errors: sortErrorsBySeverity(
+      errors.filter((error) =>
+        matchesStatusColumn(actionStatusesByErrorId.get(error.id), column.id),
+      ),
       actionStatusesByErrorId,
     ),
   }));

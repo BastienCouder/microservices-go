@@ -1,5 +1,5 @@
-import { gatewayJSON } from "@/shared/api/gateway";
-import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
+import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
+import { attachStableSlugs } from "@/shared/public-slugs";
 
 type JsonObject = Record<string, unknown>;
 
@@ -7,6 +7,7 @@ type ProjectTokenCandidate = {
   id: string;
   name: string;
   slug: string;
+  organizationId: string;
 };
 
 function asObject(value: unknown): JsonObject {
@@ -24,16 +25,8 @@ function getField(value: JsonObject, keys: string[]): unknown {
   return undefined;
 }
 
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  const payload = asObject(value);
-  if (payload.success === true && "data" in payload) {
-    return payload.data;
-  }
-  return value;
-}
-
 export function normalizeProjectTokenCandidates(value: unknown): ProjectTokenCandidate[] {
-  const payload = unwrapSuccessEnvelope(value);
+  const payload = unwrapGatewayPayload(value);
   if (!Array.isArray(payload)) return [];
 
   return attachStableSlugs(
@@ -42,20 +35,29 @@ export function normalizeProjectTokenCandidates(value: unknown): ProjectTokenCan
       .map((entry) => ({
         id: asString(getField(entry, ["id", "ID"])),
         name: asString(getField(entry, ["name", "Name"])) || "Projet",
+        organizationId: asString(
+          getField(entry, ["organizationId", "OrganizationID"]),
+        ),
       }))
       .filter((project) => project.id !== ""),
     "project",
   );
 }
 
-export async function resolveProjectTokenToId(
+export type ResolvedProjectTokenContext = {
+  projectId: string;
+  projectSlug: string;
+  organizationId: string;
+};
+
+export async function resolveProjectTokenToContext(
   apiBaseURL: string,
   input: {
     projectToken: string;
     organizationId?: string;
     signal?: AbortSignal;
   },
-): Promise<string | null> {
+): Promise<ResolvedProjectTokenContext | null> {
   const projectToken = input.projectToken.trim();
   if (projectToken === "") return null;
 
@@ -67,5 +69,26 @@ export async function resolveProjectTokenToId(
 
   if (!response.ok) return null;
 
-  return findBySlugOrId(normalizeProjectTokenCandidates(response.data), projectToken)?.id ?? null;
+  const project = normalizeProjectTokenCandidates(response.data)
+    .find((candidate) => candidate.id === projectToken);
+  if (!project) return null;
+
+  return {
+    projectId: project.id,
+    projectSlug: project.slug,
+    organizationId: project.organizationId,
+  };
+}
+
+export async function resolveProjectTokenToId(
+  apiBaseURL: string,
+  input: {
+    projectToken: string;
+    organizationId?: string;
+    signal?: AbortSignal;
+  },
+): Promise<string | null> {
+  return (
+    await resolveProjectTokenToContext(apiBaseURL, input)
+  )?.projectId ?? null;
 }

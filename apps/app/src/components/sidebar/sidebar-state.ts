@@ -1,6 +1,18 @@
 import type { OrganizationHierarchy, OrganizationProjectSummary } from "@/shared/models";
 import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 
+type ProjectTokenHierarchy = {
+  organization: {
+    id: string;
+    slug: string;
+  };
+  projects: Array<{
+    id: string;
+    slug: string;
+    organizationId: string;
+  }>;
+};
+
 type SelectPreferredIDOptions = {
   candidates: Array<string | null | undefined>;
   availableIds: Iterable<string>;
@@ -117,11 +129,32 @@ export function selectPreferredID({ candidates, availableIds, fallback = "" }: S
 }
 
 export function findOrganizationIdForProjectToken(
-  hierarchies: Array<OrganizationHierarchy | null | undefined>,
+  hierarchies: Array<ProjectTokenHierarchy | null | undefined>,
   projectToken: string,
+  preferredOrganizationToken = "",
 ): string {
   const normalizedToken = normalizeString(projectToken);
   if (normalizedToken === "") return "";
+
+  const normalizedOrganizationToken = normalizeString(preferredOrganizationToken);
+  if (normalizedOrganizationToken !== "") {
+    for (const hierarchy of hierarchies) {
+      if (!hierarchy) continue;
+      if (
+        hierarchy.organization.id !== normalizedOrganizationToken &&
+        hierarchy.organization.slug !== normalizedOrganizationToken
+      ) {
+        continue;
+      }
+
+      const project = hierarchy.projects.find(
+        ({ id, slug }) => id === normalizedToken || slug === normalizedToken,
+      );
+      if (project) {
+        return hierarchy.organization.id || project.organizationId;
+      }
+    }
+  }
 
   for (const hierarchy of hierarchies) {
     if (!hierarchy) continue;

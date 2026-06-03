@@ -14,6 +14,7 @@ import (
 
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	httpadapter "github.com/bastiencouder/microservices-go/services/api-gateway/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/api-gateway/internal/config"
 )
@@ -71,18 +72,7 @@ func main() {
 	h.Register(mux)
 
 	server := httpsrv.NewServer(cfg.HTTPAddr, mux)
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", promhttp.Handler())
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("api-gateway metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "api-gateway", promhttp.Handler())
 
 	go func() {
 		log.Printf("api-gateway listening on %s", cfg.HTTPAddr)

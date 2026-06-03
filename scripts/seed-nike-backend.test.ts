@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
-import { MODELS, readAnalysisMode, signInternalJWT } from "./seed-nike-backend.ts";
+import { MODELS, buildRuntimeSeedPlan, createIDAllocator, readAnalysisMode, signInternalJWT } from "./seed-nike-backend.ts";
+
+function expectScopedUUID(value: string, prefix: string) {
+  expect(value).toMatch(new RegExp(`^${prefix}_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, "i"));
+}
 
 function decodePayload(token: string): Record<string, unknown> {
   const [, payload] = token.split(".");
@@ -28,6 +32,50 @@ describe("seed-nike-backend", () => {
       "gemma-3-4b-free",
       "gemma-3-27b-free",
     ]);
+  });
+
+  test("id allocator increments shared sequences with service prefixes", () => {
+    const allocator = createIDAllocator(357);
+    expectScopedUUID(allocator.next("prj"), "prj");
+    expectScopedUUID(allocator.next("prm"), "prm");
+    expectScopedUUID(allocator.next("cmp"), "cmp");
+    expect(allocator.current()).toBe(360);
+  });
+
+  test("runtime seed plan auto-generates coherent ids", () => {
+    const plan = buildRuntimeSeedPlan({
+      projectSeqStart: 357,
+      analysisSeqStart: 158,
+      cleanupProjectIDs: ["nike"],
+    });
+
+    expectScopedUUID(plan.projectId, "prj");
+    expect(plan.cleanupProjectIDs).toEqual(["nike", plan.projectId]);
+    expect(plan.prompts).toHaveLength(6);
+    expect(plan.competitors).toHaveLength(6);
+    expect(plan.runs).toHaveLength(9);
+    expect(plan.alerts).toHaveLength(4);
+    expectScopedUUID(plan.prompts[0]!.id, "prm");
+    expectScopedUUID(plan.competitors[0]!.id, "cmp");
+    expectScopedUUID(plan.runs[0]!.id, "run");
+    expectScopedUUID(plan.runs[0]!.promptRuns[0]!.id, "prun");
+    expectScopedUUID(plan.runs[0]!.responses[0]!.id, "resp");
+    expectScopedUUID(plan.alerts[0]!.id, "alt");
+    expect(plan.liveRequestId).toBe(`${plan.projectId}-live-seed`);
+  });
+
+  test("runtime seed plan reuses generated project ids", () => {
+    const reusableProjectID = "prj_11111111-2222-4333-8444-555555555555";
+    const plan = buildRuntimeSeedPlan({
+      projectSeqStart: 357,
+      analysisSeqStart: 158,
+      reusableProjectID,
+      cleanupProjectIDs: ["nike", reusableProjectID],
+    });
+
+    expect(plan.projectId).toBe(reusableProjectID);
+    expect(plan.cleanupProjectIDs).toEqual(["nike", reusableProjectID]);
+    expectScopedUUID(plan.prompts[0]!.id, "prm");
   });
 
   test("signInternalJWT encodes issuer, audience and identities", () => {

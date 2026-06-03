@@ -25,6 +25,10 @@ describe("error hub", () => {
     expect(kanbanSource.includes("const [selectedError, setSelectedError]")).toBe(
       true,
     );
+    expect(kanbanSource.includes('const [boardView, setBoardView]')).toBe(true);
+    expect(kanbanSource.includes('value={boardView}')).toBe(true);
+    expect(kanbanSource.includes('value="severity"')).toBe(true);
+    expect(kanbanSource.includes('value="status"')).toBe(true);
     expect(
       kanbanSource.includes("onOpenDetails={setSelectedError}"),
     ).toBe(true);
@@ -48,6 +52,11 @@ describe("error hub", () => {
     expect(typesSource.includes("ACTION_STATUS_OPTIONS")).toBe(true);
     expect(utilsSource.includes("filterErrorsByActionStatus")).toBe(true);
     expect(utilsSource.includes("sortErrorsByActionStatus")).toBe(true);
+    expect(utilsSource.includes("groupErrorsByActionStatus")).toBe(true);
+    expect(typesSource.includes("STATUS_COLUMNS")).toBe(true);
+    expect(typesSource.includes('title: "À faire"')).toBe(true);
+    expect(typesSource.includes('title: "En cours"')).toBe(true);
+    expect(typesSource.includes('title: "Terminé"')).toBe(true);
     expect(utilsSource.includes('if (status === "processing") return 0;')).toBe(
       true,
     );

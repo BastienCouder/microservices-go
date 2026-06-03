@@ -1,4 +1,4 @@
-import type { BrandCompetitor } from "@/lib/perception-data";
+import type { BrandCompetitor } from "@/features/perception/_lib/shared/perception-data";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 export type EditorTab = "brand" | "competitors";

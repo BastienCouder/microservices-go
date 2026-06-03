@@ -1,9 +1,11 @@
 package http
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,11 +15,16 @@ import (
 )
 
 type Handler struct {
-	svc *usecase.Service
+	svc        *usecase.Service
+	readyCheck func(context.Context) error
 }
 
-func NewHandler(svc *usecase.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *usecase.Service, readyCheck ...func(context.Context) error) *Handler {
+	var readiness func(context.Context) error
+	if len(readyCheck) > 0 {
+		readiness = readyCheck[0]
+	}
+	return &Handler{svc: svc, readyCheck: readiness}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -33,11 +40,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "attribution-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "attribution-service"})
 }
 
-func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "attribution-service"})
+func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
+		httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "attribution-service"})
+		return
+	}
+	httpjson.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "attribution-service"})
 }
 
 func (h *Handler) attributionProjectRoutes(w http.ResponseWriter, r *http.Request) {
@@ -127,19 +138,19 @@ type recordEventRequest struct {
 func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -162,19 +173,19 @@ func (h *Handler) recordEvent(w http.ResponseWriter, r *http.Request, projectID 
 func (h *Handler) recordInternalEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -197,7 +208,7 @@ func (h *Handler) recordInternalEvent(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request, projectID string) {
 	payload, err := io.ReadAll(http.MaxBytesReader(w, r.Body, 1<<20))
 	if err != nil {
-		writeError(w, http.StatusBadRequest, "invalid webhook payload")
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid webhook payload")
 		return
 	}
 
@@ -211,13 +222,13 @@ func (h *Handler) handleStripeWebhook(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) recordIngestionEvent(w http.ResponseWriter, r *http.Request, projectID string) {
 	var req recordEventRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
 	occurredAt, err := parseRFC3339Optional(req.OccurredAt)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -240,13 +251,13 @@ func (h *Handler) recordIngestionEvent(w http.ResponseWriter, r *http.Request, p
 func (h *Handler) listEvents(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	limit := 50
@@ -268,14 +279,14 @@ func (h *Handler) listEvents(w http.ResponseWriter, r *http.Request, projectID s
 func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 	organizationID, _ := authenticatedOrganizationID(r)
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -290,18 +301,18 @@ func (h *Handler) getFunnel(w http.ResponseWriter, r *http.Request, projectID st
 func (h *Handler) getTrafficReport(w http.ResponseWriter, r *http.Request, projectID string) {
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	from, to, err := parseWindow(r)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -353,25 +364,30 @@ func parseRFC3339Optional(value string) (time.Time, error) {
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 	case errors.Is(err, usecase.ErrUnauthorized):
-		writeError(w, http.StatusForbidden, err.Error())
+		httpjson.WriteForbiddenError(w)
 	case errors.Is(err, usecase.ErrNotFound):
-		writeError(w, http.StatusNotFound, err.Error())
+		httpjson.WriteNotFoundError(w)
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
-		writeError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
+		log.Printf("attribution dependency unavailable: %v", err)
+		httpjson.WriteError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
 	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 	}
 }
 
 func userFacingDependencyError(err error) string {
 	message := strings.ToLower(err.Error())
+	if strings.Contains(message, "access_token_scope_insufficient") ||
+		strings.Contains(message, "insufficient authentication scopes") {
+		return "Relance la connexion Google Analytics pour autoriser la lecture des rapports GA4, puis réessaie."
+	}
 	if strings.Contains(message, "service_disabled") ||
 		strings.Contains(message, "analyticsdata.googleapis.com") ||
 		strings.Contains(message, "google analytics data api has not been used") ||
 		(strings.Contains(message, "google analytics data api") && strings.Contains(message, "disabled")) {
-		return "Active Google Analytics Data API dans le projet Google Cloud du client OAuth, puis réessaie dans quelques minutes."
+		return "Active Google Analytics Data API dans le projet Google Cloud utilise pour cette connexion GA4, puis reessaie dans quelques minutes."
 	}
 	if strings.Contains(message, "ga4") || strings.Contains(message, "google analytics") {
 		return "Google Analytics est momentanément indisponible pour ce projet. Vérifie l'accès à la propriété GA4, puis réessaie."
@@ -422,20 +438,13 @@ func ingestionSigningToken(r *http.Request) string {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(out); err != nil {
-		return err
-	}
-	return nil
+	return httpjson.DecodeJSON(w, r, out)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {
-	writeJSON(w, status, map[string]any{"success": true, "data": data})
+	httpjson.WriteSuccess(w, status, data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	httpjson.WriteSuccess(w, status, payload)
 }

@@ -24,6 +24,7 @@ export function Navigation() {
     { name: t("howItWorks"), href: "#how-it-works" },
     { name: t("developers"), href: "#developers" },
     { name: t("pricing"), href: "#pricing" },
+    { name: t("faq"), href: "#faq" },
   ];
 
   useEffect(() => {

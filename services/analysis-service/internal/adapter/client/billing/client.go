@@ -2,7 +2,6 @@ package billing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,7 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
@@ -41,12 +41,12 @@ func (c *Client) GetMonthlyQuota(ctx context.Context, organizationID int64) (int
 		return 0, false, fmt.Errorf("%w: organizationId must be positive", usecase.ErrValidation)
 	}
 
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"billing-service",
 		"analysis-service",
-		security.OutboundTokenClaims{Organization: organizationID},
+		internalauth.Claims{Organization: organizationID},
 	)
 	if err != nil {
 		return 0, false, fmt.Errorf("sign internal jwt: %w", err)
@@ -84,7 +84,7 @@ func (c *Client) GetMonthlyQuota(ctx context.Context, organizationID int64) (int
 	var payload struct {
 		MonthlyQuota int `json:"monthly_quota"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 		return 0, false, fmt.Errorf("decode billing quota response: %w", err)
 	}
 

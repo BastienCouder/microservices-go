@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"log"
 	"net/http"
 	"strconv"
@@ -30,15 +31,15 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "permission-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "permission-service"})
 }
 
 func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "permission-service"})
+		httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "permission-service"})
 		return
 	}
-	writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "permission-service"})
+	httpjson.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "permission-service"})
 }
 
 func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
@@ -47,15 +48,14 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 		Action         string `json:"action"`
 		Resource       string `json:"resource"`
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // SEC-003: 1 MiB body limit
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json payload")
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
 		return
 	}
 
 	userID, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing authenticated user")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 
@@ -66,12 +66,13 @@ func (h *Handler) check(w http.ResponseWriter, r *http.Request) {
 		Resource:       req.Resource,
 	})
 	if err != nil {
+		log.Printf("permission check failed: organization_id=%d user_id=%d action=%s resource=%s err=%v", req.OrganizationID, userID, req.Action, req.Resource, err)
 		if errors.Is(err, domain.ErrInvalidPermissionCheck) {
-			writeError(w, http.StatusBadRequest, err.Error())
+			httpjson.WriteValidationError(w)
 			auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "invalid"})
 			return
 		}
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 		auditSecurityEvent("permission_check", map[string]any{"organization_id": req.OrganizationID, "user_id": userID, "action": req.Action, "resource": req.Resource, "result": "error"})
 		return
 	}
@@ -97,9 +98,7 @@ func authenticatedUserID(r *http.Request) (int64, bool) {
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	httpjson.WriteSuccess(w, status, value)
 }
 
 func auditSecurityEvent(event string, fields map[string]any) {

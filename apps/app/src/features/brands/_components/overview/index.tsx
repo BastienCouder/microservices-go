@@ -6,10 +6,10 @@ import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SectionTitle } from "@/components/shared/section-title";
-import { usePerceptionData } from "@/features/perception/core/use-perception-data";
+import { usePerceptionData } from "@/features/perception/_lib/shared/use-perception-data";
 import { PageHeader } from "@/components/shared/page-header";
 import { PERCEPTION_TEXT } from "@/lib/app-data";
-import { createEmptyPerceptionViewData } from "@/lib/perception-data";
+import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
 import {
   deriveShortDescription,
 } from "../../_lib/overview/brand-overview-helpers";

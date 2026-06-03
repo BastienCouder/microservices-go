@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import { appQueryKeys } from "@/lib/query-keys";
+import { invalidateOrganizationScope } from "@/shared/api/query-refresh";
 import type { UserProfile } from "@/shared/models";
 import { findBySlugOrId } from "@/shared/public-slugs";
 import {
@@ -49,6 +50,7 @@ type UseOrganizationsPageViewModelInput = {
 export type OrganizationsPageViewModel = {
   activeTab: ViewTab;
   activeError: string | null;
+  actionError: string | null;
   notice: string | null;
   isInitialLoading: boolean;
   selectedOrganization: OrganizationSummary | null;
@@ -260,17 +262,11 @@ export function useOrganizationsPageViewModel({
     (resourcesQuery.error instanceof Error ? resourcesQuery.error.message : null);
 
   const invalidateOrganizationData = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({
-        queryKey: appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrganizationId),
-      }),
-      queryClient.invalidateQueries({
-        queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
-      }),
-    ]);
+    await invalidateOrganizationScope(
+      queryClient,
+      apiBaseURL,
+      selectedOrganizationId,
+    );
   };
 
   const mutations = useOrganizationMutations({
@@ -304,6 +300,7 @@ export function useOrganizationsPageViewModel({
   return {
     activeTab: effectiveActiveTab,
     activeError,
+    actionError: localError,
     notice,
     isInitialLoading:
       organizationsQuery.isLoading ||

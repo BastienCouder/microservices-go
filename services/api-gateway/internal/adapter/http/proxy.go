@@ -1,6 +1,7 @@
 package http
 
 import (
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"strings"
 	"time"
@@ -16,7 +17,7 @@ func (h *Handler) route(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !isHealthRequest(r) && !h.rateLimiter.Allow(h.clientIP(r)) {
-		writeJSONError(w, http.StatusTooManyRequests, "rate limit exceeded")
+		httpjson.WriteRateLimitExceeded(w)
 		auditAccess(r, "api-gateway", http.StatusTooManyRequests, 0, time.Now().UTC())
 		return
 	}

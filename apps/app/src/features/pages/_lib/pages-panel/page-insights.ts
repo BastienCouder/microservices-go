@@ -1,4 +1,7 @@
-import type { MonitoringData, MonitoringPrompt } from "@/lib/monitoring-data";
+import type {
+  MonitoringData,
+  MonitoringPrompt,
+} from "@/features/monitoring/_lib/shared/monitoring-data";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 
 import type {

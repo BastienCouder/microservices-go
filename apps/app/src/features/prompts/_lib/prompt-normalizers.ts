@@ -1,5 +1,6 @@
 "use client";
 
+import { unwrapGatewayPayload } from "@/shared/api/gateway";
 import { SELECTED_ORG_KEY } from "@/features/models/_lib/model-access";
 import {
   comparePromptRunsByRecency,
@@ -51,14 +52,6 @@ function getField<T = unknown>(obj: Record<string, unknown>, keys: string[]): T 
     if (key in obj) return obj[key] as T;
   }
   return undefined;
-}
-
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.success === true && "data" in value) {
-    return value.data;
-  }
-  return value;
 }
 
 function getString(value: unknown): string {
@@ -190,7 +183,7 @@ export function normalizeProjectPromptRecord(entry: Record<string, unknown>): Pr
 }
 
 export function normalizePromptPage(value: unknown): PromptPageResult {
-  const payload = unwrapSuccessEnvelope(value);
+  const payload = unwrapGatewayPayload(value);
   const record = isRecord(payload) ? payload : {};
   const rawItems = Array.isArray(payload)
     ? payload

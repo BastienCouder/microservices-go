@@ -1,28 +1,53 @@
 import type { PeriodFilterOption } from "@/components/shared/period-filter-picker";
-import type { PerceptionSeverity } from "@/lib/perception-data";
-import type { OptimizationErrorSource } from "@/lib/optimization-errors-data";
+import type { PerceptionSeverity } from "@/features/perception/_lib/shared/perception-data";
+import type { OptimizationErrorSource } from "@/features/perception/_lib/shared/optimization-errors-data";
 
 export const SEVERITY_COLUMNS: Array<{
+  id: string;
   severity: PerceptionSeverity;
   title: string;
   tone: string;
 }> = [
   {
+    id: "high",
     severity: "high",
     title: "Critique",
     tone: "bg-destructive/10 text-destructive",
   },
   {
+    id: "medium",
     severity: "medium",
     title: "Moyenne",
     tone: "bg-amber-500/10 text-amber-700",
   },
   {
+    id: "low",
     severity: "low",
     title: "Faible",
     tone: "bg-green-500/10 text-green-700",
   },
 ];
+
+export const STATUS_COLUMNS = [
+  {
+    id: "todo",
+    title: "À faire",
+    tone: "bg-slate-500/10 text-slate-700",
+  },
+  {
+    id: "processing",
+    title: "En cours",
+    tone: "bg-sky-500/10 text-sky-700",
+  },
+  {
+    id: "done",
+    title: "Terminé",
+    tone: "bg-emerald-500/10 text-emerald-700",
+  },
+] as const;
+
+export type ErrorHubBoardView = "severity" | "status";
+export type ErrorHubStatusColumnId = (typeof STATUS_COLUMNS)[number]["id"];
 
 export const PERIOD_OPTIONS = [
   { value: "all", label: "Toutes les erreurs" },

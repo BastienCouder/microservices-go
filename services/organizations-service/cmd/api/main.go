@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,17 +9,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	amqp "github.com/rabbitmq/amqp091-go"
-
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	projectclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/project"
 	userclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/user"
 	httpadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/http"
 	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/messaging/rabbitmq"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
 )
 
@@ -30,16 +26,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
 		os.Exit(code)
 	}
 
-	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "organizations-service")
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "organizations-service")
 	if err != nil {
 		log.Fatalf("wait for organizations database: %v", err)
 	}
 	defer db.Close()
-	if err := waitForRabbitMQ(context.Background(), cfg.RabbitMQURL, "organizations-service"); err != nil {
+	if err := serviceboot.WaitForRabbitMQ(context.Background(), cfg.RabbitMQURL, "organizations-service"); err != nil {
 		log.Fatalf("wait for rabbitmq: %v", err)
 	}
 
@@ -71,24 +67,13 @@ func main() {
 	}
 	defer invitationNotifier.Close()
 	svc.EnableInvitationNotifications(invitationNotifier, cfg.AppBaseURL, cfg.InvitationLoginURL)
-	h := httpadapter.NewHandler(svc, readinessCheck(db))
+	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 
 	mux := http.NewServeMux()
 	h.Register(mux)
 
-	server := httpsrv.NewServer(cfg.HTTPAddr, security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "organizations-service")(mux))
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.HandleFunc("GET /metrics", metricsHandler)
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("organizations-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	server := httpsrv.NewServer(cfg.HTTPAddr, internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "organizations-service")(mux))
+	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "organizations-service")
 
 	go func() {
 		log.Printf("organizations-service listening on %s", cfg.HTTPAddr)
@@ -110,100 +95,5 @@ func main() {
 	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
-	}
-}
-
-func metricsHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	_, _ = fmt.Fprintln(w, "# HELP service_up Service health indicator.")
-	_, _ = fmt.Fprintln(w, "# TYPE service_up gauge")
-	_, _ = fmt.Fprintln(w, "service_up 1")
-}
-
-func waitForRabbitMQ(ctx context.Context, amqpURL, serviceName string) error {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		conn, err := amqp.Dial(amqpURL)
-		if err == nil {
-			_ = conn.Close()
-			return nil
-		}
-
-		log.Printf("%s rabbitmq unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
-	}
-}
-
-func runHealthcheckMode(databaseURL string) (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	db, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		return 1, true
-	}
-	defer db.Close()
-	if err := db.Ping(ctx); err != nil {
-		return 1, true
-	}
-	return 0, true
-}
-
-func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
-	return func(ctx context.Context) error {
-		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		return db.Ping(pingCtx)
-	}
-}
-
-func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		db, err := pgxpool.New(attemptCtx, dsn)
-		if err == nil {
-			err = db.Ping(attemptCtx)
-		}
-		cancel()
-
-		if err == nil {
-			return db, nil
-		}
-		if db != nil {
-			db.Close()
-		}
-
-		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
 	}
 }

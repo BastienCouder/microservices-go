@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/domain"
-	"github.com/bastiencouder/microservices-go/services/auth-service/internal/security"
 )
 
 var (
@@ -62,7 +62,7 @@ func (c *Client) EnsureProfile(ctx context.Context, identity domain.Identity) er
 	}
 
 	firstName, lastName := deriveNames(identity.Traits.Name, email)
-	token, err := security.SignInternalJWT(c.secret, c.issuer, "user-service", "auth-service", security.OutboundTokenClaims{
+	token, err := internalauth.SignInternalJWT(c.secret, c.issuer, "user-service", "auth-service", internalauth.Claims{
 		IdentityID: authIdentityID,
 	})
 	if err != nil {

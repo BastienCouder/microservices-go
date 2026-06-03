@@ -8,6 +8,7 @@ import {
 
 describe("onboarding mode", () => {
   test("treats account and project setup routes as fresh onboarding starts", () => {
+    expect(shouldStartFreshOnboarding("?setup-account")).toBe(true);
     expect(shouldStartFreshOnboarding("?setup=account")).toBe(true);
     expect(shouldStartFreshOnboarding("?setup=project")).toBe(true);
     expect(shouldStartFreshOnboarding("")).toBe(false);
@@ -33,6 +34,7 @@ describe("onboarding mode", () => {
   });
 
   test("normalizes unknown setup modes to resume", () => {
+    expect(getOnboardingSetupMode("?setup-account")).toBe("account");
     expect(getOnboardingSetupMode("?setup=account")).toBe("account");
     expect(getOnboardingSetupMode("?setup=project")).toBe("project");
     expect(getOnboardingSetupMode("?setup=other")).toBe("resume");

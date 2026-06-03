@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
@@ -13,7 +13,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { PageHeader } from "@/components/shared/page-header";
 import { appQueryKeys } from "@/lib/query-keys";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
-import type { BrandCanon, BrandCompetitor, PerceptionViewData } from "@/lib/perception-data";
+import type {
+  BrandCanon,
+  BrandCompetitor,
+  PerceptionViewData,
+} from "@/features/perception/_lib/shared/perception-data";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { CompetitorEditor } from "./competitor-editor";
 import { EditableListField } from "./editable-list-field";
@@ -40,7 +45,6 @@ export function BrandCanonEditorPanel({
   const queryClient = useQueryClient();
   const [canonDraft, setCanonDraft] = useState<BrandCanon>(initialData.brandCanon);
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
-  const [isSaving, setIsSaving] = useState(false);
   const brandsLocation = buildBrandsLocation(location.search);
   const loadError = initialData.metadata.emptyStateLabel;
 
@@ -48,20 +52,17 @@ export function BrandCanonEditorPanel({
     setCanonDraft((current) => ({ ...current, [key]: value }));
   };
 
-  const handleSave = async () => {
-    if (!initialData.metadata.projectId) {
-      pushErrorToast(new Error(t("demoSaveMessage")), t("demoSaveMessage"));
-      return;
-    }
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (!initialData.metadata.projectId) {
+        throw new Error(t("demoSaveMessage"));
+      }
 
-    const competitorError = validateCompetitors(competitorsDraft, locale);
-    if (competitorError) {
-      pushErrorToast(new Error(competitorError), competitorError);
-      return;
-    }
+      const competitorError = validateCompetitors(competitorsDraft, locale);
+      if (competitorError) {
+        throw new Error(competitorError);
+      }
 
-    setIsSaving(true);
-    try {
       const savedBrandCanon = await saveBrandCanonProject(initialData.metadata.projectId, {
         ...canonDraft,
         audience: sanitizeList(canonDraft.audience),
@@ -77,21 +78,24 @@ export function BrandCanonEditorPanel({
         features: sanitizeList(savedBrandCanon.features ?? current.features),
         pricing: { ...current.pricing, ...(savedBrandCanon.pricing ?? {}) },
       }));
-      await queryClient.invalidateQueries({
-        queryKey: appQueryKeys.perception(
+      await invalidateQueryKeys(queryClient, [
+        appQueryKeys.perception(
           apiBaseURL,
           initialData.metadata.projectId ?? null,
           resolveRuntimeMode(routeSearch),
         ),
-      });
+      ]);
       pushSuccessToast(t("savedMessage"));
       navigate(brandsLocation);
-    } catch (err) {
-      pushErrorToast(err, t("saveError"));
-    } finally {
-      setIsSaving(false);
-    }
-  };
+    },
+    onError: (error) => {
+      pushErrorToast(
+        error,
+        error instanceof Error ? error.message : t("saveError"),
+      );
+    },
+  });
+  const isSaving = saveMutation.isPending;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
@@ -172,7 +176,7 @@ export function BrandCanonEditorPanel({
             >
               {t("cancel")}
             </Button>
-            <Button type="button" onClick={() => void handleSave()} disabled={isSaving}>
+            <Button type="button" onClick={() => saveMutation.mutate()} disabled={isSaving}>
               {isSaving ? t("saving") : t("save")}
             </Button>
           </div>

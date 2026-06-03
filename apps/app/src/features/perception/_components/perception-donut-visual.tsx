@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
-import type { PerceptionViewData } from "@/lib/perception-data";
+import type { PerceptionViewData } from "../_lib/shared/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
 import { SectionTitle } from "@/components/shared/section-title";
 import { cn } from "@/lib/utils";

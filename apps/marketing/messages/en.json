@@ -4,6 +4,7 @@
     "howItWorks": "How it works",
     "developers": "Developers",
     "pricing": "Pricing",
+    "faq": "FAQ",
     "signIn": "Sign in",
     "startCreating": "Get started",
     "accessApp": "Open app",
@@ -115,6 +116,27 @@
       {
         "title": "Prove impact over time",
         "description": "Track visibility trends, compare outcomes by model and show progress clearly to the rest of your team."
+      }
+    ]
+  },
+  "segments": {
+    "eyebrow": "Segment use cases",
+    "title": "B2B AI systems",
+    "subtitle": "already filter by role and company size.",
+    "description": "If your positioning is not explicit for each audience, you disappear from recommendations. Visia helps align your brand signals, pages and messaging with the segments that matter most.",
+    "cardLabel": "Profile",
+    "items": [
+      {
+        "title": "For Head of Growth",
+        "description": "See how AI systems compare you on acquisition, activation and performance, then fix the positioning gaps that keep you out of shortlists."
+      },
+      {
+        "title": "For scale-up CMOs",
+        "description": "Measure whether your brand shows up as a credible choice for fast-growing teams, with the right category, maturity and proof signals."
+      },
+      {
+        "title": "For B2B SaaS vendors",
+        "description": "Clarify your value proposition, use cases and market position so AI answers rank you higher against alternatives that are already well understood."
       }
     ]
   },
@@ -309,6 +331,34 @@
       }
     }
   },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Answers",
+    "subtitle": "to the questions that come up most.",
+    "description": "A quick overview of how Visia works, which use cases it covers and how it fits into a modern marketing stack.",
+    "items": [
+      {
+        "question": "What does Visia actually measure?",
+        "answer": "Visia analyzes how often your brand appears in AI-generated answers, how it is described and which competitors are mentioned instead."
+      },
+      {
+        "question": "Which models can be tracked?",
+        "answer": "The platform helps you compare assistants such as ChatGPT, Gemini, Claude and Perplexity so you can see how visibility shifts across engines."
+      },
+      {
+        "question": "Does Visia tell me what to fix?",
+        "answer": "Yes. Beyond the diagnosis, Visia highlights missing signals, unclear messaging on your pages and the highest-priority actions to improve recommendation potential."
+      },
+      {
+        "question": "Is it built for non-technical marketing teams?",
+        "answer": "Yes. The product is designed for marketing, content and SEO teams, with recommendations that are actionable without having to manage infrastructure."
+      },
+      {
+        "question": "Can we connect Visia to our stack?",
+        "answer": "Yes. API access, exports and developer-friendly workflows make it easy to plug analysis data into dashboards, internal tools and automations."
+      }
+    ]
+  },
   "cta": {
     "title": "Ready to build something great?",
     "startBuilding": "Start building free",
@@ -328,6 +378,7 @@
       "howItWorks": "How it works",
       "developers": "Developers",
       "pricing": "Pricing",
+      "faq": "FAQ",
       "about": "About",
       "blog": "Blog",
       "careers": "Careers",

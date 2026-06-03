@@ -11,7 +11,7 @@ import {
 } from "../content-optimizer-api";
 import {
   readOrganizationIdFromSearch,
-  readProjectIdFromSearch,
+  readProjectTokenFromSearch,
   readSelectedOrganizationID,
   readSelectedProjectToken,
 } from "@/shared/selection";
@@ -192,7 +192,7 @@ export function useContentOptimizerViewModel({
   routeSearch,
 }: UseContentOptimizerViewModelInput) {
   const projectId = useMemo(
-    () => readProjectIdFromSearch(routeSearch) || readSelectedProjectToken(),
+    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectToken(),
     [routeSearch],
   );
   const organizationId = useMemo(

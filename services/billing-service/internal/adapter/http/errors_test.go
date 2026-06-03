@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -45,15 +46,15 @@ func TestBillingHandlerWritesStructuredValidationError(t *testing.T) {
 	if payload.Error.Code != "invalid_request" {
 		t.Fatalf("expected invalid_request code, got %q", payload.Error.Code)
 	}
-	if !strings.Contains(payload.Error.Message, "seats must be positive") {
-		t.Fatalf("expected validation message, got %q", payload.Error.Message)
+	if payload.Error.Message != httpjson.ValidationErrorMessage {
+		t.Fatalf("expected validation message %q, got %q", httpjson.ValidationErrorMessage, payload.Error.Message)
 	}
 }
 
 func TestBillingWriteErrorUsesRateLimitedCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	writeError(rec, http.StatusTooManyRequests, "rate limit exceeded")
+	httpjson.WriteError(rec, http.StatusTooManyRequests, "rate limit exceeded")
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d body=%s", rec.Code, rec.Body.String())

@@ -1,5 +1,4 @@
-import type { OptimizationError } from "@/lib/optimization-errors-data";
-import type { PerceptionSeverity } from "@/lib/perception-data";
+import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,6 +12,7 @@ import { ErrorHubColumnLoading } from "./template";
 
 type ErrorHubColumnProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
+  columnId: string;
   columnIndex: number;
   emptyLabel?: string | null;
   errors: OptimizationError[];
@@ -27,7 +27,6 @@ type ErrorHubColumnProps = {
   onMarkDone: (error: OptimizationError) => void | Promise<void>;
   onOpenDetails: (error: OptimizationError) => void;
   savingErrorIds: ReadonlySet<string>;
-  severity: PerceptionSeverity;
   title: string;
   tone: string;
   totalColumns: number;
@@ -35,6 +34,7 @@ type ErrorHubColumnProps = {
 
 export function ErrorHubColumn({
   actionStatusesByErrorId,
+  columnId,
   columnIndex,
   emptyLabel,
   errors,
@@ -47,7 +47,6 @@ export function ErrorHubColumn({
   onMarkDone,
   onOpenDetails,
   savingErrorIds,
-  severity,
   title,
   tone,
   totalColumns,
@@ -55,7 +54,7 @@ export function ErrorHubColumn({
   return (
     <section
       className="relative flex min-h-[420px] flex-col rounded-xl bg-muted/20 p-2 lg:min-h-0"
-      data-severity={severity}
+      data-column={columnId}
     >
       {columnIndex !== totalColumns - 1 && (
         <div className="absolute right-[-16px] top-4 hidden h-[calc(100%-32px)] w-1 bg-border lg:block" />

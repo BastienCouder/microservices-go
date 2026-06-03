@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
-	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -27,7 +27,7 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 	if req.GetProjectId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "project_id is required")
 	}
-	claims, ok := security.ClaimsFromContext(ctx)
+	claims, ok := internalauth.ClaimsFromContext(ctx)
 	if !ok || claims.Organization <= 0 || claims.UserID <= 0 {
 		return nil, status.Error(codes.Unauthenticated, "missing organization or user claims")
 	}

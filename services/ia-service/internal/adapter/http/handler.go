@@ -1,8 +1,8 @@
 package http
 
 import (
-	"encoding/json"
 	"errors"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
@@ -28,11 +28,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "ia-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "ia-service"})
 }
 
 func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "ia-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "ia-service"})
 }
 
 type executePromptRequest struct {
@@ -50,7 +50,7 @@ type executePromptRequest struct {
 func (h *Handler) executePrompt(w http.ResponseWriter, r *http.Request) {
 	var req executePromptRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -80,7 +80,7 @@ type extractBrandRequest struct {
 func (h *Handler) extractBrand(w http.ResponseWriter, r *http.Request) {
 	var req extractBrandRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -98,29 +98,22 @@ func (h *Handler) extractBrand(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrUnknownModel):
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 	case errors.Is(err, usecase.ErrValidation):
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 	}
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(out); err != nil {
-		return err
-	}
-	return nil
+	return httpjson.DecodeJSON(w, r, out)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {
-	writeJSON(w, status, map[string]any{"success": true, "data": data})
+	httpjson.WriteSuccess(w, status, data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	httpjson.WriteSuccess(w, status, payload)
 }

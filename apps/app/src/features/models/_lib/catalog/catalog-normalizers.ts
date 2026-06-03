@@ -37,6 +37,9 @@ export function normalizeProjects(value: unknown): ModelsProjectSummary[] {
       .filter((entry): entry is Record<string, unknown> => isRecord(entry))
       .map((entry) => ({
         id: getIDString(getField(entry, ["id", "ID"])),
+        organizationId: getIDString(
+          getField(entry, ["organizationId", "OrganizationID"]),
+        ),
         name: getString(getField(entry, ["name", "Name"])) || "Projet",
         brandName: getString(getField(entry, ["brandName", "BrandName"])),
         status: getString(getField(entry, ["status", "Status"])),

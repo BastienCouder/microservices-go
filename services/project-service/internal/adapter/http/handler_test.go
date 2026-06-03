@@ -289,7 +289,7 @@ func TestGeneratePromptsRouteCreatesTenPrompts(t *testing.T) {
 	}
 }
 
-func TestGA4OAuthCallbackReturnsUserFriendlyDependencyError(t *testing.T) {
+func TestGA4OAuthCallbackReturnsActionableInvalidGrantMessage(t *testing.T) {
 	svc := usecase.NewService()
 	svc.ConfigureGA4OAuth(
 		handlerTestGA4OAuthProvider{exchangeErr: errors.New("google oauth error (400): invalid_grant")},
@@ -329,11 +329,56 @@ func TestGA4OAuthCallbackReturnsUserFriendlyDependencyError(t *testing.T) {
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected callback 503, got %d: %s", rec.Code, rec.Body.String())
 	}
-	if !strings.Contains(rec.Body.String(), "Connexion Google Analytics momentanément indisponible") {
-		t.Fatalf("expected user friendly GA4 error, got %s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), "a expiré ou a déjà été utilisée") {
+		t.Fatalf("expected actionable invalid_grant error, got %s", rec.Body.String())
 	}
 	if strings.Contains(rec.Body.String(), "exchange ga4 oauth code") || strings.Contains(rec.Body.String(), "invalid_grant") {
 		t.Fatalf("expected response to hide dependency details, got %s", rec.Body.String())
+	}
+}
+
+func TestGA4OAuthCallbackKeepsGenericMessageForOtherOAuthFailures(t *testing.T) {
+	svc := usecase.NewService()
+	svc.ConfigureGA4OAuth(
+		handlerTestGA4OAuthProvider{exchangeErr: errors.New("google oauth error (500): backend failure")},
+		"state-secret",
+	)
+	ctx := context.Background()
+	project, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "GA4 OAuth Generic Callback",
+		Domain:         "oauth-generic.test",
+		WebsiteURL:     "https://oauth-generic.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	start, err := svc.StartProjectGA4OAuth(ctx, project.ID, 42, usecase.StartProjectGA4OAuthInput{
+		RedirectURI: "http://localhost:30004/traffic",
+	})
+	if err != nil {
+		t.Fatalf("start ga4 oauth: %v", err)
+	}
+
+	handler := NewHandler(svc)
+	mux := http.NewServeMux()
+	handler.Register(mux)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/projects/"+project.ID+"/impact-integrations/ga4/oauth/callback",
+		strings.NewReader(`{"code":"one-use-code","state":"`+start.State+`","redirectUri":"http://localhost:30004/traffic"}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "42")
+	rec := httptest.NewRecorder()
+
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected callback 503, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if !strings.Contains(rec.Body.String(), "Connexion Google Analytics momentanément indisponible") {
+		t.Fatalf("expected generic GA4 error, got %s", rec.Body.String())
 	}
 }
 

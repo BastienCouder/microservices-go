@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
-import { gatewayJSON, toGatewayError } from "./gateway";
+import { gatewayJSON, toGatewayError, unwrapGatewayPayload } from "./gateway";
 
 const originalFetch = globalThis.fetch;
 
@@ -20,7 +20,7 @@ describe("gatewayJSON", () => {
     let acceptHeader = "";
     globalThis.fetch = (async (_url, init) => {
       acceptHeader = new Headers(init?.headers).get("Accept") ?? "";
-      return jsonResponse(200, { loaded: true });
+      return jsonResponse(200, { success: true, data: { loaded: true } });
     }) as typeof fetch;
 
     await gatewayJSON<{ loaded: boolean }>("http://api.test", "/projects", {
@@ -39,7 +39,7 @@ describe("gatewayJSON", () => {
           { once: true },
         );
       });
-      return jsonResponse(200, { loaded: true });
+      return jsonResponse(200, { success: true, data: { loaded: true } });
     }) as typeof fetch;
 
     const response = await gatewayJSON<{ loaded: boolean }>(
@@ -51,7 +51,9 @@ describe("gatewayJSON", () => {
     expect(response).toEqual({
       ok: false,
       status: 0,
-      error: "request timed out",
+      error: "La requête a expiré. Réessaie.",
+      rawError: "request timed out",
+      kind: "timeout",
     });
   });
 
@@ -71,7 +73,9 @@ describe("gatewayJSON", () => {
     expect(response).toEqual({
       ok: false,
       status: 502,
-      error: "request failed",
+      error: "Le service est temporairement indisponible.",
+      rawError: "request failed",
+      kind: "dependency_unavailable",
       details: null,
     });
   });
@@ -83,7 +87,7 @@ describe("gatewayJSON", () => {
       if (calls.length === 1) {
         return jsonResponse(503, { error: "auth dependency unavailable" });
       }
-      return jsonResponse(200, { loaded: true });
+      return jsonResponse(200, { success: true, data: { loaded: true } });
     }) as typeof fetch;
 
     const response = await gatewayJSON<{ loaded: boolean }>(
@@ -120,6 +124,8 @@ describe("gatewayJSON", () => {
       ok: false,
       status: 503,
       error: "auth dependency unavailable",
+      rawError: "auth dependency unavailable",
+      kind: "unknown",
       details: { error: "auth dependency unavailable" },
     });
     expect(calls).toBe(1);
@@ -147,13 +153,16 @@ describe("gatewayJSON", () => {
     if (!result.ok) {
       expect(result.status).toBe(400);
       expect(result.code).toBe("invalid_request");
-      expect(result.error).toBe("invalid subscription: seats must be positive");
+      expect(result.kind).toBe("validation");
+      expect(result.rawError).toBe("invalid subscription: seats must be positive");
+      expect(result.error).toBe("Vérifie les informations saisies.");
 
       const error = toGatewayError(result, "fallback");
       expect(error.name).toBe("GatewayError");
       expect(error.status).toBe(400);
       expect(error.code).toBe("invalid_request");
-      expect(error.message).toBe("invalid subscription: seats must be positive");
+      expect(error.kind).toBe("validation");
+      expect(error.message).toBe("Vérifie les informations saisies.");
     }
   });
 
@@ -175,8 +184,30 @@ describe("gatewayJSON", () => {
     if (!result.ok) {
       expect(result.status).toBe(429);
       expect(result.code).toBe("rate_limited");
-      expect(result.error).toBe("rate limit exceeded");
+      expect(result.kind).toBe("rate_limited");
+      expect(result.rawError).toBe("rate limit exceeded");
+      expect(result.error).toBe("Trop de requêtes. Réessaie dans un instant.");
     }
+  });
+
+  test("unwraps enveloped success payloads", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse(200, {
+        success: true,
+        data: { id: "prj_1", name: "Acme" },
+      })) as typeof fetch;
+
+    const result = await gatewayJSON<{ id: string; name: string }>(
+      "https://api.test",
+      "/projects/prj_1",
+      { method: "GET", retry: { attempts: 0 } },
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      status: 200,
+      data: { id: "prj_1", name: "Acme" },
+    });
   });
 
   test("keeps legacy string error payloads compatible", async () => {
@@ -192,7 +223,20 @@ describe("gatewayJSON", () => {
     if (!result.ok) {
       expect(result.status).toBe(409);
       expect(result.code).toBe(undefined);
+      expect(result.kind).toBe("unknown");
+      expect(result.rawError).toBe("legacy failure");
       expect(result.error).toBe("legacy failure");
     }
+  });
+});
+
+describe("unwrapGatewayPayload", () => {
+  test("unwraps success envelopes even when metadata is present", () => {
+    expect(
+      unwrapGatewayPayload({
+        data: [{ id: "gpt-oss-20b-free" }],
+        success: true,
+      }),
+    ).toEqual([{ id: "gpt-oss-20b-free" }]);
   });
 });

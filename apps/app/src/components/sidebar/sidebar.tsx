@@ -24,7 +24,6 @@ import { gatewayJSON } from "@/shared/api/gateway";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { OrganizationHierarchy } from "@/shared/models";
 import {
-  findResolvedProjectContext,
   loadProjectContextHierarchies,
 } from "@/shared/project-context";
 import { findBySlugOrId } from "@/shared/public-slugs";
@@ -32,7 +31,7 @@ import {
   SELECTED_CONTEXT_CHANGE_EVENT,
   buildScopedHref,
   readOrganizationIdFromSearch,
-  readProjectIdFromSearch,
+  readProjectTokenFromSearch,
   readRouteQueryParam,
   readSelectedOrganizationID,
   readSelectedProjectToken,
@@ -47,6 +46,7 @@ import { SidebarNavItem } from "./sidebar-nav-item";
 import { SidebarPromptPlanProgress } from "./sidebar-prompt-plan-progress";
 import type { SidebarProjectOption } from "./sidebar-constants";
 import {
+  findOrganizationIdForProjectToken,
   findProjectIdForToken,
   normalizeOrganizationHierarchy,
   selectPreferredID,
@@ -183,7 +183,7 @@ function SidebarComponent({
   const showSettings = settingsOpen && isSettingsPath;
 
   const routeOrgToken = readOrganizationIdFromSearch(location.search);
-  const routeProjectToken = readProjectIdFromSearch(location.search);
+  const routeProjectToken = readProjectTokenFromSearch(location.search);
   const preferredProjectToken = routeProjectToken || stored.projectToken;
 
   useEffect(() => {
@@ -231,11 +231,11 @@ function SidebarComponent({
       loadProjectContextHierarchies(apiBaseURL, organizations, signal),
   });
 
-  const projectOrgId =
-    findResolvedProjectContext(
-      projectContextQuery.data ?? [],
-      preferredProjectToken,
-    )?.organizationId ?? "";
+  const projectOrgId = findOrganizationIdForProjectToken(
+    projectContextQuery.data ?? [],
+    preferredProjectToken,
+    stored.organizationId,
+  );
 
   const selectedOrgId = selectPreferredID({
     candidates: [
@@ -303,7 +303,7 @@ function SidebarComponent({
       account: buildScopedHref("/account", { project }),
       addProject: buildCreateProjectOnboardingHref(),
     };
-  }, [activeProject, activeOrg, selectedOrgId]);
+  }, [activeProject, activeOrg]);
 
   const isActiveHref = (href: string) => {
     const [path, search = ""] = href.split("?");
@@ -332,18 +332,19 @@ function SidebarComponent({
 
     setStored({
       organizationId: project?.organizationId ?? selectedOrgId,
-      projectToken: project?.slug ?? projectId,
+      projectToken: projectId,
     });
 
     storeSelectedProjectContext({
       organizationId: project?.organizationId,
       projectId,
-      projectToken: project?.slug,
+      projectToken: projectId,
     });
 
     navigate(
       buildScopedHref(location.pathname, {
         project: project?.slug,
+        projectId,
         org: null,
         createProject: null,
       }),
@@ -359,6 +360,7 @@ function SidebarComponent({
       value,
       buildScopedHref("/organizations", {
         project: activeProject?.slug,
+        projectId: activeProject?.id,
         section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
       }),
     ]),

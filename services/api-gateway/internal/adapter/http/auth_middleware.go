@@ -2,6 +2,7 @@ package http
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -112,6 +113,7 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			resource := resourceFromPath(r2.URL.Path, defaultResource)
 			allowed, reason, err := h.checkPermission(r.Context(), userID, orgID, action, resource)
 			if err != nil {
+				log.Printf("permission check failed: user_id=%d organization_id=%d action=%s resource=%s path=%s err=%v", userID, orgID, action, resource, r2.URL.Path, err)
 				writeJSONError(w, http.StatusBadGateway, "permission service unavailable")
 				auditSecurityEvent("permission_check", map[string]any{
 					"user_id":         userID,

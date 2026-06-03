@@ -103,12 +103,12 @@ func authenticatedUserIDFromHeader(raw string) (int64, error) {
 func orgAndUserIDsFromRequest(w http.ResponseWriter, r *http.Request) (orgID, userID int64, ok bool) {
 	orgID, err := organizationIDFromHeader(r.Header.Get("X-Organization-ID"))
 	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, err.Error())
+		writeJSONError(w, http.StatusBadRequest, "validation error")
 		return 0, 0, false
 	}
 	userID, err = authenticatedUserIDFromHeader(r.Header.Get("X-Authenticated-User-ID"))
 	if err != nil {
-		writeJSONError(w, http.StatusUnauthorized, err.Error())
+		writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 		return 0, 0, false
 	}
 	return orgID, userID, true

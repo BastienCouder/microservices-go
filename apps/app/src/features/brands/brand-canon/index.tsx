@@ -1,6 +1,6 @@
 import { BrandCanonLoadingState } from "@/features/perception/_components";
-import { createEmptyPerceptionViewData } from "@/lib/perception-data";
-import { usePerceptionData } from "@/features/perception/core/use-perception-data";
+import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
+import { usePerceptionData } from "@/features/perception/_lib/shared/use-perception-data";
 
 import { BrandCanonEditorPanel } from "./_components";
 import { normalizeBrandCanonSearch } from "./_lib/brand-canon-utils";

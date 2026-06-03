@@ -1,5 +1,5 @@
 import { MONITORING_TEXT } from "@/lib/app-data";
-import { type MonitoringPrompt } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "../shared/monitoring-data";
 import { type ChartConfig } from "@/components/ui/chart";
 
 export const chartConfig = {

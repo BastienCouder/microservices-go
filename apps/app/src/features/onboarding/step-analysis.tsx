@@ -48,6 +48,10 @@ export function StepAnalysis({
   const analysisRetryErrorMessage = t("analysisRetryError");
 
   useEffect(() => {
+    if (creationError) {
+      return;
+    }
+
     const timer = window.setInterval(() => {
       setProgress((currentProgress) => {
         const ceiling = createdProjectId ? 100 : 95;
@@ -60,7 +64,7 @@ export function StepAnalysis({
     }, 350);
 
     return () => window.clearInterval(timer);
-  }, [attempt, createdProjectId]);
+  }, [attempt, createdProjectId, creationError]);
 
   useEffect(() => {
     if (startedAttemptRef.current === attempt) {
@@ -147,7 +151,9 @@ export function StepAnalysis({
       </div>
 
       {creationError ? (
-        <div>
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
+          <p className="font-medium text-destructive">{analysisRetryErrorMessage}</p>
+          <p className="mt-1 text-muted-foreground">{creationError}</p>
           <Button type="button" variant="outline" onClick={retryCreateProject}>
             {t("analysisRetry")}
           </Button>

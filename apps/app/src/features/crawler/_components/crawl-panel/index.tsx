@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { pushErrorToast, pushInfoToast } from "@/components/ui/toast-actions";
+import { pushInfoToast } from "@/components/ui/toast-actions";
 import { useContentOptimizerViewModel } from "../../_lib/crawl/use-content-optimizer-view-model";
 import { CrawlerPageHeader } from "./_components/crawler-page-header";
 import { CrawlerResultsView } from "./_components/crawler-results-view";
@@ -155,12 +155,6 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   function handleAnalyzeSiteClick() {
     viewModel.discover();
   }
-
-  useEffect(() => {
-    if (viewModel.error) {
-      pushErrorToast(new Error(viewModel.error), viewModel.error);
-    }
-  }, [viewModel.error]);
 
   useEffect(() => {
     if (viewModel.discovering) {

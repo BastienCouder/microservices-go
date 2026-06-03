@@ -1,8 +1,9 @@
 package http
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -12,11 +13,16 @@ import (
 )
 
 type Handler struct {
-	svc *usecase.Service
+	svc        *usecase.Service
+	readyCheck func(context.Context) error
 }
 
-func NewHandler(svc *usecase.Service) *Handler {
-	return &Handler{svc: svc}
+func NewHandler(svc *usecase.Service, readyCheck ...func(context.Context) error) *Handler {
+	var readiness func(context.Context) error
+	if len(readyCheck) > 0 {
+		readiness = readyCheck[0]
+	}
+	return &Handler{svc: svc, readyCheck: readiness}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
@@ -52,7 +58,7 @@ func (h *Handler) aiModelRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 	}
 	modelID, err := url.PathUnescape(parts[0])
 	if err != nil || strings.TrimSpace(modelID) == "" {
-		writeError(w, http.StatusBadRequest, "invalid model id")
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid model id")
 		return
 	}
 
@@ -91,11 +97,15 @@ func (h *Handler) analysisProjectRoutes(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "project-service"})
+	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "project-service"})
 }
 
-func (h *Handler) ready(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "project-service"})
+func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
+	if h.readyCheck == nil || h.readyCheck(r.Context()) == nil {
+		httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ready", "service": "project-service"})
+		return
+	}
+	httpjson.WriteJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "service": "project-service"})
 }
 
 type createProjectRequest struct {
@@ -113,18 +123,18 @@ type createProjectRequest struct {
 func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 	createdBy, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req createProjectRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -152,7 +162,7 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -290,13 +300,13 @@ type assignProjectMemberRequest struct {
 func (h *Handler) assignProjectMember(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req assignProjectMemberRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -311,7 +321,7 @@ func (h *Handler) assignProjectMember(w http.ResponseWriter, r *http.Request, pr
 func (h *Handler) listProjectMembers(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -326,12 +336,12 @@ func (h *Handler) listProjectMembers(w http.ResponseWriter, r *http.Request, pro
 func (h *Handler) removeProjectMember(w http.ResponseWriter, r *http.Request, projectID string, rawUserID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	userID, err := strconv.ParseInt(strings.TrimSpace(rawUserID), 10, 64)
 	if err != nil || userID <= 0 {
-		writeError(w, http.StatusBadRequest, "invalid user id")
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid user id")
 		return
 	}
 
@@ -381,7 +391,7 @@ func (h *Handler) competitorRoutes(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	project, err := h.svc.GetProject(r.Context(), projectID, organizationID)
@@ -405,13 +415,13 @@ type updateProjectRequest struct {
 func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req updateProjectRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -434,7 +444,7 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 func (h *Handler) deleteProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if err := h.svc.DeleteProject(r.Context(), projectID, organizationID); err != nil {
@@ -465,7 +475,7 @@ func (h *Handler) listScheduledAnalysisJobs(w http.ResponseWriter, r *http.Reque
 func (h *Handler) getProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	value, err := h.svc.GetProjectImpactIntegrations(r.Context(), projectID, organizationID)
@@ -516,13 +526,13 @@ type updateProjectIngestionIntegrationRequest struct {
 func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req updateProjectImpactIntegrationsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -558,13 +568,13 @@ func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http
 func (h *Handler) startProjectGA4OAuth(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req startProjectGA4OAuthRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	value, err := h.svc.StartProjectGA4OAuth(r.Context(), projectID, organizationID, usecase.StartProjectGA4OAuthInput{
@@ -580,13 +590,13 @@ func (h *Handler) startProjectGA4OAuth(w http.ResponseWriter, r *http.Request, p
 func (h *Handler) completeProjectGA4OAuth(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req completeProjectGA4OAuthRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	value, err := h.svc.CompleteProjectGA4OAuth(r.Context(), projectID, organizationID, usecase.CompleteProjectGA4OAuthInput{
@@ -605,7 +615,7 @@ func (h *Handler) completeProjectGA4OAuth(w http.ResponseWriter, r *http.Request
 func (h *Handler) listProjectGA4OAuthProperties(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	properties, err := h.svc.ListProjectGA4OAuthProperties(r.Context(), projectID, organizationID)
@@ -619,13 +629,13 @@ func (h *Handler) listProjectGA4OAuthProperties(w http.ResponseWriter, r *http.R
 func (h *Handler) selectProjectGA4OAuthProperty(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req selectProjectGA4OAuthPropertyRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	value, err := h.svc.SelectProjectGA4OAuthProperty(r.Context(), projectID, organizationID, usecase.SelectProjectGA4OAuthPropertyInput{
@@ -641,7 +651,7 @@ func (h *Handler) selectProjectGA4OAuthProperty(w http.ResponseWriter, r *http.R
 func (h *Handler) finalizeProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	result, err := h.svc.FinalizeProject(r.Context(), projectID, organizationID)
@@ -667,18 +677,18 @@ type runPerceptionAnalysisRequest struct {
 func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
 	createdBy, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req runManualAnalysisRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -698,18 +708,18 @@ func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, proj
 func (h *Handler) runPerceptionAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
 	createdBy, ok := authenticatedUserID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing user identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
 		return
 	}
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
 	var req runPerceptionAnalysisRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -732,12 +742,12 @@ type addPromptsRequest struct {
 func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	var req addPromptsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -752,7 +762,7 @@ func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID s
 func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	page, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page")))
@@ -772,7 +782,7 @@ func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID 
 func (h *Handler) generatePrompts(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 
@@ -798,7 +808,7 @@ type updatePromptRequest struct {
 func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowPromptRequest(w, r, promptID, organizationID) {
@@ -806,7 +816,7 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	}
 	var req updatePromptRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, organizationID, usecase.UpdatePromptInput{
@@ -833,12 +843,12 @@ type bulkUpdatePromptStatusRequest struct {
 func (h *Handler) bulkUpdatePromptStatus(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	var req bulkUpdatePromptStatusRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	prompts, err := h.svc.UpdatePromptsStatus(r.Context(), projectID, organizationID, usecase.UpdatePromptsStatusInput{
@@ -855,7 +865,7 @@ func (h *Handler) bulkUpdatePromptStatus(w http.ResponseWriter, r *http.Request,
 func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowPromptRequest(w, r, promptID, organizationID) {
@@ -875,12 +885,12 @@ type addCompetitorsRequest struct {
 func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	var req addCompetitorsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	competitors, err := h.svc.AddCompetitors(r.Context(), projectID, organizationID, req.Competitors)
@@ -894,7 +904,7 @@ func (h *Handler) addCompetitors(w http.ResponseWriter, r *http.Request, project
 func (h *Handler) listCompetitors(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	competitors, err := h.svc.ListCompetitors(r.Context(), projectID, organizationID)
@@ -915,7 +925,7 @@ type updateCompetitorRequest struct {
 func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
@@ -923,7 +933,7 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 	}
 	var req updateCompetitorRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	competitor, err := h.svc.UpdateCompetitor(r.Context(), competitorID, organizationID, usecase.UpdateCompetitorInput{
@@ -942,7 +952,7 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, competitorID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
@@ -974,7 +984,7 @@ func (h *Handler) listModels(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listLLMProviderCredentials(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
 	if projectID == "" {
-		writeError(w, http.StatusBadRequest, "projectId is required")
+		httpjson.WriteError(w, http.StatusBadRequest, "projectId is required")
 		return
 	}
 	h.listLLMProviderCredentialsForProject(w, r, projectID)
@@ -983,7 +993,7 @@ func (h *Handler) listLLMProviderCredentials(w http.ResponseWriter, r *http.Requ
 func (h *Handler) listLLMProviderCredentialsForProject(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowProjectRequest(w, r, projectID, organizationID) {
@@ -1004,7 +1014,7 @@ type updateLLMProviderCredentialRequest struct {
 func (h *Handler) updateLLMProviderCredential(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
 	if projectID == "" {
-		writeError(w, http.StatusBadRequest, "projectId is required")
+		httpjson.WriteError(w, http.StatusBadRequest, "projectId is required")
 		return
 	}
 	h.updateLLMProviderCredentialForProject(w, r, projectID, r.PathValue("provider"))
@@ -1013,7 +1023,7 @@ func (h *Handler) updateLLMProviderCredential(w http.ResponseWriter, r *http.Req
 func (h *Handler) updateLLMProviderCredentialForProject(w http.ResponseWriter, r *http.Request, projectID string, provider string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowProjectRequest(w, r, projectID, organizationID) {
@@ -1021,13 +1031,13 @@ func (h *Handler) updateLLMProviderCredentialForProject(w http.ResponseWriter, r
 	}
 	provider = strings.TrimSpace(provider)
 	if provider == "" {
-		writeError(w, http.StatusBadRequest, "invalid provider")
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid provider")
 		return
 	}
 
 	var req updateLLMProviderCredentialRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -1042,7 +1052,7 @@ func (h *Handler) updateLLMProviderCredentialForProject(w http.ResponseWriter, r
 func (h *Handler) deleteLLMProviderCredential(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
 	if projectID == "" {
-		writeError(w, http.StatusBadRequest, "projectId is required")
+		httpjson.WriteError(w, http.StatusBadRequest, "projectId is required")
 		return
 	}
 	h.deleteLLMProviderCredentialForProject(w, r, projectID, r.PathValue("provider"))
@@ -1051,7 +1061,7 @@ func (h *Handler) deleteLLMProviderCredential(w http.ResponseWriter, r *http.Req
 func (h *Handler) deleteLLMProviderCredentialForProject(w http.ResponseWriter, r *http.Request, projectID string, provider string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	if !h.allowProjectRequest(w, r, projectID, organizationID) {
@@ -1059,7 +1069,7 @@ func (h *Handler) deleteLLMProviderCredentialForProject(w http.ResponseWriter, r
 	}
 	provider = strings.TrimSpace(provider)
 	if provider == "" {
-		writeError(w, http.StatusBadRequest, "invalid provider")
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid provider")
 		return
 	}
 
@@ -1095,7 +1105,7 @@ type syncOpenRouterModelsRequest struct {
 func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
 	var req syncOpenRouterModelsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -1120,7 +1130,7 @@ func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	selection, err := h.svc.ListProjectModels(r.Context(), projectID, organizationID)
@@ -1138,12 +1148,12 @@ type replaceProjectModelsRequest struct {
 func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "missing organization identity")
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
 	var req replaceProjectModelsRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 	result, err := h.svc.ReplaceProjectModels(r.Context(), projectID, organizationID, req.ModelIDs)
@@ -1168,7 +1178,7 @@ type createAIModelRequest struct {
 func (h *Handler) createModel(w http.ResponseWriter, r *http.Request) {
 	var req createAIModelRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -1207,7 +1217,7 @@ type updateAIModelRequest struct {
 func (h *Handler) updateModel(w http.ResponseWriter, r *http.Request, modelID string) {
 	var req updateAIModelRequest
 	if err := decodeJSON(w, r, &req); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 		return
 	}
 
@@ -1230,21 +1240,29 @@ func (h *Handler) updateModel(w http.ResponseWriter, r *http.Request, modelID st
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):
-		writeError(w, http.StatusBadRequest, err.Error())
+		httpjson.WriteValidationError(w)
 	case errors.Is(err, usecase.ErrUnauthorized):
-		writeError(w, http.StatusForbidden, err.Error())
+		httpjson.WriteForbiddenError(w)
 	case errors.Is(err, usecase.ErrNotFound):
-		writeError(w, http.StatusNotFound, err.Error())
+		httpjson.WriteNotFoundError(w)
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
-		writeError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
+		httpjson.WriteError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
 	default:
-		writeError(w, http.StatusInternalServerError, "internal server error")
+		httpjson.WriteInternalError(w)
 	}
 }
 
 func userFacingDependencyError(err error) string {
 	message := err.Error()
 	normalized := strings.ToLower(message)
+	if strings.Contains(normalized, "invalid_grant") || strings.Contains(normalized, "invalid grant") {
+		return "La tentative de connexion Google Analytics a expiré ou a déjà été utilisée. Relance la connexion Google."
+	}
+	if strings.Contains(normalized, "did not return a refresh token") ||
+		strings.Contains(normalized, "missing refresh_token") ||
+		strings.Contains(normalized, "missing refresh token") {
+		return "Google n'a pas fourni de jeton de connexion durable. Relance la connexion Google Analytics et accepte de nouveau l'accès."
+	}
 	if strings.Contains(normalized, "ga4 oauth") || strings.Contains(normalized, "google oauth") {
 		return "Connexion Google Analytics momentanément indisponible. Réessaie dans quelques instants."
 	}
@@ -1303,20 +1321,13 @@ func hasOrganizationFullAccess(r *http.Request) bool {
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-	decoder := json.NewDecoder(r.Body)
-	if err := decoder.Decode(out); err != nil {
-		return err
-	}
-	return nil
+	return httpjson.DecodeJSON(w, r, out)
 }
 
 func writeSuccess(w http.ResponseWriter, status int, data any) {
-	writeJSON(w, status, map[string]any{"success": true, "data": data})
+	httpjson.WriteSuccess(w, status, data)
 }
 
 func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	httpjson.WriteSuccess(w, status, payload)
 }

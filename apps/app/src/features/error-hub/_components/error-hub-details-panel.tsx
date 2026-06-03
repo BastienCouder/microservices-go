@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { OptimizationError } from "@/lib/optimization-errors-data";
+import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
 
 import {
   ErrorDetailsContent,

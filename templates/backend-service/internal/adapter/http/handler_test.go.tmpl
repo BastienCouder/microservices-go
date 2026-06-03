@@ -1,0 +1,24 @@
+package http
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/usecase"
+)
+
+func TestHealth(t *testing.T) {
+	h := NewHandler(usecase.NewService(), nil)
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/health", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}

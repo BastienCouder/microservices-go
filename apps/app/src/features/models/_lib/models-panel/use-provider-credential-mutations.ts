@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
+import { invalidateProjectScope } from "@/shared/api/query-refresh";
 
 import {
   deleteLLMProviderCredential,
@@ -78,7 +79,12 @@ export function useProviderCredentialMutations({
         (current: LLMProviderCredentialStatus[] | undefined) =>
           upsertCredential(current, credential),
       );
-      await queryClient.invalidateQueries({ queryKey: providerCredentialsQueryKey });
+      await invalidateProjectScope(
+        queryClient,
+        apiBaseURL,
+        organizationId,
+        projectId,
+      );
       onSaveSuccess?.(credential);
     },
     onError: (mutationError) => onSaveError?.(mutationError),
@@ -101,7 +107,12 @@ export function useProviderCredentialMutations({
         (current: LLMProviderCredentialStatus[] | undefined) =>
           removeCredential(current, credential.provider),
       );
-      await queryClient.invalidateQueries({ queryKey: providerCredentialsQueryKey });
+      await invalidateProjectScope(
+        queryClient,
+        apiBaseURL,
+        organizationId,
+        projectId,
+      );
       onDeleteSuccess?.(credential);
     },
     onError: (mutationError) => onDeleteError?.(mutationError),

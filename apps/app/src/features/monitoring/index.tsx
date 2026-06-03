@@ -1,5 +1,5 @@
-import { MonitoringDataProvider } from "@/hooks/use-monitoring-data";
-import { MonitoringStoreProvider } from "@/lib/monitoring-store";
+import { MonitoringDataProvider } from "./_lib/shared/use-monitoring-data";
+import { MonitoringStoreProvider } from "./_lib/shared/monitoring-store";
 import { MonitoringLayout } from "./layout";
 
 

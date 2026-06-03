@@ -12,7 +12,7 @@ import {
   type PerceptionError,
   type PerceptionTrendPeriodKey,
   type PerceptionViewData,
-} from "@/lib/perception-data";
+} from "./shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { deletePerceptionClientJSON, getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
 import {

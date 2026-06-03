@@ -21,13 +21,13 @@ export function InfrastructureSection() {
   const llms: LLM[] = [
     { name: "ChatGPT", icon: "/models/openai.svg" },
     { name: "Perplexity", icon: "/models/perplexity.svg" },
-    { name: "Claude", icon: "/models/anthropic.svg" },
     { name: "Gemini", icon: "/models/google.svg" },
-    { name: "Grok", icon: "/models/grok.svg" },
-    { name: "Copilot", icon: "/models/copilot.svg" },
-    { name: "DeepSeek", icon: "/models/deepseek.svg" },
+    { name: "Claude", icon: "/models/anthropic.svg" },
     { name: "Mistral", icon: "/models/mistral.svg" },
-    { name: "Meta AI", icon: "/models/meta.svg" },
+    { name: "Grok", icon: "/models/grok.svg" },
+    { name: "Qwen", icon: "/models/qwen.svg" },
+    { name: "DeepSeek", icon: "/models/deepseek.svg" },
+    { name: "z ai", icon: "/models/zai.svg" },
   ];
 
   useEffect(() => {

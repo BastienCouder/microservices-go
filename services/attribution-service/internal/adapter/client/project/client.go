@@ -10,7 +10,7 @@ import (
 
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
-	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -153,8 +153,8 @@ func (c *Client) EnsureProjectOwnedByUser(ctx context.Context, projectID, userID
 		return fmt.Errorf("%w: userId must be a positive integer", usecase.ErrValidation)
 	}
 
-	claims := security.OutboundTokenClaims{UserID: parsedUserID}
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "attribution-service", claims)
+	claims := internalauth.Claims{UserID: parsedUserID}
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "attribution-service", claims)
 	if err != nil {
 		return fmt.Errorf("sign internal jwt: %w", err)
 	}
@@ -198,12 +198,12 @@ func (c *Client) EnsureProjectInOrganization(ctx context.Context, projectID stri
 		return fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
 	}
 
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"project-service",
 		"attribution-service",
-		security.OutboundTokenClaims{Organization: organizationID},
+		internalauth.Claims{Organization: organizationID},
 	)
 	if err != nil {
 		return fmt.Errorf("sign internal jwt: %w", err)

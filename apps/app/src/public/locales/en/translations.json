@@ -1,4 +1,19 @@
 {
+  "shared-api": {
+    "validationError": "Check the information you entered.",
+    "unauthorizedError": "Sign in again to continue.",
+    "forbiddenError": "You do not have permission for this action.",
+    "notFoundError": "The requested resource could not be found.",
+    "conflictError": "This action conflicts with the current state.",
+    "rateLimitedError": "Too many requests. Please try again in a moment.",
+    "quotaExceededError": "Your quota has been reached for now.",
+    "dependencyUnavailableError": "The service is temporarily unavailable.",
+    "internalError": "An internal error occurred.",
+    "timeoutError": "The request timed out. Please try again.",
+    "cancelledError": "The request was cancelled.",
+    "networkError": "Unable to reach the service. Please try again.",
+    "unknownError": "The request failed."
+  },
   "monitoring-analytics-panel": {
     "autoInsightsTitle": "Automatic insights",
     "autoInsightsDescription": "Key observations detected from visibility and citation trends.",
@@ -784,7 +799,7 @@
     "promptsDescription": "Add the questions your customers ask AI models.",
     "promptsGenerateLabel": "Prompt generation",
     "promptsGenerateHint": "Generate a first batch of prompts from your brand and competitor context.",
-    "generateWithAI": "Generate with AI",
+    "generateWithAI": "Generate",
     "promptsWorkspaceLabel": "Prompts",
     "promptsConfigured": "{{count}} configured",
     "addPrompt": "Add prompt",

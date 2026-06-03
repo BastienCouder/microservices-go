@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   readOrganizationIdFromSearch,
-  readProjectIdFromSearch,
+  readProjectTokenFromSearch,
   readSelectedOrganizationID,
   readSelectedProjectToken,
 } from "@/shared/selection";
@@ -32,7 +32,7 @@ export function useAgentReadyAuditViewModel({
   routeSearch,
 }: UseAgentReadyAuditViewModelInput) {
   const projectId = useMemo(
-    () => readProjectIdFromSearch(routeSearch) || readSelectedProjectToken(),
+    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectToken(),
     [routeSearch],
   );
   const organizationId = useMemo(

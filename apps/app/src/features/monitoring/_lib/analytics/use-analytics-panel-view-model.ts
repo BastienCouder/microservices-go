@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { useMonitoringData } from "../shared/use-monitoring-data";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {

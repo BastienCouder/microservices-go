@@ -16,6 +16,7 @@ import type { OrganizationsPageViewModel } from "./_lib/page/use-organizations-p
 export function OrganizationsLayout({
   activeTab,
   activeError,
+  actionError,
   notice,
   isInitialLoading,
   selectedOrganization,
@@ -62,10 +63,10 @@ export function OrganizationsLayout({
   onRefetchOrganizations,
 }: OrganizationsPageViewModel) {
   useEffect(() => {
-    if (activeError) {
-      pushErrorToast(new Error(activeError), activeError);
+    if (actionError) {
+      pushErrorToast(new Error(actionError), actionError);
     }
-  }, [activeError]);
+  }, [actionError]);
 
   useEffect(() => {
     if (notice) {

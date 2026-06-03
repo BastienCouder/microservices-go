@@ -10,6 +10,7 @@ import (
 	"time"
 
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
+	onboardingapp "github.com/bastiencouder/microservices-go/services/api-gateway/internal/app/onboarding"
 )
 
 type Handler struct {
@@ -30,8 +31,8 @@ type Handler struct {
 	billingURL           string
 	projectURL           string
 	permissionGRPC       *permissionGRPCClient
+	onboardingService    *onboardingapp.Service
 	httpClient           *http.Client
-	scanStore            *agentReadyScanStore
 	rateLimiter          *rateLimiter
 	publicAPI            PublicAPIConfig
 	authBreaker          *circuitBreaker
@@ -251,7 +252,6 @@ func NewHandlerWithGRPCAndServicesAndPublicAPI(
 			Transport: transport,
 			Timeout:   3 * time.Second,
 		},
-		scanStore:            newAgentReadyScanStore(),
 		rateLimiter:          limiter,
 		authBreaker:          authBreaker,
 		authBulkhead:         authBulkhead,
@@ -267,6 +267,7 @@ func NewHandlerWithGRPCAndServicesAndPublicAPI(
 		trustedProxyNets:     trustedProxyNets,
 		publicAPI:            publicAPI.withDefaults(),
 	}
+	h.onboardingService = onboardingapp.NewService(h.httpClient, organizationsServiceURL, projectServiceURL, internalJWTSecret, internalJWTIssuer)
 	h.routes = h.buildRoutes()
 	return h, nil
 }

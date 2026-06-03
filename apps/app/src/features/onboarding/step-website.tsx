@@ -70,7 +70,6 @@ export function StepWebsite({
       >
         <Input
           id="website"
-          placeholder={t("websiteUrlPlaceholder")}
           value={websiteUrl}
           onChange={(event) => setWebsiteUrl(event.target.value)}
           autoFocus={!isDemo}

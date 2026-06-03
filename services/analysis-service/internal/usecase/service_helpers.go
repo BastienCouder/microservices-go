@@ -1,10 +1,13 @@
 package usecase
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"sort"
 	"strings"
+	"time"
 )
 
 func (s *Service) promptRunsForRunLocked(runID string) []PromptRun {
@@ -192,7 +195,18 @@ func removeID(items []string, target string) []string {
 
 func (s *Service) nextID(prefix string) string {
 	s.seq++
-	return fmt.Sprintf("%s-%d", prefix, s.seq)
+	return scopedUUID(prefix)
+}
+
+func scopedUUID(prefix string) string {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UTC().UnixNano())
+	}
+	raw[6] = (raw[6] & 0x0f) | 0x40
+	raw[8] = (raw[8] & 0x3f) | 0x80
+	hexValue := hex.EncodeToString(raw[:])
+	return fmt.Sprintf("%s_%s-%s-%s-%s-%s", prefix, hexValue[0:8], hexValue[8:12], hexValue[12:16], hexValue[16:20], hexValue[20:32])
 }
 
 func copyAnalysisRun(run *AnalysisRun) AnalysisRun {

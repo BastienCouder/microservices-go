@@ -1,4 +1,4 @@
-import type { BrandCanon } from "@/lib/perception-data";
+import type { BrandCanon } from "@/features/perception/_lib/shared/perception-data";
 
 const BRAND_CANON_EDITOR_PATH = "/perception/brand-canon";
 

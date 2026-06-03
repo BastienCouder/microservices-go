@@ -4,7 +4,7 @@ import { useMutation, type QueryClient } from "@tanstack/react-query";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import { createProjectPrompt, deleteProjectPrompt, generateProjectPrompts, patchPrompt, patchPromptModels, patchPromptSchedule } from "./prompt-api";
 import {
   addSeedPrompts,
@@ -95,9 +95,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         },
       );
 
-      if (!response.ok) {
-        throw new Error("Impossible de mettre a jour le statut des prompts.");
-      }
+      requireGatewayResult(response, "Impossible de mettre a jour le statut des prompts.");
 
       return { promptIds, status };
     },

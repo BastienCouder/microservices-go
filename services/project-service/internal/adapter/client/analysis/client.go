@@ -10,7 +10,7 @@ import (
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
-	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -131,11 +131,11 @@ func (c *Client) Close() error {
 }
 
 func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartRequest) (usecase.AnalysisStartResponse, error) {
-	claims := security.OutboundTokenClaims{
+	claims := internalauth.Claims{
 		UserID:       req.CreatedBy,
 		Organization: req.OrganizationID,
 	}
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", claims)
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", claims)
 	if err != nil {
 		return usecase.AnalysisStartResponse{}, fmt.Errorf("sign internal jwt: %w", err)
 	}
@@ -191,7 +191,7 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 }
 
 func (c *Client) RecordResponse(ctx context.Context, runID string, input usecase.AnalysisRecordResponseInput) error {
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", security.OutboundTokenClaims{})
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", internalauth.Claims{})
 	if err != nil {
 		return fmt.Errorf("sign internal jwt: %w", err)
 	}

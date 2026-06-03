@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -11,19 +10,19 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"google.golang.org/grpc"
 
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	organizationsclient "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/client/organizations"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/http"
 	permissionrepo "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/permission-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/permission-service/internal/usecase"
 )
 
@@ -32,11 +31,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
 		os.Exit(code)
 	}
 
-	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "permission-service")
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "permission-service")
 	if err != nil {
 		log.Fatalf("wait for permission database: %v", err)
 	}
@@ -45,25 +44,14 @@ func main() {
 	repo := permissionrepo.NewRepository(db)
 	roleResolver := organizationsclient.NewClient(cfg.OrganizationsServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
 	svc := usecase.NewService(repo, roleResolver)
-	h := httpadapter.NewHandler(svc, readinessCheck(db))
+	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
 	h.Register(mux)
 
-	server := httpsrv.NewServer(cfg.HTTPAddr, security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")(mux))
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", promhttp.Handler())
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("permission-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	server := httpsrv.NewServer(cfg.HTTPAddr, internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")(mux))
+	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "permission-service", promhttp.Handler())
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
 		AllowInsecure:     cfg.GRPCAllowInsecure,
 		CertFile:          cfg.GRPCTLSCertFile,
@@ -74,7 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure grpc tls: %v", err)
 	}
-	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")))
+	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(internalauth.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "permission-service")))
 	grpcServer := grpc.NewServer(grpcServerOptions...)
 	permissionv1.RegisterPermissionServiceServer(grpcServer, g)
 
@@ -112,65 +100,4 @@ func main() {
 		log.Printf("shutdown error: %v", err)
 	}
 	grpcServer.GracefulStop()
-}
-
-func runHealthcheckMode(databaseURL string) (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	db, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		return 1, true
-	}
-	defer db.Close()
-	if err := db.Ping(ctx); err != nil {
-		return 1, true
-	}
-	return 0, true
-}
-
-func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
-	return func(ctx context.Context) error {
-		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		return db.Ping(pingCtx)
-	}
-}
-
-func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		db, err := pgxpool.New(attemptCtx, dsn)
-		if err == nil {
-			err = db.Ping(attemptCtx)
-		}
-		cancel()
-
-		if err == nil {
-			return db, nil
-		}
-		if db != nil {
-			db.Close()
-		}
-
-		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
-	}
 }

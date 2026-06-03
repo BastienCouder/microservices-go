@@ -87,6 +87,22 @@ export function readSelectedProjectToken(): string {
   return readLastSelectedProjectToken() || readSelectedProjectID();
 }
 
+export function readProjectTokenFromSearch(routeSearch: string): string {
+  const projectAlias = readRouteQueryParam(routeSearch, "project");
+  return (
+    readRouteQueryParam(routeSearch, "projectId") ||
+    readRouteQueryParam(routeSearch, "project_id") ||
+    (projectAlias.startsWith("prj_") ? projectAlias : "")
+  ).trim();
+}
+
+export function readOptionalProjectTokenFromSearch(
+  routeSearch: string,
+): string | null {
+  const projectToken = readProjectTokenFromSearch(routeSearch);
+  return projectToken === "" ? null : projectToken;
+}
+
 export function storeSelectedProjectContext({
   organizationId,
   projectId,
@@ -110,10 +126,11 @@ export function storeSelectedProjectContext({
 }
 
 export function readProjectIdFromSearch(routeSearch: string): string {
+  const projectAlias = readRouteQueryParam(routeSearch, "project");
   return (
     readRouteQueryParam(routeSearch, "projectId") ||
     readRouteQueryParam(routeSearch, "project_id") ||
-    readRouteQueryParam(routeSearch, "project")
+    (projectAlias.startsWith("prj_") ? projectAlias : "")
   ).trim();
 }
 
@@ -127,10 +144,18 @@ export function readOrganizationIdFromSearch(routeSearch: string): string {
 
 export function resolveSelectedContextSearch(routeSearch: string): string {
   const routeProjectId = readProjectIdFromSearch(routeSearch);
-  const selectedProjectId = readSelectedProjectToken();
+  const routeProjectAlias = readRouteQueryParam(routeSearch, "project");
+  const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
+  const selectedProjectToken = readSelectedProjectToken();
+  const selectedStoredProjectId = readSelectedProjectID();
   const selectedOrganizationId = readSelectedOrganizationID();
 
-  if (!routeProjectId && !selectedProjectId && !selectedOrganizationId) {
+  if (
+    !routeProjectId &&
+    !selectedProjectToken &&
+    !selectedStoredProjectId &&
+    !selectedOrganizationId
+  ) {
     return routeSearch;
   }
 
@@ -138,14 +163,19 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
     routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
   );
 
-  if (!routeProjectId && selectedProjectId) {
-    params.set("project", selectedProjectId);
+  if (!routeProjectAlias && !routeProjectId && selectedProjectToken) {
+    params.set("project", selectedProjectToken);
   }
 
   if (
     selectedOrganizationId &&
-    !routeProjectId &&
-    !readOrganizationIdFromSearch(routeSearch)
+    !routeOrganizationId &&
+    !routeProjectAlias &&
+    (
+      !routeProjectId ||
+      routeProjectId === selectedProjectToken ||
+      routeProjectId === selectedStoredProjectId
+    )
   ) {
     params.set("organizationId", selectedOrganizationId);
   }
@@ -176,11 +206,17 @@ export function buildScopedHref(
   const params = new URLSearchParams(rawSearch);
 
   for (const [key, value] of Object.entries(updates)) {
-    if (key === "project") {
+    if (key === "project" || key === "projectId" || key === "project_id") {
       params.delete("projectId");
       params.delete("project_id");
+      params.delete("project");
     }
-    if (key === "org") {
+    if (
+      key === "org" ||
+      key === "organizationId" ||
+      key === "organization_id"
+    ) {
+      params.delete("org");
       params.delete("organizationId");
       params.delete("organization_id");
     }

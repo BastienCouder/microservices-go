@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -12,12 +10,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 
 	analysisv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	billingclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/billing"
 	cloudflarecrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/cloudflarecrawl"
@@ -27,7 +26,6 @@ import (
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
 	analysisstate "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/state/postgres"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
@@ -36,11 +34,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
 		os.Exit(code)
 	}
 
-	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "analysis-service")
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "analysis-service")
 	if err != nil {
 		log.Fatalf("wait for analysis database: %v", err)
 	}
@@ -113,7 +111,7 @@ func main() {
 		log.Fatalf("initialize analysis service: %v", err)
 	}
 
-	h := httpadapter.NewHandler(svc)
+	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
@@ -121,22 +119,11 @@ func main() {
 
 	httpServer := httpsrv.NewServer(
 		cfg.HTTPAddr,
-		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")(mux),
+		internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")(mux),
 		httpsrv.WithReadTimeout(10*time.Second),
 		httpsrv.WithWriteTimeout(20*time.Second),
 	)
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.HandleFunc("GET /metrics", metricsHandler)
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("analysis-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "analysis-service")
 
 	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
 		AllowInsecure:     cfg.GRPCAllowInsecure,
@@ -148,7 +135,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure grpc tls: %v", err)
 	}
-	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(security.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")))
+	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(internalauth.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")))
 	grpcServer := grpc.NewServer(grpcServerOptions...)
 	analysisv1.RegisterAnalysisServiceServer(grpcServer, g)
 
@@ -186,64 +173,4 @@ func main() {
 		log.Printf("shutdown error: %v", err)
 	}
 	grpcServer.GracefulStop()
-}
-
-func runHealthcheckMode(databaseURL string) (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	db, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		return 1, true
-	}
-	defer db.Close()
-	if err := db.Ping(ctx); err != nil {
-		return 1, true
-	}
-	return 0, true
-}
-
-func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		db, err := pgxpool.New(attemptCtx, dsn)
-		if err == nil {
-			err = db.Ping(attemptCtx)
-		}
-		cancel()
-
-		if err == nil {
-			return db, nil
-		}
-		if db != nil {
-			db.Close()
-		}
-
-		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
-	}
-}
-
-func metricsHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	_, _ = fmt.Fprintln(w, "# HELP service_up Service health indicator.")
-	_, _ = fmt.Fprintln(w, "# TYPE service_up gauge")
-	_, _ = fmt.Fprintln(w, "service_up 1")
 }

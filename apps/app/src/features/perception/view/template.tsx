@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { createEmptyPerceptionViewData } from "@/lib/perception-data";
+import { createEmptyPerceptionViewData } from "../_lib/shared/perception-data";
 import { PerceptionLoadingState } from "../_components";
-import { usePerceptionData } from "../core/use-perception-data";
+import { usePerceptionData } from "../_lib/shared/use-perception-data";
 import { PerceptionClient } from "./client";
 
 type PerceptionTemplateProps = {

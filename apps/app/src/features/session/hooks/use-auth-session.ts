@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { navigateToWebAuth } from "@/shared/auth/web-auth";
 import type { UserProfile } from "@/shared/models";
 
@@ -59,7 +60,8 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
       queryClient.setQueryData(appQueryKeys.session(apiBaseURL), null);
       setFeedback(nextFeedback);
     },
-    onSettled: () => {
+    onSettled: async () => {
+      await invalidateQueryKeys(queryClient, [appQueryKeys.session(apiBaseURL)]);
       navigateToWebAuth();
     },
   });

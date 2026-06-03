@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 )
 
@@ -42,12 +42,12 @@ func (c *Client) GetProject(ctx context.Context, projectID string, organizationI
 		return usecase.ProjectMetadata{}, fmt.Errorf("project id is required")
 	}
 
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"project-service",
 		"attribution-service",
-		security.OutboundTokenClaims{Organization: organizationID},
+		internalauth.Claims{Organization: organizationID},
 	)
 	if err != nil {
 		return usecase.ProjectMetadata{}, fmt.Errorf("sign internal jwt: %w", err)

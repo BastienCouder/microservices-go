@@ -17,7 +17,7 @@ import {
   getPerceptionPeriodLabel,
   usePerceptionViewModel,
 } from "../_lib";
-import type { PerceptionViewData } from "@/lib/perception-data";
+import type { PerceptionViewData } from "../_lib/shared/perception-data";
 import { CheckCircle2, Sparkles, Target } from "lucide-react";
 
 type PerceptionClientProps = {

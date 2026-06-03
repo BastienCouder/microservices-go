@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
 import { loadBillingEntitlements } from "@/shared/billing";
 import {
@@ -120,7 +121,10 @@ export function useBillingGateViewModel({
       if (!organizationId) {
         organizationId = await createBillingOrganization(apiBaseURL, organizationName);
         setSelectedOrganizationId(organizationId);
-        await queryClient.invalidateQueries({ queryKey: appQueryKeys.organizations(apiBaseURL, null) });
+        await invalidateQueryKeys(queryClient, [
+          appQueryKeys.organizations(apiBaseURL, null),
+          ["organizations", "project-context-hierarchies", apiBaseURL],
+        ]);
       }
 
       const checkoutURL = await createStripeCheckoutSession(apiBaseURL, {
@@ -144,6 +148,7 @@ export function useBillingGateViewModel({
   );
 
   return {
+    actionError: localError || "",
     billingCycle,
     billingStatus: billingQuery.data?.subscriptionStatus ?? "",
     checkoutNotice: getCheckoutNotice(routeSearch),

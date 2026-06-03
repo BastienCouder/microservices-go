@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -78,6 +79,12 @@ func TestStartAnalysisCreatesRun(t *testing.T) {
 	}
 	if result.AnalysisRun.ExpectedResponses != 4 {
 		t.Fatalf("expected 4 expected responses, got %d", result.AnalysisRun.ExpectedResponses)
+	}
+	if matched := regexp.MustCompile(`^run_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(result.AnalysisRun.ID); !matched {
+		t.Fatalf("expected UUID-like run id, got %q", result.AnalysisRun.ID)
+	}
+	if matched := regexp.MustCompile(`^prun_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(result.PromptRuns[0].ID); !matched {
+		t.Fatalf("expected UUID-like prompt run id, got %q", result.PromptRuns[0].ID)
 	}
 }
 

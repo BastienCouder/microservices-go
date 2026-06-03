@@ -14,7 +14,7 @@ import type {
   PerceptionModelOption,
   PerceptionTrendPeriodKey,
   PerceptionViewData,
-} from "@/lib/perception-data";
+} from "../_lib/shared/perception-data";
 import {
   buildProjectModelFilterItems,
   buildSelectedProjectModelFilterIds,

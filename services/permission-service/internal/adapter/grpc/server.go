@@ -3,6 +3,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +30,7 @@ func (s *Server) Check(ctx context.Context, req *permissionv1.CheckRequest) (*pe
 		Resource:       req.Resource,
 	})
 	if err != nil {
+		log.Printf("permission grpc check failed: organization_id=%d user_id=%d action=%s resource=%s err=%v", req.GetOrganizationId(), req.GetUserId(), req.GetAction(), req.GetResource(), err)
 		if isInvalidPermissionInput(err) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}

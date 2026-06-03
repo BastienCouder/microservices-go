@@ -5,7 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Input } from "@/components/ui/input";
-import type { BrandCompetitor } from "@/lib/perception-data";
+import type { BrandCompetitor } from "@/features/perception/_lib/shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 export function CompetitorEditor({

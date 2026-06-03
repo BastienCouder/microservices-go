@@ -2,7 +2,7 @@ import type {
   PerceptionAxisKey,
   PerceptionSeverity,
   PerceptionTrendPeriodKey,
-} from "@/lib/perception-data";
+} from "./shared/perception-data";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 type SupportedLocale = "en" | "fr";

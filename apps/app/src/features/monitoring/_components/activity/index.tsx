@@ -1,6 +1,6 @@
 import { Template } from "./template";
 import { useActivityPanelViewModel } from "../../_lib/activity/use-activity-panel-view-model";
-import type { MonitoringData } from "@/hooks/use-monitoring-data";
+import type { MonitoringData } from "../../_lib/shared/monitoring-data";
 import { ActivityAlerts } from "./activity-alerts";
 import { ActivityPromptsStream } from "./activity-prompts-stream";
 import { ActivityAlertDetailSheet } from "./activity-alert-detail-sheet";

@@ -158,6 +158,25 @@ func TestUserFacingDependencyErrorMentionsDisabledAnalyticsDataAPI(t *testing.T)
 	if !strings.Contains(message, "Active") {
 		t.Fatalf("expected activation guidance, got %q", message)
 	}
+	if strings.Contains(strings.ToLower(message), "client oauth") {
+		t.Fatalf("expected generic GA4 connection guidance, got %q", message)
+	}
+}
+
+func TestUserFacingDependencyErrorMentionsMissingOAuthScope(t *testing.T) {
+	err := fmt.Errorf(
+		"%w: ga4 traffic unavailable: ga4 runReport error (403): Request had insufficient authentication scopes. reason: ACCESS_TOKEN_SCOPE_INSUFFICIENT service: analyticsdata.googleapis.com",
+		usecase.ErrDependencyUnavailable,
+	)
+
+	message := userFacingDependencyError(err)
+
+	if !strings.Contains(message, "Relance la connexion Google Analytics") {
+		t.Fatalf("expected reconnect guidance, got %q", message)
+	}
+	if strings.Contains(message, "Active Google Analytics Data API") {
+		t.Fatalf("expected scope guidance instead of API activation guidance, got %q", message)
+	}
 }
 
 func TestGetTrafficReportCompatibilityRoute(t *testing.T) {

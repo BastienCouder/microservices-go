@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 
 import type {
   CatalogModelPayload,
@@ -34,11 +34,9 @@ export async function loadModelCatalog(
     { method: "GET", organizationId, signal: options?.signal },
   );
 
-  if (!response.ok) {
-    throw new Error("Impossible de charger le catalogue des modeles.");
-  }
-
-  return normalizeCatalog(response.data);
+  return normalizeCatalog(
+    requireGatewayResult(response, "Impossible de charger le catalogue des modeles."),
+  );
 }
 
 export async function loadOnboardingModelCatalog(
@@ -51,11 +49,9 @@ export async function loadOnboardingModelCatalog(
     { method: "GET", signal: options?.signal },
   );
 
-  if (!response.ok) {
-    throw new Error("Impossible de charger le catalogue des modeles.");
-  }
-
-  return normalizeCatalog(response.data);
+  return normalizeCatalog(
+    requireGatewayResult(response, "Impossible de charger le catalogue des modeles."),
+  );
 }
 
 export async function loadProjectsAndCatalog(
@@ -72,11 +68,15 @@ export async function loadProjectsAndCatalog(
     loadModelCatalog(apiBaseURL, organizationId, options),
   ]);
 
-  if (!projectsResponse.ok) {
-    throw new Error("Impossible de charger les projets pour cette organisation.");
-  }
-
-  return { projects: normalizeProjects(projectsResponse.data), catalog };
+  return {
+    projects: normalizeProjects(
+      requireGatewayResult(
+        projectsResponse,
+        "Impossible de charger les projets pour cette organisation.",
+      ),
+    ),
+    catalog,
+  };
 }
 
 export async function loadProjectModels(
@@ -91,11 +91,9 @@ export async function loadProjectModels(
     { method: "GET", organizationId, signal },
   );
 
-  if (!response.ok) {
-    throw new Error("Impossible de charger les modeles actifs du projet.");
-  }
-
-  return normalizeSelectedModelIds(response.data);
+  return normalizeSelectedModelIds(
+    requireGatewayResult(response, "Impossible de charger les modeles actifs du projet."),
+  );
 }
 
 export async function loadLLMProviderCredentials(
@@ -110,8 +108,9 @@ export async function loadLLMProviderCredentials(
     { method: "GET", organizationId, signal },
   );
 
-  if (!response.ok) throw new Error("Impossible de charger les cles API LLM.");
-  return normalizeLLMProviderCredentials(response.data);
+  return normalizeLLMProviderCredentials(
+    requireGatewayResult(response, "Impossible de charger les cles API LLM."),
+  );
 }
 
 export async function saveLLMProviderCredential(
@@ -127,11 +126,9 @@ export async function saveLLMProviderCredential(
     { method: "PUT", organizationId, body: JSON.stringify({ apiKey }) },
   );
 
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible d'enregistrer la cle API LLM.");
-  }
-
-  const [credential] = normalizeLLMProviderCredentials(response.data);
+  const [credential] = normalizeLLMProviderCredentials(
+    requireGatewayResult(response, "Impossible d'enregistrer la cle API LLM."),
+  );
   if (!credential) throw new Error("Reponse de cle API LLM invalide.");
   return credential;
 }
@@ -148,11 +145,9 @@ export async function deleteLLMProviderCredential(
     { method: "DELETE", organizationId },
   );
 
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de supprimer la cle API LLM.");
-  }
-
-  const [credential] = normalizeLLMProviderCredentials(response.data);
+  const [credential] = normalizeLLMProviderCredentials(
+    requireGatewayResult(response, "Impossible de supprimer la cle API LLM."),
+  );
   return (
     credential ?? {
       provider: normalizeProviderId(provider),
@@ -174,9 +169,9 @@ export async function createCatalogModel(
     { method: "POST", organizationId, body: JSON.stringify(payload) },
   );
 
-  if (!response.ok) throw new Error("Impossible de creer le modele.");
-
-  const model = normalizeCatalogMutationItem(response.data);
+  const model = normalizeCatalogMutationItem(
+    requireGatewayResult(response, "Impossible de creer le modele."),
+  );
   if (!model) throw new Error("Reponse catalogue invalide.");
   return model;
 }
@@ -193,11 +188,9 @@ export async function updateCatalogModel(
     { method: "PATCH", organizationId, body: JSON.stringify(payload) },
   );
 
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de mettre a jour le modele.");
-  }
-
-  const model = normalizeCatalogMutationItem(response.data);
+  const model = normalizeCatalogMutationItem(
+    requireGatewayResult(response, "Impossible de mettre a jour le modele."),
+  );
   if (!model) throw new Error("Reponse catalogue invalide.");
   return model;
 }
@@ -213,13 +206,12 @@ export async function syncOpenRouterModelCatalog(
     { method: "POST", organizationId, body: JSON.stringify(input) },
   );
 
-  if (!response.ok) {
-    throw new Error(
-      response.error || "Impossible de synchroniser les modeles OpenRouter.",
-    );
-  }
+  const data = requireGatewayResult(
+    response,
+    "Impossible de synchroniser les modeles OpenRouter.",
+  );
 
-  const payload = unwrapSuccessEnvelope(response.data);
+  const payload = unwrapSuccessEnvelope(data);
   if (!isRecord(payload)) throw new Error("Reponse OpenRouter invalide.");
 
   return {

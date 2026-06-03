@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestAnalysisWriteErrorUsesRateLimitedCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	writeError(rec, http.StatusTooManyRequests, "quota exceeded")
+	httpjson.WriteQuotaExceeded(rec)
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d body=%s", rec.Code, rec.Body.String())
@@ -28,7 +29,7 @@ func TestAnalysisWriteErrorUsesRateLimitedCode(t *testing.T) {
 	if payload.Error.Code != "rate_limited" {
 		t.Fatalf("expected rate_limited code, got %q", payload.Error.Code)
 	}
-	if payload.Error.Message != "quota exceeded" {
+	if payload.Error.Message != httpjson.QuotaExceededMessage {
 		t.Fatalf("expected quota exceeded message, got %q", payload.Error.Message)
 	}
 }

@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import {
+  buildScopedHref,
   keepProjectOnlyContextSearch,
+  readOptionalProjectTokenFromSearch,
+  readProjectTokenFromSearch,
   resolveSelectedContextSearch,
   storeLastSelectedProjectToken,
   storeSelectedOrganizationID,
@@ -82,6 +85,32 @@ describe("selection storage", () => {
     );
   });
 
+  test("does not reuse organization scope from an informational project slug", () => {
+    installMockWindow();
+
+    storeSelectedOrganizationID("org-1");
+    storeSelectedProjectID("project-1");
+    storeLastSelectedProjectToken("adidas");
+
+    expect(resolveSelectedContextSearch("?project=adidas")).toBe("?project=adidas");
+  });
+
+  test("prefers the canonical project id when both slug and canonical id are present", () => {
+    expect(
+      readProjectTokenFromSearch("?project=adidas&projectId=prj_123&organizationId=1"),
+    ).toBe("prj_123");
+  });
+
+  test("returns null when no project token is present", () => {
+    expect(readOptionalProjectTokenFromSearch("?organizationId=1")).toBe(null);
+  });
+
+  test("ignores informational project slugs as API project ids", () => {
+    expect(readProjectTokenFromSearch("?project=adidas")).toBe("");
+    expect(readOptionalProjectTokenFromSearch("?project=adidas")).toBe(null);
+    expect(readProjectTokenFromSearch("?project=prj_123")).toBe("prj_123");
+  });
+
   test("keeps explicit route organization scope over stored organization context", () => {
     installMockWindow();
 
@@ -111,5 +140,14 @@ describe("selection storage", () => {
         "?project=kahier&projectId=prj-354&org=nike&organizationId=org-1&section=members",
       ),
     ).toBe("?project=kahier&section=members");
+  });
+
+  test("replaces compact aliases when building a canonical scoped href", () => {
+    expect(
+      buildScopedHref("/models?project=adidas&org=org-2", {
+        project: "adidas",
+        organizationId: "org-1",
+      }),
+    ).toBe("/models?project=adidas&organizationId=org-1");
   });
 });

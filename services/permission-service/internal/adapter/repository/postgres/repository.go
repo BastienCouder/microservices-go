@@ -21,7 +21,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func roleGrantsFullAccess(role string) bool {
-	return role == "admin" || role == "super_admin"
+	return role == "owner" || role == "admin" || role == "super_admin"
 }
 
 func (r *Repository) Check(ctx context.Context, in domain.CheckInput) (domain.CheckResult, error) {

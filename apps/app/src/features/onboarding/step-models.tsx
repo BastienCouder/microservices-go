@@ -155,18 +155,6 @@ export function StepModels({
   });
 
   const catalog = catalogQuery.data ?? EMPTY_MODEL_CATALOG;
-  useEffect(() => {
-    if (catalogQuery.error instanceof Error) {
-      pushErrorToast(catalogQuery.error, t("modelsEmpty"));
-    }
-  }, [catalogQuery.error, t]);
-
-  useEffect(() => {
-    if (providerCredentialsQuery.error instanceof Error) {
-      pushErrorToast(providerCredentialsQuery.error, t("modelsDeveloperKeysSaveError"));
-    }
-  }, [providerCredentialsQuery.error, t]);
-
   const providerCredentials =
     providerCredentialsQuery.data ?? EMPTY_PROVIDER_CREDENTIALS;
   const providerCredentialLookup = useMemo(
@@ -404,6 +392,8 @@ export function StepModels({
     selectedCount > 0 &&
     !developerPlanMissingKeys &&
     (!requiresProjectProviderCredentials || providerCredentialsReady);
+  const catalogErrorMessage =
+    catalogQuery.error instanceof Error ? catalogQuery.error.message : "";
 
   useEffect(() => {
     if (developerPlanMissingKeysMessage) {
@@ -492,7 +482,13 @@ export function StepModels({
     </div>
   );
 
-  if (catalogQuery.isLoading) {
+  if (normalizedApiBaseURL === "") {
+    content = (
+      <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
+        Configuration API manquante.
+      </div>
+    );
+  } else if (catalogQuery.isLoading) {
     content = (
       <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
         {t("modelsLoading")}
@@ -501,7 +497,7 @@ export function StepModels({
   } else if (catalogQuery.error instanceof Error) {
     content = (
       <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
-        {t("modelsEmpty")}
+        {catalogErrorMessage}
       </div>
     );
   } else if (selectableModels.length === 0) {

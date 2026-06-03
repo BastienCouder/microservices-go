@@ -1,4 +1,4 @@
-import { MonitoringDataProvider } from "@/hooks/use-monitoring-data";
+import { MonitoringDataProvider } from "@/features/monitoring/_lib/shared/use-monitoring-data";
 
 import { PromptsLayout } from "./layout";
 

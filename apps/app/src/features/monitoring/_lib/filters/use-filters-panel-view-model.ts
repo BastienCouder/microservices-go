@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { useMonitoringData } from "../shared/use-monitoring-data";
 import { buildSelectedProjectModelFilterIds } from "@/lib/project-models";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 

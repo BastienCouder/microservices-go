@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
-import type { BrandCanon } from "@/lib/perception-data";
+import type { BrandCanon } from "../_lib/shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PerceptionLeftPanel } from "./perception-left-panel";
 import { PerceptionThreeColumnLayout } from "./perception-three-column-layout";

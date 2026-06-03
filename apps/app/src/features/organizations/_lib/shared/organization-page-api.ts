@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, toGatewayError, type GatewayResult } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  optionalGatewayData,
+  requireGatewayData,
+} from "@/shared/api/gateway";
 import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 import {
   getArray,
@@ -43,23 +47,6 @@ type LoadOrganizationResourcesOptions = {
   currentUserId?: string;
   signal?: AbortSignal;
 };
-
-async function requireGatewayData<T>(promise: Promise<GatewayResult<T>>, message: string): Promise<T> {
-  const response = await promise;
-  if (!response.ok) {
-    throw toGatewayError(response, message);
-  }
-  return response.data;
-}
-
-async function optionalGatewayData<T>(
-  promise: Promise<GatewayResult<T>>,
-  fallback: T,
-): Promise<T> {
-  const response = await promise;
-  if (!response.ok) return fallback;
-  return response.data;
-}
 
 export async function loadOrganizationSummaries(
   apiBaseURL: string,

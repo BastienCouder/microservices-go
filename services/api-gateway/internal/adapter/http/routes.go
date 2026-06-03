@@ -97,14 +97,14 @@ func (h *Handler) buildRoutes() []routeEntry {
 		}
 		h.serveProxyWithInternalAuth(w, r2, h.attributionProxy, "attribution-service", internalTokenClaims{})
 	})
-	onboardingModelCatalogHandler := h.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	onboardingModelCatalogHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := r.Clone(r.Context())
 		urlCopy := *r.URL
 		r2.URL = &urlCopy
 		r2.URL.Path = "/ai-models"
 		r2.URL.RawPath = ""
-		h.projectProxy.ServeHTTP(w, r2)
-	}), "project-service", "projects")
+		h.serveProxyWithInternalAuth(w, r2, h.projectProxy, "project-service", internalTokenClaims{})
+	})
 	onboardingProjectCreateHandler := h.withAuth(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := r.Clone(r.Context())
 		urlCopy := *r.URL
@@ -133,13 +133,6 @@ func (h *Handler) buildRoutes() []routeEntry {
 			handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				h.health(w, r)
 			}),
-			service: "api-gateway",
-		},
-		{
-			match: func(r *http.Request) bool {
-				return isAgentReadyScanCollectionRequest(r) || isAgentReadyScanItemRequest(r)
-			},
-			handler: h.withAuth(http.HandlerFunc(h.handleAgentReadyScan), "api-gateway", "analysis"),
 			service: "api-gateway",
 		},
 		{match: isPublicAPIRequest, handler: http.HandlerFunc(h.handlePublicAPI), service: "public-api"},

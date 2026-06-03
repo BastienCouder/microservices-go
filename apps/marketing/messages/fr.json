@@ -4,6 +4,7 @@
     "howItWorks": "Comment ça marche",
     "developers": "Développeurs",
     "pricing": "Tarifs",
+    "faq": "FAQ",
     "signIn": "Se connecter",
     "startCreating": "Commencer",
     "accessApp": "Accéder à l'app",
@@ -85,7 +86,7 @@
   "hero": {
     "title1": "La plateforme",
     "title2": "pour être mentionné dans",
-    "description": "Quand un prospect demande à une IA quel outil choisir, votre marque est-elle mentionnée ou invisible ? Visia vous montre ce qui ressort vraiment et quoi corriger pour devenir recommandable.",
+    "description": "Quand un prospect demande à une IA quel outil choisir, votre marque est-elle mentionnée ou invisible ? VISIA détecte pourquoi, et corrige ça.",
     "startTrial": "Commencer l'analyse",
     "watchDemo": "Voir la démo",
     "stats": {
@@ -115,6 +116,27 @@
       {
         "title": "Prouvez l'impact dans le temps",
         "description": "Suivez l'évolution de votre présence, comparez les résultats par modèle et montrez les gains à votre équipe."
+      }
+    ]
+  },
+  "segments": {
+    "eyebrow": "Cas d'usage par segment",
+    "title": "Les IA B2B",
+    "subtitle": "filtrent déjà par rôle et taille d'entreprise.",
+    "description": "Si votre positionnement n'est pas clair pour chaque profil, vous disparaissez des recommandations. Visia aide à aligner vos signaux de marque, vos pages et vos messages avec les segments qui comptent.",
+    "cardLabel": "Profil",
+    "items": [
+      {
+        "title": "Pour les Head of Growth",
+        "description": "Identifiez comment les IA vous comparent sur l'acquisition, l'activation et la performance, puis corrigez les angles qui vous excluent des shortlists."
+      },
+      {
+        "title": "Pour les CMO de scale-ups",
+        "description": "Mesurez si votre marque ressort comme un choix crédible pour une équipe en phase d'acceleration, avec les bons signaux de catégorie, de maturité et de preuve."
+      },
+      {
+        "title": "Pour les éditeurs SaaS B2B",
+        "description": "Clarifiez votre proposition de valeur, vos cas d'usage et votre position sur le marché pour remonter dans les réponses IA face aux alternatives déjà bien comprises."
       }
     ]
   },
@@ -148,7 +170,7 @@
       "line1": "Une couverture large.",
       "line2": "Un signal fiable."
     },
-    "description": "Surveillez en continu les moteurs qui comptent, avec un historique comparable, une lecture propre des réponses et un suivi stable de votre présence.",
+    "description": "VISIA monitore 10 LLMs en continu — ChatGPT, Perplexity, Gemini, Claude, Mistral, Llama, et plus. Chaque prompt est rejoué en conditions réelles, sans cache, avec rotation d'agents. Résultats disponibles en moins de 50ms.",
     "stats": {
       "covered": "LLMs couverts",
       "uptime": "disponibilité",
@@ -309,6 +331,34 @@
       }
     }
   },
+  "faq": {
+    "eyebrow": "FAQ",
+    "title": "Les réponses",
+    "subtitle": "aux questions qui reviennent le plus.",
+    "description": "Une vue rapide sur le fonctionnement de Visia, les cas d'usage couverts et la manière dont la plateforme s'intègre dans votre stack marketing.",
+    "items": [
+      {
+        "question": "Qu'est-ce que Visia mesure exactement ?",
+        "answer": "Visia analyse la présence de votre marque dans les réponses générées par les IA, la façon dont elle est décrite et les concurrents qui ressortent à votre place."
+      },
+      {
+        "question": "Quels modèles sont suivis ?",
+        "answer": "La plateforme permet de comparer plusieurs assistants comme ChatGPT, Gemini, Claude ou Perplexity pour voir comment votre visibilité varie d'un moteur à l'autre."
+      },
+      {
+        "question": "Est-ce que Visia me dit quoi corriger ?",
+        "answer": "Oui. Au-delà du constat, Visia remonte les signaux manquants, les zones floues dans vos pages et les priorités à traiter pour devenir plus recommandable."
+      },
+      {
+        "question": "Est-ce adapté à une équipe marketing non technique ?",
+        "answer": "Oui. L'interface est pensée pour des équipes marketing, contenu et SEO, avec des recommandations exploitables sans devoir manipuler l'infrastructure."
+      },
+      {
+        "question": "Peut-on brancher Visia à notre stack ?",
+        "answer": "Oui. API, exports et workflows développeurs permettent d'intégrer les analyses à vos dashboards, outils internes ou automatisations existantes."
+      }
+    ]
+  },
   "cta": {
     "title": "Prêt à construire quelque chose de grand ?",
     "startBuilding": "Commencer gratuitement",
@@ -328,6 +378,7 @@
       "howItWorks": "Comment ça marche",
       "developers": "Développeurs",
       "pricing": "Tarifs",
+      "faq": "FAQ",
       "about": "À propos",
       "blog": "Blog",
       "careers": "Carrières",

@@ -22,7 +22,7 @@ import {
 import type {
   PerceptionError,
   PerceptionModelOption,
-} from "@/lib/perception-data";
+} from "../_lib/shared/perception-data";
 import { buildProviderLabel } from "@/lib/project-models";
 import { cn } from "@/lib/utils";
 import { SectionTitle } from "@/components/shared/section-title";

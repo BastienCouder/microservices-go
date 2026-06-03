@@ -1,13 +1,16 @@
 import { API_CONFIG } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayResult,
+  unwrapGatewayPayload,
+  type GatewayResult,
+} from "@/shared/api/gateway";
 import { readSelectedOrganizationID } from "@/shared/selection";
 
 function readData<T>(result: GatewayResult<unknown>): T {
-  if (!result.ok) throw new Error(result.error || `HTTP ${result.status}`);
-
-  const json = result.data as { data?: T; message?: string };
-  if (json?.data !== undefined) return json.data;
-  throw new Error(json?.message || "Reponse API invalide");
+  return unwrapGatewayPayload(
+    requireGatewayResult(result, "Impossible de charger les donnees de perception."),
+  ) as T;
 }
 
 function readOrganizationId(): string | undefined {

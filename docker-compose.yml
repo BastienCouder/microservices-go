@@ -735,12 +735,12 @@ services:
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       INTERNAL_SERVICE_SUBJECT: langgraph-scheduler
-      GRPC_ALLOW_INSECURE: "false"
+      GRPC_ALLOW_INSECURE: "true"
       SCHEDULER_POLL_INTERVAL_MS: "30000"
     secrets:
       - internal_jwt_secret
     healthcheck:
-      test: ["CMD-SHELL", "pgrep -x service || exit 1"]
+      test: ["CMD", "/nodejs/bin/node", "-e", "const fs=require('fs');process.exit(fs.readFileSync('/proc/1/cmdline','utf8').includes('dist/index.js')?0:1)"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -1034,6 +1034,8 @@ services:
     restart: unless-stopped
     networks:
       - infra-net
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password

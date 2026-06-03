@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
@@ -49,12 +49,12 @@ func (c *Client) RecordEvent(ctx context.Context, input usecase.AttributionEvent
 		return fmt.Errorf("user id is required")
 	}
 
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"attribution-service",
 		"project-service",
-		security.OutboundTokenClaims{
+		internalauth.Claims{
 			UserID:       input.UserID,
 			Organization: input.OrganizationID,
 		},

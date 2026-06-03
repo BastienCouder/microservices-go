@@ -33,10 +33,14 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
   }, [routeSearch, viewModel.checkoutNotice]);
 
   useEffect(() => {
-    if (viewModel.error) {
-      pushErrorToast(new Error(viewModel.error), viewModel.error);
+    if (viewModel.actionError) {
+      const checkoutStatus = new URLSearchParams(routeSearch).get("checkout");
+      if (checkoutStatus === "success" || checkoutStatus === "cancel") {
+        return;
+      }
+      pushErrorToast(new Error(viewModel.actionError), viewModel.actionError);
     }
-  }, [viewModel.error]);
+  }, [routeSearch, viewModel.actionError]);
 
   const handleCheckout = (plan: CheckoutPlan) => {
     viewModel.startCheckout(plan);

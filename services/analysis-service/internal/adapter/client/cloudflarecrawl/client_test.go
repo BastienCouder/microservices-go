@@ -313,3 +313,58 @@ func TestStartCrawlMapsDecodeErrorsToDependencyUnavailable(t *testing.T) {
 		t.Fatalf("expected dependency unavailable, got %v", err)
 	}
 }
+
+func TestStartCrawlMapsRateLimitErrorsToQuotaExceeded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = io.WriteString(w, `{"success":false,"errors":[{"code":2001,"message":"Rate limit exceeded"}]}`)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{
+		AccountID: "account-1",
+		APIToken:  "token-1",
+		BaseURL:   server.URL,
+	})
+	if err != nil {
+		t.Fatalf("new cloudflare crawl client: %v", err)
+	}
+
+	_, err = client.StartCrawl(context.Background(), usecase.ContentOptimizerCrawlStartInput{
+		URL:     "https://example.com",
+		Limit:   12,
+		Depth:   2,
+		Formats: []string{"markdown"},
+	})
+	if !errors.Is(err, usecase.ErrQuotaExceeded) {
+		t.Fatalf("expected quota exceeded, got %v", err)
+	}
+}
+
+func TestStartCrawlMapsCloudflareRateLimitEnvelopeToQuotaExceeded(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"success":false,"errors":[{"code":2001,"message":"Rate limit exceeded"}]}`)
+	}))
+	defer server.Close()
+
+	client, err := NewClient(Config{
+		AccountID: "account-1",
+		APIToken:  "token-1",
+		BaseURL:   server.URL,
+	})
+	if err != nil {
+		t.Fatalf("new cloudflare crawl client: %v", err)
+	}
+
+	_, err = client.StartCrawl(context.Background(), usecase.ContentOptimizerCrawlStartInput{
+		URL:     "https://example.com",
+		Limit:   12,
+		Depth:   2,
+		Formats: []string{"markdown"},
+	})
+	if !errors.Is(err, usecase.ErrQuotaExceeded) {
+		t.Fatalf("expected quota exceeded, got %v", err)
+	}
+}

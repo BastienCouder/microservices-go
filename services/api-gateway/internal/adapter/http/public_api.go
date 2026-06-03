@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 )
 
 type PublicAPIConfig struct {
@@ -170,7 +172,7 @@ func (h *Handler) validatePublicAPIKey(ctx context.Context, rawKey string) (publ
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("api key validation status=%d", resp.StatusCode)
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&key); err != nil {
+		if err := httpjson.DecodeSuccessData(resp.Body, &key); err != nil {
 			return false, true, err
 		}
 		if key.ID <= 0 || key.OrganizationID <= 0 {
@@ -204,7 +206,7 @@ func (h *Handler) loadPublicEntitlements(ctx context.Context, organizationID int
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("billing entitlements status=%d", resp.StatusCode)
 		}
-		if err := json.NewDecoder(resp.Body).Decode(&entitlements); err != nil {
+		if err := httpjson.DecodeSuccessData(resp.Body, &entitlements); err != nil {
 			return false, true, err
 		}
 		if entitlements.OrganizationID == 0 {
@@ -259,7 +261,7 @@ func (h *Handler) publicRouteTarget(r *http.Request, apiKey publicAPIKey, entitl
 	case path == "/analysis/runs" || strings.HasPrefix(path, "/analysis/runs/"):
 		return publicRouteTarget{handler: h.analysisProxy, service: "analysis-service", path: path, query: r.URL.RawQuery, claims: claims}, true
 	case path == "/agent-ready/scans" || strings.HasPrefix(path, "/agent-ready/scans/"):
-		return publicRouteTarget{direct: h.handlePublicAgentReadyScan}, true
+		return publicRouteTarget{handler: h.analysisProxy, service: "analysis-service", path: "/analysis" + path, query: r.URL.RawQuery, claims: claims}, true
 	default:
 		return publicRouteTarget{}, false
 	}
@@ -350,14 +352,4 @@ func (h *Handler) writePublicUsage(w http.ResponseWriter, _ *http.Request, _ pub
 
 func (h *Handler) writePublicEntitlements(w http.ResponseWriter, _ *http.Request, _ publicAPIKey, entitlements publicEntitlements) {
 	writeJSON(w, http.StatusOK, entitlements)
-}
-
-func (h *Handler) handlePublicAgentReadyScan(w http.ResponseWriter, r *http.Request, _ publicAPIKey, _ publicEntitlements) {
-	r2 := r.Clone(r.Context())
-	urlCopy := *r.URL
-	r2.URL = &urlCopy
-	r2.URL.Path = strings.TrimPrefix(r.URL.Path, "/v1")
-	r2.URL.Path = "/analysis" + r2.URL.Path
-	r2.URL.RawPath = ""
-	h.handleAgentReadyScan(w, r2)
 }

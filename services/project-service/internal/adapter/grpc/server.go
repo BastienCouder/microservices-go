@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	projectv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/project/v1"
-	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -25,7 +25,7 @@ func (s *Server) CheckProjectAccess(ctx context.Context, req *projectv1.CheckPro
 		return nil, status.Error(codes.InvalidArgument, "project_id is required")
 	}
 
-	claims, ok := security.ClaimsFromContext(ctx)
+	claims, ok := internalauth.ClaimsFromContext(ctx)
 	if !ok || claims.Organization <= 0 {
 		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
 	}
@@ -51,7 +51,7 @@ func (s *Server) ListProjectCompetitors(ctx context.Context, req *projectv1.List
 		return nil, status.Error(codes.InvalidArgument, "project_id is required")
 	}
 
-	claims, ok := security.ClaimsFromContext(ctx)
+	claims, ok := internalauth.ClaimsFromContext(ctx)
 	if !ok || claims.Organization <= 0 {
 		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
 	}
@@ -80,7 +80,7 @@ func (s *Server) ListProjectEnabledModels(ctx context.Context, req *projectv1.Li
 		return nil, status.Error(codes.InvalidArgument, "project_id is required")
 	}
 
-	claims, ok := security.ClaimsFromContext(ctx)
+	claims, ok := internalauth.ClaimsFromContext(ctx)
 	if !ok || claims.Organization <= 0 {
 		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
 	}

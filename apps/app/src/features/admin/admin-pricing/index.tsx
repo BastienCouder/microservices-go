@@ -38,6 +38,7 @@ import {
   type BillingPriceMap,
 } from "@/shared/billing";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { cn } from "@/shared/utils";
 
 type AdminPricingPageProps = {
@@ -368,22 +369,6 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   );
 
   useEffect(() => {
-    if (organizationsQuery.error instanceof Error) {
-      pushErrorToast(
-        organizationsQuery.error,
-        "Impossible de charger les organisations.",
-      );
-    }
-  }, [organizationsQuery.error]);
-
-  useEffect(() => {
-    const error = plansQuery.error || tiersQuery.error || creditCostSettingsQuery.error;
-    if (error instanceof Error) {
-      pushErrorToast(error, "Impossible de charger le pricing.");
-    }
-  }, [plansQuery.error, tiersQuery.error, creditCostSettingsQuery.error]);
-
-  useEffect(() => {
     if (!creditCostSettingsQuery.data) return;
     setCreditCostDraft(creditCostSettingsDraftFromSettings(creditCostSettingsQuery.data));
   }, [creditCostSettingsQuery.data]);
@@ -461,11 +446,11 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
       return { plan, settings: updatedSettings, tier };
     },
     onSuccess: async (_result, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: plansQueryKey }),
-        queryClient.invalidateQueries({ queryKey: tiersQueryKey }),
-        queryClient.invalidateQueries({ queryKey: ["billing", "quota", apiBaseURL] }),
-        queryClient.invalidateQueries({ queryKey: ["prompt-quota", apiBaseURL] }),
+      await invalidateQueryKeys(queryClient, [
+        plansQueryKey,
+        tiersQueryKey,
+        ["billing", "quota", apiBaseURL],
+        ["prompt-quota", apiBaseURL],
       ]);
       pushSuccessToast(
         variables.successMessage ?? "Plan et prix du palier mis à jour.",
@@ -539,10 +524,10 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
       });
     },
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: creditCostSettingsQueryKey }),
-        queryClient.invalidateQueries({ queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all") }),
-        queryClient.invalidateQueries({ queryKey: appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active") }),
+      await invalidateQueryKeys(queryClient, [
+        creditCostSettingsQueryKey,
+        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
+        appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
       ]);
       pushSuccessToast("Règles de crédits mises à jour.");
     },

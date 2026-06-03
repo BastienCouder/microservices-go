@@ -87,14 +87,15 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
         <AnimatedWave />
       </div>
 
-      <OnboardingLeftPanel />
-
+      <div className="hidden xl:block">
+        <OnboardingLeftPanel />
+      </div>
       <section className="relative z-10 min-w-0 flex-1">
         <div className="absolute left-4 top-4 z-30 sm:right-6 lg:right-10">
           <Button
             variant="outline"
             onClick={() => navigate(-1)}
-            className="flex items-center gap-1 rounded-full border-none bg-white/50 p-1.5 text-xs font-medium text-muted-foreground outline-none backdrop-blur hover:bg-white/80"
+            className="flex items-center gap-1 rounded-full !border-0 !ring-0 bg-white/50 p-1.5 text-xs font-medium text-muted-foreground shadow-none outline-none backdrop-blur hover:bg-white/80 focus-visible:!border-0 focus-visible:!ring-0"
           >
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back

@@ -105,6 +105,12 @@ Lint strict:
 make lint
 ```
 
+## Documentation
+
+- Public API avec API key: [apps/app/docs/public-api.md](apps/app/docs/public-api.md)
+- Standard backend Go: [docs/backend-standard.md](docs/backend-standard.md)
+- Template nouveau service backend: [docs/backend-service-template.md](docs/backend-service-template.md)
+
 ## Organizations DB stack
 
 - Driver/runtime: `pgx/v5` (`pgxpool`)

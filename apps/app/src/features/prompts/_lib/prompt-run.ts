@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import type { PromptItem } from "./types";
 
 export type RunnablePrompt = Pick<PromptItem, "id" | "sourcePromptId" | "prompt" | "models">;
@@ -95,9 +95,7 @@ export async function startPromptAnalysis({
     },
   );
 
-  if (!response.ok) {
-    throw new Error("Impossible de lancer le prompt.");
-  }
+  requireGatewayResult(response, "Impossible de lancer le prompt.");
 }
 
 export async function startPromptAnalyses({

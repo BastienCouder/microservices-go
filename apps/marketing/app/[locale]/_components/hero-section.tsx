@@ -41,8 +41,8 @@ export function HeroSection() {
   const activeWord = words[wordIndex];
 
   return (
-    <section className="relative min-h-screen flex flex-col justify-center overflow-hidden">
-      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 py-24 sm:py-28 lg:py-40">
+    <section className="relative flex flex-col justify-center overflow-hidden">
+      <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12 pt-24 sm:pt-28 lg:pt-40">
         <div className="mb-12">
           <h1
             className={`text-[clamp(2.5rem,11vw,7.5rem)] font-display leading-[0.9] tracking-tight transition-all duration-1000 ${
@@ -98,7 +98,7 @@ export function HeroSection() {
         </div>
       </div>
 
-      <div
+      {/* <div
         className={`lg:absolute lg:bottom-2 lg:left-0 lg:right-0 transition-all duration-700 delay-500 ${
           isVisible ? "opacity-100" : "opacity-0"
         }`}
@@ -115,7 +115,7 @@ export function HeroSection() {
             </div>
           ))}
         </div>
-      </div>
+      </div> */}
     </section>
   );
 }

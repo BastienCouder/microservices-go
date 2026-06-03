@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -338,7 +340,19 @@ func (s *Service) getProjectForOrganizationLocked(projectID string, organization
 
 func (s *Service) nextID(prefix string) string {
 	s.seq++
-	return fmt.Sprintf("%s-%d", prefix, s.seq)
+	return scopedUUID(prefix)
+}
+
+func scopedUUID(prefix string) string {
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		// Keep ids unique enough even if crypto/rand is temporarily unavailable.
+		return fmt.Sprintf("%s_%d", prefix, time.Now().UTC().UnixNano())
+	}
+	raw[6] = (raw[6] & 0x0f) | 0x40
+	raw[8] = (raw[8] & 0x3f) | 0x80
+	hexValue := hex.EncodeToString(raw[:])
+	return fmt.Sprintf("%s_%s-%s-%s-%s-%s", prefix, hexValue[0:8], hexValue[8:12], hexValue[12:16], hexValue[16:20], hexValue[20:32])
 }
 
 func copyProject(project *Project) Project {

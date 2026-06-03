@@ -10,12 +10,15 @@ import { SecuritySection } from "@/app/[locale]/_components/security-section";
 import { DevelopersSection } from "@/app/[locale]/_components/developers-section";
 import { TestimonialsSection } from "@/app/[locale]/_components/testimonials-section";
 import { PricingSection } from "@/app/[locale]/_components/pricing-section";
+import { FaqSection } from "@/app/[locale]/_components/faq-section";
 import { CtaSection } from "@/app/[locale]/_components/cta-section";
 import { FooterSection } from "@/app/[locale]/_components/footer-section";
 import { defaultLocale, isLocale, type Locale } from "@/src/i18n/config";
 import { buildLocalizedMetadata } from "@/src/site/config";
 import { getTranslations } from "next-intl/server";
-import VisiaDashboardShell from "./_components/visia-dashboard";
+import LinearHeroCard, { LinearMonitoringPreview } from "./_components/linear-card";
+import { Separator } from "@/components/ui/separator";
+import { SegmentsSection } from "./_components/segments-section";
 
 export async function generateMetadata({
   params,
@@ -39,13 +42,18 @@ export default function Home() {
     <main className="relative min-h-screen overflow-x-hidden noise-overlay">
       <Navigation />
       <HeroSection />
-       <VisiaDashboardShell
-      appName="VISIA."
-      brandName="visia"
+      <LinearHeroCard
+        title="Faster app launch"
+        description="Render UI before vehicle_state sync."
+        eyebrow="ENG-2703"
+      >
+        <LinearMonitoringPreview />
+      </LinearHeroCard>
 
-    />
-      <FeaturesSection />
-      <HowItWorksSection />
+      <Separator/>
+ 
+      <SegmentsSection />
+    
       <InfrastructureSection />
      {/*  <MetricsSection /> */}
       <IntegrationsSection />
@@ -53,6 +61,7 @@ export default function Home() {
       <DevelopersSection />
      {/*  <TestimonialsSection /> */}
       <PricingSection />
+      <FaqSection />
     {/*   <CtaSection /> */}
       <FooterSection />
     </main>

@@ -14,7 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "../../_lib/shared/monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 

@@ -1,7 +1,14 @@
 import { API_CONFIG, apiRoutes } from "@/lib/api-config";
-import type { BrandCanon, BrandCompetitor } from "@/lib/perception-data";
+import type {
+  BrandCanon,
+  BrandCompetitor,
+} from "@/features/perception/_lib/shared/perception-data";
 import { SELECTED_ORG_KEY } from "@/features/models/_lib/model-access";
-import { gatewayJSON } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayResult,
+  unwrapGatewayPayload,
+} from "@/shared/api/gateway";
 
 function readSelectedOrganizationId(): string {
   if (typeof window === "undefined") return "";
@@ -19,14 +26,11 @@ async function requestJson<T>(path: string, init: RequestInit): Promise<T> {
     organizationId: organizationId || undefined,
   });
 
-  if (!result.ok) throw new Error(result.error || `HTTP ${result.status}`);
-  if (result.status === 204 || result.data === null) return undefined as T;
-
-  const json = result.data;
-  if (json && typeof json === "object" && "data" in json) {
-    return (json as { data: T }).data;
-  }
-  return json as T;
+  const data = unwrapGatewayPayload(
+    requireGatewayResult(result, "Impossible de synchroniser le brand canon."),
+  );
+  if (result.status === 204 || data === null) return undefined as T;
+  return data as T;
 }
 
 export async function saveBrandCanonProject(

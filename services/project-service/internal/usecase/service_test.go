@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -70,6 +71,9 @@ func TestProjectFlowCreateFinalize(t *testing.T) {
 	}
 	if project.CreatedBy != 7 {
 		t.Fatalf("expected created by 7, got %d", project.CreatedBy)
+	}
+	if matched := regexp.MustCompile(`^prj_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`).MatchString(project.ID); !matched {
+		t.Fatalf("expected UUID-like project id, got %q", project.ID)
 	}
 
 	if _, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM pour PME ?"}); err != nil {

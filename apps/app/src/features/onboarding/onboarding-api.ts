@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import { storeSelectedOrganizationID } from "@/shared/selection";
 
 export type OnboardingCompetitor = {
@@ -47,12 +47,6 @@ type OnboardingProjectResult = {
 
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
-}
-
-function unwrapData(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.success === true && "data" in value) return value.data;
-  return value;
 }
 
 function getIDString(value: unknown): string {
@@ -105,7 +99,7 @@ export async function createOnboardingProject(
   const brandName = input.brandName.trim();
   const websiteUrl = input.websiteUrl.trim();
   const organizationId = input.organizationId.trim();
-  const organizationName = input.organizationName.trim();
+  const organizationName = input.organizationName.trim() || brandName;
   const modelIds = input.modelIds.map((modelId) => modelId.trim()).filter(Boolean);
 
   if (!brandName) {
@@ -140,11 +134,10 @@ export async function createOnboardingProject(
       }),
     },
   );
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de finaliser l'onboarding.");
-  }
-
-  const payload = unwrapData(response.data);
+  const payload = requireGatewayResult(
+    response,
+    "Impossible de finaliser l'onboarding.",
+  );
   const record = isRecord(payload) ? payload : {};
   const projectId = getIDString(record.projectId ?? record.projectID ?? record.id);
   const createdProjectOrganizationId = getIDString(
@@ -188,12 +181,10 @@ export async function previewOnboardingBrandProfile(
       }),
     },
   );
-
-  if (!response.ok) {
-    throw new Error(response.error || "Impossible de preparer le profil de marque.");
-  }
-
-  const payload = unwrapData(response.data);
+  const payload = requireGatewayResult(
+    response,
+    "Impossible de preparer le profil de marque.",
+  );
   const record = isRecord(payload) ? payload : {};
 
   return {

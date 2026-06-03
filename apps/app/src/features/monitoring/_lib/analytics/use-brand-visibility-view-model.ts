@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { useMonitoringData } from "../shared/use-monitoring-data";
 
 import { filterPromptsByScope } from "../shared/prompt-filters";
 import { useMonitoringFilters } from "../shared/use-monitoring-filters";

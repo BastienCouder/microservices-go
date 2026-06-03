@@ -18,6 +18,7 @@ export function FooterSection() {
         { name: t("links.howItWorks"), href: "#how-it-works" },
         { name: t("links.developers"), href: "#developers" },
         { name: t("links.pricing"), href: "#pricing" },
+        { name: t("links.faq"), href: "#faq" },
       ],
     },
     {

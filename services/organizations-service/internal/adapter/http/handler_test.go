@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
 )
@@ -224,8 +225,8 @@ func TestValidateOrganizationAPIKeyEndpointReturnsScopedMetadata(t *testing.T) {
 	}
 
 	var payload map[string]any
-	if err := json.Unmarshal(resp.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
 	}
 	if payload["organizationId"] != float64(7) {
 		t.Fatalf("expected organizationId 7, got %+v", payload)
@@ -386,7 +387,7 @@ func TestGetOrganizationHierarchyReturnsProjects(t *testing.T) {
 	var payload struct {
 		Projects []usecase.ProjectSummary `json:"projects"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
 	if len(payload.Projects) != 1 {

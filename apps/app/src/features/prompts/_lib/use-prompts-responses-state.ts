@@ -3,7 +3,7 @@
 import { useDeferredValue, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
-import { useMonitoringData } from "@/hooks/use-monitoring-data";
+import { useMonitoringData } from "@/features/monitoring/_lib/shared/use-monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
 import {
   readOrganizationIdFromSearch,

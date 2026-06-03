@@ -1,7 +1,7 @@
 import type { DateRange } from "react-day-picker";
 import { shallow } from "zustand/shallow";
 
-import { useMonitoringStore } from "@/lib/monitoring-store";
+import { useMonitoringStore } from "./monitoring-store";
 
 export type MonitoringFiltersSnapshot = {
   period: string;

@@ -129,7 +129,15 @@ function clearOAuthCallbackParams(restoredSearch = "") {
     return;
   }
   const url = new URL(window.location.href);
-  url.search = restoredSearch;
+  if (restoredSearch) {
+    url.search = restoredSearch;
+  } else {
+    url.searchParams.delete("code");
+    url.searchParams.delete("state");
+    url.searchParams.delete("scope");
+    url.searchParams.delete("authuser");
+    url.searchParams.delete("prompt");
+  }
   window.history.replaceState(window.history.state, "", url.toString());
   window.dispatchEvent(new PopStateEvent("popstate", { state: window.history.state }));
 }
@@ -419,6 +427,7 @@ export function useTrafficReportPanelViewModel({
       })
       .catch((err) => {
         releaseGA4OAuthCallbackState(state);
+        clearOAuthCallbackParams(pendingOAuth?.routeSearch ?? "");
         clearPendingGA4OAuth();
         showCaughtFormError(
           err,

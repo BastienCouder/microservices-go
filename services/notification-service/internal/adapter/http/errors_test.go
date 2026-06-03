@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +11,7 @@ import (
 func TestNotificationWriteErrorUsesRateLimitedCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
-	writeError(rec, http.StatusTooManyRequests, "rate limit exceeded")
+	httpjson.WriteError(rec, http.StatusTooManyRequests, "rate limit exceeded")
 
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429, got %d body=%s", rec.Code, rec.Body.String())

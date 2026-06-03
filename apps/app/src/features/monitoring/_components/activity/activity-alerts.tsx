@@ -10,7 +10,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
-import type { MonitoringData } from "@/lib/monitoring-data";
+import type { MonitoringData } from "../../_lib/shared/monitoring-data";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { SectionTitle } from "@/components/shared/section-title";
 import { EmptyStateCard } from "../../../../components/shared/empty-state-card";

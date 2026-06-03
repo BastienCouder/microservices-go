@@ -1,0 +1,51 @@
+package usecase
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/domain"
+)
+
+type Service struct{}
+
+func NewService() *Service {
+	return &Service{}
+}
+
+type CreateInput struct {
+	Name string
+}
+
+type Resource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+func (s *Service) Create(_ context.Context, input CreateInput) (Resource, error) {
+	name := strings.TrimSpace(input.Name)
+	if name == "" {
+		return Resource{}, fmt.Errorf("%w: name is required", domain.ErrValidation)
+	}
+
+	return Resource{
+		ID:   "example-id",
+		Name: name,
+	}, nil
+}
+
+func (s *Service) Get(_ context.Context, id string) (Resource, error) {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		return Resource{}, fmt.Errorf("%w: id is required", domain.ErrValidation)
+	}
+	if id != "example-id" {
+		return Resource{}, fmt.Errorf("%w: __RESOURCE_NAME__ not found", domain.ErrNotFound)
+	}
+
+	return Resource{
+		ID:   id,
+		Name: "example",
+	}, nil
+}

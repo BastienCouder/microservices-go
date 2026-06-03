@@ -2,12 +2,12 @@ package organizations
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	internaljwt "github.com/bastiencouder/microservices-go/contracts/pkg/internaljwt"
 )
 
@@ -62,7 +62,7 @@ func (c *Client) RolesForUser(ctx context.Context, organizationID, userID int64)
 		UserID int64
 		Roles  []string
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&members); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &members); err != nil {
 		return nil, err
 	}
 

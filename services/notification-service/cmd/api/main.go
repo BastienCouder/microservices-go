@@ -10,18 +10,17 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	amqp "github.com/rabbitmq/amqp091-go"
 
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	emailrenderer "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/client/emailrenderer"
 	resendemail "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/email/resend"
 	httpadapter "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/http"
 	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/messaging/rabbitmq"
 	notificationrepo "github.com/bastiencouder/microservices-go/services/notification-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/notification-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/notification-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/notification-service/internal/usecase"
 )
 
@@ -30,16 +29,16 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
 		os.Exit(code)
 	}
 
-	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "notification-service")
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "notification-service")
 	if err != nil {
 		log.Fatalf("wait for notification database: %v", err)
 	}
 	defer db.Close()
-	if err := waitForRabbitMQ(context.Background(), cfg.RabbitMQURL, "notification-service"); err != nil {
+	if err := serviceboot.WaitForRabbitMQ(context.Background(), cfg.RabbitMQURL, "notification-service"); err != nil {
 		log.Fatalf("wait for rabbitmq: %v", err)
 	}
 
@@ -50,24 +49,13 @@ func main() {
 	appCtx, cancelApp := context.WithCancel(context.Background())
 	defer cancelApp()
 	go runEmailNotificationConsumerLoop(appCtx, cfg, svc)
-	h := httpadapter.NewHandler(svc, readinessCheck(db))
+	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 
 	mux := http.NewServeMux()
 	h.Register(mux)
 
-	server := httpsrv.NewServer(cfg.HTTPAddr, security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "notification-service")(mux))
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", promhttp.Handler())
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("notification-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	server := httpsrv.NewServer(cfg.HTTPAddr, internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "notification-service")(mux))
+	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "notification-service", promhttp.Handler())
 
 	go func() {
 		log.Printf("notification-service listening on %s", cfg.HTTPAddr)
@@ -90,59 +78,6 @@ func main() {
 	}
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
-	}
-}
-
-func runHealthcheckMode(databaseURL string) (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	db, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		return 1, true
-	}
-	defer db.Close()
-	if err := db.Ping(ctx); err != nil {
-		return 1, true
-	}
-	return 0, true
-}
-
-func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
-	return func(ctx context.Context) error {
-		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		defer cancel()
-		return db.Ping(pingCtx)
-	}
-}
-
-func waitForRabbitMQ(ctx context.Context, amqpURL, serviceName string) error {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		conn, err := amqp.Dial(amqpURL)
-		if err == nil {
-			_ = conn.Close()
-			return nil
-		}
-
-		log.Printf("%s rabbitmq unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
 	}
 }
 
@@ -197,40 +132,5 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()
-	}
-}
-
-func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		db, err := pgxpool.New(attemptCtx, dsn)
-		if err == nil {
-			err = db.Ping(attemptCtx)
-		}
-		cancel()
-
-		if err == nil {
-			return db, nil
-		}
-		if db != nil {
-			db.Close()
-		}
-
-		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
 	}
 }

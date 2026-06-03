@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
@@ -81,7 +81,7 @@ func (c *Client) AnalyzeContentIssues(ctx context.Context, input usecase.Content
 		return nil, fmt.Errorf("encode ia request: %w", err)
 	}
 
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "analysis-service", security.OutboundTokenClaims{
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "analysis-service", internalauth.Claims{
 		Organization: input.OrganizationID,
 	})
 	if err != nil {
@@ -169,7 +169,7 @@ func (c *Client) executeStructuredPrompt(ctx context.Context, body executePrompt
 		return "", fmt.Errorf("encode ia request: %w", err)
 	}
 
-	token, err := security.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "analysis-service", security.OutboundTokenClaims{
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "analysis-service", internalauth.Claims{
 		Organization: organizationID,
 	})
 	if err != nil {

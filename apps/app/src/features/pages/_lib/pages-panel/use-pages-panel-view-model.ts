@@ -7,7 +7,7 @@ import {
   getMonitoringQueryContext,
   loadMonitoringData,
   type MonitoringData,
-} from "@/lib/monitoring-data";
+} from "@/features/monitoring/_lib/shared/monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
 
 import { buildPagesPanelViewModel } from "./page-insights";

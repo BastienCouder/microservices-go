@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { apiRoutes } from "@/lib/api-config";
-import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { invalidateProjectScope } from "@/shared/api/query-refresh";
 
 const DEFAULT_UPDATE_ERROR = "Impossible de mettre a jour les modeles du projet.";
 
@@ -48,28 +48,13 @@ export function useSaveProjectModelsMutation({
       if (!response.ok) throw new Error(sanitizeLegacyModelUpdateError(response.error));
       return modelIds;
     },
-    onSuccess: async (nextModelIds) => {
-      const projectModelsKey = appQueryKeys.projectModels(
+    onSuccess: async () => {
+      await invalidateProjectScope(
+        queryClient,
         apiBaseURL,
         organizationId,
         selectedProjectId,
       );
-      queryClient.setQueryData(projectModelsKey, nextModelIds);
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: projectModelsKey }),
-        queryClient.invalidateQueries({
-          queryKey: ["monitoring", apiBaseURL, selectedProjectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["perception", apiBaseURL, selectedProjectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["prompts", apiBaseURL, organizationId, selectedProjectId],
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["prompts", "catalog", apiBaseURL, organizationId, selectedProjectId],
-        }),
-      ]);
       onSuccessMessage("Modeles du projet mis a jour.");
     },
     onError: (mutationError) => {

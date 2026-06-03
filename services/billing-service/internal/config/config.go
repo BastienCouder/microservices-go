@@ -2,9 +2,9 @@ package config
 
 import (
 	"fmt"
-	"net/url"
-	"os"
 	"strings"
+
+	"github.com/bastiencouder/microservices-go/contracts/pkg/envcfg"
 )
 
 type Config struct {
@@ -35,7 +35,7 @@ type StripeConfig struct {
 }
 
 func Load() (Config, error) {
-	httpAddr, err := requiredEnv("HTTP_ADDR")
+	httpAddr, err := envcfg.RequiredEnv("HTTP_ADDR")
 	if err != nil {
 		return Config{}, err
 	}
@@ -43,11 +43,11 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
+	internalJWTSecret, err := envcfg.SecretFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTIssuer, err := requiredEnv("INTERNAL_JWT_ISSUER")
+	internalJWTIssuer, err := envcfg.RequiredEnv("INTERNAL_JWT_ISSUER")
 	if err != nil {
 		return Config{}, err
 	}
@@ -55,181 +55,81 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+
 	return Config{
 		HTTPAddr:              httpAddr,
-		MetricsAddr:           optionalEnv("METRICS_ADDR"),
+		MetricsAddr:           envcfg.OptionalEnv("METRICS_ADDR"),
 		DatabaseURL:           databaseURL,
 		InternalJWTSecret:     internalJWTSecret,
 		InternalJWTIssuer:     internalJWTIssuer,
-		AttributionServiceURL: optionalEnv("ATTRIBUTION_SERVICE_URL"),
-		ProjectServiceURL:     optionalEnv("PROJECT_SERVICE_URL"),
+		AttributionServiceURL: envcfg.OptionalEnv("ATTRIBUTION_SERVICE_URL"),
+		ProjectServiceURL:     envcfg.OptionalEnv("PROJECT_SERVICE_URL"),
 		Stripe:                stripeCfg,
 	}, nil
 }
 
 func DatabaseURLFromEnv() (string, error) {
-	host, err := requiredEnv("BILLING_DB_HOST")
-	if err != nil {
-		return "", err
-	}
-	port, err := requiredEnv("BILLING_DB_PORT")
-	if err != nil {
-		return "", err
-	}
-	user, err := requiredEnv("BILLING_DB_USER")
-	if err != nil {
-		return "", err
-	}
-	name, err := requiredEnv("BILLING_DB_NAME")
-	if err != nil {
-		return "", err
-	}
-	sslMode, err := requiredEnv("BILLING_DB_SSLMODE")
-	if err != nil {
-		return "", err
-	}
-	password, err := passwordFromEnv("BILLING_DB_PASSWORD", "BILLING_DB_PASSWORD_FILE")
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		url.QueryEscape(user),
-		url.QueryEscape(password),
-		host,
-		port,
-		name,
-		sslMode,
-	), nil
-}
-
-func passwordFromEnv(passwordKey, fileKey string) (string, error) {
-	if value := strings.TrimSpace(os.Getenv(passwordKey)); value != "" {
-		return value, nil
-	}
-	filePath := strings.TrimSpace(os.Getenv(fileKey))
-	if filePath == "" {
-		return "", fmt.Errorf("missing required environment variable %s or %s", passwordKey, fileKey)
-	}
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("read password file %s: %w", filePath, err)
-	}
-	value := strings.TrimSpace(string(raw))
-	if value == "" {
-		return "", fmt.Errorf("password file %s is empty", filePath)
-	}
-	return value, nil
-}
-
-func requiredEnv(key string) (string, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return "", fmt.Errorf("missing required environment variable %s", key)
-	}
-	return value, nil
-}
-
-func optionalEnv(key string) string {
-	return strings.TrimSpace(os.Getenv(key))
-}
-
-func optionalBoolEnv(key string, defaultValue bool) (bool, error) {
-	raw := strings.TrimSpace(os.Getenv(key))
-	if raw == "" {
-		return defaultValue, nil
-	}
-	switch strings.ToLower(raw) {
-	case "1", "true", "yes", "on":
-		return true, nil
-	case "0", "false", "no", "off":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
-	}
-}
-
-func optionalBoolEnvOrFile(key, fileKey string, defaultValue bool) (bool, error) {
-	if raw := strings.TrimSpace(os.Getenv(key)); raw != "" {
-		return parseBool(key, raw)
-	}
-	filePath := strings.TrimSpace(os.Getenv(fileKey))
-	if filePath == "" {
-		return defaultValue, nil
-	}
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return false, fmt.Errorf("read value file %s for %s: %w", filePath, key, err)
-	}
-	value := strings.TrimSpace(string(raw))
-	if value == "" {
-		return defaultValue, nil
-	}
-	return parseBool(fileKey, value)
-}
-
-func parseBool(key, raw string) (bool, error) {
-	switch strings.ToLower(strings.TrimSpace(raw)) {
-	case "1", "true", "yes", "on":
-		return true, nil
-	case "0", "false", "no", "off":
-		return false, nil
-	default:
-		return false, fmt.Errorf("invalid environment variable %s: must be a boolean", key)
-	}
+	return envcfg.PostgresURL(
+		"BILLING_DB_HOST",
+		"BILLING_DB_PORT",
+		"BILLING_DB_USER",
+		"BILLING_DB_NAME",
+		"BILLING_DB_SSLMODE",
+		"BILLING_DB_PASSWORD",
+		"BILLING_DB_PASSWORD_FILE",
+	)
 }
 
 func loadStripeConfig() (StripeConfig, error) {
-	enabled, err := optionalBoolEnvOrFile("STRIPE_ENABLED", "STRIPE_ENABLED_FILE", false)
+	enabled, err := envcfg.OptionalBoolEnvOrFile("STRIPE_ENABLED", "STRIPE_ENABLED_FILE", false)
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	secretKey, err := optionalEnvOrFile("STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY_FILE")
+	secretKey, err := envcfg.OptionalValueFromEnv("STRIPE_SECRET_KEY", "STRIPE_SECRET_KEY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	webhookSecret, err := optionalEnvOrFile("STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_FILE")
+	webhookSecret, err := envcfg.OptionalValueFromEnv("STRIPE_WEBHOOK_SECRET", "STRIPE_WEBHOOK_SECRET_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	checkoutSuccessURL, err := optionalEnvOrFile("STRIPE_CHECKOUT_SUCCESS_URL", "STRIPE_CHECKOUT_SUCCESS_URL_FILE")
+	checkoutSuccessURL, err := envcfg.OptionalValueFromEnv("STRIPE_CHECKOUT_SUCCESS_URL", "STRIPE_CHECKOUT_SUCCESS_URL_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	checkoutCancelURL, err := optionalEnvOrFile("STRIPE_CHECKOUT_CANCEL_URL", "STRIPE_CHECKOUT_CANCEL_URL_FILE")
+	checkoutCancelURL, err := envcfg.OptionalValueFromEnv("STRIPE_CHECKOUT_CANCEL_URL", "STRIPE_CHECKOUT_CANCEL_URL_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	customerPortalReturnURL, err := optionalEnvOrFile("STRIPE_CUSTOMER_PORTAL_RETURN_URL", "STRIPE_CUSTOMER_PORTAL_RETURN_URL_FILE")
+	customerPortalReturnURL, err := envcfg.OptionalValueFromEnv("STRIPE_CUSTOMER_PORTAL_RETURN_URL", "STRIPE_CUSTOMER_PORTAL_RETURN_URL_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	starterMonthlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_STARTER_MONTHLY", "STRIPE_PRICE_STARTER_MONTHLY_FILE")
+	starterMonthlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_STARTER_MONTHLY", "STRIPE_PRICE_STARTER_MONTHLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	starterYearlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_STARTER_YEARLY", "STRIPE_PRICE_STARTER_YEARLY_FILE")
+	starterYearlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_STARTER_YEARLY", "STRIPE_PRICE_STARTER_YEARLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	growthMonthlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_GROWTH_MONTHLY", "STRIPE_PRICE_GROWTH_MONTHLY_FILE")
+	growthMonthlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_GROWTH_MONTHLY", "STRIPE_PRICE_GROWTH_MONTHLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	growthYearlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_GROWTH_YEARLY", "STRIPE_PRICE_GROWTH_YEARLY_FILE")
+	growthYearlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_GROWTH_YEARLY", "STRIPE_PRICE_GROWTH_YEARLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	proMonthlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_MONTHLY_FILE")
+	proMonthlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_PRO_MONTHLY", "STRIPE_PRICE_PRO_MONTHLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	proYearlyPriceID, err := optionalEnvOrFile("STRIPE_PRICE_PRO_YEARLY", "STRIPE_PRICE_PRO_YEARLY_FILE")
+	proYearlyPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_PRO_YEARLY", "STRIPE_PRICE_PRO_YEARLY_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
-	correctionCreditsPriceID, err := optionalEnvOrFile("STRIPE_PRICE_CORRECTION_CREDITS", "STRIPE_PRICE_CORRECTION_CREDITS_FILE")
+	correctionCreditsPriceID, err := envcfg.OptionalValueFromEnv("STRIPE_PRICE_CORRECTION_CREDITS", "STRIPE_PRICE_CORRECTION_CREDITS_FILE")
 	if err != nil {
 		return StripeConfig{}, err
 	}
@@ -268,19 +168,4 @@ func loadStripeConfig() (StripeConfig, error) {
 		}
 	}
 	return cfg, nil
-}
-
-func optionalEnvOrFile(valueKey, fileKey string) (string, error) {
-	if value := strings.TrimSpace(os.Getenv(valueKey)); value != "" {
-		return value, nil
-	}
-	filePath := strings.TrimSpace(os.Getenv(fileKey))
-	if filePath == "" {
-		return "", nil
-	}
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("read value file %s for %s: %w", filePath, valueKey, err)
-	}
-	return strings.TrimSpace(string(raw)), nil
 }

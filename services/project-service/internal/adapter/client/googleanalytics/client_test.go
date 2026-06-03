@@ -14,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestAuthorizationURLRequestsAnalyticsEditScope(t *testing.T) {
+func TestAuthorizationURLRequestsAnalyticsEditAndReadScopes(t *testing.T) {
 	client, err := NewClient("client-id", "client-secret")
 	if err != nil {
 		t.Fatalf("new client: %v", err)
@@ -29,8 +29,12 @@ func TestAuthorizationURLRequestsAnalyticsEditScope(t *testing.T) {
 		t.Fatalf("parse authorization url: %v", err)
 	}
 
-	if got := parsed.Query().Get("scope"); got != analyticsEditScope {
-		t.Fatalf("expected analytics edit scope %q, got %q", analyticsEditScope, got)
+	scope := parsed.Query().Get("scope")
+	if !strings.Contains(scope, analyticsEditScope) {
+		t.Fatalf("expected analytics edit scope %q, got %q", analyticsEditScope, scope)
+	}
+	if !strings.Contains(scope, analyticsReadOnlyScope) {
+		t.Fatalf("expected analytics readonly scope %q, got %q", analyticsReadOnlyScope, scope)
 	}
 }
 

@@ -55,28 +55,66 @@ export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPrompt
     const resolvedBrand = brandName.trim() || t("yourBrand");
     const competitorName = competitors[0]?.name?.trim();
     const resolvedIndustry = industry.trim();
+    const resolvedUseCase =
+      resolvedIndustry || (locale === "fr" ? "mon besoin" : "my use case");
 
     const generatedTexts =
       locale === "fr"
         ? [
-            `quelles sont les meilleures alternatives à ${resolvedBrand} ?`,
-            `${resolvedBrand} est-il fiable pour les entreprises ?`,
+            `meilleure alternative à ${resolvedBrand}`,
+            `remplacer ${resolvedBrand} par quoi ?`,
+            `outil similaire à ${resolvedBrand}`,
+            `c'est quoi comme ${resolvedBrand} mais moins cher`,
             competitorName
-              ? `${resolvedBrand} vs ${competitorName} : quelle solution choisir ?`
-              : `comment ${resolvedBrand} se compare-t-il à ses concurrents ?`,
+              ? `${resolvedBrand} ou ${competitorName} lequel choisir`
+              : `${resolvedBrand} ou quel concurrent choisir`,
+            competitorName
+              ? `différence entre ${resolvedBrand} et ${competitorName}`
+              : `différence entre ${resolvedBrand} et ses concurrents`,
+            competitorName
+              ? `${resolvedBrand} vs ${competitorName}`
+              : `${resolvedBrand} vs concurrents`,
+            `${resolvedBrand} c'est bien ?`,
+            `${resolvedBrand} avis`,
+            `${resolvedBrand} ça vaut quoi`,
+            `${resolvedBrand} fiable ou pas`,
+            `meilleur outil pour ${resolvedUseCase}`,
+            `quel outil pour ${resolvedUseCase}`,
+            `comment faire ${resolvedUseCase} avec l'IA`,
             resolvedIndustry
-              ? `quels sont les meilleurs outils IA pour ${resolvedIndustry} ?`
-              : `quels sont les meilleurs outils comme ${resolvedBrand} en 2026 ?`,
+              ? `outil IA ${resolvedIndustry} recommandation`
+              : `outil IA recommandation`,
+            `${resolvedBrand} ça coûte combien`,
+            `${resolvedBrand} gratuit ou payant`,
+            `vaut le coup ${resolvedBrand} pour une petite boite`,
           ]
         : [
-            `what are the best alternatives to ${resolvedBrand}?`,
-            `is ${resolvedBrand} reliable for enterprise teams?`,
+            `best alternative to ${resolvedBrand}`,
+            `what can replace ${resolvedBrand}?`,
+            `tool similar to ${resolvedBrand}`,
+            `what is like ${resolvedBrand} but cheaper`,
             competitorName
-              ? `${resolvedBrand} vs ${competitorName}: which solution is better?`
-              : `how does ${resolvedBrand} compare to competitors?`,
+              ? `${resolvedBrand} or ${competitorName} which one to choose`
+              : `${resolvedBrand} or which competitor to choose`,
+            competitorName
+              ? `difference between ${resolvedBrand} and ${competitorName}`
+              : `difference between ${resolvedBrand} and competitors`,
+            competitorName
+              ? `${resolvedBrand} vs ${competitorName}`
+              : `${resolvedBrand} vs competitors`,
+            `is ${resolvedBrand} good?`,
+            `${resolvedBrand} reviews`,
+            `is ${resolvedBrand} worth it`,
+            `is ${resolvedBrand} reliable or not`,
+            `best tool for ${resolvedUseCase}`,
+            `which tool for ${resolvedUseCase}`,
+            `how to do ${resolvedUseCase} with AI`,
             resolvedIndustry
-              ? `what are the best AI tools for ${resolvedIndustry}?`
-              : `top tools like ${resolvedBrand} in 2026`,
+              ? `recommended AI tool for ${resolvedIndustry}`
+              : `recommended AI tool`,
+            `how much does ${resolvedBrand} cost`,
+            `${resolvedBrand} free or paid`,
+            `is ${resolvedBrand} worth it for a small business`,
           ];
 
     const existingTexts = new Set(
@@ -99,7 +137,6 @@ export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPrompt
       description={t("promptsDescription")}
       headerAction={
         <Button type="button" variant="outline" onClick={generatePromptsWithAI}>
-          <Sparkles className="size-4 text-primary" />
           {t("generateWithAI")}
         </Button>
       }

@@ -3,11 +3,12 @@ import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppToaster } from "@/components/ui/toaster";
+import { ACCOUNT_SETUP_SEARCH } from "@/features/onboarding/onboarding-mode";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { loadUserOrganizationSummaries } from "@/shared/organizations";
@@ -18,7 +19,8 @@ import {
 } from "@/shared/project-context";
 import {
   keepProjectOnlyContextSearch,
-  readProjectIdFromSearch,
+  readOrganizationIdFromSearch,
+  readProjectTokenFromSearch,
   resolveSelectedContextSearch,
   SELECTED_CONTEXT_CHANGE_EVENT,
   storeSelectedProjectContext,
@@ -40,19 +42,6 @@ function getAPIBaseURL(): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function unwrapData(value: unknown): unknown {
-  if (
-    value &&
-    typeof value === "object" &&
-    "success" in value &&
-    (value as { success?: unknown }).success === true &&
-    "data" in value
-  ) {
-    return (value as { data: unknown }).data;
-  }
-  return value;
-}
-
 async function loadProjectCount(
   apiBaseURL: string,
   signal?: AbortSignal,
@@ -66,7 +55,7 @@ async function loadProjectCount(
     return null;
   }
 
-  const payload = unwrapData(response.data);
+  const payload = unwrapGatewayPayload(response.data);
   return Array.isArray(payload) ? payload.length : 0;
 }
 
@@ -88,7 +77,11 @@ export default function App() {
     [bypassResolvedContext, location.search, selectionVersion],
   );
   const routeProjectToken = useMemo(
-    () => (bypassResolvedContext ? "" : readProjectIdFromSearch(baseRouteSearch)),
+    () => (bypassResolvedContext ? "" : readProjectTokenFromSearch(baseRouteSearch)),
+    [baseRouteSearch, bypassResolvedContext],
+  );
+  const routeOrganizationToken = useMemo(
+    () => (bypassResolvedContext ? "" : readOrganizationIdFromSearch(baseRouteSearch)),
     [baseRouteSearch, bypassResolvedContext],
   );
   const apiBaseURL = useMemo(() => getAPIBaseURL(), []);
@@ -124,8 +117,9 @@ export default function App() {
       findResolvedProjectContext(
         routeProjectContextQuery.data ?? [],
         routeProjectToken,
+        routeOrganizationToken,
       ),
-    [routeProjectContextQuery.data, routeProjectToken],
+    [routeOrganizationToken, routeProjectContextQuery.data, routeProjectToken],
   );
   const resolvedRouteSearch = useMemo(
     () =>
@@ -228,7 +222,7 @@ export default function App() {
     storeSelectedProjectContext({
       organizationId: resolvedProjectContext.organizationId,
       projectId: resolvedProjectContext.projectId,
-      projectToken: resolvedProjectContext.projectSlug,
+      projectToken: resolvedProjectContext.projectId,
     });
   }, [resolvedProjectContext]);
 
@@ -293,7 +287,11 @@ export default function App() {
   }
 
   if (mustRedirectToOnboarding) {
-    return <Navigate replace to="/onboarding?setup=account" />;
+    return <Navigate replace to={`/onboarding${ACCOUNT_SETUP_SEARCH}`} />;
+  }
+
+  if (isOnboardingRoute && busy) {
+    return null;
   }
 
   if (isOnboardingRoute || isInvitationRoute || isBillingRoute) {

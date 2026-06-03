@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/shared/page-header";
-import { pushErrorToast, pushWarningToast } from "@/components/ui/toast-actions";
+import { pushWarningToast } from "@/components/ui/toast-actions";
 
 import { ProviderApiKeysPanel } from "../provider-keys/provider-api-keys-panel";
 import {
@@ -27,12 +27,6 @@ type ModelsPanelProps = {
 export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
   const viewModel = useModelsPanelViewModel({ apiBaseURL, routeSearch });
   const missingProviderLabels = viewModel.missingProviderLabels.join(", ");
-
-  useEffect(() => {
-    if (viewModel.displayError) {
-      pushErrorToast(new Error(viewModel.displayError), viewModel.displayError);
-    }
-  }, [viewModel.displayError]);
 
   useEffect(() => {
     if (viewModel.developerPlanMissingKeys) {

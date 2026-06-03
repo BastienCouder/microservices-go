@@ -1,11 +1,6 @@
 package config
 
-import (
-	"fmt"
-	"net/url"
-	"os"
-	"strings"
-)
+import "github.com/bastiencouder/microservices-go/contracts/pkg/envcfg"
 
 type Config struct {
 	HTTPAddr          string
@@ -16,27 +11,26 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	httpAddr, err := requiredEnv("HTTP_ADDR")
+	httpAddr, err := envcfg.RequiredEnv("HTTP_ADDR")
 	if err != nil {
 		return Config{}, err
 	}
-
 	databaseURL, err := DatabaseURLFromEnv()
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTSecret, err := passwordFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
+	internalJWTSecret, err := envcfg.SecretFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
-	internalJWTIssuer, err := requiredEnv("INTERNAL_JWT_ISSUER")
+	internalJWTIssuer, err := envcfg.RequiredEnv("INTERNAL_JWT_ISSUER")
 	if err != nil {
 		return Config{}, err
 	}
 
 	return Config{
 		HTTPAddr:          httpAddr,
-		MetricsAddr:       optionalEnv("METRICS_ADDR"),
+		MetricsAddr:       envcfg.OptionalEnv("METRICS_ADDR"),
 		DatabaseURL:       databaseURL,
 		InternalJWTSecret: internalJWTSecret,
 		InternalJWTIssuer: internalJWTIssuer,
@@ -44,69 +38,13 @@ func Load() (Config, error) {
 }
 
 func DatabaseURLFromEnv() (string, error) {
-	host, err := requiredEnv("USER_DB_HOST")
-	if err != nil {
-		return "", err
-	}
-	port, err := requiredEnv("USER_DB_PORT")
-	if err != nil {
-		return "", err
-	}
-	user, err := requiredEnv("USER_DB_USER")
-	if err != nil {
-		return "", err
-	}
-	name, err := requiredEnv("USER_DB_NAME")
-	if err != nil {
-		return "", err
-	}
-	sslMode, err := requiredEnv("USER_DB_SSLMODE")
-	if err != nil {
-		return "", err
-	}
-	password, err := passwordFromEnv("USER_DB_PASSWORD", "USER_DB_PASSWORD_FILE")
-	if err != nil {
-		return "", err
-	}
-
-	return fmt.Sprintf(
-		"postgres://%s:%s@%s:%s/%s?sslmode=%s",
-		url.QueryEscape(user),
-		url.QueryEscape(password),
-		host,
-		port,
-		name,
-		sslMode,
-	), nil
-}
-
-func passwordFromEnv(passwordKey, fileKey string) (string, error) {
-	if value := strings.TrimSpace(os.Getenv(passwordKey)); value != "" {
-		return value, nil
-	}
-	filePath := strings.TrimSpace(os.Getenv(fileKey))
-	if filePath == "" {
-		return "", fmt.Errorf("missing required environment variable %s or %s", passwordKey, fileKey)
-	}
-	raw, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("read password file %s: %w", filePath, err)
-	}
-	value := strings.TrimSpace(string(raw))
-	if value == "" {
-		return "", fmt.Errorf("password file %s is empty", filePath)
-	}
-	return value, nil
-}
-
-func requiredEnv(key string) (string, error) {
-	value := os.Getenv(key)
-	if value == "" {
-		return "", fmt.Errorf("missing required environment variable %s", key)
-	}
-	return value, nil
-}
-
-func optionalEnv(key string) string {
-	return strings.TrimSpace(os.Getenv(key))
+	return envcfg.PostgresURL(
+		"USER_DB_HOST",
+		"USER_DB_PORT",
+		"USER_DB_USER",
+		"USER_DB_NAME",
+		"USER_DB_SSLMODE",
+		"USER_DB_PASSWORD",
+		"USER_DB_PASSWORD_FILE",
+	)
 }

@@ -1,3 +1,4 @@
+import { unwrapGatewayPayload } from "@/shared/api/gateway";
 import type { ModelCatalogItem } from "../model-access";
 
 export const OPENROUTER_PROVIDER_ID = "openrouter";
@@ -49,9 +50,7 @@ export function getField<T = unknown>(
 }
 
 export function unwrapSuccessEnvelope(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.success === true && "data" in value) return value.data;
-  return value;
+  return unwrapGatewayPayload(value);
 }
 
 export function getString(value: unknown): string {

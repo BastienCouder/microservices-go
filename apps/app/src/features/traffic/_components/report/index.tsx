@@ -6,7 +6,6 @@ import { PeriodFilterPicker } from "@/components/shared/period-filter-picker";
 import { SearchFilterInput } from "@/components/shared/search-filter-input";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { pushErrorToast } from "@/components/ui/toast-actions";
 import { cn } from "@/lib/utils";
 import { GA4IntegrationCard } from "./ga4-integration-card";
 import { TrafficKpiRow } from "./kpi-row";
@@ -15,7 +14,6 @@ import { TopPagesTable } from "./top-pages-table";
 import { TrafficEngineFilter } from "./traffic-engine-filter";
 import { TrafficTrend } from "./traffic-trend";
 import {
-  shouldToastTrafficReportError,
   useTrafficReportPanelViewModel,
 } from "../../_lib/report/use-traffic-report-panel-view-model";
 import type { TrafficPeriod } from "../../_lib/report/types";
@@ -40,19 +38,6 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
   const vm = useTrafficReportPanelViewModel({ apiBaseURL, routeSearch });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const showReportShell = vm.loading || vm.isConnected || Boolean(vm.error);
-
-  useEffect(() => {
-    if (
-      vm.error &&
-      shouldToastTrafficReportError({
-        error: vm.error,
-        isConnected: vm.isConnected,
-        isBusy: vm.loading || vm.saving,
-      })
-    ) {
-      pushErrorToast(new Error(vm.error), vm.error);
-    }
-  }, [vm.error, vm.isConnected, vm.loading, vm.saving]);
 
   const filtersContent = (
     <>

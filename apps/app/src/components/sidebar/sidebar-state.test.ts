@@ -95,6 +95,27 @@ describe("sidebar state helpers", () => {
     );
   });
 
+  test("findOrganizationIdForProjectToken prefers the selected organization when duplicate slugs exist", () => {
+    const first = normalizeOrganizationHierarchy(
+      {
+        organization: { id: "org-1", name: "First" },
+        projects: [{ id: "project-a", name: "Website" }],
+      },
+      "org-1",
+    );
+    const second = normalizeOrganizationHierarchy(
+      {
+        organization: { id: "org-2", name: "Second" },
+        projects: [{ id: "project-b", name: "Website" }],
+      },
+      "org-2",
+    );
+
+    expect(
+      findOrganizationIdForProjectToken([first, second], "website", "org-2"),
+    ).toBe("org-2");
+  });
+
   test("findProjectIdForToken resolves a stored project slug to its id", () => {
     const hierarchy = normalizeOrganizationHierarchy(
       {

@@ -362,6 +362,7 @@ type apiError struct {
 	statusCode     int
 	message        string
 	authentication bool
+	rateLimited    bool
 	validation     bool
 }
 
@@ -373,6 +374,11 @@ func (e *apiError) Error() string {
 	switch {
 	case e.authentication:
 		return "cloudflare crawl authentication failed: " + message
+	case e.rateLimited:
+		if e.operation != "" {
+			return "quota exceeded: cloudflare crawl " + e.operation + " failed: " + message
+		}
+		return "quota exceeded: cloudflare crawl failed: " + message
 	case e.validation:
 		if e.operation != "" {
 			return "validation error: cloudflare crawl " + e.operation + " request invalid: " + message
@@ -390,32 +396,38 @@ func (e *apiError) Is(target error) bool {
 	switch target {
 	case ErrAuthentication:
 		return e.authentication
+	case usecase.ErrQuotaExceeded:
+		return e.rateLimited
 	case usecase.ErrValidation:
 		return e.validation
 	case usecase.ErrDependencyUnavailable:
-		return !e.validation
+		return !e.validation && !e.rateLimited
 	default:
 		return false
 	}
 }
 
 func newAPIErrorFromStatus(statusCode int, message string) error {
+	rateLimited := statusCode == http.StatusTooManyRequests || containsRateLimitMessage(message)
 	return &apiError{
 		statusCode:     statusCode,
 		message:        message,
 		authentication: statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden,
-		validation:     statusCode == http.StatusBadRequest || statusCode == http.StatusUnprocessableEntity,
+		rateLimited:    rateLimited,
+		validation:     !rateLimited && (statusCode == http.StatusBadRequest || statusCode == http.StatusUnprocessableEntity),
 	}
 }
 
 func newAPIErrorFromEnvelope[T any](operation string, envelope apiEnvelope[T]) error {
 	message := envelope.errorMessage()
 	authentication := envelope.hasErrorCode(10000) || containsAuthenticationMessage(message)
+	rateLimited := envelope.hasErrorCode(2001) || containsRateLimitMessage(message)
 	return &apiError{
 		operation:      operation,
 		message:        message,
 		authentication: authentication,
-		validation:     !authentication && envelope.hasValidationError(),
+		rateLimited:    !authentication && rateLimited,
+		validation:     !authentication && !rateLimited && envelope.hasValidationError(),
 	}
 }
 
@@ -440,6 +452,11 @@ func (e apiEnvelope[T]) hasValidationError() bool {
 func containsAuthenticationMessage(message string) bool {
 	message = strings.ToLower(strings.TrimSpace(message))
 	return strings.Contains(message, "authentication")
+}
+
+func containsRateLimitMessage(message string) bool {
+	message = strings.ToLower(strings.TrimSpace(message))
+	return strings.Contains(message, "rate limit exceeded") || strings.Contains(message, "rate limited")
 }
 
 type crawlResultPayload struct {

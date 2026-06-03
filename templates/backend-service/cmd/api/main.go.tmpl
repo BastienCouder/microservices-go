@@ -1,0 +1,88 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
+	httpadapter "github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/adapter/http"
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/config"
+	"github.com/bastiencouder/microservices-go/services/__SERVICE_SLUG__/internal/usecase"
+)
+
+func main() {
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("load config: %v", err)
+	}
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
+		os.Exit(code)
+	}
+
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "__SERVICE_NAME__")
+	if err != nil {
+		log.Fatalf("wait for database: %v", err)
+	}
+	defer db.Close()
+
+	svc := usecase.NewService()
+	h := httpadapter.NewHandler(svc, readinessCheck(db))
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	handler := internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "__SERVICE_NAME__")(mux)
+	server := httpsrv.NewServer(cfg.HTTPAddr, handler)
+	var metricsServer *http.Server
+	if cfg.MetricsAddr != "" {
+		metricsMux := http.NewServeMux()
+		metricsMux.HandleFunc("GET /metrics", serviceboot.MetricsHandler)
+		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
+		go func() {
+			log.Printf("__SERVICE_NAME__ metrics listening on %s", cfg.MetricsAddr)
+			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				log.Fatalf("metrics listen error: %v", err)
+			}
+		}()
+	}
+
+	go func() {
+		log.Printf("__SERVICE_NAME__ listening on %s", cfg.HTTPAddr)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("listen error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if metricsServer != nil {
+		if err := metricsServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("metrics shutdown error: %v", err)
+		}
+	}
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("shutdown error: %v", err)
+	}
+}
+
+func readinessCheck(db *pgxpool.Pool) func(context.Context) error {
+	return func(ctx context.Context) error {
+		pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+		defer cancel()
+		return db.Ping(pingCtx)
+	}
+}

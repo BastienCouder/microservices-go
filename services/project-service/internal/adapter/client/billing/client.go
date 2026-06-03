@@ -2,7 +2,6 @@ package billing
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/bastiencouder/microservices-go/services/project-service/internal/security"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
@@ -42,12 +42,12 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 		return usecase.BillingEntitlements{}, fmt.Errorf("organization id is required")
 	}
 
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"billing-service",
 		"project-service",
-		security.OutboundTokenClaims{Organization: organizationID},
+		internalauth.Claims{Organization: organizationID},
 	)
 	if err != nil {
 		return usecase.BillingEntitlements{}, fmt.Errorf("sign internal jwt: %w", err)
@@ -81,7 +81,7 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 		MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
 		MaxProjects             int    `json:"max_projects"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 		return usecase.BillingEntitlements{}, fmt.Errorf("decode billing response: %w", err)
 	}
 
@@ -94,12 +94,12 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 }
 
 func (c *Client) GetCreditCostSettings(ctx context.Context) (usecase.CreditCostSettings, error) {
-	token, err := security.SignInternalJWT(
+	token, err := internalauth.SignInternalJWT(
 		c.jwtSecret,
 		c.jwtIssuer,
 		"billing-service",
 		"project-service",
-		security.OutboundTokenClaims{},
+		internalauth.Claims{},
 	)
 	if err != nil {
 		return usecase.CreditCostSettings{}, fmt.Errorf("sign internal jwt: %w", err)
@@ -133,7 +133,7 @@ func (c *Client) GetCreditCostSettings(ctx context.Context) (usecase.CreditCostS
 			CreditCost         int     `json:"credit_cost"`
 		} `json:"rules"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
 		return usecase.CreditCostSettings{}, fmt.Errorf("decode billing response: %w", err)
 	}
 

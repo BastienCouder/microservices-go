@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildScopedHref,
   readOrganizationIdFromSearch,
+  readProjectTokenFromSearch,
+  readSelectedProjectID,
   readSelectedOrganizationID,
   SELECTED_CONTEXT_CHANGE_EVENT,
 } from "@/shared/selection";
@@ -13,7 +15,6 @@ import {
   isProviderUsableWithCredentials,
   sortCatalogItemsByProvider,
 } from "../catalog-client";
-import { readProjectIdFromSearch } from "./models-panel-route";
 import { useModelsPanelData } from "./use-models-panel-data";
 import { useProviderCredentialMutations } from "./use-provider-credential-mutations";
 import { useSaveProjectModelsMutation } from "./use-save-project-models-mutation";
@@ -42,16 +43,19 @@ export const PROVIDER_API_KEY_TEXTS = {
 };
 
 function readOrganizationId(routeSearch: string): string {
-  const routeProjectId = readProjectIdFromSearch(routeSearch);
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
-  if (/^\d+$/.test(routeOrganizationId)) {
+  if (routeOrganizationId !== "") {
     return routeOrganizationId;
   }
-  if (routeProjectId) {
-    return "";
-  }
-
   return readSelectedOrganizationID();
+}
+
+function readCanonicalProjectToken(routeSearch: string): string {
+  const routeProjectToken = readProjectTokenFromSearch(routeSearch);
+  if (routeProjectToken !== "") {
+    return routeProjectToken;
+  }
+  return readSelectedProjectID();
 }
 
 export function useModelsPanelViewModel({
@@ -61,15 +65,19 @@ export function useModelsPanelViewModel({
   const [organizationId, setOrganizationId] = useState(() =>
     readOrganizationId(routeSearch),
   );
+  const [storedProjectToken, setStoredProjectToken] = useState(() =>
+    readCanonicalProjectToken(routeSearch),
+  );
   const [search, setSearch] = useState("");
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<Record<string, string>>({});
   const hintedProjectToken = useMemo(
-    () => readProjectIdFromSearch(routeSearch),
-    [routeSearch],
+    () => readProjectTokenFromSearch(routeSearch) || storedProjectToken,
+    [routeSearch, storedProjectToken],
   );
 
   useEffect(() => {
     setOrganizationId(readOrganizationId(routeSearch));
+    setStoredProjectToken(readCanonicalProjectToken(routeSearch));
   }, [routeSearch]);
 
   useEffect(() => {
@@ -77,6 +85,7 @@ export function useModelsPanelViewModel({
 
     const syncOrganizationId = () => {
       setOrganizationId(readOrganizationId(routeSearch));
+      setStoredProjectToken(readCanonicalProjectToken(routeSearch));
     };
 
     window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, syncOrganizationId);
@@ -93,7 +102,7 @@ export function useModelsPanelViewModel({
 
   const saveModelsMutation = useSaveProjectModelsMutation({
     apiBaseURL,
-    organizationId,
+    organizationId: data.effectiveOrganizationId,
     selectedProjectId: data.selectedProjectId,
     onSuccessMessage: (nextMessage) => {
       pushSuccessToast(nextMessage);
@@ -104,7 +113,7 @@ export function useModelsPanelViewModel({
   });
   const providerMutations = useProviderCredentialMutations({
     apiBaseURL,
-    organizationId,
+    organizationId: data.effectiveOrganizationId,
     projectId: data.selectedProjectId,
     onSaveSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({ ...current, [credential.provider]: "" }));
@@ -170,15 +179,29 @@ export function useModelsPanelViewModel({
     return sortCatalogItemsByProvider(items);
   }, [data.catalog, search]);
   const redirectHref = useMemo(() => {
+    if (data.loadingCatalog || data.hasMissingHintedProject) {
+      return null;
+    }
     if (!data.selectedProject) return null;
 
     const hintedProject = hintedProjectToken.trim();
-    if (hintedProject === data.selectedProject.slug) return null;
+    if (hintedProject === data.selectedProject.id) {
+      return null;
+    }
 
-    return buildScopedHref(`/models${routeSearch}`, {
-      project: data.selectedProject.slug,
+    if (hintedProject !== "" && hintedProject !== data.selectedProject.slug) {
+      return null;
+    }
+
+    return buildScopedHref("/models", {
+      project: data.selectedProject.id,
     });
-  }, [data.selectedProject, hintedProjectToken, routeSearch]);
+  }, [
+    data.hasMissingHintedProject,
+    data.loadingCatalog,
+    data.selectedProject,
+    hintedProjectToken,
+  ]);
 
   const developerPlanMissingKeys =
     data.isDeveloperPlan &&
@@ -281,7 +304,8 @@ export function useModelsPanelViewModel({
   }, [data.selectedModelIds, saveModelsMutation]);
 
   return {
-    organizationId,
+    organizationId: data.effectiveOrganizationId || organizationId,
+    effectiveOrganizationId: data.effectiveOrganizationId,
     search,
     setSearch,
     loading: data.loading,

@@ -13,8 +13,6 @@ import (
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
-const singletonStateID = 1
-
 type persistedState struct {
 	Seq                 int64                                             `json:"seq"`
 	Runs                map[string]*usecase.AnalysisRun                   `json:"runs"`
@@ -59,18 +57,6 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		ActionsByProject:    make(map[string][]string),
 	}
 
-	err := s.db.QueryRow(ctx, `
-		SELECT seq
-		FROM analysis_service_meta
-		WHERE id = $1
-	`, singletonStateID).Scan(&state.Seq)
-	if err != nil {
-		if isNoRows(err) {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("select analysis meta: %w", err)
-	}
-
 	if err := s.loadRuns(ctx, &state); err != nil {
 		return nil, false, err
 	}
@@ -91,6 +77,10 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	}
 	if err := s.loadOptimizeActions(ctx, &state); err != nil {
 		return nil, false, err
+	}
+
+	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 && len(state.Alerts) == 0 {
+		return nil, false, nil
 	}
 
 	payload, err := json.Marshal(state)
@@ -115,15 +105,6 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 			_ = tx.Rollback(context.Background())
 		}
 	}()
-
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO analysis_service_meta (id, seq, updated_at)
-		VALUES ($1, $2, NOW())
-		ON CONFLICT (id)
-		DO UPDATE SET seq = EXCLUDED.seq, updated_at = NOW()
-	`, singletonStateID, state.Seq); err != nil {
-		return fmt.Errorf("upsert analysis meta: %w", err)
-	}
 
 	for _, statement := range []string{
 		`DELETE FROM brand_canon`,

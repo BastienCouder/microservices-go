@@ -25,7 +25,7 @@ describe("project context resolution", () => {
 
     const context = findResolvedProjectContext(
       [nikeHierarchy, bcoHierarchy].filter((value): value is NonNullable<typeof value> => value !== null),
-      "bco",
+      "prj-bco",
     );
 
     expect(context?.organizationId).toBe("org-bco");
@@ -54,5 +54,60 @@ describe("project context resolution", () => {
     expect(params.get("projectId")).toBe("prj-bco");
     expect(params.get("organizationId")).toBe("org-bco");
     expect(params.get("period")).toBe("7d");
+  });
+
+  test("resolves only by canonical project id even when duplicate project slugs exist", () => {
+    const firstHierarchy = normalizeProjectContextHierarchy(
+      {
+        organization: { id: "1", name: "Org One" },
+        projects: [{ id: "prj-1", name: "Adidas" }],
+      },
+      { id: "1", name: "Org One", slug: "org-one" },
+    );
+    const secondHierarchy = normalizeProjectContextHierarchy(
+      {
+        organization: { id: "2", name: "Org Two" },
+        projects: [{ id: "prj-2", name: "Adidas" }],
+      },
+      { id: "2", name: "Org Two", slug: "org-two" },
+    );
+
+    const context = findResolvedProjectContext(
+      [firstHierarchy, secondHierarchy].filter(
+        (value): value is NonNullable<typeof value> => value !== null,
+      ),
+      "prj-2",
+      "2",
+    );
+
+    expect(context?.organizationId).toBe("2");
+    expect(context?.projectId).toBe("prj-2");
+  });
+
+  test("does not resolve a project token against another organization when the hinted organization misses it", () => {
+    const firstHierarchy = normalizeProjectContextHierarchy(
+      {
+        organization: { id: "1", name: "Org One" },
+        projects: [{ id: "prj-1", name: "Adidas" }],
+      },
+      { id: "1", name: "Org One", slug: "org-one" },
+    );
+    const secondHierarchy = normalizeProjectContextHierarchy(
+      {
+        organization: { id: "2", name: "Org Two" },
+        projects: [{ id: "prj-2", name: "Nike" }],
+      },
+      { id: "2", name: "Org Two", slug: "org-two" },
+    );
+
+    const context = findResolvedProjectContext(
+      [firstHierarchy, secondHierarchy].filter(
+        (value): value is NonNullable<typeof value> => value !== null,
+      ),
+      "prj-1",
+      "2",
+    );
+
+    expect(context).toBe(null);
   });
 });

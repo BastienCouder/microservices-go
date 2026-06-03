@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,17 +9,16 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	ga4client "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/ga4"
 	projectclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/project"
 	projectapiclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/projectapi"
 	httpadapter "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/http"
 	attributionrepo "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 )
 
@@ -30,11 +27,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := runHealthcheckMode(cfg.DatabaseURL); ok {
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
 		os.Exit(code)
 	}
 
-	db, err := waitForDatabase(context.Background(), cfg.DatabaseURL, "attribution-service")
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "attribution-service")
 	if err != nil {
 		log.Fatalf("wait for attribution database: %v", err)
 	}
@@ -69,29 +66,18 @@ func main() {
 		svc.EnableVisitProvider(projectResolver, visitProvider)
 		svc.EnableTrafficProvider(projectResolver, visitProvider)
 	}
-	h := httpadapter.NewHandler(svc)
+	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 
 	mux := http.NewServeMux()
 	h.Register(mux)
 
 	server := httpsrv.NewServer(
 		cfg.HTTPAddr,
-		security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "attribution-service")(mux),
+		internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "attribution-service")(mux),
 		httpsrv.WithReadTimeout(10*time.Second),
 		httpsrv.WithWriteTimeout(20*time.Second),
 	)
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.HandleFunc("GET /metrics", metricsHandler)
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("attribution-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "attribution-service")
 
 	go func() {
 		log.Printf("attribution-service listening on %s", cfg.HTTPAddr)
@@ -114,64 +100,4 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
-}
-
-func runHealthcheckMode(databaseURL string) (int, bool) {
-	if len(os.Args) < 2 || os.Args[1] != "healthcheck" {
-		return 0, false
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-	defer cancel()
-
-	db, err := pgxpool.New(ctx, databaseURL)
-	if err != nil {
-		return 1, true
-	}
-	defer db.Close()
-	if err := db.Ping(ctx); err != nil {
-		return 1, true
-	}
-	return 0, true
-}
-
-func waitForDatabase(ctx context.Context, dsn, serviceName string) (*pgxpool.Pool, error) {
-	backoff := time.Second
-	const maxBackoff = 30 * time.Second
-
-	for {
-		attemptCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-		db, err := pgxpool.New(attemptCtx, dsn)
-		if err == nil {
-			err = db.Ping(attemptCtx)
-		}
-		cancel()
-
-		if err == nil {
-			return db, nil
-		}
-		if db != nil {
-			db.Close()
-		}
-
-		log.Printf("%s database unavailable: %v; retrying in %s", serviceName, err, backoff)
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-time.After(backoff):
-		}
-
-		if backoff < maxBackoff {
-			backoff *= 2
-			if backoff > maxBackoff {
-				backoff = maxBackoff
-			}
-		}
-	}
-}
-
-func metricsHandler(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
-	_, _ = fmt.Fprintln(w, "# HELP service_up Service health indicator.")
-	_, _ = fmt.Fprintln(w, "# TYPE service_up gauge")
-	_, _ = fmt.Fprintln(w, "service_up 1")
 }

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Link2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import type { MonitoringPrompt } from "@/hooks/use-monitoring-data";
+import type { MonitoringPrompt } from "../../_lib/shared/monitoring-data";
 import { cn } from "@/lib/utils";
 import { RichResponseText } from "@/features/prompts/_components/details/rich-response-text";
 

@@ -1,6 +1,6 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
-import { attachStableSlugs, findBySlugOrId, slugifyPublicName } from "@/shared/public-slugs";
+import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
+import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
 import type { UserOrganizationSummary } from "@/shared/organizations";
 
 type JsonRecord = Record<string, unknown>;
@@ -29,15 +29,21 @@ export type ResolvedProjectContext = {
   projectName: string;
 };
 
-function isRecord(value: unknown): value is JsonRecord {
-  return typeof value === "object" && value !== null;
+function matchesOrganizationScope(
+  hierarchy: ProjectContextHierarchy,
+  organizationToken: string,
+): boolean {
+  const normalized = organizationToken.trim();
+  if (!normalized) return false;
+
+  return (
+    hierarchy.organization.id === normalized ||
+    hierarchy.organization.slug === normalized
+  );
 }
 
-function unwrapData(value: unknown): unknown {
-  if (isRecord(value) && value.success === true && "data" in value) {
-    return value.data;
-  }
-  return value;
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null;
 }
 
 function getField(value: JsonRecord, keys: string[]): unknown {
@@ -74,7 +80,7 @@ export function normalizeProjectContextHierarchy(
   value: unknown,
   fallbackOrganization: Pick<UserOrganizationSummary, "id" | "name" | "slug">,
 ): ProjectContextHierarchy | null {
-  const payload = unwrapData(value);
+  const payload = unwrapGatewayPayload(value);
   if (!isRecord(payload)) return null;
 
   const organizationValue = getField(payload, ["organization", "Organization"]);
@@ -143,12 +149,24 @@ export async function loadProjectContextHierarchies(
 export function findResolvedProjectContext(
   hierarchies: ProjectContextHierarchy[],
   projectToken: string,
+  organizationToken = "",
 ): ResolvedProjectContext | null {
   const token = projectToken.trim();
   if (!token) return null;
 
-  for (const hierarchy of hierarchies) {
-    const project = findBySlugOrId(hierarchy.projects, token);
+  const scopedHierarchies = organizationToken.trim()
+    ? hierarchies.filter((hierarchy) =>
+        matchesOrganizationScope(hierarchy, organizationToken),
+      )
+    : hierarchies;
+  const searchableHierarchies = scopedHierarchies.length > 0
+    ? scopedHierarchies
+    : organizationToken.trim()
+      ? []
+      : hierarchies;
+
+  for (const hierarchy of searchableHierarchies) {
+    const project = hierarchy.projects.find((candidate) => candidate.id === token);
     if (!project) continue;
 
     return {

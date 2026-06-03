@@ -1,5 +1,9 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, type GatewayResult } from "@/shared/api/gateway";
+import {
+  gatewayJSON,
+  requireGatewayData,
+  unwrapGatewayPayload,
+} from "@/shared/api/gateway";
 import { storeSelectedOrganizationID } from "@/shared/selection";
 
 type JsonRecord = Record<string, unknown>;
@@ -18,13 +22,6 @@ function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
 
-function unwrapData(value: unknown): unknown {
-  if (isRecord(value) && value.success === true && "data" in value) {
-    return value.data;
-  }
-  return value;
-}
-
 function getIDString(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
@@ -33,17 +30,6 @@ function getIDString(value: unknown): string {
 
 function getString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
-}
-
-async function requireGatewayData<T>(
-  promise: Promise<GatewayResult<T>>,
-  message: string,
-): Promise<T> {
-  const response = await promise;
-  if (!response.ok) {
-    throw new Error(response.error || message);
-  }
-  return response.data;
 }
 
 function parseNumericOrganizationId(organizationId: string): number {
@@ -75,7 +61,7 @@ export async function createBillingOrganization(
     "Impossible de creer l'organisation.",
   );
 
-  const organization = unwrapData(payload);
+  const organization = unwrapGatewayPayload(payload);
   const organizationId = isRecord(organization)
     ? getIDString(organization.id ?? organization.ID)
     : "";
@@ -117,7 +103,7 @@ export async function createStripeCheckoutSession(
     "Impossible de creer la session Stripe.",
   );
 
-  const checkout = unwrapData(payload);
+  const checkout = unwrapGatewayPayload(payload);
   const checkoutURL = isRecord(checkout) ? getString(checkout.checkout_url) : "";
   if (!checkoutURL) {
     throw new Error("Stripe n'a pas renvoye d'URL de paiement.");

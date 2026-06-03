@@ -8,7 +8,7 @@ import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTri
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import {
   buildScopedHref,
-  readProjectIdFromSearch,
+  readProjectTokenFromSearch,
   readSelectedProjectToken,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
@@ -46,7 +46,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const activeProjectToken =
-    readProjectIdFromSearch(location.search) || readSelectedProjectToken();
+    readProjectTokenFromSearch(location.search) || readSelectedProjectToken();
 
   const navigationItems = useMemo(
     () => [

@@ -1,5 +1,5 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON } from "@/shared/api/gateway";
+import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 
 export type PromptQuotaUsageData = {
   hasQuota: boolean;
@@ -39,14 +39,6 @@ function asBool(value: unknown): boolean {
 
 function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
-}
-
-function unwrapSuccessEnvelope(value: unknown): unknown {
-  const payload = asObject(value);
-  if (payload.success === true && "data" in payload) {
-    return payload.data;
-  }
-  return value;
 }
 
 function normalizePromptQuotaUsage(value: unknown): PromptQuotaUsageData {
@@ -96,5 +88,5 @@ export async function loadPromptQuotaUsage(
     throw new PromptQuotaRequestError(result.status, result.error);
   }
 
-  return normalizePromptQuotaUsage(unwrapSuccessEnvelope(result.data));
+  return normalizePromptQuotaUsage(unwrapGatewayPayload(result.data));
 }

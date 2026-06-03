@@ -1,4 +1,5 @@
 import { attachStableSlugs } from "@/shared/public-slugs";
+import { unwrapGatewayPayload } from "@/shared/api/gateway";
 import type {
   OrganizationAPIKey,
   OrganizationInvitation,
@@ -22,9 +23,7 @@ export function isRecord(value: unknown): value is JsonRecord {
 }
 
 export function unwrapData(value: unknown): unknown {
-  if (!isRecord(value)) return value;
-  if (value.success === true && "data" in value) return value.data;
-  return value;
+  return unwrapGatewayPayload(value);
 }
 
 export function getField(value: JsonRecord, keys: string[]): unknown {

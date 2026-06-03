@@ -53,6 +53,7 @@ import {
 } from "@/shared/billing";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 
 type AdminOrganizationsPageProps = {
   apiBaseURL: string;
@@ -238,21 +239,6 @@ export function AdminOrganizationsPage({
   }, [planFilter, rows, search]);
 
   useEffect(() => {
-    if (organizationsQuery.error instanceof Error) {
-      pushErrorToast(
-        organizationsQuery.error,
-        "Impossible de charger les organisations.",
-      );
-    }
-  }, [organizationsQuery.error]);
-
-  useEffect(() => {
-    if (quotasQuery.error instanceof Error) {
-      pushErrorToast(quotasQuery.error, "Impossible de charger les quotas.");
-    }
-  }, [quotasQuery.error]);
-
-  useEffect(() => {
     if (rows.length === 0) return;
     setDrafts((current) => {
       const next = { ...current };
@@ -312,13 +298,9 @@ export function AdminOrganizationsPage({
       return { previousRows };
     },
     onSuccess: async (_, variables) => {
-      await Promise.all([
-        queryClient.invalidateQueries({
-          queryKey: appQueryKeys.billingQuota(apiBaseURL, variables.organizationId),
-        }),
-        queryClient.invalidateQueries({
-          queryKey: ["prompt-quota", apiBaseURL, variables.organizationId],
-        }),
+      await invalidateQueryKeys(queryClient, [
+        appQueryKeys.billingQuota(apiBaseURL, variables.organizationId),
+        ["prompt-quota", apiBaseURL, variables.organizationId],
       ]);
       pushSuccessToast("Quota de crédits mis a jour.");
     },

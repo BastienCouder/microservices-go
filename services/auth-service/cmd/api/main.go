@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"log"
 	"net/http"
 	"os"
@@ -13,11 +12,12 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
+	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	kratosclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/kratos"
 	userclient "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/client/user"
 	httpadapter "github.com/bastiencouder/microservices-go/services/auth-service/internal/adapter/http"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/config"
-	"github.com/bastiencouder/microservices-go/services/auth-service/internal/security"
 	"github.com/bastiencouder/microservices-go/services/auth-service/internal/usecase"
 )
 
@@ -35,19 +35,8 @@ func main() {
 	mux := http.NewServeMux()
 	h.Register(mux)
 
-	server := httpsrv.NewServer(cfg.HTTPAddr, security.NewInternalAuthMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "auth-service")(mux))
-	var metricsServer *http.Server
-	if cfg.MetricsAddr != "" {
-		metricsMux := http.NewServeMux()
-		metricsMux.Handle("/metrics", promhttp.Handler())
-		metricsServer = httpsrv.NewServer(cfg.MetricsAddr, metricsMux)
-		go func() {
-			log.Printf("auth-service metrics listening on %s", cfg.MetricsAddr)
-			if err := metricsServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				log.Fatalf("metrics listen error: %v", err)
-			}
-		}()
-	}
+	server := httpsrv.NewServer(cfg.HTTPAddr, internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "auth-service")(mux))
+	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "auth-service", promhttp.Handler())
 
 	go func() {
 		log.Printf("auth-service listening on %s", cfg.HTTPAddr)
