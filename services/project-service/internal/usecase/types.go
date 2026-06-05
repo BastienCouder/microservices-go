@@ -10,6 +10,7 @@ var (
 	ErrValidation            = errors.New("validation error")
 	ErrUnauthorized          = errors.New("unauthorized")
 	ErrNotFound              = errors.New("not found")
+	ErrQuotaExceeded         = errors.New("quota exceeded")
 	ErrDependencyUnavailable = errors.New("dependency unavailable")
 )
 
@@ -462,11 +463,13 @@ type AnalysisStartRequest struct {
 	ModelCreditCostSum int
 	RequestedCredits   int
 	RunType            string
+	Force              bool
 }
 
 type AnalysisStartResponse struct {
-	RunID      string
-	PromptRuns []AnalysisPromptRun
+	RunID            string
+	PromptRuns       []AnalysisPromptRun
+	RequestedCredits int
 }
 
 type RunManualAnalysisInput struct {

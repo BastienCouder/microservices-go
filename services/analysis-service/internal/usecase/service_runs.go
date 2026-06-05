@@ -96,7 +96,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 		}
 	}
 
-	if runType == "perception" {
+	if runType == "perception" && !input.Force {
 		if existing := s.latestFreshPerceptionRunLocked(projectID, s.now().UTC()); existing != nil {
 			promptRuns := s.promptRunsForRunLocked(existing.ID)
 			s.mu.Unlock()
@@ -123,13 +123,13 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 			return StartAnalysisResult{}, err
 		}
 		if found && monthlyQuota > 0 {
-			usedCredits := s.currentMonthlyCreditUsageLocked(input.OrganizationID, now)
-			if usedCredits+requestedCredits > monthlyQuota {
+			reservedCredits := s.currentMonthlyReservedCreditUsageLocked(input.OrganizationID, now)
+			if reservedCredits+requestedCredits > monthlyQuota {
 				s.mu.Unlock()
 				return StartAnalysisResult{}, fmt.Errorf(
 					"%w: monthly credit quota reached (%d/%d)",
 					ErrQuotaExceeded,
-					usedCredits,
+					reservedCredits,
 					monthlyQuota,
 				)
 			}

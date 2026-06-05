@@ -1,6 +1,8 @@
 package http
 
 import (
+	"bytes"
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
+	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
 )
 
 func TestAgentReadyScanScoresSelectedChecks(t *testing.T) {
@@ -133,4 +136,63 @@ func TestAgentReadyScanCollectionListsRecoverableScanIDs(t *testing.T) {
 	if len(payload.Items) != 1 || payload.Items[0].ScanID != scanID {
 		t.Fatalf("expected listed scan id %s, got %+v", scanID, payload.Items)
 	}
+}
+
+func TestCreateAgentReadyScanConsumesCreditsWhenOrganizationIsAuthenticated(t *testing.T) {
+	ctx := context.Background()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/robots.txt" {
+			w.Header().Set("Content-Type", "text/plain")
+			_, _ = w.Write([]byte("User-agent: *\nAllow: /\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "text/html")
+		_, _ = w.Write([]byte("<html><body>OK</body></html>"))
+	}))
+	defer server.Close()
+
+	svc, err := usecase.NewServiceWithDependencies(ctx, usecase.Dependencies{
+		BillingQuota: staticAgentReadyBillingQuota{monthlyQuota: 100},
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+	h := NewHandler(svc)
+	h.httpClient = server.Client()
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/analysis/agent-ready/scans",
+		bytes.NewBufferString(`{"url":"`+server.URL+`","checks":["robots_txt"]}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "42")
+	resp := httptest.NewRecorder()
+
+	h.handleAgentReadyScan(resp, req)
+
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("expected 202, got %d body=%s", resp.Code, resp.Body.String())
+	}
+	projectID := agentReadyUsageProjectID(server.URL)
+	var usage usecase.PromptQuotaUsage
+	for attempt := 0; attempt < 20; attempt++ {
+		usage, err = svc.GetPromptQuotaUsage(ctx, projectID, 42)
+		if err != nil {
+			t.Fatalf("get quota usage: %v", err)
+		}
+		if usage.UsedCredits == 5 {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("expected 5 credits for successful quick agent ready scan, got %d", usage.UsedCredits)
+}
+
+type staticAgentReadyBillingQuota struct {
+	monthlyQuota int
+}
+
+func (p staticAgentReadyBillingQuota) GetMonthlyQuota(_ context.Context, _ int64) (int, bool, error) {
+	return p.monthlyQuota, p.monthlyQuota > 0, nil
 }

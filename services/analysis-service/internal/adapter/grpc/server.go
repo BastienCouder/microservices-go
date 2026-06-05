@@ -50,6 +50,7 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 		ModelCreditCostSum: modelCreditCostSumFromMetadata(ctx),
 		RequestedCredits:   requestedCreditsFromMetadata(ctx),
 		RunType:            req.GetRunType(),
+		Force:              forceAnalysisFromMetadata(ctx),
 	})
 	if err != nil {
 		return nil, toStatus(err)
@@ -69,6 +70,20 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 		})
 	}
 	return resp, nil
+}
+
+func forceAnalysisFromMetadata(ctx context.Context) bool {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return false
+	}
+	for _, value := range md.Get("x-force-analysis") {
+		parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+		if err == nil {
+			return parsed
+		}
+	}
+	return false
 }
 
 func requestedCreditsFromMetadata(ctx context.Context) int {

@@ -30,6 +30,8 @@ type Config struct {
 	IAServiceURL                   string
 	ContentIssueAnalyzerModelID    string
 	ContentIssueAnalyzerProviderID string
+	OptimizeActionBriefModelID     string
+	OptimizeActionBriefProviderID  string
 }
 
 func Load() (Config, error) {
@@ -114,6 +116,8 @@ func Load() (Config, error) {
 		IAServiceURL:                   envcfg.OptionalEnv("IA_SERVICE_URL"),
 		ContentIssueAnalyzerModelID:    envcfg.OptionalEnv("CONTENT_ISSUE_ANALYZER_MODEL_ID"),
 		ContentIssueAnalyzerProviderID: envcfg.OptionalEnv("CONTENT_ISSUE_ANALYZER_PROVIDER_ID"),
+		OptimizeActionBriefModelID:     envcfg.OptionalEnv("OPTIMIZE_ACTION_BRIEF_MODEL_ID"),
+		OptimizeActionBriefProviderID:  envcfg.OptionalEnv("OPTIMIZE_ACTION_BRIEF_PROVIDER_ID"),
 	}, nil
 }
 

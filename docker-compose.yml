@@ -648,6 +648,8 @@ services:
       IA_SERVICE_URL: http://ia-service:8091
       CONTENT_ISSUE_ANALYZER_MODEL_ID: "${CONTENT_ISSUE_ANALYZER_MODEL_ID:-gpt-oss-20b-free}"
       CONTENT_ISSUE_ANALYZER_PROVIDER_ID: "${CONTENT_ISSUE_ANALYZER_PROVIDER_ID:-openrouter}"
+      OPTIMIZE_ACTION_BRIEF_MODEL_ID: "${OPTIMIZE_ACTION_BRIEF_MODEL_ID:-z-ai/glm-4.5-air:free}"
+      OPTIMIZE_ACTION_BRIEF_PROVIDER_ID: "${OPTIMIZE_ACTION_BRIEF_PROVIDER_ID:-openrouter}"
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret

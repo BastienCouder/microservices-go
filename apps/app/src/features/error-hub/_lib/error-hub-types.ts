@@ -46,7 +46,7 @@ export const STATUS_COLUMNS = [
   },
 ] as const;
 
-export type ErrorHubBoardView = "severity" | "status";
+export type ErrorHubBoardView = "severity" | "status" | "content";
 export type ErrorHubStatusColumnId = (typeof STATUS_COLUMNS)[number]["id"];
 
 export const PERIOD_OPTIONS = [

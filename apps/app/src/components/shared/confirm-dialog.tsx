@@ -73,7 +73,6 @@ export function ConfirmDialog({
       {trigger ? <AlertDialogTrigger asChild>{trigger}</AlertDialogTrigger> : null}
       <AlertDialogContent size={size}>
         <AlertDialogHeader>
-          {media ? <AlertDialogMedia>{media}</AlertDialogMedia> : null}
           <AlertDialogTitle>{title}</AlertDialogTitle>
           {description ? (
             <AlertDialogDescription>{description}</AlertDialogDescription>

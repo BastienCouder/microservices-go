@@ -17,4 +17,5 @@ describe("billing plans", () => {
     expect(isDeveloperBillingPlan("growth")).toBe(false);
     expect(isDeveloperBillingPlan(null)).toBe(false);
   });
+
 });

@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { pushWarningToast } from "@/components/ui/toast-actions";
 import { apiRoutes } from "@/lib/api-config";
+import { appQueryKeys } from "@/lib/query-keys";
+import { loadPromptQuotaUsage } from "@/features/prompts/_lib/prompt-quota";
+import { useClientExportAccess } from "@/shared/export-entitlements";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationID,
+} from "@/shared/selection";
 import {
   derivePerceptionHeatmapFromResponses,
   derivePerceptionRadarFromResponses,
@@ -19,6 +28,7 @@ import {
   getOptimizationActionMatchIds,
   toCanonicalPerceptionSourceErrorId,
 } from "./optimization-action-ids";
+import { exportPerceptionWorkbook } from "./perception-export";
 import { resolvePerceptionGeneratedContent } from "./perception-i18n";
 
 type OptimizeDraft = {
@@ -55,6 +65,7 @@ function buildFallbackModelCatalog(initialData: PerceptionViewData) {
     description: modelName,
     iconPath: "/models/openai.svg",
     live: true,
+    creditCost: 1,
   }));
 }
 
@@ -84,8 +95,15 @@ function mergeDrafts(
   return Array.from(merged.values());
 }
 
-export function usePerceptionViewModel(initialData: PerceptionViewData) {
+export function usePerceptionViewModel(
+  initialData: PerceptionViewData,
+  options: { apiBaseURL?: string; routeSearch?: string } = {},
+) {
   const { locale, t } = useScopedI18n("perception");
+  const exportAccess = useClientExportAccess({
+    apiBaseURL: options.apiBaseURL,
+    routeSearch: options.routeSearch,
+  });
   const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
@@ -93,6 +111,15 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
   const [selectedPeriod, setSelectedPeriod] = useState<PerceptionTrendPeriodKey>("all");
   const [showAllModels, setShowAllModels] = useState(false);
   const [showUniqueModelFilters, setShowUniqueModelFilters] = useState(false);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [lastAnalysisCredits, setLastAnalysisCredits] = useState<number | null>(null);
+  const organizationId = useMemo(
+    () =>
+      readOrganizationIdFromSearch(options.routeSearch ?? "") ||
+      readSelectedOrganizationID(),
+    [options.routeSearch],
+  );
 
   useEffect(() => {
     const projectId = initialData.metadata.projectId;
@@ -295,7 +322,11 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
 
     setSavingErrorIds((current) => new Set(current).add(error.id));
     try {
-      const result = await postPerceptionClientJSON<{ id: string; status: string }>(
+      const result = await postPerceptionClientJSON<{
+        id: string;
+        generatedContent?: string;
+        status: string;
+      }>(
         apiRoutes.analysis.optimizeActions(initialData.metadata.projectId),
         {
           priority: error.optimizePriority,
@@ -328,7 +359,7 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
                 title: error.title,
                 issue: error.issue,
                 impact: error.impact,
-                generatedContent: localizedGeneratedContent,
+                generatedContent: result.generatedContent || localizedGeneratedContent,
                 status: result.status || "processing",
               },
               ...current,
@@ -345,6 +376,89 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
         return next;
       });
     }
+  };
+
+  const estimatedPerceptionCredits = useMemo(() => {
+    const modelCreditCostSum = Math.max(
+      1,
+      modelCatalog.reduce(
+        (total, model) => total + Math.max(1, Math.floor(model.creditCost ?? 1)),
+        0,
+      ),
+    );
+    return 10 + 5 * modelCreditCostSum;
+  }, [modelCatalog]);
+  const quotaQuery = useQuery({
+    queryKey: appQueryKeys.promptQuota(
+      options.apiBaseURL ?? "",
+      organizationId,
+      initialData.metadata.projectId ?? null,
+    ),
+    enabled:
+      (options.apiBaseURL ?? "").trim() !== "" &&
+      organizationId.trim() !== "" &&
+      Boolean(initialData.metadata.projectId),
+    queryFn: ({ signal }) =>
+      loadPromptQuotaUsage(
+        options.apiBaseURL ?? "",
+        initialData.metadata.projectId!,
+        organizationId,
+        { signal },
+      ),
+  });
+  const perceptionQuotaExceeded =
+    quotaQuery.data?.hasQuota === true &&
+    quotaQuery.data.monthlyCredits > 0 &&
+    quotaQuery.data.remainingCredits < estimatedPerceptionCredits;
+
+  const handleRunPerceptionAnalysis = async () => {
+    const projectId = initialData.metadata.projectId;
+    if (!projectId || analysisRunning) return;
+    if (perceptionQuotaExceeded) {
+      pushWarningToast(
+        "Crédits insuffisants",
+        `Cette analyse coûte ${estimatedPerceptionCredits} crédits. Il reste ${quotaQuery.data?.remainingCredits ?? 0}/${quotaQuery.data?.monthlyCredits ?? 0} crédits sur votre quota mensuel.`,
+      );
+      return;
+    }
+
+    setAnalysisError(null);
+    setLastAnalysisCredits(null);
+    setAnalysisRunning(true);
+    try {
+      const result = await postPerceptionClientJSON<{
+        RequestedCredits?: number;
+        requestedCredits?: number;
+      }>(apiRoutes.analysis.perceptionRun(projectId), {
+        force: true,
+        requestId: `${projectId}-perception-manual-${Date.now()}`,
+      });
+      const credits =
+        typeof result.requestedCredits === "number"
+          ? result.requestedCredits
+          : typeof result.RequestedCredits === "number"
+            ? result.RequestedCredits
+            : estimatedPerceptionCredits;
+      setLastAnalysisCredits(credits);
+    } catch (err) {
+      setAnalysisError(
+        err instanceof Error ? err.message : "Impossible de lancer l'analyse de perception.",
+      );
+    } finally {
+      setAnalysisRunning(false);
+    }
+  };
+
+  const handleExportPerceptionData = (periodLabel: string) => {
+    exportPerceptionWorkbook({
+      data: initialData,
+      periodLabel,
+      selectedModels,
+      scoreCards,
+      radar: filteredRadar,
+      heatmap: modelAxisHeatmap,
+      trendData: perceptionTrend.data,
+    });
   };
 
   return {
@@ -369,7 +483,24 @@ export function usePerceptionViewModel(initialData: PerceptionViewData) {
     visibleOptimizeDrafts,
     actionStatusesByErrorId,
     savingErrorIds,
+    analysisRunning,
+    analysisError,
+    estimatedPerceptionCredits,
+    perceptionQuotaExceeded,
+    perceptionQuotaLoading:
+      quotaQuery.isLoading || (quotaQuery.isFetching && !quotaQuery.data),
+    perceptionRemainingCredits: quotaQuery.data?.remainingCredits ?? 0,
+    perceptionMonthlyCredits: quotaQuery.data?.monthlyCredits ?? 0,
+    lastAnalysisCredits,
+    canExport: exportAccess.canExport,
+    exportDisabled:
+      filteredResponses.length === 0 &&
+      filteredRadar.length === 0 &&
+      filteredTopErrors.length === 0 &&
+      visibleOptimizeDrafts.length === 0,
     handleFix,
     handleRemoveAction,
+    handleRunPerceptionAnalysis,
+    handleExportPerceptionData,
   };
 }

@@ -379,6 +379,9 @@ func TestGetQuotaIncludesServerManagedModelLimits(t *testing.T) {
 	if !strings.Contains(body, `"max_projects":5`) {
 		t.Fatalf("expected max projects in payload, got %s", body)
 	}
+	if !strings.Contains(body, `"allow_ai_briefs":true`) {
+		t.Fatalf("expected AI brief entitlement in payload, got %s", body)
+	}
 	if !strings.Contains(body, `"subscription_status":"active"`) {
 		t.Fatalf("expected subscription status in payload, got %s", body)
 	}
@@ -394,7 +397,7 @@ func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
 				OrganizationID: 7,
 				Plan:           domain.PlanPro,
 				Seats:          3,
-				MonthlyQuota:   1000000,
+				MonthlyQuota:   3000,
 				BillingCycle:   domain.BillingCycleMonthly,
 				Status:         domain.SubscriptionStatusActive,
 				UpdatedAt:      time.Now().UTC(),
@@ -413,7 +416,8 @@ func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
 		"monthly_quota": 1500,
 		"model_selection_limit": 12,
 		"monthly_model_change_limit": 4,
-		"max_projects": 25
+		"max_projects": 25,
+		"allow_ai_briefs": false
 	}`))
 	updateReq.Header.Set("Content-Type", "application/json")
 	updateReq.Header.Set("X-Organization-ID", "7")
@@ -442,6 +446,9 @@ func TestUpdatePlanSettingsChangesQuotaEntitlements(t *testing.T) {
 	}
 	if !strings.Contains(body, `"max_projects":25`) {
 		t.Fatalf("expected max projects in entitlements, got %s", body)
+	}
+	if !strings.Contains(body, `"allow_ai_briefs":false`) {
+		t.Fatalf("expected updated AI brief entitlement, got %s", body)
 	}
 	if !strings.Contains(updateRec.Body.String(), `"monthly_quota":1500`) {
 		t.Fatalf("expected updated plan quota in response, got %s", updateRec.Body.String())

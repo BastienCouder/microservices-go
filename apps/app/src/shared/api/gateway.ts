@@ -114,11 +114,11 @@ function classifyGatewayFailure(input: {
   if (code === "invalid_request" || message === "validation error") {
     return "validation";
   }
-  if (code === "rate_limited" || input.status === 429) {
-    return "rate_limited";
-  }
   if (code === "quota_exceeded" || message === "quota exceeded") {
     return "quota_exceeded";
+  }
+  if (code === "rate_limited" || input.status === 429) {
+    return "rate_limited";
   }
   if (code === "not_found" || input.status === 404 || message === "resource not found") {
     return "not_found";

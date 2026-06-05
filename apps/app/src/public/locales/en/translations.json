@@ -6,7 +6,7 @@
     "notFoundError": "The requested resource could not be found.",
     "conflictError": "This action conflicts with the current state.",
     "rateLimitedError": "Too many requests. Please try again in a moment.",
-    "quotaExceededError": "Your quota has been reached for now.",
+    "quotaExceededError": "You do not have any credits left.",
     "dependencyUnavailableError": "The service is temporarily unavailable.",
     "internalError": "An internal error occurred.",
     "timeoutError": "The request timed out. Please try again.",

@@ -16,7 +16,7 @@ const BILLING_PLAN_LABELS: Record<SimulatedPlan, string> = {
   starter: "Starter",
   developer: "Developer",
   growth: "Growth",
-  pro: "Pro",
+  pro: "Agency",
   "agency-enterprise": "Agency / Enterprise",
 };
 

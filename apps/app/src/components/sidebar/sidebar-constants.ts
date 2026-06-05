@@ -19,7 +19,6 @@ export type SidebarItem = {
     | "pages"
     | "perception"
     | "traffic"
-    | "crawler"
     | "contentOptimizer"
     | "errorHub"
     | "brands"
@@ -40,7 +39,6 @@ export const SIDEBAR_LABELS = {
   pages: "pages",
   perception: "perception",
   traffic: "Traffic",
-  crawler: "crawler",
   contentOptimizer: "content optimizer",
   errorHub: "error hub",
   brands: "brands",
@@ -68,7 +66,6 @@ export const BRAND_CONTEXT_ITEMS: SidebarItem[] = [
 
 export const OPTIMIZATION_ITEMS: SidebarItem[] = [
   { href: "/content-optimizer", labelKey: "contentOptimizer" },
-  { href: "/crawler", labelKey: "crawler" },
   { href: "/error-hub", labelKey: "errorHub" },
 ];
 

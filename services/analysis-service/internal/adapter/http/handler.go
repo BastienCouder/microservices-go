@@ -186,6 +186,7 @@ type startAnalysisRequest struct {
 	ModelCreditCostSum int                  `json:"modelCreditCostSum"`
 	RequestedCredits   int                  `json:"requestedCredits"`
 	RunType            string               `json:"runType"`
+	Force              bool                 `json:"force"`
 }
 
 type previewOnboardingBrandProfileRequest struct {
@@ -260,6 +261,7 @@ func (h *Handler) startAnalysis(w http.ResponseWriter, r *http.Request, projectI
 		ModelCreditCostSum: req.ModelCreditCostSum,
 		RequestedCredits:   req.RequestedCredits,
 		RunType:            req.RunType,
+		Force:              req.Force,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -448,6 +450,7 @@ func (h *Handler) createOptimizeAction(w http.ResponseWriter, r *http.Request, p
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
+	createdBy, _ := authenticatedUserID(r)
 
 	var req createOptimizeActionRequest
 	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
@@ -455,6 +458,7 @@ func (h *Handler) createOptimizeAction(w http.ResponseWriter, r *http.Request, p
 		return
 	}
 	action, err := h.svc.CreateOptimizeAction(r.Context(), projectID, organizationID, usecase.CreateOptimizeActionInput{
+		CreatedBy:        createdBy,
 		Priority:         req.Priority,
 		Type:             req.Type,
 		Title:            req.Title,

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"reflect"
 	"testing"
 )
@@ -39,11 +40,15 @@ func (s *analysisClientSpy) RecordResponse(_ context.Context, _ string, input An
 type iaClientSpy struct {
 	execCalls  int
 	execInputs []IAExecutePromptInput
+	err        error
 }
 
 func (s *iaClientSpy) ExecutePrompt(_ context.Context, input IAExecutePromptInput) (IAExecutePromptResult, error) {
 	s.execCalls++
 	s.execInputs = append(s.execInputs, input)
+	if s.err != nil {
+		return IAExecutePromptResult{}, s.err
+	}
 	var result IAExecutePromptResult
 	result.RawResponse = "ok"
 	result.Analysis.BrandMentioned = true
@@ -144,6 +149,13 @@ func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) 
 	if len(analysisSpy.lastStartReq.ModelIDs) == 0 {
 		t.Fatalf("expected all active project models to be selected")
 	}
+	if analysisSpy.lastStartReq.ModelCreditCostSum <= 0 {
+		t.Fatalf("expected model credit cost sum to be populated")
+	}
+	expectedCredits := 10 + 5*analysisSpy.lastStartReq.ModelCreditCostSum
+	if analysisSpy.lastStartReq.RequestedCredits != expectedCredits {
+		t.Fatalf("expected perception requested credits %d, got %d", expectedCredits, analysisSpy.lastStartReq.RequestedCredits)
+	}
 	if iaSpy.execCalls != len(analysisSpy.lastStartReq.PromptTexts)*len(analysisSpy.lastStartReq.ModelIDs) {
 		t.Fatalf("expected one IA call per perception prompt/model, got %d", iaSpy.execCalls)
 	}
@@ -160,6 +172,81 @@ func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) 
 	}
 	if perceptionPrompts != 3 {
 		t.Fatalf("expected 3 persisted perception prompts, got %d", perceptionPrompts)
+	}
+}
+
+func TestRunPerceptionAnalysisMultipliesCreditsByModelCost(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	premiumModel := svc.models["gpt-oss-20b-free"]
+	premiumModel.CreditCost = 2
+	svc.models[premiumModel.ID] = premiumModel
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+		Industry:       "CRM",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.RunPerceptionAnalysis(ctx, project.ID, 42, 7, RunPerceptionAnalysisInput{RequestID: "perception-premium"}); err != nil {
+		t.Fatalf("run perception: %v", err)
+	}
+	if analysisSpy.lastStartReq.ModelCreditCostSum < len(analysisSpy.lastStartReq.ModelIDs)+1 {
+		t.Fatalf("expected premium model to increase credit cost sum, got sum=%d models=%d", analysisSpy.lastStartReq.ModelCreditCostSum, len(analysisSpy.lastStartReq.ModelIDs))
+	}
+	expectedCredits := 10 + 5*analysisSpy.lastStartReq.ModelCreditCostSum
+	if analysisSpy.lastStartReq.RequestedCredits != expectedCredits {
+		t.Fatalf("expected premium perception credits %d, got %d", expectedCredits, analysisSpy.lastStartReq.RequestedCredits)
+	}
+}
+
+func TestRunPerceptionAnalysisReturnsDependencyUnavailableOnProviderFailure(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{err: errors.New("provider returned status 503")}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if _, err := svc.RunPerceptionAnalysis(ctx, project.ID, 42, 7, RunPerceptionAnalysisInput{RequestID: "provider-failure"}); !errors.Is(err, ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable error, got %v", err)
+	}
+	if analysisSpy.recordCalls != 0 {
+		t.Fatalf("expected no invented fallback responses, got %d", analysisSpy.recordCalls)
 	}
 }
 

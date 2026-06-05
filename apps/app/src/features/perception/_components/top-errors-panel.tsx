@@ -136,6 +136,9 @@ export function TopErrorsPanel({
               onRemoveAction={
                 onRemoveAction ? () => void onRemoveAction(error) : undefined
               }
+              showProviderIconsOnly
+              showIndex={false}
+              hideFooter
             />
           ))
         )}
@@ -449,12 +452,6 @@ function getSeverityTone(
   };
 }
 
-function getPriorityDotTone(priority: PerceptionError["optimizePriority"]) {
-  if (priority === "high") return "bg-rose-500";
-  if (priority === "medium") return "bg-amber-500";
-  return "bg-green-500";
-}
-
 type PerceptionModelBadgeMeta = {
   iconPath: string;
   name: string;
@@ -590,6 +587,24 @@ function getPerceptionModelBadgeMeta(
   };
 }
 
+function getUniqueProviderModelBadges(
+  modelNames: string[],
+  modelLookup: ReadonlyMap<string, PerceptionModelOption>,
+) {
+  const badges: PerceptionModelBadgeMeta[] = [];
+  const seenProviders = new Set<string>();
+
+  for (const modelName of modelNames) {
+    const badge = getPerceptionModelBadgeMeta(modelName, modelLookup);
+    const providerKey = normalizeModelLookupKey(badge.provider);
+    if (seenProviders.has(providerKey)) continue;
+    seenProviders.add(providerKey);
+    badges.push(badge);
+  }
+
+  return badges;
+}
+
 function ModelBadgeIcon({
   className,
   model,
@@ -630,6 +645,8 @@ export function PerceptionTopErrorCard({
   index,
   markingActionDone = false,
   showIndex = true,
+  showProviderIconsOnly = false,
+  hideFooter = false,
   footerMeta,
   modelLookup = new Map(),
   onOpenDetails,
@@ -648,6 +665,8 @@ export function PerceptionTopErrorCard({
   index: number;
   markingActionDone?: boolean;
   showIndex?: boolean;
+  showProviderIconsOnly?: boolean;
+  hideFooter?: boolean;
   footerMeta?: string;
   modelLookup?: ReadonlyMap<string, PerceptionModelOption>;
   onOpenDetails: () => void;
@@ -680,7 +699,6 @@ export function PerceptionTopErrorCard({
         : actionGenerated
           ? t("topErrorsAdded")
           : t("topErrorsFix");
-  const hasMultipleModels = error.detectedInModels.length > 1;
   const resolvedGeneratedContent = resolvePerceptionGeneratedContent(
     error.generatedContent,
     error.generatedContentKey,
@@ -689,6 +707,9 @@ export function PerceptionTopErrorCard({
   const primaryModel = error.detectedInModels[0]
     ? getPerceptionModelBadgeMeta(error.detectedInModels[0], modelLookup)
     : null;
+  const providerIconBadges = showProviderIconsOnly
+    ? getUniqueProviderModelBadges(error.detectedInModels, modelLookup)
+    : [];
 
   return (
     <div className="group w-full rounded-xl bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20">
@@ -700,21 +721,14 @@ export function PerceptionTopErrorCard({
       >
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
-            {primaryModel ? (
+            {showProviderIconsOnly ? (
+              <div className={cn("h-3.5 w-3.5 shrink-0 rounded-full", tone.dot)} />
+            ) : primaryModel ? (
               <div className="rounded-lg border border-border/50 bg-white p-1">
-                {hasMultipleModels ? (
-                  <span
-                    className={cn(
-                      "block h-3.5 w-3.5 rounded-full",
-                      getPriorityDotTone(error.optimizePriority),
-                    )}
-                  />
-                ) : (
-                  <ModelBadgeIcon
-                    model={primaryModel}
-                    className="h-3.5 w-3.5"
-                  />
-                )}
+                <ModelBadgeIcon
+                  model={primaryModel}
+                  className="h-3.5 w-3.5"
+                />
               </div>
             ) : (
               <div className={cn("h-3.5 w-3.5 rounded-full", tone.dot)} />
@@ -782,92 +796,108 @@ export function PerceptionTopErrorCard({
         ) : null}
       </button>
 
-      <div
-        className={cn(
-          "flex flex-wrap items-center gap-2 border-t border-border/40 pt-3",
-          footerAlign === "end" ? "justify-end" : "justify-between",
-        )}
-      >
+      {showProviderIconsOnly && providerIconBadges.length > 0 ? (
+        <div className="mt-3 flex items-center gap-1.5 border-t border-border/40 pt-3">
+          {providerIconBadges.map((modelBadge) => (
+            <span
+              key={modelBadge.provider}
+              className="rounded-lg border border-border/50 bg-white p-1"
+              title={modelBadge.provider}
+            >
+              <ModelBadgeIcon model={modelBadge} className="h-3.5 w-3.5" />
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {hideFooter ? null : (
         <div
           className={cn(
-            "flex min-w-0 flex-wrap items-center gap-1.5",
-            footerAlign === "end" && "justify-end",
+            "flex flex-wrap items-center gap-2 border-t border-border/40 pt-3",
+            footerAlign === "end" ? "justify-end" : "justify-between",
           )}
         >
-          {error.detectedInModels.slice(0, 2).map((model) => {
-            const modelBadge = getPerceptionModelBadgeMeta(model, modelLookup);
-
-            return (
-              <Badge
-                key={model}
-                variant="outline"
-                className="inline-flex max-w-[190px] min-w-0 items-center gap-1 font-normal"
-                title={modelBadge.title}
-              >
-                <ModelBadgeIcon model={modelBadge} className="h-3 w-3" />
-                <span className="min-w-0 truncate">{modelBadge.provider}</span>
-                <span className="shrink-0 text-muted-foreground/70">-</span>
-                <span className="min-w-0 truncate text-muted-foreground">
-                  {modelBadge.name}
-                </span>
-              </Badge>
-            );
-          })}
-          {error.detectedInModels.length > 2 ? (
-            <Badge variant="outline" className="font-normal">
-              +{error.detectedInModels.length - 2}
-            </Badge>
-          ) : null}
-          {footerMeta ? (
-            <span
-              className="max-w-full truncate text-[11px] font-medium text-muted-foreground md:max-w-[260px] md:text-xs"
-              title={footerMeta}
-            >
-              {footerMeta}
-            </span>
-          ) : null}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {actionStatus ? (
-            <Badge
-              variant="outline"
-              className={cn(
-                "h-6 rounded-sm px-2 text-xs font-bold border-none",
-                statusTone,
-              )}
-            >
-              {formatPerceptionStatusLabelI18n(actionStatus, locale)}
-            </Badge>
-          ) : null}
-
           <div
             className={cn(
-              "flex h-6 items-center rounded-sm px-2 text-xs font-bold",
-              getPerceptionPriorityTone(error.optimizePriority),
+              "flex min-w-0 flex-wrap items-center gap-1.5",
+              footerAlign === "end" && "justify-end",
             )}
           >
-            {formatPerceptionPriorityLabelI18n(error.optimizePriority, locale)}
+            {error.detectedInModels.slice(0, 2).map((model) => {
+              const modelBadge = getPerceptionModelBadgeMeta(model, modelLookup);
+
+              return (
+                <Badge
+                  key={model}
+                  variant="outline"
+                  className="inline-flex max-w-[190px] min-w-0 items-center gap-1 font-normal"
+                  title={modelBadge.title}
+                >
+                  <ModelBadgeIcon model={modelBadge} className="h-3 w-3" />
+                  <span className="min-w-0 truncate">{modelBadge.provider}</span>
+                  <span className="shrink-0 text-muted-foreground/70">-</span>
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    {modelBadge.name}
+                  </span>
+                </Badge>
+              );
+            })}
+            {error.detectedInModels.length > 2 ? (
+              <Badge variant="outline" className="font-normal">
+                +{error.detectedInModels.length - 2}
+              </Badge>
+            ) : null}
+            {footerMeta ? (
+              <span
+                className="max-w-full truncate text-[11px] font-medium text-muted-foreground md:max-w-[260px] md:text-xs"
+                title={footerMeta}
+              >
+                {footerMeta}
+              </span>
+            ) : null}
           </div>
 
-          {shouldShowActionButton ? (
-            <Button
-              type="button"
-              size="sm"
-              className="h-7 shrink-0 px-2 text-xs"
-              disabled={
-                actionSaving ||
-                markingActionDone ||
-                (actionStatus === "done" && !canRemoveAction) ||
-                (actionGenerated && !canMarkDone && !canRemoveAction)
-              }
-              onClick={actionButtonHandler}
+          <div className="flex shrink-0 items-center gap-2">
+            {actionStatus ? (
+              <Badge
+                variant="outline"
+                className={cn(
+                  "h-6 rounded-sm px-2 text-xs font-bold border-none",
+                  statusTone,
+                )}
+              >
+                {formatPerceptionStatusLabelI18n(actionStatus, locale)}
+              </Badge>
+            ) : null}
+
+            <div
+              className={cn(
+                "flex h-6 items-center rounded-sm px-2 text-xs font-bold",
+                getPerceptionPriorityTone(error.optimizePriority),
+              )}
             >
-              {actionButtonLabel}
-            </Button>
-          ) : null}
+              {formatPerceptionPriorityLabelI18n(error.optimizePriority, locale)}
+            </div>
+
+            {shouldShowActionButton ? (
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 shrink-0 px-2 text-xs"
+                disabled={
+                  actionSaving ||
+                  markingActionDone ||
+                  (actionStatus === "done" && !canRemoveAction) ||
+                  (actionGenerated && !canMarkDone && !canRemoveAction)
+                }
+                onClick={actionButtonHandler}
+              >
+                {actionButtonLabel}
+              </Button>
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

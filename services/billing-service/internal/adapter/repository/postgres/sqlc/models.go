@@ -32,6 +32,7 @@ type BillingPlanSetting struct {
 	ModelSelectionLimit     int32
 	MonthlyModelChangeLimit int32
 	MaxProjects             int32
+	AllowAIBriefs           bool
 	UpdatedAt               pgtype.Timestamptz
 }
 

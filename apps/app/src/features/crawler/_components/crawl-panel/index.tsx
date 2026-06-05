@@ -19,10 +19,39 @@ import {
 type CrawlPanelProps = {
   apiBaseURL: string;
   routeSearch: string;
+  variant?: "crawler" | "contentOptimizer";
 };
 
-export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
+const CONTENT_OPTIMIZER_COPY = {
+  header: {
+    title: "Optimisation de contenu",
+    baseline:
+      "Identifie les pages à améliorer pour la visibilité IA et priorise les corrections.",
+    discoverInitialLabel: "Découvrir les pages",
+    discoverRunningLabel: "Découverte en cours",
+    analyzeSelectionLabel: "Analyser la sélection",
+    analyzeRunningLabel: "Analyse en cours",
+    reviewAnalyzedPagesLabel: "Nouvelle sélection",
+    reviewAnalyzedPagesRunningLabel: "Découverte en cours",
+  },
+  initialSetup: {
+    title: "Optimisation de contenu",
+    titleWithProject: (projectName: string) =>
+      `Optimisation de contenu - ${projectName}`,
+    description:
+      "Découvre les pages du domaine, choisis celles à analyser, puis priorise les corrections GEO les plus actionnables.",
+    discoverLabel: "Découvrir les pages",
+    discoveringLabel: "Découverte en cours",
+  },
+};
+
+export function CrawlPanel({
+  apiBaseURL,
+  routeSearch,
+  variant = "crawler",
+}: CrawlPanelProps) {
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
+  const copy = variant === "contentOptimizer" ? CONTENT_OPTIMIZER_COPY : null;
   const reviewingDiscoveredPages =
     (viewModel.phase === "review" ||
       (viewModel.phase === "discovering" &&
@@ -132,7 +161,6 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
   ).length;
   const reanalyzing = viewModel.discovering || viewModel.crawling;
   const hasAnalysis = viewModel.crawlRecords.length > 0;
-  const canUsePageSelection = records.length > 0;
   const showProjectTransition = viewModel.hydratingProjectScope;
   const showInitialSetup =
     !showProjectTransition &&
@@ -140,6 +168,10 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
     !viewModel.loadingLatest &&
     !hasAnalysis &&
     !reviewingDiscoveredPages;
+  const creditConfirmation = {
+    ...viewModel.quotaUsage,
+    planLabel: viewModel.billingPlanLabel,
+  };
   function toggleSort(nextKey: SortKey) {
     if (sortKey === nextKey) {
       setSortDirection((current) => (current === "asc" ? "desc" : "asc"));
@@ -173,15 +205,16 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
           reviewingDiscoveredPages={reviewingDiscoveredPages}
           hasAnalysis={hasAnalysis}
           reanalyzing={reanalyzing}
-          discovering={viewModel.discovering}
-          canDiscover={viewModel.canDiscover}
           canCrawlSelected={viewModel.canCrawlSelected}
           canReanalyze={viewModel.canReanalyze}
           loadingLatest={viewModel.loadingLatest}
-          onDiscover={() => viewModel.discover()}
           onCrawlSelected={() => viewModel.crawlSelected()}
           onAnalyzeSite={handleAnalyzeSiteClick}
           onReviewSelection={() => viewModel.reviewSelection()}
+          estimatedAnalyzeCredits={viewModel.estimatedAnalyzeCredits}
+          estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}
+          creditConfirmation={creditConfirmation}
+          copy={copy?.header}
         />
       )}
 
@@ -193,6 +226,9 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
             reanalyzing={reanalyzing}
             canReanalyze={viewModel.canReanalyze}
             onAnalyzeSite={handleAnalyzeSiteClick}
+            estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}
+            creditConfirmation={creditConfirmation}
+            copy={copy?.initialSetup}
           />
         ) : (
           <>
@@ -225,12 +261,6 @@ export function CrawlPanel({ apiBaseURL, routeSearch }: CrawlPanelProps) {
                 onSeverityFilterChange={setSeverityFilter}
                 onToggleSort={toggleSort}
                 onSelectRecord={viewModel.setSelectedResultURL}
-                selectable={canUsePageSelection}
-                selectedURLs={viewModel.selectedURLs}
-                selectedCount={viewModel.selectedCount}
-                allSelected={viewModel.allDiscoveredSelected}
-                onTogglePage={viewModel.togglePage}
-                onToggleAll={viewModel.toggleAllPages}
               />
             )}
           </>

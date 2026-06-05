@@ -38,6 +38,9 @@ describe("crawl panel", () => {
     expect(resultsViewSource.includes('label="Statut"')).toBe(true);
     expect(resultsViewSource.includes('label="Sévérité"')).toBe(true);
     expect(resultsViewSource.includes("Diagnostic GEO")).toBe(true);
+    expect(resultsViewSource.includes("Opportunités d'amélioration")).toBe(true);
+    expect(resultsViewSource.includes("Aucune opportunité prioritaire")).toBe(true);
+    expect(resultsViewSource.includes("issueSourceLabel")).toBe(true);
     expect(resultsViewSource.includes("SelectTrigger")).toBe(false);
   });
 
@@ -59,9 +62,16 @@ describe("crawl panel", () => {
 
   test("separates header actions without a scoped reanalysis dialog", () => {
     expect(source.includes("<CrawlerPageHeader")).toBe(true);
-    expect(headerSource.includes("Actualiser les URLs")).toBe(true);
+    expect(headerSource.includes("Actualiser les URLs")).toBe(false);
     expect(headerSource.includes("Analyser la sélection")).toBe(true);
-    expect(headerSource.includes("Modifier la sélection")).toBe(true);
+    expect(headerSource.includes("Nouvelle sélection")).toBe(true);
+    expect(headerSource.includes("ConfirmDialog")).toBe(true);
+    expect(headerSource.includes("estimatedDiscoverCredits")).toBe(true);
+    expect(headerSource.includes("estimatedAnalyzeCredits")).toBe(true);
+    expect(viewModelSource.includes("Crédits insuffisants")).toBe(true);
+    expect(viewModelSource.includes("pushWarningToast")).toBe(true);
+    expect(headerSource.includes("Modifier la sélection")).toBe(false);
+    expect(source.includes("Relancer la découverte")).toBe(false);
     expect(headerSource.includes("Réanalyser toutes les pages")).toBe(false);
     expect(headerSource.includes("Réanalyser certaines pages")).toBe(false);
     expect(headerSource.includes("Choisir les pages")).toBe(false);
@@ -71,6 +81,21 @@ describe("crawl panel", () => {
     expect(source.includes("viewModel.discover()")).toBe(true);
     expect(source.includes("viewModel.crawlSelected()")).toBe(true);
     expect(source.includes("function handleReanalyzeAllClick()")).toBe(false);
+  });
+
+  test("confirms content optimizer actions with plan credit usage", () => {
+    expect(viewModelSource.includes("contentOptimizerCreditCost")).toBe(true);
+    expect(viewModelSource.includes("loadPromptQuotaUsage")).toBe(true);
+    expect(viewModelSource.includes("loadBillingEntitlements")).toBe(true);
+    expect(viewModelSource.includes("quotaUsage")).toBe(true);
+    expect(viewModelSource.includes("billingPlanLabel")).toBe(true);
+    expect(source.includes("const creditConfirmation =")).toBe(true);
+    expect(source.includes("planLabel: viewModel.billingPlanLabel")).toBe(true);
+    expect(source.includes("estimatedAnalyzeCredits={viewModel.estimatedAnalyzeCredits}")).toBe(true);
+    expect(source.includes("estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}")).toBe(true);
+    expect(source.includes("creditConfirmation={creditConfirmation}")).toBe(true);
+    expect(initialSetupSource.includes("ConfirmDialog")).toBe(true);
+    expect(initialSetupSource.includes("Solde actuel")).toBe(true);
   });
 
   test("shows crawler URLs as selectable rows for analysis", () => {
@@ -85,7 +110,9 @@ describe("crawl panel", () => {
       true,
     );
     expect(selectionViewSource.includes("Contenu extrait")).toBe(false);
-    expect(resultsViewSource.includes("selectedCount")).toBe(true);
+    expect(resultsViewSource.includes("selectedCount")).toBe(false);
+    expect(resultsViewSource.includes("Tout sélectionner")).toBe(false);
+    expect(resultsViewSource.includes("Checkbox")).toBe(false);
     expect(source.includes("onTogglePage={viewModel.togglePage}")).toBe(true);
   });
 
@@ -100,10 +127,14 @@ describe("crawl panel", () => {
     expect(initialSetupSource.includes("<OnboardingStep")).toBe(true);
   });
 
-  test("keeps discovery state separate from latest analyzed crawl snapshots", () => {
+  test("restores the latest analyzed crawl before falling back to discovery review", () => {
     expect(viewModelSource.includes("getLatestContentOptimizerCrawl")).toBe(
-      false,
+      true,
     );
+    expect(viewModelSource.includes("setCrawlResult(latest.result);")).toBe(
+      true,
+    );
+    expect(viewModelSource.includes('setPhase("completed");')).toBe(true);
     expect(viewModelSource.includes("setDiscoveryResult(null);")).toBe(true);
   });
 
@@ -156,6 +187,10 @@ describe("crawl panel", () => {
     expect(viewModelSource.includes("previousDiscovery")).toBe(true);
     expect(viewModelSource.includes("previousPhase")).toBe(true);
     expect(viewModelSource.includes("reviewSelection")).toBe(true);
+    expect(viewModelSource.includes("lastAnalyzedURLs")).toBe(true);
+    expect(viewModelSource.includes("pendingReviewSelectedURLs")).toBe(true);
+    expect(viewModelSource.includes("selectedReviewURLs")).toBe(true);
+    expect(viewModelSource.includes("discoverMutation.mutate();")).toBe(true);
     expect(
       normalizedSource.includes(
         'viewModel.phase === "discovering" && viewModel.discoveredPages.length > 0',
@@ -177,9 +212,26 @@ describe("crawl panel", () => {
 
   test("groups analyzed content into GEO insight dimensions", () => {
     expect(utilsSource.includes("geoInsightGroups")).toBe(true);
+    expect(utilsSource.includes("Lecture IA")).toBe(true);
     expect(utilsSource.includes("Compréhension IA")).toBe(true);
     expect(utilsSource.includes("Réponse générative")).toBe(true);
     expect(utilsSource.includes("Crédibilité")).toBe(true);
+    expect(utilsSource.includes('issue.source === "ai"')).toBe(true);
+    expect(utilsSource.includes("issueSourceLabel")).toBe(true);
+    expect(utilsSource.includes("Signaux")).toBe(true);
+    expect(utilsSource.includes("Prochaine action")).toBe(false);
+    expect(utilsSource.includes('label: "Priorité"')).toBe(true);
+    expect(utilsSource.includes("formatSignalCount")).toBe(true);
+    expect(resultsViewSource.includes("formatSignalCount")).toBe(true);
+  });
+
+  test("decodes crawled HTML entities before displaying text", () => {
+    expect(utilsSource.includes("decodeHTMLText")).toBe(true);
+    expect(utilsSource.includes("String.fromCodePoint")).toBe(true);
+    expect(resultsViewSource.includes("decodeHTMLText(record.title)")).toBe(true);
+    expect(resultsViewSource.includes("decodeHTMLText(issue.title)")).toBe(true);
+    expect(resultsViewSource.includes("decodeHTMLText(issue.recommendation)")).toBe(true);
+    expect(resultsViewSource.includes("decodeHTMLText(topIssue?.title")).toBe(true);
   });
 
   test("adds compact GEO KPIs for analyzed content", () => {

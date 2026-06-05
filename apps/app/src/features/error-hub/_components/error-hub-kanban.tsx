@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { pushErrorToast } from "@/components/ui/toast-actions";
 import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
 import {
   buildProjectModelLookup,
@@ -14,6 +13,7 @@ import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { buildPerceptionModelLookup } from "../../perception/_components/top-errors-panel";
 import { ErrorHubColumn } from "./error-hub-column";
+import { ErrorHubContentBriefsTab } from "./error-hub-content-briefs-tab";
 import { ErrorHubDetailsPanel } from "./error-hub-details-panel";
 import { ErrorHubFiltersToolbar } from "./error-hub-filters-toolbar";
 import {
@@ -33,8 +33,10 @@ import {
 
 type ErrorHubKanbanProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
+  canGenerateAiBrief: boolean;
   competitors: string[];
   errors: OptimizationError[];
+  generatedContentByErrorId: ReadonlyMap<string, string>;
   generatedIds: ReadonlySet<string>;
   initialSourceFilter?: SourceFilter;
   loading: boolean;
@@ -48,8 +50,10 @@ type ErrorHubKanbanProps = {
 
 export function ErrorHubKanban({
   actionStatusesByErrorId,
+  canGenerateAiBrief,
   competitors,
   errors,
+  generatedContentByErrorId,
   generatedIds,
   initialSourceFilter,
   loading,
@@ -63,12 +67,6 @@ export function ErrorHubKanban({
   const { locale } = useLocale();
   const { t } = useScopedI18n("perception");
   const isMobile = useIsMobile();
-
-  useEffect(() => {
-    if (persistError) {
-      pushErrorToast(new Error(persistError), persistError);
-    }
-  }, [persistError]);
 
   const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
   const [modelsPopoverOpen, setModelsPopoverOpen] = useState(false);
@@ -237,6 +235,9 @@ export function ErrorHubKanban({
                   <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
                     Par statut
                   </TabsTrigger>
+                  <TabsTrigger value="content" className="px-3 text-xs md:text-sm">
+                    Briefs contenu
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -245,28 +246,44 @@ export function ErrorHubKanban({
       </div>
 
       <main className="min-h-0 flex-1 overflow-visible lg:overflow-hidden">
-        <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
-          {columns.map((column, columnIndex) => (
-            <ErrorHubColumn
-              key={column.id}
-              {...column}
+        {boardView === "content" ? (
+          <div className="min-h-0 lg:h-full lg:overflow-y-auto">
+            <ErrorHubContentBriefsTab
               actionStatusesByErrorId={actionStatusesByErrorId}
-              columnId={column.id}
-              columnIndex={columnIndex}
-              emptyLabel={persistError}
+              canGenerateAiBrief={canGenerateAiBrief}
+              errors={filteredErrors}
+              generatedContentByErrorId={generatedContentByErrorId}
               generatedIds={generatedIds}
               loading={loading}
-              locale={locale}
-              markingDoneErrorIds={markingDoneErrorIds}
-              modelLookup={modelLookup}
               onCreateAction={onCreateAction}
-              onMarkDone={onMarkDone}
               onOpenDetails={setSelectedError}
               savingErrorIds={savingErrorIds}
-              totalColumns={columns.length}
             />
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
+            {columns.map((column, columnIndex) => (
+              <ErrorHubColumn
+                key={column.id}
+                {...column}
+                actionStatusesByErrorId={actionStatusesByErrorId}
+                columnId={column.id}
+                columnIndex={columnIndex}
+                emptyLabel={persistError}
+                generatedIds={generatedIds}
+                loading={loading}
+                locale={locale}
+                markingDoneErrorIds={markingDoneErrorIds}
+                modelLookup={modelLookup}
+                onCreateAction={onCreateAction}
+                onMarkDone={onMarkDone}
+                onOpenDetails={setSelectedError}
+                savingErrorIds={savingErrorIds}
+                totalColumns={columns.length}
+              />
+            ))}
+          </div>
+        )}
       </main>
 
       <ErrorHubDetailsPanel

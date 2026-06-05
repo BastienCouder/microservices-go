@@ -19,6 +19,7 @@ export type ContentOptimizerIssue = {
   description: string;
   recommendation: string;
   fixType: string;
+  source?: "rule" | "ai" | string;
 };
 
 export type ContentOptimizerCrawlRecord = {

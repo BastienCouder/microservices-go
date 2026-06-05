@@ -292,10 +292,8 @@ function SidebarComponent({
       traffic: buildScopedHref("/traffic", { project }),
       models: buildScopedHref("/models", { project }),
       brands: buildScopedHref("/brands", { project }),
-      crawler: buildScopedHref("/crawler", { project }),
       contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       errorHub: buildScopedHref("/error-hub", { project }),
-      aiAgentReady: buildScopedHref("/ai-agent-ready", { project }),
       organizations: buildScopedHref("/organizations", { project }),
       adminOrganizations: "/admin/organizations",
       adminPricing: buildScopedHref("/admin/pricing", { org }),
@@ -393,7 +391,6 @@ function SidebarComponent({
       indent: true,
       items: [
         item(links.contentOptimizer, content.contentOptimizer),
-        item(links.crawler, content.crawler),
         item(links.errorHub, content.errorHub),
       ],
     },

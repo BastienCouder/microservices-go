@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChevronDown, RefreshCw, SlidersHorizontal } from "lucide-react";
+import { ChevronDown, Download, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { PeriodFilterPicker } from "@/components/shared/period-filter-picker";
@@ -87,11 +87,24 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
         variant="outline"
         disabled={vm.refreshing}
         onClick={() => void vm.refresh()}
-        className="w-full sm:w-auto xl:justify-self-end"
+        className="w-full sm:w-auto"
       >
         <RefreshCw data-icon="inline-start" />
         Actualiser
       </Button>
+
+      {vm.canExport ? (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={vm.exportDisabled}
+          onClick={vm.exportTrafficData}
+          className="w-full sm:w-auto xl:justify-self-end"
+        >
+          <Download data-icon="inline-start" />
+          Export Excel
+        </Button>
+      ) : null}
     </>
   );
 
@@ -151,7 +164,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
               </CollapsibleContent>
             </Collapsible>
 
-            <section className="hidden gap-3 rounded-md bg-card p-3 text-card-foreground md:grid md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_220px_170px_auto] xl:items-center">
+            <section className="hidden gap-3 rounded-md bg-card p-3 text-card-foreground md:grid md:grid-cols-2 xl:grid-cols-[minmax(280px,1fr)_220px_170px_auto_auto] xl:items-center">
               {filtersContent}
             </section>
           </>

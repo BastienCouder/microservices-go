@@ -16,6 +16,7 @@ const models: ProjectModelMeta[] = [
     description: "",
     iconPath: "",
     live: true,
+    creditCost: 1,
   },
   {
     id: "alpha-2",
@@ -26,6 +27,7 @@ const models: ProjectModelMeta[] = [
     description: "",
     iconPath: "",
     live: true,
+    creditCost: 1,
   },
   {
     id: "alpha-10",
@@ -36,6 +38,7 @@ const models: ProjectModelMeta[] = [
     description: "",
     iconPath: "",
     live: true,
+    creditCost: 1,
   },
   {
     id: "beta",
@@ -46,6 +49,7 @@ const models: ProjectModelMeta[] = [
     description: "",
     iconPath: "",
     live: false,
+    creditCost: 1,
   },
 ];
 

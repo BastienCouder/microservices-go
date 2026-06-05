@@ -1,0 +1,153 @@
+---
+- name: Deploy fury-defendu
+  hosts: production
+  become: true
+  vars_files:
+    - ../group_vars/production.yml
+  tasks:
+    - name: Ensure deploy parent directory exists
+      ansible.builtin.file:
+        path: "{{ deploy_path | dirname }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check repository state
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/.git"
+      register: deploy_git_dir
+
+    - name: Clone repository if missing
+      ansible.builtin.command:
+        argv:
+          - sudo
+          - -u
+          - "{{ deploy_user }}"
+          - git
+          - clone
+          - --branch
+          - "{{ repo_version }}"
+          - "{{ repo_url }}"
+          - "{{ deploy_path }}"
+      when: not deploy_git_dir.stat.exists
+
+    - name: Ensure deploy directory owner after initial clone
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        recurse: true
+      when: not deploy_git_dir.stat.exists
+
+    - name: Update repository
+      ansible.builtin.command:
+        argv:
+          - sudo
+          - -u
+          - "{{ deploy_user }}"
+          - git
+          - -C
+          - "{{ deploy_path }}"
+          - pull
+          - --ff-only
+
+    - name: Check repository was cloned
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/.git"
+      register: cloned_git_dir
+
+    - name: Stop deploy if repository is missing
+      ansible.builtin.fail:
+        msg: "Repository was not cloned into {{ deploy_path }}"
+      when: not cloned_git_dir.stat.exists
+
+    - name: Create secrets directory
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/secrets"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0700"
+
+    - name: Check Docker secrets exist on server
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/secrets/{{ item }}"
+      register: docker_secret_files
+      loop:
+        - postgres_db.txt
+        - postgres_host.txt
+        - postgres_password.txt
+        - postgres_port.txt
+        - postgres_user.txt
+        - shotgun_organizer_id.txt
+        - shotgun_events_key.txt
+        - next_public_ga_measurement_id.txt
+        - next_public_site_url.txt
+
+    - name: Stop deploy if a Docker secret is missing
+      ansible.builtin.fail:
+        msg: "Missing server secret: {{ deploy_path }}/secrets/{{ item.item }}"
+      when: not item.stat.exists
+      loop: "{{ docker_secret_files.results }}"
+
+    - name: Render Nginx site
+      ansible.builtin.template:
+        src: ../templates/nginx-site.conf.j2
+        dest: "{{ nginx_site_path }}"
+        mode: "0644"
+
+    - name: Enable Nginx site
+      ansible.builtin.file:
+        src: "{{ nginx_site_path }}"
+        dest: "{{ nginx_site_link_path }}"
+        state: link
+
+    - name: Disable default Nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Check Nginx config
+      ansible.builtin.command: nginx -t
+      changed_when: false
+
+    - name: Check Docker Compose file exists
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/docker-compose.yml"
+      register: compose_file
+
+    - name: Stop deploy if Docker Compose file is missing
+      ansible.builtin.fail:
+        msg: "Missing compose file: {{ deploy_path }}/docker-compose.yml. Check that repo_version={{ repo_version }} is pushed to GitHub and contains docker-compose.yml."
+      when: not compose_file.stat.exists
+
+    - name: Start application
+      ansible.builtin.command:
+        argv:
+          - sudo
+          - -u
+          - "{{ deploy_user }}"
+          - docker
+          - compose
+          - -f
+          - "{{ deploy_path }}/docker-compose.yml"
+          - up
+          - -d
+          - --build
+
+    - name: Check Certbot is installed
+      ansible.builtin.command: certbot --version
+      changed_when: false
+
+    - name: Configure HTTPS with Let's Encrypt
+      ansible.builtin.shell: >
+        certbot --nginx --non-interactive --agree-tos --redirect
+        --email {{ letsencrypt_email }}
+        {% for domain in app_domains %}-d {{ domain }} {% endfor %}
+      register: certbot_result
+      changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
+
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded

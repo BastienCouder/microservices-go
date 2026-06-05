@@ -52,7 +52,7 @@ func WriteRateLimitExceeded(w http.ResponseWriter) {
 }
 
 func WriteQuotaExceeded(w http.ResponseWriter) {
-	WriteError(w, http.StatusTooManyRequests, QuotaExceededMessage)
+	WriteErrorWithCode(w, http.StatusTooManyRequests, "quota_exceeded", QuotaExceededMessage)
 }
 
 func WriteValidationError(w http.ResponseWriter) {

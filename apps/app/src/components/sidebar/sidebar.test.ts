@@ -7,7 +7,8 @@ describe("sidebar navigation", () => {
     expect(source.includes("optimizeActions")).toBe(true);
     expect(source.includes("projectSettings")).toBe(true);
     expect(source.includes("content.responses")).toBe(true);
-    expect(source.includes('item(links.crawler, content.crawler)')).toBe(true);
+    expect(source.includes('item(links.contentOptimizer, content.contentOptimizer)')).toBe(true);
+    expect(source.includes('item(links.crawler, content.crawler)')).toBe(false);
     expect(source.includes('item(links.brands, content.brands)')).toBe(true);
     expect(source.includes('item(links.models, content.models)')).toBe(true);
     expect(source.includes('"/ai-agent-ready"')).toBe(false);

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"strconv"
@@ -54,6 +55,7 @@ type ContentOptimizerIssue struct {
 	Description    string `json:"description"`
 	Recommendation string `json:"recommendation"`
 	FixType        string `json:"fixType"`
+	Source         string `json:"source,omitempty"`
 }
 
 type ContentOptimizerCrawlRecord struct {
@@ -103,8 +105,27 @@ func (s *Service) StartContentOptimizerCrawl(
 		return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: content crawler is not configured", ErrDependencyUnavailable)
 	}
 
+	reservation, err := s.ReserveCreditUsage(ctx, CreditUsageInput{
+		OrganizationID: organizationID,
+		ProjectID:      projectID,
+		RunType:        RunTypeContentCrawl,
+		Credits:        contentOptimizerCrawlCreditCost(normalized.Limit),
+	})
+	if err != nil {
+		return ContentOptimizerCrawlJob{}, err
+	}
+
 	job, err := s.contentCrawler.StartCrawl(ctx, normalized)
 	if err != nil {
+		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+		return ContentOptimizerCrawlJob{}, err
+	}
+	if strings.TrimSpace(job.ID) == "" {
+		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+		return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: content crawler returned an empty job id", ErrDependencyUnavailable)
+	}
+	if err := s.LinkCreditUsageRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(job.ID), reservation.ID); err != nil {
+		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
 		return ContentOptimizerCrawlJob{}, err
 	}
 	return job, nil
@@ -148,8 +169,14 @@ func (s *Service) GetContentOptimizerCrawl(
 	if !normalized.SkipAnalysis {
 		result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
 	}
-	if !normalized.SkipAnalysis && isTerminalCrawlJobStatus(result.Status) && shouldSaveContentOptimizerCrawlResult(normalized, result) {
-		if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
+	if isTerminalCrawlJobStatus(result.Status) {
+		if !normalized.SkipAnalysis && shouldSaveContentOptimizerCrawlResult(normalized, result) {
+			if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
+				_ = s.finalizeContentOptimizerCrawlCredit(ctx, projectID, jobID, false)
+				return ContentOptimizerCrawlResult{}, err
+			}
+		}
+		if err := s.finalizeContentOptimizerCrawlCredit(ctx, projectID, jobID, strings.EqualFold(result.Status, "completed")); err != nil {
 			return ContentOptimizerCrawlResult{}, err
 		}
 	}
@@ -174,6 +201,17 @@ func (s *Service) AnalyzeSelectedContentOptimizerRecords(
 	}
 
 	jobID := "selected-analysis-" + strconv.FormatInt(s.now().UTC().UnixNano(), 10)
+	reservation, err := s.ReserveCreditUsage(ctx, CreditUsageInput{
+		RequestID:      jobID,
+		OrganizationID: organizationID,
+		ProjectID:      projectID,
+		RunType:        RunTypeContentSelectedAnalysis,
+		Credits:        contentOptimizerCrawlCreditCost(len(normalizedRecords)),
+	})
+	if err != nil {
+		return ContentOptimizerCrawlResult{}, err
+	}
+
 	result := ContentOptimizerCrawlResult{
 		ID:       jobID,
 		Status:   "completed",
@@ -183,6 +221,10 @@ func (s *Service) AnalyzeSelectedContentOptimizerRecords(
 	}
 	result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
 	if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
+		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+		return ContentOptimizerCrawlResult{}, err
+	}
+	if _, err := s.CompleteCreditUsage(ctx, reservation.ID); err != nil {
 		return ContentOptimizerCrawlResult{}, err
 	}
 	return result, nil
@@ -388,15 +430,62 @@ func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 	return fmt.Sprintf("%d|%s", organizationID, strings.TrimSpace(projectID))
 }
 
+func contentOptimizerCrawlCreditRequestID(jobID string) string {
+	return "content-crawl-job:" + strings.TrimSpace(jobID)
+}
+
+func (s *Service) finalizeContentOptimizerCrawlCredit(ctx context.Context, projectID string, jobID string, success bool) error {
+	var err error
+	if success {
+		_, err = s.CompleteCreditUsageByRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(jobID))
+	} else {
+		_, err = s.ReleaseCreditUsageByRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(jobID))
+	}
+	if errors.Is(err, ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
+func contentOptimizerCrawlCreditCost(pageLimit int) int {
+	if pageLimit <= 0 {
+		pageLimit = defaultContentCrawlLimit
+	}
+	switch {
+	case pageLimit <= 10:
+		return 10
+	case pageLimit <= 50:
+		return 35
+	case pageLimit <= 200:
+		return 100
+	default:
+		extraPages := pageLimit - 200
+		return 100 + (extraPages+4)/5
+	}
+}
+
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
 	result.Records = append([]ContentOptimizerCrawlRecord(nil), result.Records...)
 	for index := range result.Records {
 		result.Records[index].Issues = mergeContentOptimizerIssues(
-			analyzeContentOptimizerRecord(result.Records[index]),
+			withContentOptimizerIssueSource(
+				analyzeContentOptimizerRecord(result.Records[index]),
+				"rule",
+			),
 			result.Records[index].Issues,
 		)
 	}
 	return result
+}
+
+func withContentOptimizerIssueSource(issues []ContentOptimizerIssue, source string) []ContentOptimizerIssue {
+	nextIssues := append([]ContentOptimizerIssue(nil), issues...)
+	for index := range nextIssues {
+		if strings.TrimSpace(nextIssues[index].Source) == "" {
+			nextIssues[index].Source = source
+		}
+	}
+	return nextIssues
 }
 
 func (s *Service) analyzeContentOptimizerCrawlResult(
@@ -421,7 +510,10 @@ func (s *Service) analyzeContentOptimizerCrawlResult(
 		if err != nil {
 			continue
 		}
-		result.Records[index].Issues = mergeContentOptimizerIssues(record.Issues, aiIssues)
+		result.Records[index].Issues = mergeContentOptimizerIssues(
+			record.Issues,
+			withContentOptimizerIssueSource(aiIssues, "ai"),
+		)
 	}
 	return result
 }

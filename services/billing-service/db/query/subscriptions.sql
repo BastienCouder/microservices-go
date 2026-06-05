@@ -86,6 +86,7 @@ SELECT
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   updated_at
 FROM billing_plan_settings
 ORDER BY
@@ -106,9 +107,10 @@ INSERT INTO billing_plan_settings (
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (plan)
 DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -117,6 +119,7 @@ DO UPDATE SET
   model_selection_limit = EXCLUDED.model_selection_limit,
   monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
   max_projects = EXCLUDED.max_projects,
+  allow_ai_briefs = EXCLUDED.allow_ai_briefs,
   updated_at = EXCLUDED.updated_at;
 
 -- name: ListBillingPricingTiers :many

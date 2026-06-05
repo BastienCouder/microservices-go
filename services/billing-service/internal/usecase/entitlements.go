@@ -18,6 +18,7 @@ type OrganizationEntitlements struct {
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
 	MaxProjects             int    `json:"max_projects"`
+	AllowAIBriefs           bool   `json:"allow_ai_briefs"`
 }
 
 func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitlements {
@@ -32,6 +33,7 @@ func DefaultOrganizationEntitlements(organizationID int64) OrganizationEntitleme
 		ModelSelectionLimit:     settings.ModelSelectionLimit,
 		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
 		MaxProjects:             settings.MaxProjects,
+		AllowAIBriefs:           settings.AllowAIBriefs,
 	}
 }
 
@@ -50,6 +52,7 @@ func EntitlementsFromSubscription(sub *domain.Subscription) OrganizationEntitlem
 		ModelSelectionLimit:     settings.ModelSelectionLimit,
 		MonthlyModelChangeLimit: settings.MonthlyModelChangeLimit,
 		MaxProjects:             settings.MaxProjects,
+		AllowAIBriefs:           settings.AllowAIBriefs,
 	}
 }
 
@@ -66,6 +69,7 @@ func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationI
 			entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
 			entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
 			entitlements.MaxProjects = settings.MaxProjects
+			entitlements.AllowAIBriefs = settings.AllowAIBriefs
 			return entitlements, nil
 		}
 		return entitlements, err
@@ -79,6 +83,7 @@ func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationI
 	entitlements.ModelSelectionLimit = settings.ModelSelectionLimit
 	entitlements.MonthlyModelChangeLimit = settings.MonthlyModelChangeLimit
 	entitlements.MaxProjects = settings.MaxProjects
+	entitlements.AllowAIBriefs = settings.AllowAIBriefs
 	return entitlements, nil
 }
 

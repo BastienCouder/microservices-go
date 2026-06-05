@@ -10,6 +10,9 @@ const detailsSource = await Bun.file(
 const columnSource = await Bun.file(
   new URL("./_components/error-hub-column.tsx", import.meta.url),
 ).text();
+const contentBriefsSource = await Bun.file(
+  new URL("./_components/error-hub-content-briefs-tab.tsx", import.meta.url),
+).text();
 const utilsSource = await Bun.file(
   new URL("./_lib/error-hub-utils.ts", import.meta.url),
 ).text();
@@ -29,6 +32,17 @@ describe("error hub", () => {
     expect(kanbanSource.includes('value={boardView}')).toBe(true);
     expect(kanbanSource.includes('value="severity"')).toBe(true);
     expect(kanbanSource.includes('value="status"')).toBe(true);
+    expect(kanbanSource.includes('value="content"')).toBe(true);
+    expect(kanbanSource.includes("ErrorHubContentBriefsTab")).toBe(true);
+    expect(typesSource.includes('"status" | "content"')).toBe(true);
+    expect(contentBriefsSource.includes("Opportunites")).toBe(true);
+    expect(contentBriefsSource.includes("Brief IA")).toBe(true);
+    expect(contentBriefsSource.includes("Suggestion initiale")).toBe(true);
+    expect(source.includes("generatedContentByErrorId")).toBe(true);
+    expect(kanbanSource.includes("generatedContentByErrorId")).toBe(true);
+    expect(source.includes("canGenerateAiBrief")).toBe(true);
+    expect(kanbanSource.includes("canGenerateAiBrief")).toBe(true);
+    expect(contentBriefsSource.includes("canGenerateAiBrief ?")).toBe(true);
     expect(
       kanbanSource.includes("onOpenDetails={setSelectedError}"),
     ).toBe(true);
@@ -87,5 +101,17 @@ describe("error hub", () => {
   test("uses alertes monitoring copy instead of monitoring alerte", () => {
     expect(utilsSource.includes("Monitoring alerte")).toBe(false);
     expect(utilsSource.includes("Alerte monitoring")).toBe(true);
+  });
+
+  test("keeps calculated monitoring diagnostics out of the error hub", () => {
+    expect(source.includes("isErrorHubError")).toBe(true);
+    expect(
+      normalizedSource.includes(
+        'error.source !== "monitoring" || error.origin !== "derived"',
+      ),
+    ).toBe(true);
+    expect(
+      normalizedSource.includes("errors={(data?.errors ?? []).filter(isErrorHubError)}"),
+    ).toBe(true);
   });
 });

@@ -39,6 +39,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.billingQuota = deps.BillingQuota
 	svc.contentCrawler = deps.ContentCrawler
 	svc.contentIssueAnalyzer = deps.ContentIssueAnalyzer
+	svc.optimizeActionBriefGenerator = deps.OptimizeActionBriefGenerator
 	svc.onboardingBrandProfileAnalyzer = deps.OnboardingBrandProfileAnalyzer
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
@@ -297,14 +298,54 @@ func (s *Service) currentMonthlyCreditUsageLocked(organizationID int64, now time
 	return total
 }
 
+func (s *Service) currentMonthlyReservedCreditUsageLocked(organizationID int64, now time.Time) int {
+	total := 0
+	for _, run := range s.runs {
+		if run == nil || run.OrganizationID != organizationID {
+			continue
+		}
+		if !isSameUTCMonth(run.CreatedAt, now) {
+			continue
+		}
+		total += runReservedCreditCount(run)
+	}
+	return total
+}
+
 func runCreditCount(run *AnalysisRun) int {
 	if run == nil {
+		return 0
+	}
+	switch strings.ToLower(strings.TrimSpace(run.Status)) {
+	case "failed", "errored", "cancelled", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user":
+		return 0
+	}
+	if run.ExpectedResponses > 0 {
+		if run.CompletedResponses <= 0 {
+			return 0
+		}
+		if run.CreditsCount > 0 {
+			return (run.CreditsCount*run.CompletedResponses + run.ExpectedResponses - 1) / run.ExpectedResponses
+		}
+		return min(max(0, run.CompletedResponses), max(0, run.PromptsCount))
+	}
+	if strings.EqualFold(strings.TrimSpace(run.Status), "running") {
 		return 0
 	}
 	if run.CreditsCount > 0 {
 		return run.CreditsCount
 	}
 	return max(0, run.PromptsCount)
+}
+
+func runReservedCreditCount(run *AnalysisRun) int {
+	if run == nil {
+		return 0
+	}
+	if run.Status == "running" && run.CreditsCount > 0 {
+		return run.CreditsCount
+	}
+	return runCreditCount(run)
 }
 
 func requestedCreditCount(promptCount, modelCreditCostSum, requestedCredits int) int {

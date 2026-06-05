@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-const perceptionPromptCron = "0 9 * * 1"
-
 func buildPerceptionPromptTexts(project Project) []string {
 	brand := strings.TrimSpace(project.BrandName)
 	if brand == "" {
@@ -53,7 +51,7 @@ func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []stri
 				ModelIDs:  nonNilStringSlice(modelIDs),
 				Schedule: PromptSchedule{
 					Mode:       PromptScheduleModeGlobal,
-					Cron:       perceptionPromptCron,
+					Cron:       "",
 					Timezone:   DefaultPromptTimezone,
 					ModelCrons: map[string]string{},
 				},
@@ -68,7 +66,7 @@ func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []stri
 			prompt.ModelIDs = nonNilStringSlice(modelIDs)
 			prompt.Schedule = prunePromptScheduleModelCrons(prompt.Schedule, modelIDs)
 			prompt.Schedule.Mode = PromptScheduleModeGlobal
-			prompt.Schedule.Cron = perceptionPromptCron
+			prompt.Schedule.Cron = ""
 			if prompt.Schedule.Timezone == "" {
 				prompt.Schedule.Timezone = DefaultPromptTimezone
 			}
@@ -127,5 +125,5 @@ func (s *Service) RunPerceptionAnalysis(ctx context.Context, projectID string, o
 	if requestID == "" {
 		requestID = fmt.Sprintf("%s-perception-%s", projectID, time.Now().UTC().Format("20060102"))
 	}
-	return s.runAnalysis(ctx, projectCopy, prompts, modelIDs, competitors, requestID, PromptKindPerception)
+	return s.runAnalysis(ctx, projectCopy, prompts, modelIDs, competitors, requestID, PromptKindPerception, input.Force)
 }

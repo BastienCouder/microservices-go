@@ -3,13 +3,21 @@ import { describe, expect, test } from "bun:test";
 const source = await Bun.file(new URL("./client.tsx", import.meta.url)).text();
 
 describe("perception client layout", () => {
-  test("keeps generated actions in the middle column and wires fix buttons", () => {
-    expect(source.includes("PerceptionOptimizeActions")).toBe(true);
-    expect(source.includes("drafts={viewModel.visibleOptimizeDrafts}")).toBe(true);
-    expect(source.includes("persistError={viewModel.persistError}")).toBe(true);
+  test("hides the generated actions section and keeps fix buttons wired", () => {
+    expect(source.includes("PerceptionOptimizeActions")).toBe(false);
+    expect(source.includes("drafts={viewModel.visibleOptimizeDrafts}")).toBe(false);
+    expect(source.includes("persistError={viewModel.persistError}")).toBe(false);
     expect(source.includes("onCreateAction={viewModel.handleFix}")).toBe(true);
     expect(source.includes("generatedIds={viewModel.generatedIds}")).toBe(true);
     expect(source.includes("modelCatalog={viewModel.modelCatalog}")).toBe(true);
     expect(source.includes("savingErrorIds={viewModel.savingErrorIds}")).toBe(true);
+  });
+
+  test("adds an Excel export action next to the perception analysis button", () => {
+    expect(source.includes("Export Excel")).toBe(true);
+    expect(source.includes("Download")).toBe(true);
+    expect(source.includes("viewModel.canExport")).toBe(true);
+    expect(source.includes("viewModel.exportDisabled")).toBe(true);
+    expect(source.includes("viewModel.handleExportPerceptionData(periodLabel)")).toBe(true);
   });
 });

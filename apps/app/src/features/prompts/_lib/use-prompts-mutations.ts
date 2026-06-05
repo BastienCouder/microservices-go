@@ -1,7 +1,11 @@
 "use client";
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
-import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
+import {
+  pushErrorToast,
+  pushSuccessToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
@@ -22,6 +26,7 @@ import {
   type PromptRunProgressEntry,
 } from "./prompt-run-progress";
 import { startPromptAnalyses } from "./prompt-run";
+import type { PromptQuotaUsageData } from "./prompt-quota";
 import { promptScheduleLabel } from "./utils";
 import type {
   AIModel,
@@ -43,6 +48,8 @@ type UsePromptsMutationsParams = {
   promptSort: PromptSort;
   promptSortDirection: PromptSortDirection;
   promptAvailableModels: AIModel[];
+  modelCreditCosts: Map<string, number>;
+  quotaUsage: PromptQuotaUsageData | null;
   availablePersonas: string[];
   recentPrompts: Array<{
     promptId?: string;
@@ -70,6 +77,49 @@ type UsePromptsMutationsParams = {
 };
 
 export function usePromptsMutations(params: UsePromptsMutationsParams) {
+  const getModelCreditCost = (modelId: string) => {
+    const normalized = modelId.trim();
+    const cost =
+      params.modelCreditCosts.get(normalized) ??
+      params.modelCreditCosts.get(normalized.toLowerCase());
+    return Math.max(1, Math.floor(cost ?? 1));
+  };
+
+  const estimatePromptRunCredits = (
+    prompt?: Pick<PromptItem, "models"> | null,
+  ) => {
+    if (!prompt) return 0;
+    const modelIds = dedupeModels(prompt.models);
+    return Math.max(
+      1,
+      modelIds.reduce((total, modelId) => total + getModelCreditCost(modelId), 0),
+    );
+  };
+
+  const estimatePromptRunsCredits = (promptsToRun: PromptItem[]) =>
+    promptsToRun.reduce(
+      (total, prompt) => total + estimatePromptRunCredits(prompt),
+      0,
+    );
+
+  const hasEnoughCreditsFor = (credits: number) => {
+    const quota = params.quotaUsage;
+    return (
+      !quota?.hasQuota ||
+      quota.monthlyCredits <= 0 ||
+      quota.remainingCredits >= credits
+    );
+  };
+  const pushInsufficientCreditsToast = (credits: number) => {
+    const quota = params.quotaUsage;
+    pushWarningToast(
+      "Crédits insuffisants",
+      quota?.hasQuota && quota.monthlyCredits > 0
+        ? `Cette analyse coûte ${credits} crédits. Il reste ${quota.remainingCredits}/${quota.monthlyCredits} crédits sur votre quota mensuel.`
+        : `Cette analyse coûte ${credits} crédits.`,
+    );
+  };
+
   const invalidateCatalog = async () => {
     if (!params.organizationId || !params.activeProjectId) return;
     await params.queryClient.invalidateQueries({
@@ -244,6 +294,11 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
 
   const runPromptsMutation = useMutation({
     mutationFn: async (promptsToRun: PromptItem[]) => {
+      const requestedCredits = estimatePromptRunsCredits(promptsToRun);
+      if (!hasEnoughCreditsFor(requestedCredits)) {
+        pushInsufficientCreditsToast(requestedCredits);
+        throw new Error("Crédits insuffisants pour lancer cette analyse.");
+      }
       await startPromptAnalyses({
         apiBaseURL: params.apiBaseURL,
         organizationId: params.organizationId,
@@ -253,6 +308,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
           sourcePromptId: prompt.sourcePromptId || prompt.id,
           prompt: prompt.prompt,
           models: prompt.models,
+          modelCreditCostSum: estimatePromptRunCredits(prompt),
         })),
       });
       return promptsToRun.map((prompt) => prompt.id);
@@ -328,8 +384,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
     },
   });
 
-  const canRunPrompt = (prompt?: Pick<PromptItem, "id" | "sourcePromptId"> | null) =>
-    !params.quotaReached &&
+  const canRunPrompt = (prompt?: Pick<PromptItem, "id" | "sourcePromptId" | "models"> | null) =>
     canRunPersistedPrompt(prompt, {
       organizationId: params.organizationId,
       activeProjectId: params.activeProjectId,
@@ -419,6 +474,9 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
     deletePrompt,
     deleteSelectedPrompts,
     canRunPrompt,
+    hasEnoughCreditsFor,
+    pushInsufficientCreditsToast,
+    estimatePromptRunsCredits,
     updatePromptModels,
     updatePromptSchedule,
   };

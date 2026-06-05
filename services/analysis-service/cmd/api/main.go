@@ -76,19 +76,23 @@ func main() {
 	}
 
 	var contentIssueAnalyzer usecase.ContentIssueAnalyzer
+	var optimizeActionBriefGenerator usecase.OptimizeActionBriefGenerator
 	var onboardingBrandProfileAnalyzer usecase.OnboardingBrandProfileAnalyzer
 	if cfg.IAServiceURL != "" && cfg.ContentIssueAnalyzerModelID != "" {
 		iaAnalyzer, err := iaclient.NewClient(iaclient.Config{
-			BaseURL:    cfg.IAServiceURL,
-			JWTSecret:  cfg.InternalJWTSecret,
-			JWTIssuer:  cfg.InternalJWTIssuer,
-			ModelID:    cfg.ContentIssueAnalyzerModelID,
-			ProviderID: cfg.ContentIssueAnalyzerProviderID,
+			BaseURL:                       cfg.IAServiceURL,
+			JWTSecret:                     cfg.InternalJWTSecret,
+			JWTIssuer:                     cfg.InternalJWTIssuer,
+			ModelID:                       cfg.ContentIssueAnalyzerModelID,
+			ProviderID:                    cfg.ContentIssueAnalyzerProviderID,
+			OptimizeActionBriefModelID:    cfg.OptimizeActionBriefModelID,
+			OptimizeActionBriefProviderID: cfg.OptimizeActionBriefProviderID,
 		})
 		if err != nil {
 			log.Fatalf("init content issue analyzer: %v", err)
 		}
 		contentIssueAnalyzer = iaAnalyzer
+		optimizeActionBriefGenerator = iaAnalyzer
 		onboardingBrandProfileAnalyzer = iaAnalyzer
 		log.Printf("content optimizer AI issue analyzer enabled with model %s", cfg.ContentIssueAnalyzerModelID)
 	} else {
@@ -105,6 +109,7 @@ func main() {
 		BillingQuota:                   billingHTTPClient,
 		ContentCrawler:                 contentCrawler,
 		ContentIssueAnalyzer:           contentIssueAnalyzer,
+		OptimizeActionBriefGenerator:   optimizeActionBriefGenerator,
 		OnboardingBrandProfileAnalyzer: onboardingBrandProfileAnalyzer,
 	})
 	if err != nil {

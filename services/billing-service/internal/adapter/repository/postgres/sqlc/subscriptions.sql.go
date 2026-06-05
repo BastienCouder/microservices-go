@@ -60,6 +60,7 @@ SELECT
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   updated_at
 FROM billing_plan_settings
 ORDER BY
@@ -89,6 +90,7 @@ func (q *Queries) ListBillingPlanSettings(ctx context.Context) ([]BillingPlanSet
 			&i.ModelSelectionLimit,
 			&i.MonthlyModelChangeLimit,
 			&i.MaxProjects,
+			&i.AllowAIBriefs,
 			&i.UpdatedAt,
 		); err != nil {
 			return nil, err
@@ -235,9 +237,10 @@ INSERT INTO billing_plan_settings (
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 ON CONFLICT (plan)
 DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -246,6 +249,7 @@ DO UPDATE SET
   model_selection_limit = EXCLUDED.model_selection_limit,
   monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
   max_projects = EXCLUDED.max_projects,
+  allow_ai_briefs = EXCLUDED.allow_ai_briefs,
   updated_at = EXCLUDED.updated_at
 `
 
@@ -257,6 +261,7 @@ type UpsertBillingPlanSettingsParams struct {
 	ModelSelectionLimit     int32
 	MonthlyModelChangeLimit int32
 	MaxProjects             int32
+	AllowAIBriefs           bool
 	UpdatedAt               pgtype.Timestamptz
 }
 
@@ -269,6 +274,7 @@ func (q *Queries) UpsertBillingPlanSettings(ctx context.Context, arg UpsertBilli
 		arg.ModelSelectionLimit,
 		arg.MonthlyModelChangeLimit,
 		arg.MaxProjects,
+		arg.AllowAIBriefs,
 		arg.UpdatedAt,
 	)
 	return err

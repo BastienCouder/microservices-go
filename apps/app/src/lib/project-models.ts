@@ -9,6 +9,7 @@ export type ProjectModelMeta = {
   description: string;
   iconPath: string;
   live: boolean;
+  creditCost: number;
 };
 
 export type ProjectModelVisual = {
@@ -201,6 +202,7 @@ export function toProjectModelMeta(
     description: options?.description ?? value.description,
     iconPath: value.iconPath,
     live: options?.live ?? value.isEnabledForProject,
+    creditCost: value.creditCost,
   };
 }
 

@@ -7,8 +7,6 @@ import {
 } from "@/components/shared/period-filter-picker";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -25,8 +23,11 @@ import {
   columns,
   computeGeoKpiSummaries,
   computePriority,
+  decodeHTMLText,
+  formatSignalCount,
   geoInsightGroups,
   hostnameFromURL,
+  issueSourceLabel,
   issuesForGeoInsightGroup,
   pathnameFromURL,
   primaryIssue,
@@ -67,17 +68,11 @@ type CrawlerResultsViewProps = {
   records: ContentOptimizerCrawlRecord[];
   filteredRecords: ContentOptimizerCrawlRecord[];
   selectedRecord: ContentOptimizerCrawlRecord | null;
-  selectable?: boolean;
-  selectedURLs?: Set<string>;
-  selectedCount?: number;
-  allSelected?: boolean;
   onQueryChange: (value: string) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onSeverityFilterChange: (value: SeverityFilter) => void;
   onToggleSort: (key: SortKey) => void;
   onSelectRecord: (url: string) => void;
-  onTogglePage?: (url: string, checked: boolean) => void;
-  onToggleAll?: (checked: boolean) => void;
 };
 
 function loadingRows() {
@@ -105,16 +100,7 @@ function loadingRows() {
         <Skeleton className="h-6 w-20 rounded-full" />
       </TableCell>
       <TableCell>
-        <div className="space-y-2">
-          <Skeleton className="h-5 w-24 rounded-full" />
-          <Skeleton className="h-3 w-full max-w-[180px]" />
-        </div>
-      </TableCell>
-      <TableCell>
-        <div className="space-y-2">
-          <Skeleton className="h-3 w-full max-w-[220px]" />
-          <Skeleton className="h-3 w-2/3 max-w-[180px]" />
-        </div>
+        <Skeleton className="h-6 w-24 rounded-full" />
       </TableCell>
     </TableRow>
   ));
@@ -176,13 +162,15 @@ function CrawlerDetailPane({
     );
   }
 
+  const selectedTitle = decodeHTMLText(selectedRecord.title) || selectedRecord.url;
+
   return (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-4">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h3 className="truncate text-sm font-semibold text-foreground">
-              {selectedRecord.title || selectedRecord.url}
+              {selectedTitle}
             </h3>
             <p className="mt-1 break-all text-xs text-muted-foreground">
               {selectedRecord.url}
@@ -193,7 +181,7 @@ function CrawlerDetailPane({
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge variant="outline">HTTP {selectedRecord.httpStatus ?? "-"}</Badge>
           <Badge variant="outline">
-            {selectedRecord.issues?.length ?? 0} point(s)
+            {formatSignalCount(selectedRecord.issues?.length ?? 0)}
           </Badge>
           <Badge className={computePriority(selectedRecord).className}>
             {computePriority(selectedRecord).label}
@@ -230,14 +218,14 @@ function CrawlerDetailPane({
                         {group.label}
                       </p>
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                        {topIssue?.title ?? group.description}
+                        {decodeHTMLText(topIssue?.title ?? group.description)}
                       </p>
                     </div>
                     <Badge
                       variant={hasIssues ? "secondary" : "outline"}
                       className="h-6 shrink-0 rounded-sm px-2 text-xs font-bold"
                     >
-                      {hasIssues ? `${groupIssues.length}` : "OK"}
+                      {hasIssues ? formatSignalCount(groupIssues.length) : "OK"}
                     </Badge>
                   </div>
                 </div>
@@ -248,22 +236,22 @@ function CrawlerDetailPane({
 
         {(selectedRecord.issues?.length ?? 0) > 0 ? (
           <section className="space-y-4">
-            <SectionTitle showIndicator={false}>Points à corriger</SectionTitle>
+            <SectionTitle showIndicator={false}>Opportunités d'amélioration</SectionTitle>
             <div className="space-y-3">
               {selectedRecord.issues?.map((issue, index) => (
                 <button
                   type="button"
                   key={issue.id}
                   className="group w-full cursor-default rounded-md bg-background p-4 text-left transition-all ring-2 ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                  aria-label={issue.title}
+                  aria-label={decodeHTMLText(issue.title)}
                 >
                   <div className="mb-2.5 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold text-foreground md:text-sm">
-                        {issue.title}
+                        {decodeHTMLText(issue.title)}
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground md:text-xs">
-                        Point #{index + 1}
+                        Opportunité #{index + 1}
                       </p>
                     </div>
 
@@ -275,17 +263,20 @@ function CrawlerDetailPane({
                     >
                       {severityLabel(issue.severity)}
                     </Badge>
+                    <Badge variant="outline" className="h-6 px-2 text-xs font-bold">
+                      {issueSourceLabel(issue)}
+                    </Badge>
                   </div>
 
                   <p className="mb-3 text-xs font-medium leading-relaxed text-foreground/90 transition-colors group-hover:text-foreground md:text-sm">
-                    {issue.recommendation}
+                    {decodeHTMLText(issue.recommendation)}
                   </p>
                 </button>
               ))}
             </div>
           </section>
         ) : (
-          <EmptyStateCard label="Aucun point détecté sur cette page. Aucune action requise." />
+          <EmptyStateCard label="Aucune opportunité prioritaire détectée sur cette page." />
         )}
 
         <section className="space-y-4">
@@ -314,17 +305,11 @@ export function CrawlerResultsView({
   records,
   filteredRecords,
   selectedRecord,
-  selectable = false,
-  selectedURLs = new Set(),
-  selectedCount = 0,
-  allSelected = false,
   onQueryChange,
   onStatusFilterChange,
   onSeverityFilterChange,
   onToggleSort,
   onSelectRecord,
-  onTogglePage,
-  onToggleAll,
 }: CrawlerResultsViewProps) {
   function renderSortIcon(columnKey: SortKey) {
     if (sortKey !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
@@ -373,21 +358,6 @@ export function CrawlerResultsView({
             />
           </div>
 
-          {selectable ? (
-            <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-              <span>
-                {selectedCount}/{records.length} sélectionnée(s)
-              </span>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => onToggleAll?.(!allSelected)}
-              >
-                {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
-              </Button>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -396,17 +366,6 @@ export function CrawlerResultsView({
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
-                {selectable ? (
-                  <TableHead className="h-12 w-12 px-3">
-                    <Checkbox
-                      checked={allSelected}
-                      aria-label="Sélectionner toutes les pages"
-                      onCheckedChange={(checked) =>
-                        onToggleAll?.(checked === true)
-                      }
-                    />
-                  </TableHead>
-                ) : null}
                 {columns.map((column) => {
                   const sortMap: Partial<Record<CrawlColumn["id"], SortKey>> = {
                     page: "page",
@@ -449,7 +408,7 @@ export function CrawlerResultsView({
               ) : filteredRecords.length === 0 ? (
                 <TableRow>
                   <TableCell
-                    colSpan={columns.length + (selectable ? 1 : 0)}
+                    colSpan={columns.length}
                     className="py-6"
                   >
                     <EmptyStateCard
@@ -465,10 +424,9 @@ export function CrawlerResultsView({
                 </TableRow>
               ) : (
                 filteredRecords.map((record) => {
-                  const issue = primaryIssue(record);
                   const priority = computePriority(record);
                   const isSelected = selectedRecord?.url === record.url;
-                  const recordURL = record.url.trim();
+                  const recordTitle = decodeHTMLText(record.title) || record.url;
 
                   return (
                     <TableRow
@@ -488,27 +446,13 @@ export function CrawlerResultsView({
                         isSelected && "border-l-primary bg-muted/50",
                       )}
                     >
-                      {selectable ? (
-                        <TableCell
-                          className="w-12"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <Checkbox
-                            checked={selectedURLs.has(recordURL)}
-                            aria-label={`Sélectionner ${recordURL}`}
-                            onCheckedChange={(checked) =>
-                              onTogglePage?.(recordURL, checked === true)
-                            }
-                          />
-                        </TableCell>
-                      ) : null}
                       <TableCell className="max-w-[360px] whitespace-normal">
                         <div className="space-y-1">
                           <div className="line-clamp-2 text-sm font-medium leading-6">
-                            {record.title || record.url}
+                            {recordTitle}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {record.issues?.length ?? 0} point(s)
+                            {formatSignalCount(record.issues?.length ?? 0)}
                           </div>
                         </div>
                       </TableCell>
@@ -538,32 +482,10 @@ export function CrawlerResultsView({
                         </Badge>
                       </TableCell>
 
-                      <TableCell className="max-w-[340px] whitespace-normal">
-                        {issue ? (
-                          <div className="space-y-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline">
-                                {record.issues?.length ?? 0} point(s)
-                              </Badge>
-                              <Badge className={severityTone(issue.severity)}>
-                                {severityLabel(issue.severity)}
-                              </Badge>
-                            </div>
-                            <div className="line-clamp-1 text-sm font-medium">
-                              {issue.title}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">
-                            Aucun point détecté
-                          </span>
-                        )}
-                      </TableCell>
-
-                      <TableCell className="max-w-[360px] whitespace-normal">
-                        <div className="line-clamp-2 text-sm text-foreground">
-                          {issue?.recommendation ?? "Aucune action requise"}
-                        </div>
+                      <TableCell className="whitespace-normal">
+                        <Badge variant="outline">
+                          {formatSignalCount(record.issues?.length ?? 0)}
+                        </Badge>
                       </TableCell>
                     </TableRow>
                   );

@@ -106,6 +106,7 @@ export const apiRoutes = {
   },
   analysis: {
     analyze: (projectId: string) => `/analysis/projects/${projectId}/run`,
+    perceptionRun: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/analysis/perception/run`,
     quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
     perception: (projectId: string, options?: { includeDashboard?: boolean }) =>

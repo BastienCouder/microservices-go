@@ -15,30 +15,22 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
-import { appQueryKeys } from "@/lib/query-keys";
 import {
   loadOrganizationSummaries,
   type OrganizationSummary,
 } from "@/features/organizations/_lib/shared/organization-page-api";
+import { appQueryKeys } from "@/lib/query-keys";
+import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import {
-  deleteBillingPricingTier,
-  loadBillingCreditCostSettings,
   loadBillingPlanSettings,
-  loadBillingPricingTiers,
   syncStripePricingCatalog,
-  updateBillingCreditCostSettings,
   updateBillingPlanSettings,
-  updateBillingPricingTier,
   type BillingPlanCode,
-  type BillingCreditCostSettings,
-  type BillingCreditCostRule,
   type BillingPlanSettings,
-  type BillingPricingTier,
-  type BillingPriceMap,
 } from "@/shared/billing";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
-import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { cn } from "@/shared/utils";
 
 type AdminPricingPageProps = {
@@ -46,35 +38,23 @@ type AdminPricingPageProps = {
   routeSearch: string;
 };
 
-type TierDraft = {
-  promptVolume: string;
-  label: string;
-  prices: Record<string, string>;
-};
-
-type PlanLimitDraft = {
+type PlanDraft = {
+  monthlyPrice: string;
+  yearlyPrice: string;
   monthlyQuota: string;
   modelSelectionLimit: string;
   monthlyModelChangeLimit: string;
   maxProjects: string;
+  allowAiBriefs: boolean;
 };
 
-type NewPricingDraft = PlanLimitDraft & {
+type NewPlanDraft = PlanDraft & {
   plan: string;
-  promptVolume: string;
-  label: string;
-  price: string;
-  prices: Record<string, string>;
 };
 
-type CreditCostRuleDraft = {
-  minPricePerMillion: string;
-  creditCost: string;
-};
-
-const CORE_PLAN_ORDER = ["developer", "starter", "growth", "pro"] as const;
+const CORE_PLAN_ORDER = ["starter", "growth", "pro"] as const;
+const HIDDEN_ADMIN_PLANS = new Set(["developer"]);
 const EMPTY_PLANS: BillingPlanSettings[] = [];
-const EMPTY_TIERS: BillingPricingTier[] = [];
 
 function canManageUsage(organization: OrganizationSummary) {
   return (
@@ -82,18 +62,6 @@ function canManageUsage(organization: OrganizationSummary) {
     organization.role === "owner" ||
     organization.role === "super_admin"
   );
-}
-
-function centsToEuroString(cents: number | null) {
-  if (cents === null) return "";
-  return String(Math.max(0, cents) / 100).replace(/\.00$/, "");
-}
-
-function euroStringToNullableCents(value: string) {
-  const normalized = value.trim().replace(",", ".");
-  if (normalized === "") return null;
-  const parsed = Number.parseFloat(normalized);
-  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : null;
 }
 
 function normalizePlanCode(value: string) {
@@ -106,30 +74,13 @@ function normalizePlanCode(value: string) {
     .join("-");
 }
 
-function toPositiveInteger(value: string, fallback: number) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function toNonNegativeInteger(value: string) {
-  const parsed = Number.parseInt(value, 10);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-}
-
-function formatPrompts(value: number) {
-  if (value >= 5000) return "5k+";
-  if (value >= 1000) return `${value / 1000}k`;
-  return String(value);
-}
-
-function formatPrice(cents: number | null) {
-  if (cents === null) return "Sur devis";
-  return `${Math.round(cents / 100)}€`;
-}
-
 function sortBillingPlans(plans: string[]) {
   const uniquePlans = Array.from(
-    new Set(plans.map(normalizePlanCode).filter(Boolean)),
+    new Set(
+      plans
+        .map(normalizePlanCode)
+        .filter((plan) => plan && !HIDDEN_ADMIN_PLANS.has(plan)),
+    ),
   );
   uniquePlans.sort((left, right) => {
     const leftIndex = CORE_PLAN_ORDER.indexOf(left as (typeof CORE_PLAN_ORDER)[number]);
@@ -142,19 +93,33 @@ function sortBillingPlans(plans: string[]) {
   return uniquePlans;
 }
 
-function emptyPriceDrafts(planKeys: string[], current?: Record<string, string>) {
-  return Object.fromEntries(
-    planKeys.map((plan) => [plan, current?.[plan] ?? ""]),
-  );
+function centsToEuroString(cents: number) {
+  return String(Math.max(0, cents) / 100).replace(/\.00$/, "");
 }
 
-function emptyPlanDraft(): PlanLimitDraft {
-  return {
-    monthlyQuota: "1",
-    modelSelectionLimit: "0",
-    monthlyModelChangeLimit: "0",
-    maxProjects: "0",
-  };
+function euroStringToCents(value: string, fallback: number) {
+  const normalized = value.trim().replace(",", ".");
+  if (normalized === "") return fallback;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed * 100) : fallback;
+}
+
+function toPositiveInteger(value: string, fallback: number) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function toNonNegativeInteger(value: string) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+}
+
+function formatCredits(value: number) {
+  return new Intl.NumberFormat("fr-FR").format(value);
+}
+
+function formatPrice(cents: number) {
+  return `${Math.round(cents / 100)}€`;
 }
 
 function emptyPlanSettings(plan: BillingPlanCode): BillingPlanSettings {
@@ -166,146 +131,64 @@ function emptyPlanSettings(plan: BillingPlanCode): BillingPlanSettings {
     modelSelectionLimit: 0,
     monthlyModelChangeLimit: 0,
     maxProjects: 0,
+    allowAiBriefs: false,
     isMostChosen: false,
   };
 }
 
-function defaultCreditCostSettingsDraft(): {
-  defaultCreditCost: string;
-  rules: CreditCostRuleDraft[];
-} {
+function blankPlanDraft(): PlanDraft {
   return {
-    defaultCreditCost: "1",
-    rules: [
-      { minPricePerMillion: "20", creditCost: "4" },
-      { minPricePerMillion: "10", creditCost: "3" },
-      { minPricePerMillion: "5", creditCost: "2" },
-    ],
+    monthlyPrice: "",
+    yearlyPrice: "",
+    monthlyQuota: "1",
+    modelSelectionLimit: "0",
+    monthlyModelChangeLimit: "0",
+    maxProjects: "0",
+    allowAiBriefs: false,
   };
 }
 
-function creditCostSettingsDraftFromSettings(settings: BillingCreditCostSettings) {
-  return {
-    defaultCreditCost: String(Math.max(1, settings.defaultCreditCost || 1)),
-    rules: settings.rules.map((rule) => ({
-      minPricePerMillion: String(rule.minPricePerMillion),
-      creditCost: String(rule.creditCost),
-    })),
-  };
-}
-
-function normalizeCreditCostSettingsDraft(draft: {
-  defaultCreditCost: string;
-  rules: CreditCostRuleDraft[];
-}): BillingCreditCostSettings {
-  const rules = draft.rules
-    .map((rule) => {
-      const minPrice = Number.parseFloat(rule.minPricePerMillion.trim().replace(",", "."));
-      const creditCost = Number.parseInt(rule.creditCost, 10);
-      if (!Number.isFinite(minPrice) || minPrice < 0 || !Number.isFinite(creditCost) || creditCost <= 0) {
-        return null;
-      }
-      return {
-        minPricePerMillion: minPrice,
-        creditCost,
-      } satisfies BillingCreditCostRule;
-    })
-    .filter((rule): rule is BillingCreditCostRule => rule !== null)
-    .sort((left, right) => right.minPricePerMillion - left.minPricePerMillion);
-
-  return {
-    defaultCreditCost: toPositiveInteger(draft.defaultCreditCost, 1),
-    rules,
-  };
-}
-
-function nextPromptVolume(tiers: BillingPricingTier[]) {
-  const maxPromptVolume = Math.max(0, ...tiers.map((tier) => tier.promptVolume));
-  if (maxPromptVolume <= 0) return 100;
-  if (maxPromptVolume >= 5000) return maxPromptVolume + 1000;
-  return maxPromptVolume * 2;
-}
-
-function emptyNewPricingDraft(
-  tiers: BillingPricingTier[] = EMPTY_TIERS,
-  planKeys: string[] = [],
-): NewPricingDraft {
+function blankNewPlanDraft(): NewPlanDraft {
   return {
     plan: "",
-    promptVolume: String(nextPromptVolume(tiers)),
-    label: "",
-    price: "",
-    prices: emptyPriceDrafts(planKeys),
-    ...emptyPlanDraft(),
+    ...blankPlanDraft(),
   };
 }
 
-function tierDraftFromTier(tier: BillingPricingTier, planKeys: string[]): TierDraft {
-  const prices = emptyPriceDrafts(planKeys);
-  for (const plan of planKeys) {
-    prices[plan] = centsToEuroString(tier.prices[plan] ?? null);
-  }
+function planDraftFromSettings(settings: BillingPlanSettings): PlanDraft {
   return {
-    promptVolume: String(tier.promptVolume),
-    label: tier.label,
-    prices,
-  };
-}
-
-function planLimitDraftFromSettings(settings: BillingPlanSettings): PlanLimitDraft {
-  return {
+    monthlyPrice: centsToEuroString(settings.monthlyPriceCents),
+    yearlyPrice: centsToEuroString(settings.yearlyPriceCents),
     monthlyQuota: String(Math.max(1, settings.monthlyQuota || 1)),
     modelSelectionLimit: String(Math.max(0, settings.modelSelectionLimit)),
     monthlyModelChangeLimit: String(Math.max(0, settings.monthlyModelChangeLimit)),
     maxProjects: String(Math.max(0, settings.maxProjects)),
+    allowAiBriefs: settings.allowAiBriefs,
   };
 }
 
-function normalizeTierDraft(draft: TierDraft): BillingPricingTier {
-  const promptVolume = toPositiveInteger(draft.promptVolume, 1);
-  const prices = Object.fromEntries(
-    Object.entries(draft.prices).map(([plan, value]) => [
-      normalizePlanCode(plan),
-      euroStringToNullableCents(value),
-    ]),
-  ) as BillingPriceMap;
-
-  return {
-    promptVolume,
-    creditVolume: promptVolume,
-    label: draft.label.trim() || formatPrompts(promptVolume),
-    prices,
-    developerPriceCents: prices.developer ?? null,
-    starterPriceCents: prices.starter ?? null,
-    growthPriceCents: prices.growth ?? null,
-    proPriceCents: prices.pro ?? null,
-  };
-}
-
-function normalizePlanLimitDraft(
+function normalizePlanDraft(
   plan: BillingPlanCode,
   settings: BillingPlanSettings,
-  draft: PlanLimitDraft,
+  draft: PlanDraft,
 ): BillingPlanSettings {
   return {
     ...settings,
     plan,
+    monthlyPriceCents: euroStringToCents(draft.monthlyPrice, settings.monthlyPriceCents),
+    yearlyPriceCents: euroStringToCents(draft.yearlyPrice, settings.yearlyPriceCents),
     monthlyQuota: toPositiveInteger(draft.monthlyQuota, settings.monthlyQuota || 1),
     modelSelectionLimit: toNonNegativeInteger(draft.modelSelectionLimit),
     monthlyModelChangeLimit: toNonNegativeInteger(draft.monthlyModelChangeLimit),
     maxProjects: toNonNegativeInteger(draft.maxProjects),
+    allowAiBriefs: draft.allowAiBriefs === true,
   };
 }
 
 export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const queryClient = useQueryClient();
-  const [volumeIndex, setVolumeIndex] = useState(2);
-  const [tierDrafts, setTierDrafts] = useState<Record<number, TierDraft>>({});
-  const [planDrafts, setPlanDrafts] = useState<Record<string, PlanLimitDraft>>({});
-  const [creditCostDraft, setCreditCostDraft] = useState(defaultCreditCostSettingsDraft);
-  const [newPricingDraft, setNewPricingDraft] = useState<NewPricingDraft>(() =>
-    emptyNewPricingDraft(),
-  );
+  const [planDrafts, setPlanDrafts] = useState<Record<string, PlanDraft>>({});
+  const [newPlanDraft, setNewPlanDraft] = useState<NewPlanDraft>(blankNewPlanDraft);
 
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
@@ -319,11 +202,6 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   );
   const organizationId = adminOrganization?.id ?? "";
   const plansQueryKey = appQueryKeys.billingPlans(apiBaseURL, organizationId);
-  const tiersQueryKey = appQueryKeys.billingPricingTiers(apiBaseURL, organizationId);
-  const creditCostSettingsQueryKey = appQueryKeys.billingCreditCostSettings(
-    apiBaseURL,
-    organizationId,
-  );
 
   const plansQuery = useQuery({
     queryKey: plansQueryKey,
@@ -331,130 +209,51 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     queryFn: ({ signal }) =>
       loadBillingPlanSettings(apiBaseURL, organizationId, { signal }),
   });
-  const tiersQuery = useQuery({
-    queryKey: tiersQueryKey,
-    enabled: apiBaseURL.trim() !== "" && organizationId !== "",
-    queryFn: ({ signal }) =>
-      loadBillingPricingTiers(apiBaseURL, organizationId, { signal }),
-  });
-  const creditCostSettingsQuery = useQuery({
-    queryKey: creditCostSettingsQueryKey,
-    enabled: apiBaseURL.trim() !== "" && organizationId !== "",
-    queryFn: ({ signal }) =>
-      loadBillingCreditCostSettings(apiBaseURL, organizationId, { signal }),
-  });
 
   const plans = plansQuery.data ?? EMPTY_PLANS;
-  const tiers = tiersQuery.data ?? EMPTY_TIERS;
-  const orderedPlans = useMemo(
-    () =>
-      sortBillingPlans([
-        ...plans.map((plan) => plan.plan),
-        ...tiers.flatMap((tier) => Object.keys(tier.prices)),
-      ]),
-    [plans, tiers],
+  const visiblePlanIds = useMemo(
+    () => sortBillingPlans(plans.map((plan) => plan.plan)),
+    [plans],
   );
-  const selectedTier = tiers[Math.min(volumeIndex, Math.max(0, tiers.length - 1))];
-  const selectedTierDraft = selectedTier
-    ? tierDrafts[selectedTier.promptVolume] ??
-      tierDraftFromTier(selectedTier, orderedPlans)
-    : null;
-  const normalizedSelectedTier = selectedTierDraft
-    ? normalizeTierDraft(selectedTierDraft)
-    : null;
-
   const plansByID = useMemo(
     () => new Map(plans.map((plan) => [plan.plan, plan])),
     [plans],
   );
 
   useEffect(() => {
-    if (!creditCostSettingsQuery.data) return;
-    setCreditCostDraft(creditCostSettingsDraftFromSettings(creditCostSettingsQuery.data));
-  }, [creditCostSettingsQuery.data]);
-
-  useEffect(() => {
-    setTierDrafts((current) => {
-      const next = { ...current };
-      for (const tier of tiers) {
-        next[tier.promptVolume] = tierDraftFromTier(
-          tier,
-          orderedPlans.length > 0 ? orderedPlans : Object.keys(tier.prices),
-        );
-      }
-      return next;
-    });
-  }, [orderedPlans, tiers]);
-
-  useEffect(() => {
     if (plans.length === 0) return;
     setPlanDrafts((current) => {
       const next = { ...current };
       for (const plan of plans) {
-        next[plan.plan] = current[plan.plan] ?? planLimitDraftFromSettings(plan);
+        if (HIDDEN_ADMIN_PLANS.has(plan.plan)) continue;
+        next[plan.plan] = current[plan.plan] ?? planDraftFromSettings(plan);
       }
       return next;
     });
   }, [plans]);
 
-  useEffect(() => {
-    setNewPricingDraft((current) => ({
-      ...current,
-      promptVolume:
-        current.promptVolume || String(nextPromptVolume(tiers)),
-      prices: emptyPriceDrafts(orderedPlans, current.prices),
-    }));
-  }, [orderedPlans, tiers]);
-
-  const updateTierMutation = useMutation({
-    mutationFn: async (tier: BillingPricingTier) => {
-      if (!organizationId) throw new Error("Organisation admin introuvable.");
-      return updateBillingPricingTier(apiBaseURL, {
-        organizationId,
-        ...tier,
-      });
-    },
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: tiersQueryKey });
-      pushSuccessToast("Palier de tarification mis à jour.");
-    },
-    onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre à jour ce palier.");
-    },
-  });
-
   const updatePlanMutation = useMutation({
     mutationFn: async ({
       plan,
       settings,
-      tier,
     }: {
       plan: BillingPlanCode;
       settings: BillingPlanSettings;
-      tier: BillingPricingTier;
-      successMessage?: string;
     }) => {
       if (!organizationId) throw new Error("Organisation admin introuvable.");
       const updatedSettings = await updateBillingPlanSettings(apiBaseURL, {
         organizationId,
         ...settings,
       });
-      await updateBillingPricingTier(apiBaseURL, {
-        organizationId,
-        ...tier,
-      });
-      return { plan, settings: updatedSettings, tier };
+      return { plan, settings: updatedSettings };
     },
-    onSuccess: async (_result, variables) => {
+    onSuccess: async () => {
       await invalidateQueryKeys(queryClient, [
         plansQueryKey,
-        tiersQueryKey,
         ["billing", "quota", apiBaseURL],
         ["prompt-quota", apiBaseURL],
       ]);
-      pushSuccessToast(
-        variables.successMessage ?? "Plan et prix du palier mis à jour.",
-      );
+      pushSuccessToast("Plan mis à jour.");
     },
     onError: (error) => {
       pushErrorToast(error, "Impossible de mettre à jour ce plan.");
@@ -494,133 +293,19 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     },
   });
 
-  const deleteTierMutation = useMutation({
-    mutationFn: async (promptVolume: number) => {
-      if (!organizationId) throw new Error("Organisation admin introuvable.");
-      await deleteBillingPricingTier(apiBaseURL, organizationId, promptVolume);
-      return promptVolume;
-    },
-    onSuccess: async (_promptVolume, deletedPromptVolume) => {
-      await queryClient.invalidateQueries({ queryKey: tiersQueryKey });
-      setVolumeIndex((current) => Math.max(0, Math.min(current, tiers.length - 2)));
-      setTierDrafts((current) => {
-        const next = { ...current };
-        delete next[deletedPromptVolume];
-        return next;
-      });
-      pushSuccessToast("Palier supprimé.");
-    },
-    onError: (error) => {
-      pushErrorToast(error, "Impossible de supprimer ce palier.");
-    },
-  });
-
-  const updateCreditCostSettingsMutation = useMutation({
-    mutationFn: async (settings: BillingCreditCostSettings) => {
-      if (!organizationId) throw new Error("Organisation admin introuvable.");
-      return updateBillingCreditCostSettings(apiBaseURL, {
-        organizationId,
-        ...settings,
-      });
-    },
-    onSuccess: async () => {
-      await invalidateQueryKeys(queryClient, [
-        creditCostSettingsQueryKey,
-        appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
-        appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
-      ]);
-      pushSuccessToast("Règles de crédits mises à jour.");
-    },
-    onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre à jour les règles de crédits.");
-    },
-  });
-
-  const updateTierDraft = (patch: Partial<TierDraft>) => {
-    if (!selectedTier) return;
-    setTierDrafts((current) => ({
-      ...current,
-      [selectedTier.promptVolume]: {
-        ...(current[selectedTier.promptVolume] ??
-          tierDraftFromTier(selectedTier, orderedPlans)),
-        ...patch,
-      },
-    }));
-  };
-
-  const updateTierDraftPrice = (plan: BillingPlanCode, value: string) => {
-    if (!selectedTier) return;
-    const fallback = tierDraftFromTier(selectedTier, orderedPlans);
-    setTierDrafts((current) => ({
-      ...current,
-      [selectedTier.promptVolume]: {
-        ...(current[selectedTier.promptVolume] ?? fallback),
-        prices: {
-          ...((current[selectedTier.promptVolume] ?? fallback).prices),
-          [plan]: value,
-        },
-      },
-    }));
-  };
-
-  const updatePlanDraft = (plan: BillingPlanCode, patch: Partial<PlanLimitDraft>) => {
+  const updatePlanDraft = (plan: BillingPlanCode, patch: Partial<PlanDraft>) => {
     const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
     setPlanDrafts((current) => ({
       ...current,
       [plan]: {
-        ...(current[plan] ?? planLimitDraftFromSettings(settings)),
+        ...(current[plan] ?? planDraftFromSettings(settings)),
         ...patch,
       },
     }));
   };
 
-  const updateCreditCostRuleDraft = (index: number, patch: Partial<CreditCostRuleDraft>) => {
-    setCreditCostDraft((current) => ({
-      ...current,
-      rules: current.rules.map((rule, ruleIndex) =>
-        ruleIndex === index ? { ...rule, ...patch } : rule,
-      ),
-    }));
-  };
-
-  const saveTier = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedTier || !normalizedSelectedTier) return;
-    const previousPromptVolume = selectedTier.promptVolume;
-    if (
-      previousPromptVolume !== normalizedSelectedTier.promptVolume &&
-      tiers.some((tier) => tier.promptVolume === normalizedSelectedTier.promptVolume)
-    ) {
-      pushErrorToast(
-        new Error("Palier déjà existant."),
-        "Ce volume existe déjà. Choisis un volume libre pour modifier ce palier.",
-      );
-      return;
-    }
-    updateTierMutation.mutate(normalizedSelectedTier, {
-      onSuccess: async () => {
-        if (
-          previousPromptVolume === normalizedSelectedTier.promptVolume ||
-          !organizationId
-        ) {
-          return;
-        }
-        try {
-          await deleteBillingPricingTier(apiBaseURL, organizationId, previousPromptVolume);
-          await queryClient.invalidateQueries({ queryKey: tiersQueryKey });
-          setTierDrafts((current) => {
-            const next = { ...current };
-            delete next[previousPromptVolume];
-            return next;
-          });
-        } catch (error) {
-          pushErrorToast(
-            error,
-            "Le nouveau palier est sauvegardé, mais l'ancien volume n'a pas pu être supprimé.",
-          );
-        }
-      },
-    });
+  const updateNewPlanDraft = (patch: Partial<NewPlanDraft>) => {
+    setNewPlanDraft((current) => ({ ...current, ...patch }));
   };
 
   const savePlan = (
@@ -629,142 +314,80 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     settings: BillingPlanSettings,
   ) => {
     event.preventDefault();
-    if (!normalizedSelectedTier) return;
     updatePlanMutation.mutate({
       plan,
-      tier: normalizedSelectedTier,
-      settings: normalizePlanLimitDraft(
+      settings: normalizePlanDraft(
         plan,
         settings,
-        planDrafts[plan] ?? planLimitDraftFromSettings(settings),
+        planDrafts[plan] ?? planDraftFromSettings(settings),
       ),
     });
   };
 
+  const saveNewPlan = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const plan = normalizePlanCode(newPlanDraft.plan);
+    if (!plan) {
+      pushErrorToast(new Error("Plan invalide."), "Le code du plan est requis.");
+      return;
+    }
+    if (HIDDEN_ADMIN_PLANS.has(plan)) {
+      pushErrorToast(
+        new Error("Plan réservé."),
+        "Ce code plan est réservé et ne doit pas être exposé dans l'admin pricing.",
+      );
+      return;
+    }
+    if (plansByID.has(plan)) {
+      pushErrorToast(
+        new Error("Plan déjà existant."),
+        "Ce code plan existe déjà. Modifie sa carte existante.",
+      );
+      return;
+    }
+
+    const settings = normalizePlanDraft(
+      plan,
+      emptyPlanSettings(plan),
+      newPlanDraft,
+    );
+
+    updatePlanMutation.mutate(
+      { plan, settings },
+      {
+        onSuccess: () => {
+          setNewPlanDraft(blankNewPlanDraft());
+        },
+      },
+    );
+  };
+
   const markMostChosen = (plan: BillingPlanCode, settings: BillingPlanSettings) => {
     setMostChosenMutation.mutate({
-      ...settings,
       ...(planDrafts[plan]
-        ? normalizePlanLimitDraft(plan, settings, planDrafts[plan]!)
+        ? normalizePlanDraft(plan, settings, planDrafts[plan]!)
         : settings),
       plan,
       isMostChosen: true,
     });
   };
 
-  const saveNewPricing = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const plan = normalizePlanCode(newPricingDraft.plan);
-    if (!plan) {
-      pushErrorToast(new Error("Plan invalide."), "Le code du plan est requis.");
-      return;
-    }
-    if (orderedPlans.includes(plan)) {
-      pushErrorToast(
-        new Error("Plan déjà existant."),
-        "Ce code plan existe déjà. Modifie sa carte ou choisis un autre code.",
-      );
-      return;
-    }
-
-    const priceCents = euroStringToNullableCents(newPricingDraft.price);
-    if (priceCents === null) {
-      pushErrorToast(
-        new Error("Prix invalide."),
-        "Le prix du nouveau plan sur ce palier est requis.",
-      );
-      return;
-    }
-    const newPlanPrice = centsToEuroString(priceCents);
-
-    const promptVolume = toPositiveInteger(
-      newPricingDraft.promptVolume,
-      nextPromptVolume(tiers),
-    );
-    if (tiers.some((tier) => tier.promptVolume === promptVolume)) {
-      pushErrorToast(
-        new Error("Palier déjà existant."),
-        "Ce volume de crédits existe déjà. Choisis un nouveau volume.",
-      );
-      return;
-    }
-
-    const settings = normalizePlanLimitDraft(
-      plan,
-      emptyPlanSettings(plan),
-      newPricingDraft,
-    );
-    const tier = normalizeTierDraft({
-      promptVolume: String(promptVolume),
-      label: newPricingDraft.label,
-      prices: {
-        ...newPricingDraft.prices,
-        [plan]: newPlanPrice,
-      },
-    });
-
-    updatePlanMutation.mutate(
-      {
-        plan,
-        settings,
-        tier,
-        successMessage: "Nouveau plan et nouveau palier créés.",
-      },
-      {
-        onSuccess: (result) => {
-          setNewPricingDraft(
-            emptyNewPricingDraft([...tiers, result.tier], orderedPlans),
-          );
-        },
-      },
-    );
-  };
-
-  const saveCreditCostSettings = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const normalized = normalizeCreditCostSettingsDraft(creditCostDraft);
-    if (normalized.rules.length === 0) {
-      pushErrorToast(
-        new Error("Aucune règle valide."),
-        "Ajoute au moins une règle de seuil valide.",
-      );
-      return;
-    }
-    updateCreditCostSettingsMutation.mutate(normalized);
-  };
-
-  const isLoading =
-    organizationsQuery.isLoading ||
-    plansQuery.isLoading ||
-    tiersQuery.isLoading ||
-    creditCostSettingsQuery.isLoading;
-  const isFetching =
-    organizationsQuery.isFetching ||
-    plansQuery.isFetching ||
-    tiersQuery.isFetching ||
-    creditCostSettingsQuery.isFetching;
+  const isLoading = organizationsQuery.isLoading || plansQuery.isLoading;
+  const isFetching = organizationsQuery.isFetching || plansQuery.isFetching;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
         title="Tarification admin"
-        baseline="Gérez dynamiquement les paliers de crédits, les plans et les limites associées."
+        baseline="Gérez les prix, crédits et limites des plans fixes."
         actionsVariant="classic"
         className="mb-2 md:mb-3"
-        meta={
-          <>
-            <Badge variant="default">{tiers.length} paliers</Badge>
-            <Badge variant="outline">{orderedPlans.length} plans</Badge>
-          </>
-        }
+        meta={<Badge variant="outline">{visiblePlanIds.length} plans</Badge>}
         actions={
           <Button
             type="button"
             variant="outline"
-            onClick={() => {
-              void plansQuery.refetch();
-              void tiersQuery.refetch();
-            }}
+            onClick={() => void plansQuery.refetch()}
             disabled={isFetching || !organizationId}
             className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
           >
@@ -780,412 +403,44 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
           ) : !organizationId ? (
             <EmptyState label="Aucune organisation administrable trouvee pour ce compte." />
           ) : (
-            <div className="grid h-full min-h-0 gap-3 lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[380px_minmax(0,1fr)]">
-              <div className="min-h-0 space-y-3 overflow-y-auto pr-1">
-                <form
-                  onSubmit={saveCreditCostSettings}
-                  className="rounded-lg border border-border/70 bg-card p-3"
-                >
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                        Règles coût crédits
-                      </p>
-                      <h2 className="text-base font-semibold text-foreground">
-                        Seuils OpenRouter
-                      </h2>
-                    </div>
-                    <Button
-                      type="submit"
-                      size="sm"
-                      disabled={updateCreditCostSettingsMutation.isPending}
-                    >
-                      {updateCreditCostSettingsMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
-                    </Button>
-                  </div>
-
-                  <Field
-                    id="credit-cost-default"
-                    label="Crédits par défaut"
-                    value={creditCostDraft.defaultCreditCost}
-                    type="number"
-                    min={1}
-                    step="1"
-                    helper="Utilisé si aucun prix input/output n'est disponible"
-                    onChange={(defaultCreditCost) =>
-                      setCreditCostDraft((current) => ({ ...current, defaultCreditCost }))
+            <div className="grid h-full min-h-0 gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+              <NewPlanCard
+                draft={newPlanDraft}
+                pending={updatePlanMutation.isPending && !plansByID.has(updatePlanMutation.variables?.plan ?? "")}
+                onUpdate={updateNewPlanDraft}
+                onSave={saveNewPlan}
+              />
+              {visiblePlanIds.map((plan, index) => {
+                const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
+                return (
+                  <PlanCard
+                    key={plan}
+                    index={index}
+                    plan={plan}
+                    settings={settings}
+                    planDraft={planDrafts[plan] ?? planDraftFromSettings(settings)}
+                    pending={
+                      updatePlanMutation.isPending &&
+                      updatePlanMutation.variables?.plan === plan
                     }
-                  />
-
-                  <div className="mt-3 space-y-2">
-                    {creditCostDraft.rules.map((rule, index) => (
-                      <div
-                        key={`credit-rule-${index}`}
-                        className="grid gap-2 rounded-md border border-border/70 p-2 sm:grid-cols-[minmax(0,1fr)_140px_auto]"
-                      >
-                        <Field
-                          id={`credit-rule-min-price-${index}`}
-                          label="Prix min / 1M"
-                          value={rule.minPricePerMillion}
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          onChange={(minPricePerMillion) =>
-                            updateCreditCostRuleDraft(index, { minPricePerMillion })
-                          }
-                        />
-                        <Field
-                          id={`credit-rule-cost-${index}`}
-                          label="Crédits"
-                          value={rule.creditCost}
-                          type="number"
-                          min={1}
-                          step="1"
-                          onChange={(creditCost) =>
-                            updateCreditCostRuleDraft(index, { creditCost })
-                          }
-                        />
-                        <div className="flex items-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                            disabled={creditCostDraft.rules.length <= 1}
-                            onClick={() =>
-                              setCreditCostDraft((current) => ({
-                                ...current,
-                                rules: current.rules.filter((_, ruleIndex) => ruleIndex !== index),
-                              }))
-                            }
-                          >
-                            Supprimer
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-3 flex justify-end">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        setCreditCostDraft((current) => ({
-                          ...current,
-                          rules: [
-                            ...current.rules,
-                            { minPricePerMillion: "0", creditCost: String(Math.max(1, Number.parseInt(current.defaultCreditCost, 10) || 1)) },
-                          ],
-                        }))
-                      }
-                    >
-                      Ajouter une règle
-                    </Button>
-                  </div>
-                </form>
-
-                {selectedTier && selectedTierDraft && normalizedSelectedTier ? (
-                  <form
-                    onSubmit={saveTier}
-                    className="rounded-lg border border-border/70 bg-card p-3"
-                  >
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.04em] text-muted-foreground">
-                          Palier sélectionné
-                        </p>
-                        <h2 className="text-xl font-semibold text-primary">
-                          {formatPrompts(normalizedSelectedTier.promptVolume)} crédits
-                        </h2>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={deleteTierMutation.isPending}
-                          onClick={() =>
-                            deleteTierMutation.mutate(normalizedSelectedTier.promptVolume)
-                          }
-                        >
-                          Supprimer
-                        </Button>
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={updateTierMutation.isPending}
-                        >
-                          {updateTierMutation.isPending ? "Sauvegarde..." : "Sauvegarder"}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-2">
-                        <Field
-                          id="pricing-tier-label"
-                          label="Label"
-                          value={selectedTierDraft.label}
-                          onChange={(label) => updateTierDraft({ label })}
-                        />
-                        <Field
-                          id="pricing-tier-volume"
-                          label="Crédits"
-                          value={selectedTierDraft.promptVolume}
-                          type="number"
-                          min={1}
-                          step="1"
-                          onChange={(promptVolume) => updateTierDraft({ promptVolume })}
-                        />
-                    </div>
-
-                    <input
-                      type="range"
-                      min="0"
-                      max={Math.max(0, tiers.length - 1)}
-                      step="1"
-                      value={volumeIndex}
-                      onChange={(event) =>
-                        setVolumeIndex(Number.parseInt(event.target.value, 10))
-                      }
-                      className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-foreground/10 accent-foreground"
-                    />
-
-                    <div className="mt-3 grid grid-cols-3 gap-1.5">
-                      {tiers.map((tier, index) => {
-                        const active = index === volumeIndex;
-                        return (
-                          <Button
-                            key={tier.promptVolume}
-                            type="button"
-                            onClick={() => setVolumeIndex(index)}
-                            className={cn(
-                              "h-auto rounded-md border px-2 py-2 text-center transition-all",
-                              active
-                                ? "border-primary bg-primary text-background"
-                                : "border-foreground/10 bg-transparent text-muted-foreground hover:border-primary/30 hover:bg-primary/10 hover:text-primary",
-                            )}
-                          >
-                            <div className="text-sm font-medium">{tier.label}</div>
-                            <div className="mt-1 text-[10px] font-mono uppercase">
-                              crédits
-                            </div>
-                          </Button>
-                        );
-                      })}
-                    </div>
-                  </form>
-                ) : (
-                  <EmptyState label="Aucun palier pricing chargé pour le moment." />
-                )}
-
-                <form
-                  onSubmit={saveNewPricing}
-                  className="rounded-lg border border-dashed border-border/70 bg-card/60 p-3"
-                >
-                  <h2 className="mb-2 text-base font-semibold text-foreground">
-                    Nouveau plan + palier
-                  </h2>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                  <Field
-                    id="new-pricing-plan-code"
-                    label="Code plan"
-                    value={newPricingDraft.plan}
-                    helper="Exemple: agency-plus"
-                    onChange={(plan) =>
-                      setNewPricingDraft((current) => ({ ...current, plan }))
+                    stripePending={
+                      syncStripeMutation.isPending &&
+                      syncStripeMutation.variables === plan
                     }
-                  />
-                  <Field
-                    id="new-pricing-volume"
-                    label="Crédits"
-                    value={newPricingDraft.promptVolume}
-                    type="number"
-                    min={1}
-                    step="1"
-                    onChange={(promptVolume) =>
-                      setNewPricingDraft((current) => ({ ...current, promptVolume }))
+                    stripeDisabled={
+                      syncStripeMutation.isPending || updatePlanMutation.isPending
                     }
-                  />
-                  <Field
-                    id="new-pricing-label"
-                    label="Label"
-                    value={newPricingDraft.label}
-                    onChange={(label) =>
-                      setNewPricingDraft((current) => ({ ...current, label }))
+                    mostChosenPending={
+                      setMostChosenMutation.isPending &&
+                      setMostChosenMutation.variables?.plan === plan
                     }
+                    onUpdatePlanDraft={updatePlanDraft}
+                    onSave={savePlan}
+                    onSyncStripe={(targetPlan) => syncStripeMutation.mutate(targetPlan)}
+                    onMarkMostChosen={markMostChosen}
                   />
-                  <Field
-                    id="new-pricing-price"
-                    label="Prix du nouveau plan (€)"
-                    value={newPricingDraft.price}
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    helper="Requis pour creer un prix exploitable"
-                    onChange={(price) =>
-                      setNewPricingDraft((current) => ({ ...current, price }))
-                    }
-                  />
-                  </div>
-                  <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <Field
-                    id="new-pricing-monthly-quota"
-                    label="Crédits inclus / mois"
-                    value={newPricingDraft.monthlyQuota}
-                    type="number"
-                    min={1}
-                    step="1"
-                    onChange={(monthlyQuota) =>
-                      setNewPricingDraft((current) => ({
-                        ...current,
-                        monthlyQuota,
-                      }))
-                    }
-                  />
-                  <Field
-                    id="new-pricing-model-limit"
-                    label="Modeles utilisables en meme temps"
-                    value={newPricingDraft.modelSelectionLimit}
-                    type="number"
-                    min={0}
-                    step="1"
-                    helper="0 = illimite"
-                    onChange={(modelSelectionLimit) =>
-                      setNewPricingDraft((current) => ({
-                        ...current,
-                        modelSelectionLimit,
-                      }))
-                    }
-                  />
-                  <Field
-                    id="new-pricing-model-change-limit"
-                    label="Changements de modeles / mois"
-                    value={newPricingDraft.monthlyModelChangeLimit}
-                    type="number"
-                    min={0}
-                    step="1"
-                    helper="0 = illimite"
-                    onChange={(monthlyModelChangeLimit) =>
-                      setNewPricingDraft((current) => ({
-                        ...current,
-                        monthlyModelChangeLimit,
-                      }))
-                    }
-                  />
-                  <Field
-                    id="new-pricing-max-projects"
-                    label="Projets maximum"
-                    value={newPricingDraft.maxProjects}
-                    type="number"
-                    min={0}
-                    step="1"
-                    helper="0 = illimite"
-                    onChange={(maxProjects) =>
-                      setNewPricingDraft((current) => ({
-                        ...current,
-                        maxProjects,
-                      }))
-                    }
-                  />
-                  </div>
-
-                {orderedPlans.length > 0 ? (
-                  <div className="mt-3 border-t border-border/70 pt-3">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-[0.04em] text-muted-foreground">
-                      Prix optionnels
-                    </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {orderedPlans.map((plan) => (
-                        <Field
-                          key={plan}
-                          id={`new-pricing-existing-price-${plan}`}
-                          label={`Prix ${getBillingPlanLabel(plan)} (€)`}
-                          value={newPricingDraft.prices[plan] ?? ""}
-                          type="number"
-                          min={0}
-                          step="0.01"
-                          helper="Vide = Sur devis / indisponible"
-                          onChange={(value) =>
-                            setNewPricingDraft((current) => ({
-                              ...current,
-                              prices: {
-                                ...current.prices,
-                                [plan]: value,
-                              },
-                            }))
-                          }
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-3 flex justify-end">
-                  <Button type="submit" disabled={updatePlanMutation.isPending}>
-                    {updatePlanMutation.isPending ? "Ajout..." : "Ajouter plan + palier"}
-                  </Button>
-                </div>
-              </form>
-              </div>
-
-              <div className="flex min-h-0 flex-col overflow-hidden">
-                {selectedTier && selectedTierDraft && normalizedSelectedTier ? (
-                  <>
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <div>
-                        <h2 className="text-base font-semibold text-foreground">
-                          Plans et prix du palier
-                        </h2>
-                        <p className="text-xs text-muted-foreground">
-                          {formatPrompts(normalizedSelectedTier.promptVolume)} crédits inclus
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-4">
-                      {orderedPlans.map((plan, index) => {
-                        const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
-                        return (
-                          <PlanCard
-                            key={plan}
-                            index={index}
-                            plan={plan}
-                            settings={settings}
-                            tier={normalizedSelectedTier}
-                            tierPriceDraft={selectedTierDraft.prices[plan] ?? ""}
-                            planDraft={planDrafts[plan] ?? planLimitDraftFromSettings(settings)}
-                            pending={
-                              updatePlanMutation.isPending &&
-                              updatePlanMutation.variables?.plan === plan
-                            }
-                            stripePending={
-                              syncStripeMutation.isPending &&
-                              syncStripeMutation.variables === plan
-                            }
-                            stripeDisabled={
-                              syncStripeMutation.isPending ||
-                              updateTierMutation.isPending ||
-                              updatePlanMutation.isPending
-                            }
-                            mostChosenPending={
-                              setMostChosenMutation.isPending &&
-                              setMostChosenMutation.variables?.plan === plan
-                            }
-                            onUpdateTierPrice={updateTierDraftPrice}
-                            onUpdatePlanDraft={updatePlanDraft}
-                            onSave={savePlan}
-                            onSyncStripe={(targetPlan) =>
-                              syncStripeMutation.mutate(targetPlan)
-                            }
-                            onMarkMostChosen={markMostChosen}
-                          />
-                        );
-                      })}
-                    </div>
-                  </>
-                ) : null}
-              </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -1194,18 +449,128 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   );
 }
 
+function NewPlanCard({
+  draft,
+  pending,
+  onUpdate,
+  onSave,
+}: {
+  draft: NewPlanDraft;
+  pending: boolean;
+  onUpdate: (patch: Partial<NewPlanDraft>) => void;
+  onSave: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form
+      onSubmit={onSave}
+      className="relative rounded-lg border border-dashed border-border/70 bg-card/60 p-3"
+    >
+      <div className="mb-3">
+        <p className="font-mono text-xs text-muted-foreground">NEW</p>
+        <h3 className="truncate text-lg font-semibold text-primary">
+          Nouveau plan
+        </h3>
+      </div>
+
+      <div className="mb-3 border-b border-foreground/10 pb-3">
+        <Field
+          id="new-plan-code"
+          label="Code plan"
+          value={draft.plan}
+          helper="Exemple: agency-plus"
+          onChange={(plan) => onUpdate({ plan })}
+        />
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Field
+          id="new-plan-monthly-price"
+          label="Prix mensuel (€)"
+          value={draft.monthlyPrice}
+          type="number"
+          min={0}
+          step="0.01"
+          onChange={(monthlyPrice) => onUpdate({ monthlyPrice })}
+        />
+        <Field
+          id="new-plan-yearly-price"
+          label="Prix annuel / mois (€)"
+          value={draft.yearlyPrice}
+          type="number"
+          min={0}
+          step="0.01"
+          onChange={(yearlyPrice) => onUpdate({ yearlyPrice })}
+        />
+        <Field
+          id="new-plan-monthly-quota"
+          label="Crédits inclus / mois"
+          value={draft.monthlyQuota}
+          type="number"
+          min={1}
+          step="1"
+          onChange={(monthlyQuota) => onUpdate({ monthlyQuota })}
+        />
+        <Field
+          id="new-plan-model-selection-limit"
+          label="Modèles simultanés"
+          value={draft.modelSelectionLimit}
+          type="number"
+          min={0}
+          step="1"
+          helper="0 = illimité"
+          onChange={(modelSelectionLimit) => onUpdate({ modelSelectionLimit })}
+        />
+        <Field
+          id="new-plan-monthly-model-change-limit"
+          label="Changements / mois"
+          value={draft.monthlyModelChangeLimit}
+          type="number"
+          min={0}
+          step="1"
+          helper="0 = illimité"
+          onChange={(monthlyModelChangeLimit) =>
+            onUpdate({ monthlyModelChangeLimit })
+          }
+        />
+        <Field
+          id="new-plan-max-projects"
+          label="Projets maximum"
+          value={draft.maxProjects}
+          type="number"
+          min={0}
+          step="1"
+          helper="0 = illimité"
+          onChange={(maxProjects) => onUpdate({ maxProjects })}
+        />
+      </div>
+
+      <div className="mt-3">
+        <PlanFeatureToggle
+          id="new-plan-allow-ai-briefs"
+          label="Brief IA"
+          checked={draft.allowAiBriefs}
+          onCheckedChange={(allowAiBriefs) => onUpdate({ allowAiBriefs })}
+        />
+      </div>
+
+      <div className="mt-3">
+        <Button type="submit" disabled={pending} size="sm" className="w-full">
+          {pending ? "Création..." : "Créer ce plan"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 function PlanCard({
   index,
   plan,
   settings,
-  tier,
-  tierPriceDraft,
   planDraft,
   pending,
   stripePending,
   stripeDisabled,
   mostChosenPending,
-  onUpdateTierPrice,
   onUpdatePlanDraft,
   onSave,
   onSyncStripe,
@@ -1214,15 +579,12 @@ function PlanCard({
   index: number;
   plan: BillingPlanCode;
   settings: BillingPlanSettings;
-  tier: BillingPricingTier;
-  tierPriceDraft: string;
-  planDraft: PlanLimitDraft;
+  planDraft: PlanDraft;
   pending: boolean;
   stripePending: boolean;
   stripeDisabled: boolean;
   mostChosenPending: boolean;
-  onUpdateTierPrice: (plan: BillingPlanCode, value: string) => void;
-  onUpdatePlanDraft: (plan: BillingPlanCode, patch: Partial<PlanLimitDraft>) => void;
+  onUpdatePlanDraft: (plan: BillingPlanCode, patch: Partial<PlanDraft>) => void;
   onSave: (
     event: FormEvent<HTMLFormElement>,
     plan: BillingPlanCode,
@@ -1231,8 +593,6 @@ function PlanCard({
   onSyncStripe: (plan: BillingPlanCode) => void;
   onMarkMostChosen: (plan: BillingPlanCode, settings: BillingPlanSettings) => void;
 }) {
-  const currentPrice = tier.prices[plan] ?? null;
-
   return (
     <form
       onSubmit={(event) => onSave(event, plan, settings)}
@@ -1257,27 +617,32 @@ function PlanCard({
 
       <div className="mb-3 flex items-baseline justify-between border-b border-foreground/10 pb-3">
         <span className="text-2xl font-semibold tracking-tight text-foreground">
-          {formatPrice(currentPrice)}
+          {formatPrice(settings.monthlyPriceCents)}
         </span>
         <span className="text-xs text-muted-foreground">
-          {formatPrompts(tier.promptVolume)} crédits
+          {formatCredits(settings.monthlyQuota)} crédits/mois
         </span>
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         <Field
-          id={`${plan}-tier-price`}
-          label="Prix du palier (€)"
-          value={tierPriceDraft}
+          id={`${plan}-monthly-price`}
+          label="Prix mensuel (€)"
+          value={planDraft.monthlyPrice}
           type="number"
           min={0}
           step="0.01"
-          helper="Vide = Sur devis / indisponible"
-          onChange={(value) => onUpdateTierPrice(plan, value)}
+          onChange={(monthlyPrice) => onUpdatePlanDraft(plan, { monthlyPrice })}
         />
-      </div>
-
-      <div className="mt-2 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        <Field
+          id={`${plan}-yearly-price`}
+          label="Prix annuel / mois (€)"
+          value={planDraft.yearlyPrice}
+          type="number"
+          min={0}
+          step="0.01"
+          onChange={(yearlyPrice) => onUpdatePlanDraft(plan, { yearlyPrice })}
+        />
         <Field
           id={`${plan}-monthly-quota`}
           label="Crédits inclus / mois"
@@ -1285,9 +650,7 @@ function PlanCard({
           type="number"
           min={1}
           step="1"
-          onChange={(monthlyQuota) =>
-            onUpdatePlanDraft(plan, { monthlyQuota })
-          }
+          onChange={(monthlyQuota) => onUpdatePlanDraft(plan, { monthlyQuota })}
         />
         <Field
           id={`${plan}-model-selection-limit`}
@@ -1296,6 +659,7 @@ function PlanCard({
           type="number"
           min={0}
           step="1"
+          helper="0 = illimité"
           onChange={(modelSelectionLimit) =>
             onUpdatePlanDraft(plan, { modelSelectionLimit })
           }
@@ -1307,6 +671,7 @@ function PlanCard({
           type="number"
           min={0}
           step="1"
+          helper="0 = illimité"
           onChange={(monthlyModelChangeLimit) =>
             onUpdatePlanDraft(plan, { monthlyModelChangeLimit })
           }
@@ -1318,7 +683,19 @@ function PlanCard({
           type="number"
           min={0}
           step="1"
+          helper="0 = illimité"
           onChange={(maxProjects) => onUpdatePlanDraft(plan, { maxProjects })}
+        />
+      </div>
+
+      <div className="mt-3">
+        <PlanFeatureToggle
+          id={`${plan}-allow-ai-briefs`}
+          label="Brief IA"
+          checked={planDraft.allowAiBriefs}
+          onCheckedChange={(allowAiBriefs) =>
+            onUpdatePlanDraft(plan, { allowAiBriefs })
+          }
         />
       </div>
 
@@ -1352,6 +729,32 @@ function PlanCard({
         </Button>
       </div>
     </form>
+  );
+}
+
+function PlanFeatureToggle({
+  id,
+  label,
+  checked,
+  onCheckedChange,
+}: {
+  id: string;
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-border/70 px-3 py-2">
+      <Label htmlFor={id} className="text-sm font-medium">
+        {label}
+      </Label>
+      <Switch
+        id={id}
+        checked={checked}
+        onCheckedChange={onCheckedChange}
+        aria-label={label}
+      />
+    </div>
   );
 }
 
@@ -1389,27 +792,21 @@ function Field({
 
 function AdminPricingLoading() {
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl border border-border/70 p-5">
-        <Skeleton className="h-10 w-48" />
-        <Skeleton className="mt-6 h-2 w-full" />
-      </div>
-      <div className="grid gap-px overflow-hidden rounded-2xl border border-border/70 md:grid-cols-2 xl:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, index) => (
-          <div key={index} className="bg-card p-5">
-            <Skeleton className="h-6 w-32" />
-            <Skeleton className="mt-4 h-12 w-40" />
-            <div className="mt-6 space-y-4">
-              {Array.from({ length: 4 }).map((__, fieldIndex) => (
-                <div key={fieldIndex} className="space-y-2">
-                  <Skeleton className="h-4 w-40" />
-                  <Skeleton className="h-10 w-full" />
-                </div>
-              ))}
-            </div>
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div key={index} className="rounded-lg border border-border/70 bg-card p-3">
+          <Skeleton className="h-6 w-32" />
+          <Skeleton className="mt-4 h-10 w-40" />
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {Array.from({ length: 6 }).map((__, fieldIndex) => (
+              <div key={fieldIndex} className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </div>
+      ))}
     </div>
   );
 }

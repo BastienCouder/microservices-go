@@ -133,7 +133,7 @@ func stripeCatalogProductName(plan string) string {
 	case domain.PlanGrowth:
 		return "Growth"
 	case domain.PlanPro:
-		return "Pro"
+		return "Agency"
 	default:
 		parts := strings.Fields(strings.ReplaceAll(domain.NormalizePlan(plan), "-", " "))
 		for index, part := range parts {

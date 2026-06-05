@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestAnalysisWriteErrorUsesRateLimitedCode(t *testing.T) {
+func TestAnalysisWriteQuotaExceededUsesQuotaExceededCode(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	httpjson.WriteQuotaExceeded(rec)
@@ -26,8 +26,8 @@ func TestAnalysisWriteErrorUsesRateLimitedCode(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if payload.Error.Code != "rate_limited" {
-		t.Fatalf("expected rate_limited code, got %q", payload.Error.Code)
+	if payload.Error.Code != "quota_exceeded" {
+		t.Fatalf("expected quota_exceeded code, got %q", payload.Error.Code)
 	}
 	if payload.Error.Message != httpjson.QuotaExceededMessage {
 		t.Fatalf("expected quota exceeded message, got %q", payload.Error.Message)

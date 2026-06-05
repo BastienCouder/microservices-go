@@ -35,7 +35,8 @@ export function DiscoveredPagesSelectionView({
 }: DiscoveredPagesSelectionViewProps) {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-4">
-   {/*    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <SectionTitle showIndicator={false}>Pages découvertes</SectionTitle>
         <Badge
           variant="secondary"
           className="h-6 bg-primary/10 px-2 font-mono text-xs text-primary"
@@ -43,7 +44,7 @@ export function DiscoveredPagesSelectionView({
           {records.length}
         </Badge>
       </div>
- */}
+
       <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="relative w-full lg:max-w-xl">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

@@ -41,6 +41,27 @@ func (p staticBillingQuotaProvider) GetMonthlyQuota(_ context.Context, _ int64) 
 	return p.monthlyQuota, true, nil
 }
 
+type staticBillingEntitlementsProvider struct {
+	plan          string
+	monthlyQuota  int
+	allowAIBriefs bool
+}
+
+func (p staticBillingEntitlementsProvider) GetMonthlyQuota(_ context.Context, _ int64) (int, bool, error) {
+	if p.monthlyQuota <= 0 {
+		return 0, false, nil
+	}
+	return p.monthlyQuota, true, nil
+}
+
+func (p staticBillingEntitlementsProvider) GetOrganizationEntitlements(_ context.Context, _ int64) (BillingEntitlements, bool, error) {
+	return BillingEntitlements{
+		Plan:          p.plan,
+		MonthlyQuota:  p.monthlyQuota,
+		AllowAIBriefs: p.allowAIBriefs,
+	}, true, nil
+}
+
 func (s *mutableAnalysisStore) Load(_ context.Context) ([]byte, bool, error) {
 	if s.payload == nil {
 		return nil, false, nil
@@ -142,6 +163,110 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 	}
 	if third.AnalysisRun.ID == first.AnalysisRun.ID {
 		t.Fatalf("expected perception run older than a week not to be reused")
+	}
+}
+
+func TestStartAnalysisForceCreatesNewPerceptionRun(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+	now := time.Date(2026, time.May, 19, 9, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	first, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-1", Text: "What is Acme?"},
+		},
+		ModelIDs:         []string{"gpt-4o-mini"},
+		RequestedCredits: 30,
+		RunType:          "perception",
+	})
+	if err != nil {
+		t.Fatalf("start perception: %v", err)
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          first.AnalysisRun.ID,
+		PromptRunID:    first.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme is a strong option.",
+		BrandMentioned: true,
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record first perception response: %v", err)
+	}
+
+	forced, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-2", Text: "Who is Acme for?"},
+		},
+		ModelIDs:         []string{"gpt-4o-mini"},
+		RequestedCredits: 30,
+		RunType:          "perception",
+		Force:            true,
+	})
+	if err != nil {
+		t.Fatalf("force perception: %v", err)
+	}
+	if forced.AnalysisRun.ID == first.AnalysisRun.ID {
+		t.Fatalf("expected force perception to create a new run")
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          forced.AnalysisRun.ID,
+		PromptRunID:    forced.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme serves marketing teams.",
+		BrandMentioned: true,
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record forced perception response: %v", err)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, now); used != 60 {
+		t.Fatalf("expected forced perception to consume credits again, got %d", used)
+	}
+}
+
+func TestStartAnalysisDoesNotConsumeCreditsUntilResponsesSucceed(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+	now := time.Date(2026, time.May, 19, 9, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return now }
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID:     42,
+		CreatedBy:          7,
+		ProjectID:          "project-1",
+		PromptTexts:        []PromptText{{ID: "prompt-1", Text: "What is Acme?"}},
+		ModelIDs:           []string{"gpt-4o-mini", "claude-sonnet"},
+		ModelCreditCostSum: 2,
+		RunType:            "manual",
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, now); used != 0 {
+		t.Fatalf("expected failed/pending analysis to consume 0 credits, got %d", used)
+	}
+	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, now); reserved != 2 {
+		t.Fatalf("expected running analysis to reserve 2 credits, got %d", reserved)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme is mentioned.",
+		BrandMentioned: true,
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record successful response: %v", err)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, now); used != 1 {
+		t.Fatalf("expected one successful response to consume 1 credit, got %d", used)
 	}
 }
 
@@ -335,7 +460,7 @@ func TestGetPromptQuotaUsageReturnsCurrentMonthUsageAndQuota(t *testing.T) {
 	}
 
 	for index := 0; index < 2; index++ {
-		if _, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
 			OrganizationID: 42,
 			CreatedBy:      7,
 			ProjectID:      "project-1",
@@ -344,8 +469,19 @@ func TestGetPromptQuotaUsageReturnsCurrentMonthUsageAndQuota(t *testing.T) {
 			},
 			ModelIDs: []string{"gpt-4o-mini"},
 			RunType:  "manual",
-		}); err != nil {
+		})
+		if err != nil {
 			t.Fatalf("seed current month run %d: %v", index+1, err)
+		}
+		if err := svc.RecordResponse(ctx, ResponseInput{
+			RunID:          started.AnalysisRun.ID,
+			PromptRunID:    started.PromptRuns[0].ID,
+			ModelID:        "gpt-4o-mini",
+			RawResponse:    "Acme is mentioned.",
+			BrandMentioned: true,
+			Sentiment:      "positive",
+		}); err != nil {
+			t.Fatalf("record current month response %d: %v", index+1, err)
 		}
 	}
 
@@ -1370,6 +1506,9 @@ func TestGetOptimizationErrorsExcludesDerivedMonitoringDiagnostics(t *testing.T)
 
 func TestOptimizeActionsCanMoveFromProcessingToDone(t *testing.T) {
 	svc := NewService()
+	svc.optimizeActionBriefGenerator = &recordingOptimizeActionBriefGenerator{
+		brief: "Objectif\nMettre a jour la page d'accueil avec une promesse claire.",
+	}
 	ctx := context.Background()
 
 	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
@@ -1412,6 +1551,173 @@ func TestOptimizeActionsCanMoveFromProcessingToDone(t *testing.T) {
 	}
 }
 
+type recordingOptimizeActionBriefGenerator struct {
+	input OptimizeActionBriefInput
+	brief string
+	err   error
+}
+
+func (g *recordingOptimizeActionBriefGenerator) GenerateOptimizeActionBrief(_ context.Context, input OptimizeActionBriefInput) (string, error) {
+	g.input = input
+	return g.brief, g.err
+}
+
+func TestCreateOptimizeActionGeneratesBriefWhenProcessing(t *testing.T) {
+	generator := &recordingOptimizeActionBriefGenerator{
+		brief: "Objectif\nAmeliorer la reprise IA.\n\nBlocs prets a appliquer\n- FAQ: clarifier la categorie.",
+	}
+	svc := NewService()
+	svc.optimizeActionBriefGenerator = generator
+	ctx := context.Background()
+
+	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		Impact:           "La recommandation devient moins fiable.",
+		GeneratedContent: "Mettre a jour la page d'accueil avec une promesse claire.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-1",
+		Metadata: map[string]any{
+			"source":           "perception",
+			"detectedInModels": []any{"z-ai/glm-4.5-air:free", "openai/gpt-4o"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("create optimize action: %v", err)
+	}
+
+	if created.GeneratedContent != generator.brief {
+		t.Fatalf("expected generated brief content, got %q", created.GeneratedContent)
+	}
+	if created.Metadata["briefSource"] != "ai" {
+		t.Fatalf("expected AI brief source metadata, got %#v", created.Metadata["briefSource"])
+	}
+	if generator.input.Source != "perception" {
+		t.Fatalf("expected source forwarded to generator, got %q", generator.input.Source)
+	}
+	if len(generator.input.DetectedInModels) != 2 || generator.input.DetectedInModels[0] != "z-ai/glm-4.5-air:free" {
+		t.Fatalf("expected detected models forwarded, got %#v", generator.input.DetectedInModels)
+	}
+}
+
+func TestCreateOptimizeActionBriefConsumesCreditOnSuccess(t *testing.T) {
+	generator := &recordingOptimizeActionBriefGenerator{brief: "Objectif\nCorriger la page."}
+	svc := NewService()
+	svc.now = func() time.Time { return time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC) }
+	svc.optimizeActionBriefGenerator = generator
+	svc.billingQuota = staticBillingQuotaProvider{monthlyQuota: 1}
+	ctx := context.Background()
+
+	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		CreatedBy:        7,
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		GeneratedContent: "Suggestion initiale.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-credit",
+	})
+	if err != nil {
+		t.Fatalf("create optimize action: %v", err)
+	}
+	if created.GeneratedContent != generator.brief {
+		t.Fatalf("expected generated brief content, got %q", created.GeneratedContent)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 1 {
+		t.Fatalf("expected generated brief to consume 1 credit, got %d", used)
+	}
+}
+
+func TestCreateOptimizeActionBriefRequiresAdminPlanEntitlement(t *testing.T) {
+	generator := &recordingOptimizeActionBriefGenerator{brief: "Objectif\nCorriger la page."}
+	svc := NewService()
+	svc.optimizeActionBriefGenerator = generator
+	svc.billingQuota = staticBillingEntitlementsProvider{
+		plan:          "starter",
+		monthlyQuota:  100,
+		allowAIBriefs: false,
+	}
+	ctx := context.Background()
+
+	_, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		CreatedBy:        7,
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		GeneratedContent: "Suggestion initiale.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-plan",
+	})
+	if !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected unauthorized error, got %v", err)
+	}
+	if generator.input.ProjectID != "" {
+		t.Fatalf("expected generator not to be called, got input %#v", generator.input)
+	}
+}
+
+func TestCreateOptimizeActionBriefUsesAdminPlanEntitlement(t *testing.T) {
+	generator := &recordingOptimizeActionBriefGenerator{brief: "Objectif\nCorriger la page."}
+	svc := NewService()
+	svc.optimizeActionBriefGenerator = generator
+	svc.billingQuota = staticBillingEntitlementsProvider{
+		plan:          "starter",
+		monthlyQuota:  100,
+		allowAIBriefs: true,
+	}
+	ctx := context.Background()
+
+	created, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		CreatedBy:        7,
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		GeneratedContent: "Suggestion initiale.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-plan-allowed",
+	})
+	if err != nil {
+		t.Fatalf("create optimize action: %v", err)
+	}
+	if created.GeneratedContent != generator.brief {
+		t.Fatalf("expected generated brief content, got %q", created.GeneratedContent)
+	}
+}
+
+func TestCreateOptimizeActionFailsAndReleasesCreditWhenBriefGenerationFails(t *testing.T) {
+	generator := &recordingOptimizeActionBriefGenerator{err: errors.New("provider unavailable")}
+	svc := NewService()
+	svc.now = func() time.Time { return time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC) }
+	svc.optimizeActionBriefGenerator = generator
+	svc.billingQuota = staticBillingQuotaProvider{monthlyQuota: 1}
+	ctx := context.Background()
+
+	_, err := svc.CreateOptimizeAction(ctx, "project-1", 42, CreateOptimizeActionInput{
+		CreatedBy:        7,
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA ne rattachent pas la marque a la bonne categorie.",
+		GeneratedContent: "Suggestion initiale.",
+		Status:           "processing",
+		SourceErrorID:    "perception:error-fallback",
+	})
+	if !errors.Is(err, ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable error, got %v", err)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 0 {
+		t.Fatalf("expected failed brief generation to consume 0 credits, got %d", used)
+	}
+	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, svc.now().UTC()); reserved != 0 {
+		t.Fatalf("expected failed brief generation to release reservation, got %d", reserved)
+	}
+}
+
 func TestOptimizeActionsCanBeDeleted(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -1422,7 +1728,7 @@ func TestOptimizeActionsCanBeDeleted(t *testing.T) {
 		Title:            "Clarifier le positionnement",
 		Issue:            "Les IA citent mal le positionnement.",
 		GeneratedContent: "Mettre a jour la page de positionnement.",
-		Status:           "processing",
+		Status:           "draft",
 		SourceErrorID:    "perception:positioning_gap",
 	})
 	if err != nil {

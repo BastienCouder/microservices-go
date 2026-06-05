@@ -190,6 +190,30 @@ describe("gatewayJSON", () => {
     }
   });
 
+  test("classifies quota exceeded before generic 429 rate limits", async () => {
+    globalThis.fetch = (async () =>
+      jsonResponse(429, {
+        error: {
+          code: "quota_exceeded",
+          message: "quota exceeded",
+        },
+      })) as typeof fetch;
+
+    const result = await gatewayJSON<unknown>("https://api.test", "/projects", {
+      method: "POST",
+      retry: { attempts: 0 },
+    });
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(429);
+      expect(result.code).toBe("quota_exceeded");
+      expect(result.kind).toBe("quota_exceeded");
+      expect(result.rawError).toBe("quota exceeded");
+      expect(result.error).toBe("Tu n'as plus de crédits disponibles.");
+    }
+  });
+
   test("unwraps enveloped success payloads", async () => {
     globalThis.fetch = (async () =>
       jsonResponse(200, {

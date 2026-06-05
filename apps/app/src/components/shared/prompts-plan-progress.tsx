@@ -25,13 +25,13 @@ export function PromptsPlanProgress({
   const isWarning = !isDanger && promptPlanUsage.progress >= 85;
 
   const indicatorClassName = isDanger
-    ? "bg-destructive"
+    ? "bg-red-400"
     : isWarning
       ? "bg-amber-500"
       : "bg-background/40";
 
   const usageClassName = isDanger
-    ? "text-destructive"
+    ? "text-red-400"
     : isWarning
       ? "text-amber-500"
       : "text-background/80";
@@ -45,7 +45,7 @@ export function PromptsPlanProgress({
           indicatorClassName={indicatorClassName}
         />
 
-        <div className={cn("shrink-0 text-xs font-medium", compact && "truncate", usageClassName)}>
+        <div className={cn("shrink-0 text-xs font-bold", compact && "truncate", usageClassName)}>
           {t("planCreditUsage", {
             used: promptPlanUsage.usedPrompts,
             limit: promptPlanUsage.limit,

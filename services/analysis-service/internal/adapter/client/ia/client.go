@@ -15,21 +15,25 @@ import (
 )
 
 type Config struct {
-	BaseURL    string
-	JWTSecret  string
-	JWTIssuer  string
-	ModelID    string
-	ProviderID string
-	HTTPClient *http.Client
+	BaseURL                       string
+	JWTSecret                     string
+	JWTIssuer                     string
+	ModelID                       string
+	ProviderID                    string
+	OptimizeActionBriefModelID    string
+	OptimizeActionBriefProviderID string
+	HTTPClient                    *http.Client
 }
 
 type Client struct {
-	baseURL    string
-	jwtSecret  string
-	jwtIssuer  string
-	modelID    string
-	providerID string
-	http       *http.Client
+	baseURL                       string
+	jwtSecret                     string
+	jwtIssuer                     string
+	modelID                       string
+	providerID                    string
+	optimizeActionBriefModelID    string
+	optimizeActionBriefProviderID string
+	http                          *http.Client
 }
 
 func NewClient(cfg Config) (*Client, error) {
@@ -56,15 +60,43 @@ func NewClient(cfg Config) (*Client, error) {
 	if providerID == "" {
 		providerID = "openrouter"
 	}
+	optimizeActionBriefProviderID := strings.TrimSpace(cfg.OptimizeActionBriefProviderID)
+	if optimizeActionBriefProviderID == "" {
+		optimizeActionBriefProviderID = "openrouter"
+	}
+	optimizeActionBriefModelID := strings.TrimSpace(cfg.OptimizeActionBriefModelID)
+	if optimizeActionBriefModelID == "" {
+		optimizeActionBriefModelID = "z-ai/glm-4.5-air:free"
+	}
 
 	return &Client{
-		baseURL:    baseURL,
-		jwtSecret:  strings.TrimSpace(cfg.JWTSecret),
-		jwtIssuer:  strings.TrimSpace(cfg.JWTIssuer),
-		modelID:    strings.TrimSpace(cfg.ModelID),
-		providerID: providerID,
-		http:       httpClient,
+		baseURL:                       baseURL,
+		jwtSecret:                     strings.TrimSpace(cfg.JWTSecret),
+		jwtIssuer:                     strings.TrimSpace(cfg.JWTIssuer),
+		modelID:                       strings.TrimSpace(cfg.ModelID),
+		providerID:                    providerID,
+		optimizeActionBriefModelID:    optimizeActionBriefModelID,
+		optimizeActionBriefProviderID: optimizeActionBriefProviderID,
+		http:                          httpClient,
 	}, nil
+}
+
+func (c *Client) GenerateOptimizeActionBrief(
+	ctx context.Context,
+	input usecase.OptimizeActionBriefInput,
+) (string, error) {
+	body := executePromptRequest{
+		PromptID:   "content-optimizer-action-brief",
+		PromptText: buildOptimizeActionBriefPrompt(input),
+		ModelID:    c.optimizeActionBriefModelID,
+		ProviderID: c.optimizeActionBriefProviderID,
+	}
+
+	rawResponse, err := c.executeStructuredPrompt(ctx, body, input.OrganizationID)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(rawResponse), nil
 }
 
 func (c *Client) AnalyzeContentIssues(ctx context.Context, input usecase.ContentIssueAnalysisInput) ([]usecase.ContentOptimizerIssue, error) {
@@ -252,6 +284,68 @@ Contenu extrait:
 %s`, input.ProjectID, record.URL, record.HTTPStatus, record.Title, string(deterministicJSON), markdown))
 }
 
+func buildOptimizeActionBriefPrompt(input usecase.OptimizeActionBriefInput) string {
+	metadataJSON, _ := json.Marshal(input.Metadata)
+	modelsJSON, _ := json.Marshal(input.DetectedInModels)
+
+	return strings.TrimSpace(fmt.Sprintf(`Tu es un strategist GEO senior.
+Genere un brief d'optimisation de contenu actionnable pour corriger une erreur detectee dans un produit de monitoring IA.
+
+Contraintes:
+- reponds en francais;
+- ne retourne pas de JSON;
+- structure le brief avec des titres courts;
+- donne des recommandations concretes et directement applicables;
+- inclue des blocs prets a copier quand c'est utile;
+- evite les generalites.
+
+Format attendu:
+Objectif
+...
+
+Diagnostic
+...
+
+Plan de contenu
+- ...
+- ...
+
+Blocs prets a appliquer
+- Titre: ...
+- FAQ: ...
+- Paragraphe: ...
+
+Preuves a ajouter
+- ...
+
+Contexte:
+projectId: %s
+source: %s
+sourceErrorId: %s
+priorite: %s
+type: %s
+titre: %s
+probleme: %s
+impact: %s
+modelesImpactes: %s
+metadata: %s
+
+Suggestion initiale ou contexte existant:
+%s`,
+		input.ProjectID,
+		input.Source,
+		input.SourceErrorID,
+		input.Priority,
+		input.Type,
+		input.Title,
+		input.Issue,
+		input.Impact,
+		string(modelsJSON),
+		string(metadataJSON),
+		trimForPrompt(input.GeneratedContent, 4000),
+	))
+}
+
 func parseContentIssueResponse(rawResponse string, pageURL string) ([]usecase.ContentOptimizerIssue, error) {
 	rawResponse = strings.TrimSpace(rawResponse)
 	rawResponse = strings.TrimPrefix(rawResponse, "```json")
@@ -272,6 +366,7 @@ func parseContentIssueResponse(rawResponse string, pageURL string) ([]usecase.Co
 		issue.Category = normalizeIssueCategory(issue.Category)
 		issue.Severity = normalizeIssueSeverity(issue.Severity)
 		issue.FixType = normalizeAIFixType(issue.FixType)
+		issue.Source = "ai"
 		if issue.Category == "" || issue.Severity == "" || strings.TrimSpace(issue.Title) == "" || issue.FixType == "" {
 			continue
 		}

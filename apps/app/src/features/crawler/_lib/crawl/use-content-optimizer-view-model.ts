@@ -1,14 +1,20 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
+import { pushWarningToast } from "@/components/ui/toast-actions";
+import { appQueryKeys } from "@/lib/query-keys";
+import { getBillingPlanLabel } from "@/shared/billing-plan";
 import {
   analyzeSelectedContentOptimizerRecords,
   getContentOptimizerCrawl,
+  getLatestContentOptimizerCrawl,
   getProjectSummary,
   startContentOptimizerCrawl,
   type ContentOptimizerCrawlRecord,
   type ContentOptimizerCrawlResult,
 } from "../content-optimizer-api";
+import { loadPromptQuotaUsage } from "@/features/prompts/_lib/prompt-quota";
+import { loadBillingEntitlements } from "@/shared/billing";
 import {
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
@@ -62,6 +68,14 @@ function hasExtractedContent(record: ContentOptimizerCrawlRecord): boolean {
     Boolean(record.html?.trim()) ||
     record.json != null
   );
+}
+
+export function contentOptimizerCreditCost(limit: number): number {
+  const normalizedLimit = Math.max(1, Math.floor(limit));
+  if (normalizedLimit <= 10) return 10;
+  if (normalizedLimit <= 50) return 35;
+  if (normalizedLimit <= 200) return 100;
+  return 100 + Math.ceil((normalizedLimit - 200) / 5);
 }
 
 function normalizeDiscoveryHostname(hostname: string): string {
@@ -209,6 +223,17 @@ export function useContentOptimizerViewModel({
     projectId.trim() !== "" &&
     organizationId.trim() !== "";
 
+  const quotaQuery = useQuery({
+    queryKey: appQueryKeys.promptQuota(apiBaseURL, organizationId, projectId),
+    enabled: hasProjectScope,
+    queryFn: () => loadPromptQuotaUsage(apiBaseURL, projectId, organizationId),
+  });
+  const billingQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
+    enabled: apiBaseURL.trim() !== "" && organizationId.trim() !== "",
+    queryFn: () => loadBillingEntitlements(apiBaseURL, organizationId),
+  });
+
   const [projectWebsiteURL, setProjectWebsiteURL] = useState("");
   const [projectName, setProjectName] = useState("");
   const [phase, setPhase] = useState<CrawlPhase>("idle");
@@ -229,6 +254,8 @@ export function useContentOptimizerViewModel({
   const [discoveryLoadedKey, setDiscoveryLoadedKey] = useState("");
   const [hydratingProjectScope, setHydratingProjectScope] = useState(true);
   const [projectSummaryResolved, setProjectSummaryResolved] = useState(false);
+  const [pendingReviewSelectedURLs, setPendingReviewSelectedURLs] =
+    useState<Set<string> | null>(null);
 
   const discoveredPages = useMemo(
     () =>
@@ -248,6 +275,30 @@ export function useContentOptimizerViewModel({
     crawlRecords[0] ??
     null;
   const selectedCount = selectedURLs.size;
+  const estimatedDiscoverCredits = contentOptimizerCreditCost(DISCOVERY_LIMIT);
+  const estimatedAnalyzeCredits = contentOptimizerCreditCost(
+    Math.max(selectedCount, 1),
+  );
+  const quotaUsage = quotaQuery.data
+    ? {
+        currentMonth: quotaQuery.data.currentMonth,
+        hasQuota: quotaQuery.data.hasQuota,
+        isLoading: quotaQuery.isLoading || (quotaQuery.isFetching && !quotaQuery.data),
+        monthlyCredits: quotaQuery.data.monthlyCredits,
+        remainingCredits: quotaQuery.data.remainingCredits,
+        usedCredits: quotaQuery.data.usedCredits,
+      }
+    : {
+        currentMonth: "",
+        hasQuota: false,
+        isLoading: quotaQuery.isLoading,
+        monthlyCredits: billingQuery.data?.monthlyQuota ?? 0,
+        remainingCredits: 0,
+        usedCredits: 0,
+      };
+  const billingPlanLabel = billingQuery.data?.plan
+    ? getBillingPlanLabel(billingQuery.data.plan)
+    : "";
   const discoverProgress = discoveryResult?.total
     ? Math.round(
         (Math.min(discoveryResult.finished, discoveryResult.total) /
@@ -281,6 +332,16 @@ export function useContentOptimizerViewModel({
   const canReanalyze =
     canDiscover &&
     (selectedCount > 0 || crawlRecords.length > 0 || !crawlResult);
+  const hasEnoughCreditsFor = (credits: number) =>
+    !quotaUsage.hasQuota ||
+    quotaUsage.monthlyCredits <= 0 ||
+    quotaUsage.remainingCredits >= credits;
+  const pushInsufficientCreditsToast = (credits: number) => {
+    pushWarningToast(
+      "Crédits insuffisants",
+      `Cette analyse coûte ${credits} crédits. Il reste ${quotaUsage.remainingCredits}/${quotaUsage.monthlyCredits} crédits sur votre quota mensuel.`,
+    );
+  };
 
   function clearSelectionState() {
     setSelectedURLs(new Set());
@@ -311,6 +372,7 @@ export function useContentOptimizerViewModel({
     setDiscoveryLoadedKey("");
     setHydratingProjectScope(true);
     setProjectSummaryResolved(false);
+    setPendingReviewSelectedURLs(null);
   }, [projectScopeKey]);
 
   useEffect(() => {
@@ -387,24 +449,57 @@ export function useContentOptimizerViewModel({
       return;
     }
 
-    const storedDiscovery = readStoredDiscovery(
-      projectId,
-      organizationId,
-      projectWebsiteURL,
-    );
-    setDiscoveryLoadedKey(projectScopeKey);
-    if (!storedDiscovery || storedDiscovery.records.length === 0) {
+    let cancelled = false;
+
+    async function hydrateProjectReviewState() {
+      try {
+        const latest = await getLatestContentOptimizerCrawl(apiBaseURL, {
+          projectId,
+          organizationId,
+        });
+        if (cancelled) return;
+
+        if (latest?.result.records.length) {
+          setDiscoveryLoadedKey(projectScopeKey);
+          setDiscoveryResult(null);
+          setCrawlResult(latest.result);
+          applySelectedRecords(latest.result.records);
+          setPhase("completed");
+          setHydratingProjectScope(false);
+          return;
+        }
+      } catch {
+        if (cancelled) return;
+      }
+
+      const storedDiscovery = readStoredDiscovery(
+        projectId,
+        organizationId,
+        projectWebsiteURL,
+      );
+      if (cancelled) return;
+
+      setDiscoveryLoadedKey(projectScopeKey);
+      if (!storedDiscovery || storedDiscovery.records.length === 0) {
+        setHydratingProjectScope(false);
+        return;
+      }
+
+      setDiscoveryResult(storedDiscovery);
+      applySelectedRecords(storedDiscovery.records);
+      if (phase === "idle") {
+        setPhase("review");
+      }
       setHydratingProjectScope(false);
-      return;
     }
 
-    setDiscoveryResult(storedDiscovery);
-    applySelectedRecords(storedDiscovery.records);
-    if (phase === "idle") {
-      setPhase("review");
-    }
-    setHydratingProjectScope(false);
+    void hydrateProjectReviewState();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
+    apiBaseURL,
     discoveryLoadedKey,
     hasProjectScope,
     organizationId,
@@ -591,7 +686,23 @@ export function useContentOptimizerViewModel({
               projectWebsiteURL,
               filteredCompleted,
             );
-            applySelectedRecords(filteredCompleted.records);
+            if (pendingReviewSelectedURLs?.size) {
+              const discoveredURLs = new Set(
+                filteredCompleted.records.map(pageURL).filter(Boolean),
+              );
+              const nextSelectedURLs = Array.from(pendingReviewSelectedURLs).filter(
+                (url) => discoveredURLs.has(url),
+              );
+              if (nextSelectedURLs.length > 0) {
+                setSelectedURLs(new Set(nextSelectedURLs));
+                setSelectedResultURL(nextSelectedURLs[0] ?? "");
+              } else {
+                applySelectedRecords(filteredCompleted.records);
+              }
+            } else {
+              applySelectedRecords(filteredCompleted.records);
+            }
+            setPendingReviewSelectedURLs(null);
             setPhase("review");
           } else {
             setCrawlResult(completed);
@@ -673,6 +784,23 @@ export function useContentOptimizerViewModel({
   }
 
   function reviewSelection() {
+    const lastAnalyzedURLs = new Set(
+      (selectedURLs.size > 0
+        ? Array.from(selectedURLs)
+        : crawlRecords.map(pageURL)
+      ).filter(Boolean),
+    );
+
+    if (phase === "completed" && canDiscover) {
+      if (!hasEnoughCreditsFor(estimatedDiscoverCredits)) {
+        pushInsufficientCreditsToast(estimatedDiscoverCredits);
+        return;
+      }
+      setPendingReviewSelectedURLs(lastAnalyzedURLs);
+      discoverMutation.mutate();
+      return;
+    }
+
     if (discoveryResult?.records.length) {
       setPhase("review");
       return;
@@ -683,17 +811,53 @@ export function useContentOptimizerViewModel({
       organizationId,
       projectWebsiteURL,
     );
-    if (!storedDiscovery || storedDiscovery.records.length === 0) {
+    const reviewResult =
+      storedDiscovery && storedDiscovery.records.length > 0
+        ? storedDiscovery
+        : crawlResult && crawlResult.records.length > 0
+          ? {
+              ...crawlResult,
+              records: crawlResult.records,
+              total: crawlResult.records.length,
+              finished: crawlResult.records.length,
+            }
+          : null;
+
+    if (!reviewResult) {
+      if (!hasEnoughCreditsFor(estimatedDiscoverCredits)) {
+        pushInsufficientCreditsToast(estimatedDiscoverCredits);
+        return;
+      }
       discoverMutation.mutate();
       return;
     }
 
-    setDiscoveryResult(storedDiscovery);
-    applySelectedRecords(storedDiscovery.records);
+    const reviewURLs = new Set(reviewResult.records.map(pageURL).filter(Boolean));
+    const selectedReviewURLs = Array.from(lastAnalyzedURLs).filter((url) =>
+      reviewURLs.has(url),
+    );
+
+    setDiscoveryResult(reviewResult);
+    setSelectedURLs(
+      new Set(
+        selectedReviewURLs.length > 0
+          ? selectedReviewURLs
+          : reviewResult.records.map(pageURL).filter(Boolean),
+      ),
+    );
+    setSelectedResultURL(selectedReviewURLs[0] ?? reviewResult.records[0]?.url ?? "");
     setPhase("review");
   }
 
   function reanalyze(options?: CrawlRequestOptions) {
+    const requestedCredits =
+      options || selectedCount > 0
+        ? estimatedAnalyzeCredits
+        : estimatedDiscoverCredits;
+    if (!hasEnoughCreditsFor(requestedCredits)) {
+      pushInsufficientCreditsToast(requestedCredits);
+      return;
+    }
     if (options || selectedCount > 0) {
       crawlMutation.mutate(options);
       return;
@@ -720,6 +884,10 @@ export function useContentOptimizerViewModel({
     selectedCount,
     discoverProgress,
     crawlProgress,
+    estimatedAnalyzeCredits,
+    estimatedDiscoverCredits,
+    billingPlanLabel,
+    quotaUsage,
     allDiscoveredSelected,
     canDiscover,
     canCrawlSelected,
@@ -732,8 +900,18 @@ export function useContentOptimizerViewModel({
       phase === "crawling" ||
       crawlMutation.isPending ||
       analyzeSelectedRecordsMutation.isPending,
-    discover: () => discoverMutation.mutate(),
+    discover: () => {
+      if (!hasEnoughCreditsFor(estimatedDiscoverCredits)) {
+        pushInsufficientCreditsToast(estimatedDiscoverCredits);
+        return;
+      }
+      discoverMutation.mutate();
+    },
     crawlSelected: () => {
+      if (!hasEnoughCreditsFor(estimatedAnalyzeCredits)) {
+        pushInsufficientCreditsToast(estimatedAnalyzeCredits);
+        return;
+      }
       const canAnalyzeDiscoveredRecords =
         selectedContentRecords.length > 0 &&
         selectedContentRecords.every(hasExtractedContent);

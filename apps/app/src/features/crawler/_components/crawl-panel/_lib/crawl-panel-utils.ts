@@ -24,8 +24,7 @@ export const columns: CrawlColumn[] = [
   { id: "http", label: "HTTP", className: "w-[88px]" },
   { id: "status", label: "Statut", className: "w-[120px]" },
   { id: "priority", label: "Priorité", className: "w-[120px]" },
-  { id: "findings", label: "Constats", className: "min-w-[240px]" },
-  { id: "action", label: "Action recommandée", className: "min-w-[260px]" },
+  { id: "findings", label: "Signaux", className: "w-[120px]" },
 ];
 
 export function statusTone(
@@ -47,11 +46,41 @@ export function statusLabel(status: string): string {
   return status;
 }
 
+export function formatSignalCount(count: number): string {
+  return `${count} ${count > 1 ? "signaux" : "signal"}`;
+}
+
 export function pageContent(record: ContentOptimizerCrawlRecord): string {
   if (record.markdown?.trim()) return record.markdown.trim();
   if (record.html?.trim()) return record.html.trim();
   if (record.json != null) return JSON.stringify(record.json, null, 2);
   return "Aucun contenu extrait pour cette page.";
+}
+
+const htmlEntityMap: Record<string, string> = {
+  amp: "&",
+  apos: "'",
+  gt: ">",
+  lt: "<",
+  nbsp: " ",
+  quot: '"',
+};
+
+export function decodeHTMLText(value: string | null | undefined): string {
+  if (!value) return "";
+
+  return value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (match, entity) => {
+    const normalized = entity.toLowerCase();
+    if (normalized.startsWith("#x")) {
+      const codePoint = Number.parseInt(normalized.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+    if (normalized.startsWith("#")) {
+      const codePoint = Number.parseInt(normalized.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+    return htmlEntityMap[normalized] ?? match;
+  });
 }
 
 export function severityTone(severity: string): string {
@@ -98,6 +127,12 @@ export type GeoInsightGroup = {
 };
 
 export const geoInsightGroups: GeoInsightGroup[] = [
+  {
+    id: "qualitative",
+    label: "Lecture IA",
+    description: "Intentions, citabilité et nuances éditoriales.",
+    fixTypes: [],
+  },
   {
     id: "understanding",
     label: "Compréhension IA",
@@ -152,7 +187,19 @@ export function issuesForGeoInsightGroup(
   group: GeoInsightGroup,
 ): ContentOptimizerIssue[] {
   const fixTypes = new Set(group.fixTypes);
+  if (group.id === "qualitative") {
+    return (issues ?? []).filter(
+      (issue) => issue.source === "ai" || issue.fixType.startsWith("ai_"),
+    );
+  }
   return (issues ?? []).filter((issue) => fixTypes.has(issue.fixType));
+}
+
+export function issueSourceLabel(issue: ContentOptimizerIssue): string {
+  if (issue.source === "ai" || issue.fixType.startsWith("ai_")) {
+    return "IA";
+  }
+  return "Règle";
 }
 
 export type GeoKpiSummary = {

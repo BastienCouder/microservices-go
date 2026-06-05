@@ -1,0 +1,12 @@
+app_name: visia
+app_domains:
+  - visia.ai
+  - www.visia.ai
+
+deploy_path: /opt/visia
+deploy_user: deploy
+repo_url: git@github-visia:BastienCouder/visia.git
+repo_version: main
+nginx_site_path: /etc/nginx/sites-available/visia.conf
+nginx_site_link_path: /etc/nginx/sites-enabled/visia.conf
+letsencrypt_email: sarl.konstrikthor@gmail.com

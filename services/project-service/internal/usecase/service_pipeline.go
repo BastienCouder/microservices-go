@@ -201,7 +201,7 @@ func (s *Service) markOutboxProcessingFailed(ctx context.Context, eventID string
 
 func (s *Service) runInitialAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string) error {
 	requestID := fmt.Sprintf("%s-%d", project.ID, time.Now().UTC().UnixNano())
-	_, err := s.runAnalysis(ctx, project, prompts, modelIDs, competitors, requestID, "manual")
+	_, err := s.runAnalysis(ctx, project, prompts, modelIDs, competitors, requestID, "manual", false)
 	return err
 }
 
@@ -290,10 +290,10 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 	if runType == "" {
 		runType = "manual"
 	}
-	return s.runAnalysis(ctx, projectCopy, promptTexts, modelIDs, competitors, input.RequestID, runType)
+	return s.runAnalysis(ctx, projectCopy, promptTexts, modelIDs, competitors, input.RequestID, runType, false)
 }
 
-func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string, requestID string, runType string) (AnalysisStartResponse, error) {
+func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string, requestID string, runType string, force bool) (AnalysisStartResponse, error) {
 	if s.analysisClient == nil || s.iaClient == nil {
 		return AnalysisStartResponse{}, fmt.Errorf("%w: analysis and ia clients are required", ErrValidation)
 	}
@@ -317,7 +317,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		return AnalysisStartResponse{}, err
 	}
 	modelCreditCostTotal := modelCreditCostSum(effectiveModelIDs, modelCreditCosts)
-	requestedCredits := requestedCreditsForPrompts(prompts, effectiveModelIDs, modelCreditCosts)
+	requestedCredits := requestedCreditsForRun(runType, prompts, effectiveModelIDs, modelCreditCosts)
 
 	log.Printf(
 		"prompt_analysis.start project_id=%s organization_id=%d run_type=%s request_id=%s prompts=%d models=%v competitors=%d",
@@ -340,6 +340,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		ModelCreditCostSum: modelCreditCostTotal,
 		RequestedCredits:   requestedCredits,
 		RunType:            runType,
+		Force:              force,
 	})
 	if err != nil {
 		log.Printf(
@@ -355,6 +356,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 	if startResp.RunID == "" {
 		return AnalysisStartResponse{}, fmt.Errorf("start analysis run: empty run id")
 	}
+	startResp.RequestedCredits = requestedCredits
 	log.Printf(
 		"prompt_analysis.run_created run_id=%s project_id=%s run_type=%s prompt_runs=%d models=%v",
 		startResp.RunID,
@@ -429,7 +431,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					time.Since(execStart).Milliseconds(),
 					err,
 				)
-				return AnalysisStartResponse{}, fmt.Errorf("execute ia prompt %s on %s: %w", promptRun.PromptID, modelID, err)
+				return AnalysisStartResponse{}, fmt.Errorf("%w: execute ia prompt %s on %s: %v", ErrDependencyUnavailable, promptRun.PromptID, modelID, err)
 			}
 			err = s.analysisClient.RecordResponse(ctx, startResp.RunID, AnalysisRecordResponseInput{
 				PromptRunID:    promptRun.ID,
@@ -524,6 +526,21 @@ func requestedCreditsForPrompts(prompts []AnalysisPromptText, fallbackModelIDs [
 		total += modelCreditCostSum(modelIDs, costs)
 	}
 	return total
+}
+
+func requestedCreditsForRun(runType string, prompts []AnalysisPromptText, fallbackModelIDs []string, costs map[string]int) int {
+	if strings.TrimSpace(runType) == PromptKindPerception {
+		return requestedCreditsForPerception(fallbackModelIDs, costs)
+	}
+	return requestedCreditsForPrompts(prompts, fallbackModelIDs, costs)
+}
+
+func requestedCreditsForPerception(modelIDs []string, costs map[string]int) int {
+	const (
+		basePerceptionCredits     = 10
+		perceptionCreditsPerModel = 5
+	)
+	return basePerceptionCredits + perceptionCreditsPerModel*modelCreditCostSum(modelIDs, costs)
 }
 
 func modelCreditCost(modelID string, costs map[string]int) int {

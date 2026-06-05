@@ -5,7 +5,7 @@ const source = await Bun.file(
 ).text();
 
 describe("top errors panel", () => {
-  test("renders fix buttons on error cards when action creation is available", () => {
+  test("hides card footers on the perception panel while keeping action wiring available", () => {
     expect(
       source.includes("actionGenerated={generatedIds?.has(error.id) ?? false}"),
     ).toBe(true);
@@ -34,6 +34,18 @@ describe("top errors panel", () => {
     expect(source.includes("topErrorsRemove")).toBe(true);
     expect(source.includes("const canRemoveAction")).toBe(true);
     expect(source.includes("const shouldShowActionButton")).toBe(true);
+    expect(source.includes("hideFooter")).toBe(true);
+    expect(source.includes("{hideFooter ? null : (")).toBe(true);
+    expect(source.includes("showProviderIconsOnly")).toBe(true);
+    expect(source.includes("showIndex={false}")).toBe(true);
+    expect(source.includes("function getUniqueProviderModelBadges")).toBe(true);
+    expect(source.includes("seenProviders.has(providerKey)")).toBe(true);
+    expect(source.includes("title={modelBadge.provider}")).toBe(true);
+    expect(source.includes("showProviderIconsOnly ? (")).toBe(true);
+    expect(
+      source.includes("mt-3 flex items-center gap-1.5 border-t border-border/40 pt-3"),
+    ).toBe(true);
+    expect(source.includes("getPriorityDotTone")).toBe(false);
     expect(source.includes('actionStatus === "done" && !canRemoveAction')).toBe(
       true,
     );

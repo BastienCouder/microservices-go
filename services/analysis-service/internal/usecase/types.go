@@ -70,6 +70,7 @@ type StartAnalysisInput struct {
 	ModelCreditCostSum int
 	RequestedCredits   int
 	RunType            string
+	Force              bool
 }
 
 type StartAnalysisResult struct {
@@ -197,6 +198,7 @@ type OptimizeAction struct {
 }
 
 type CreateOptimizeActionInput struct {
+	CreatedBy        int64
 	Priority         string
 	Type             string
 	Title            string
@@ -283,6 +285,16 @@ type BillingQuotaProvider interface {
 	GetMonthlyQuota(ctx context.Context, organizationID int64) (monthlyQuota int, found bool, err error)
 }
 
+type BillingEntitlements struct {
+	Plan          string
+	MonthlyQuota  int
+	AllowAIBriefs bool
+}
+
+type BillingEntitlementsProvider interface {
+	GetOrganizationEntitlements(ctx context.Context, organizationID int64) (BillingEntitlements, bool, error)
+}
+
 type ContentCrawler interface {
 	StartCrawl(ctx context.Context, input ContentOptimizerCrawlStartInput) (ContentOptimizerCrawlJob, error)
 	GetCrawl(ctx context.Context, jobID string, input ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error)
@@ -297,6 +309,25 @@ type ContentIssueAnalysisInput struct {
 
 type ContentIssueAnalyzer interface {
 	AnalyzeContentIssues(ctx context.Context, input ContentIssueAnalysisInput) ([]ContentOptimizerIssue, error)
+}
+
+type OptimizeActionBriefInput struct {
+	ProjectID        string
+	OrganizationID   int64
+	Priority         string
+	Type             string
+	Title            string
+	Issue            string
+	Impact           string
+	GeneratedContent string
+	SourceErrorID    string
+	Source           string
+	DetectedInModels []string
+	Metadata         map[string]any
+}
+
+type OptimizeActionBriefGenerator interface {
+	GenerateOptimizeActionBrief(ctx context.Context, input OptimizeActionBriefInput) (string, error)
 }
 
 type OnboardingBrandProfileAnalysisInput struct {
@@ -320,6 +351,7 @@ type Dependencies struct {
 	BillingQuota                   BillingQuotaProvider
 	ContentCrawler                 ContentCrawler
 	ContentIssueAnalyzer           ContentIssueAnalyzer
+	OptimizeActionBriefGenerator   OptimizeActionBriefGenerator
 	OnboardingBrandProfileAnalyzer OnboardingBrandProfileAnalyzer
 }
 
@@ -369,5 +401,6 @@ type Service struct {
 	billingQuota                   BillingQuotaProvider
 	contentCrawler                 ContentCrawler
 	contentIssueAnalyzer           ContentIssueAnalyzer
+	optimizeActionBriefGenerator   OptimizeActionBriefGenerator
 	onboardingBrandProfileAnalyzer OnboardingBrandProfileAnalyzer
 }

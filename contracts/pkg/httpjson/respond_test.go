@@ -1,6 +1,7 @@
 package httpjson
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,6 +76,18 @@ func TestWriteQuotaExceeded(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), QuotaExceededMessage) {
 		t.Fatalf("expected quota exceeded message, got %q", rec.Body.String())
+	}
+
+	var payload struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Error.Code != "quota_exceeded" {
+		t.Fatalf("expected quota_exceeded code, got %q", payload.Error.Code)
 	}
 }
 

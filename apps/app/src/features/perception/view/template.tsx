@@ -20,5 +20,11 @@ export function PerceptionTemplate({
     return <PerceptionLoadingState />;
   }
 
-  return <PerceptionClient initialData={data ?? emptyData} />;
+  return (
+    <PerceptionClient
+      apiBaseURL={apiBaseURL}
+      initialData={data ?? emptyData}
+      routeSearch={routeSearch}
+    />
+  );
 }

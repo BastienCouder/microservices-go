@@ -18,6 +18,11 @@ func newAgentReadyScanStore() *agentReadyScanStore {
 
 func (s *agentReadyScanStore) create(input agentReadyScanRequest) string {
 	id := newAgentReadyScanID()
+	s.createWithID(id, input)
+	return id
+}
+
+func (s *agentReadyScanStore) createWithID(id string, input agentReadyScanRequest) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.scans[id] = agentReadyScanResult{
@@ -26,7 +31,6 @@ func (s *agentReadyScanStore) create(input agentReadyScanRequest) string {
 		URL:    input.URL,
 		Mode:   input.Mode,
 	}
-	return id
 }
 
 func (s *agentReadyScanStore) update(id string, result agentReadyScanResult) {

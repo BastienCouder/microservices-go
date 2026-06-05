@@ -405,15 +405,15 @@ func isStripeSupportedPlan(plan string) bool {
 func defaultMonthlyQuotaForPlan(plan string) int {
 	switch domain.NormalizePlan(plan) {
 	case domain.PlanDeveloper:
-		return defaultPlanSettingsByPlan()[domain.PlanDeveloper].MonthlyQuota
+		return 1000
 	case domain.PlanStarter:
-		return 50
+		return 100
 	case domain.PlanGrowth:
-		return 200
+		return 750
 	case domain.PlanPro:
-		return proUnlimitedMonthlyQuota
+		return 3000
 	default:
-		return 50
+		return 100
 	}
 }
 

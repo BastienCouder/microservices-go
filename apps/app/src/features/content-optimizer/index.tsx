@@ -1,5 +1,15 @@
 import { ContentOptimizerLayout } from "./layout";
 
-export function ContentOptimizerPage() {
-  return <ContentOptimizerLayout />;
+type ContentOptimizerPageProps = {
+  apiBaseURL: string;
+  routeSearch: string;
+};
+
+export function ContentOptimizerPage({
+  apiBaseURL,
+  routeSearch,
+}: ContentOptimizerPageProps) {
+  return (
+    <ContentOptimizerLayout apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+  );
 }

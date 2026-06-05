@@ -159,6 +159,7 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 			"authorization", "Bearer "+token,
 			"x-model-credit-cost-sum", strconv.Itoa(modelCreditCostSum),
 			"x-requested-credits", strconv.Itoa(requestedCredits),
+			"x-force-analysis", strconv.FormatBool(req.Force),
 		)
 		resp, callErr := c.client.StartAnalysis(callCtx, &analysisv1.StartAnalysisRequest{
 			RequestId:   req.RequestID,
@@ -175,6 +176,9 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 		return false, nil
 	})
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.ResourceExhausted {
+			return usecase.AnalysisStartResponse{}, fmt.Errorf("%w: %s", usecase.ErrQuotaExceeded, st.Message())
+		}
 		return usecase.AnalysisStartResponse{}, err
 	}
 
@@ -266,7 +270,7 @@ func isTransientGRPCError(err error) bool {
 		return false
 	}
 	switch st.Code() {
-	case codes.Unavailable, codes.DeadlineExceeded, codes.ResourceExhausted, codes.Aborted:
+	case codes.Unavailable, codes.DeadlineExceeded, codes.Aborted:
 		return true
 	default:
 		return false

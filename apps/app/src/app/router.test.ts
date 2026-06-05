@@ -7,4 +7,17 @@ describe("app router", () => {
     expect(source.includes('path="/optimize/actions"')).toBe(true);
     expect(source.includes("PerceptionOptimizeActionsPage")).toBe(true);
   });
+
+  test("passes project scope props to the content optimizer route", () => {
+    expect(source.includes('path="/content-optimizer"')).toBe(true);
+    expect(source.includes("<ContentOptimizerPage")).toBe(true);
+    expect(source.includes("apiBaseURL={apiBaseURL}")).toBe(true);
+    expect(source.includes("routeSearch={routeSearch}")).toBe(true);
+  });
+
+  test("redirects the legacy crawler route to content optimizer", () => {
+    expect(source.includes('path="/crawler"')).toBe(true);
+    expect(source.includes('pathname: "/content-optimizer"')).toBe(true);
+    expect(source.includes("const CrawlerPage")).toBe(false);
+  });
 });

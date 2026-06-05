@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const optimizeActionBriefCreditCost = 1
+
 func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, organizationID int64, input CreateOptimizeActionInput) (OptimizeAction, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
@@ -25,8 +27,61 @@ func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, or
 	if err != nil {
 		return OptimizeAction{}, err
 	}
-	if actionType == "" || title == "" || issue == "" || generatedContent == "" {
-		return OptimizeAction{}, fmt.Errorf("%w: type, title, issue and generatedContent are required", ErrValidation)
+	if actionType == "" || title == "" || issue == "" {
+		return OptimizeAction{}, fmt.Errorf("%w: type, title and issue are required", ErrValidation)
+	}
+	sourceErrorID := strings.TrimSpace(input.SourceErrorID)
+	metadata := copyMetadata(input.Metadata)
+	if metadata == nil {
+		metadata = make(map[string]any)
+	}
+	if status == "processing" {
+		if s.optimizeActionBriefGenerator == nil {
+			return OptimizeAction{}, fmt.Errorf("%w: optimize action brief generator is not configured", ErrDependencyUnavailable)
+		}
+		if err := s.ensureOptimizeActionBriefPlanAccess(ctx, organizationID); err != nil {
+			return OptimizeAction{}, err
+		}
+		reservation, err := s.ReserveCreditUsage(ctx, CreditUsageInput{
+			RequestID:      optimizeActionBriefRequestID(sourceErrorID, title),
+			OrganizationID: organizationID,
+			CreatedBy:      input.CreatedBy,
+			ProjectID:      projectID,
+			RunType:        RunTypeOptimizeActionBrief,
+			Credits:        optimizeActionBriefCreditCost,
+		})
+		if err != nil {
+			return OptimizeAction{}, err
+		}
+
+		brief, err := s.optimizeActionBriefGenerator.GenerateOptimizeActionBrief(ctx, OptimizeActionBriefInput{
+			ProjectID:        projectID,
+			OrganizationID:   organizationID,
+			Priority:         priority,
+			Type:             actionType,
+			Title:            title,
+			Issue:            issue,
+			Impact:           strings.TrimSpace(input.Impact),
+			GeneratedContent: generatedContent,
+			SourceErrorID:    sourceErrorID,
+			Source:           metadataString(metadata, "source"),
+			DetectedInModels: metadataStringSlice(metadata, "detectedInModels"),
+			Metadata:         metadata,
+		})
+		if err != nil {
+			_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+			return OptimizeAction{}, fmt.Errorf("%w: generate optimize action brief: %v", ErrDependencyUnavailable, err)
+		} else if strings.TrimSpace(brief) != "" {
+			generatedContent = strings.TrimSpace(brief)
+			metadata["briefSource"] = "ai"
+			_, _ = s.CompleteCreditUsage(ctx, reservation.ID)
+		} else {
+			_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+			return OptimizeAction{}, fmt.Errorf("%w: generate optimize action brief returned empty content", ErrDependencyUnavailable)
+		}
+	}
+	if generatedContent == "" {
+		return OptimizeAction{}, fmt.Errorf("%w: generatedContent is required", ErrValidation)
 	}
 
 	s.mu.Lock()
@@ -48,8 +103,8 @@ func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, or
 		Impact:           strings.TrimSpace(input.Impact),
 		GeneratedContent: generatedContent,
 		Status:           status,
-		SourceErrorID:    strings.TrimSpace(input.SourceErrorID),
-		Metadata:         copyMetadata(input.Metadata),
+		SourceErrorID:    sourceErrorID,
+		Metadata:         metadata,
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}
@@ -61,6 +116,36 @@ func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, or
 		return OptimizeAction{}, err
 	}
 	return copyOptimizeAction(action), nil
+}
+
+func (s *Service) ensureOptimizeActionBriefPlanAccess(ctx context.Context, organizationID int64) error {
+	if s.billingQuota == nil {
+		return nil
+	}
+	provider, ok := s.billingQuota.(BillingEntitlementsProvider)
+	if !ok {
+		return nil
+	}
+	entitlements, found, err := provider.GetOrganizationEntitlements(ctx, organizationID)
+	if err != nil {
+		return err
+	}
+	if !found || !entitlements.AllowAIBriefs {
+		return fmt.Errorf("%w: optimize action brief is not enabled for this plan", ErrUnauthorized)
+	}
+	return nil
+}
+
+func optimizeActionBriefRequestID(sourceErrorID, title string) string {
+	sourceErrorID = strings.TrimSpace(sourceErrorID)
+	if sourceErrorID != "" {
+		return "optimize-action-brief:" + sourceErrorID
+	}
+	title = strings.TrimSpace(title)
+	if title != "" {
+		return "optimize-action-brief:title:" + title
+	}
+	return ""
 }
 
 func (s *Service) ListOptimizeActions(ctx context.Context, projectID string, organizationID int64) ([]OptimizeAction, error) {
@@ -193,6 +278,45 @@ func copyMetadata(input map[string]any) map[string]any {
 	out := make(map[string]any, len(input))
 	for key, value := range input {
 		out[key] = value
+	}
+	return out
+}
+
+func metadataString(input map[string]any, key string) string {
+	if input == nil {
+		return ""
+	}
+	if value, ok := input[key].(string); ok {
+		return strings.TrimSpace(value)
+	}
+	return ""
+}
+
+func metadataStringSlice(input map[string]any, key string) []string {
+	if input == nil {
+		return nil
+	}
+	values, ok := input[key].([]string)
+	if ok {
+		out := make([]string, 0, len(values))
+		for _, value := range values {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	}
+	rawValues, ok := input[key].([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(rawValues))
+	for _, raw := range rawValues {
+		if value, ok := raw.(string); ok {
+			if trimmed := strings.TrimSpace(value); trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
 	}
 	return out
 }

@@ -1,12 +1,13 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLocale } from "@/shared/hooks/use-i18n";
 import {
   PerceptionDonutVisual,
   PerceptionLeftPanel,
   PerceptionModelAxisHeatmap,
-  PerceptionOptimizeActions,
   PerceptionScoreMiniCard,
   PerceptionThreeColumnLayout,
   PerceptionTrendChart,
@@ -18,10 +19,12 @@ import {
   usePerceptionViewModel,
 } from "../_lib";
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
-import { CheckCircle2, Sparkles, Target } from "lucide-react";
+import { CheckCircle2, Download, Play, Sparkles, Target } from "lucide-react";
 
 type PerceptionClientProps = {
+  apiBaseURL: string;
   initialData: PerceptionViewData;
+  routeSearch: string;
 };
 
 const SCORE_CARD_ICONS = {
@@ -30,9 +33,9 @@ const SCORE_CARD_ICONS = {
   sentiment: Sparkles,
 } as const;
 
-export function PerceptionClient({ initialData }: PerceptionClientProps) {
+export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: PerceptionClientProps) {
   const { locale } = useLocale();
-  const viewModel = usePerceptionViewModel(initialData);
+  const viewModel = usePerceptionViewModel(initialData, { apiBaseURL, routeSearch });
   const emptyStateLabel = initialData.metadata.emptyStateLabel;
   const periodLabel = getPerceptionPeriodLabel(
     viewModel.selectedPeriod,
@@ -44,7 +47,60 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
   );
 
   const rightColumn = (
-    <div className="px-1 pb-4">
+    <div className="space-y-3 px-1 pb-4">
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {viewModel.canExport ? (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={viewModel.exportDisabled}
+            onClick={() => viewModel.handleExportPerceptionData(periodLabel)}
+          >
+            <Download className="size-4" />
+            Export Excel
+          </Button>
+        ) : null}
+        <ConfirmDialog
+          title="Confirmer l'analyse de perception"
+          description={
+            viewModel.perceptionMonthlyCredits > 0
+              ? `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs. Solde actuel: ${viewModel.perceptionRemainingCredits}/${viewModel.perceptionMonthlyCredits} credits restants.`
+              : `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs.`
+          }
+          confirmLabel={
+            viewModel.analysisRunning ? "Analyse..." : "Lancer l'analyse"
+          }
+          cancelLabel="Annuler"
+          confirmVariant="default"
+          loading={viewModel.analysisRunning}
+          onConfirm={viewModel.handleRunPerceptionAnalysis}
+          confirmDisabled={viewModel.perceptionQuotaLoading}
+          trigger={
+            <Button
+              size="sm"
+              disabled={
+                viewModel.analysisRunning ||
+                viewModel.perceptionQuotaLoading ||
+                !initialData.metadata.projectId
+              }
+            >
+              <Play className="size-4" />
+              Analyser la perception
+            </Button>
+          }
+        />
+      </div>
+
+      {viewModel.lastAnalysisCredits !== null ? (
+        <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
+          Analyse lancee. Credits utilises: {viewModel.lastAnalysisCredits}.
+        </p>
+      ) : null}
+      {viewModel.analysisError ? (
+        <p className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          {viewModel.analysisError}
+        </p>
+      ) : null}
       <TopErrorsPanel
         emptyLabel={emptyStateLabel}
         errors={viewModel.filteredTopErrors}
@@ -119,12 +175,6 @@ export function PerceptionClient({ initialData }: PerceptionClientProps) {
             data={viewModel.perceptionTrend.data}
             periodLabel={periodLabel}
             badgeLabel={periodBadgeLabel}
-            emptyLabel={emptyStateLabel}
-          />
-
-          <PerceptionOptimizeActions
-            drafts={viewModel.visibleOptimizeDrafts}
-            persistError={viewModel.persistError}
             emptyLabel={emptyStateLabel}
           />
 

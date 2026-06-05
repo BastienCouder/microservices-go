@@ -270,11 +270,14 @@ func TestListPricingTiersKeepsLegacyPlanPricesForDefaultTiers(t *testing.T) {
 		t.Fatalf("expected default pricing tiers")
 	}
 	first := tiers[0]
-	if first.DeveloperPriceCents == nil || *first.DeveloperPriceCents != 2900 {
-		t.Fatalf("expected developer legacy price on first tier, got %+v", first)
+	if first.StarterPriceCents == nil || *first.StarterPriceCents != 5900 {
+		t.Fatalf("expected starter price on first tier, got %+v", first)
 	}
-	if first.Prices[domain.PlanDeveloper] == nil || *first.Prices[domain.PlanDeveloper] != 2900 {
-		t.Fatalf("expected dynamic developer price on first tier, got %+v", first.Prices)
+	if first.Prices[domain.PlanStarter] == nil || *first.Prices[domain.PlanStarter] != 5900 {
+		t.Fatalf("expected dynamic starter price on first tier, got %+v", first.Prices)
+	}
+	if first.Prices[domain.PlanDeveloper] != nil {
+		t.Fatalf("expected developer to be unavailable on first tier, got %+v", first.Prices)
 	}
 }
 
@@ -428,8 +431,8 @@ func TestCreateStripeCheckoutSession_Success(t *testing.T) {
 	if stripe.lastRequest.PriceID != "price_growth_m" {
 		t.Fatalf("expected growth monthly price id, got %s", stripe.lastRequest.PriceID)
 	}
-	if stripe.lastRequest.MonthlyQuota != 200 {
-		t.Fatalf("expected monthly quota 200 for growth plan, got %d", stripe.lastRequest.MonthlyQuota)
+	if stripe.lastRequest.MonthlyQuota != 750 {
+		t.Fatalf("expected monthly quota 750 for growth plan, got %d", stripe.lastRequest.MonthlyQuota)
 	}
 	if stripe.lastRequest.RequestID == "" || stripe.lastRequest.RequestID == "req_123" {
 		t.Fatalf("expected server-generated idempotency key, got %q", stripe.lastRequest.RequestID)

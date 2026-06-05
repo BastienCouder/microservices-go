@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { appQueryKeys } from "@/lib/query-keys";
+import { useClientExportAccess } from "@/shared/export-entitlements";
 import {
   completeTrafficGA4OAuth,
   disconnectTrafficGA4Integration,
@@ -24,6 +25,7 @@ import {
   formatInteger,
   formatPercent,
 } from "./traffic-report-formatters";
+import { exportTrafficWorkbook } from "./traffic-export";
 import { buildTrafficReportViewData } from "./traffic-report-view-data";
 import type {
   TrafficPeriod,
@@ -252,7 +254,6 @@ export function useTrafficReportPanelViewModel({
     () => getTrafficQueryContext(effectiveRouteSearch),
     [effectiveRouteSearch],
   );
-
   const query = useQuery({
     queryKey: appQueryKeys.traffic(
       apiBaseURL,
@@ -269,6 +270,12 @@ export function useTrafficReportPanelViewModel({
         search: trafficSearch,
         engine: trafficEngine,
       }),
+  });
+  const result = query.data;
+  const exportAccess = useClientExportAccess({
+    apiBaseURL,
+    organizationId: result?.organizationId ?? queryContext.organizationId,
+    routeSearch: effectiveRouteSearch,
   });
 
   const refresh = useCallback(async () => {
@@ -297,7 +304,6 @@ export function useTrafficReportPanelViewModel({
     setTopPagesPage(1);
   }, []);
 
-  const result = query.data;
   const report = result?.report ?? null;
   const integration = result?.integration ?? null;
   const viewData = useMemo(
@@ -576,6 +582,16 @@ export function useTrafficReportPanelViewModel({
     }
   }, [apiBaseURL, query, result, showCaughtFormError]);
 
+  const exportTrafficData = useCallback(() => {
+    if (!report) return;
+
+    exportTrafficWorkbook({
+      projectName: result?.projectName ?? "",
+      period,
+      report,
+    });
+  }, [period, report, result?.projectName]);
+
   return {
     report,
     integration,
@@ -610,6 +626,9 @@ export function useTrafficReportPanelViewModel({
       selectProperty: selectOAuthProperty,
     },
     hasData,
+    canExport: exportAccess.canExport,
+    exportDisabled: !hasData || !report,
+    exportTrafficData,
     kpis: buildKpis(report),
     filters: {
       search: trafficSearchDraft,

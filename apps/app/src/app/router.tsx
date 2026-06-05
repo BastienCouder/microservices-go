@@ -64,11 +64,6 @@ const AccountPage = lazy(() =>
     default: module.AccountPage,
   })),
 );
-const CrawlerPage = lazy(() =>
-  import("@/features/crawler/index").then((module) => ({
-    default: module.CrawlerPage,
-  })),
-);
 const ContentOptimizerPage = lazy(() =>
   import("@/features/content-optimizer/index").then((module) => ({
     default: module.ContentOptimizerPage,
@@ -198,17 +193,16 @@ export function AppRouter({
       />
       <Route
         path="/crawler"
-        element={
-          <Suspense fallback={null}>
-            <CrawlerPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
+        element={<Navigate replace to={{ pathname: "/content-optimizer", search: routeSearch }} />}
       />
       <Route
         path="/content-optimizer"
         element={
           <Suspense fallback={null}>
-            <ContentOptimizerPage />
+            <ContentOptimizerPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
           </Suspense>
         }
       />

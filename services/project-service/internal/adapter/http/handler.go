@@ -1245,6 +1245,8 @@ func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {
 		httpjson.WriteForbiddenError(w)
 	case errors.Is(err, usecase.ErrNotFound):
 		httpjson.WriteNotFoundError(w)
+	case errors.Is(err, usecase.ErrQuotaExceeded):
+		httpjson.WriteQuotaExceeded(w)
 	case errors.Is(err, usecase.ErrDependencyUnavailable):
 		httpjson.WriteError(w, http.StatusServiceUnavailable, userFacingDependencyError(err))
 	default:

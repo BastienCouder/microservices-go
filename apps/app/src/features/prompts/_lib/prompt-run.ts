@@ -2,7 +2,9 @@ import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import type { PromptItem } from "./types";
 
-export type RunnablePrompt = Pick<PromptItem, "id" | "sourcePromptId" | "prompt" | "models">;
+export type RunnablePrompt = Pick<PromptItem, "id" | "sourcePromptId" | "prompt" | "models"> & {
+  modelCreditCostSum?: number;
+};
 
 type BuildStartPromptAnalysisPayloadInput = {
   projectId: string;
@@ -27,6 +29,7 @@ export type StartPromptAnalysisPayload = {
   requestId: string;
   promptTexts: Array<{ id: string; text: string }>;
   modelIds: string[];
+  modelCreditCostSum: number;
   runType: "manual";
 };
 
@@ -74,6 +77,10 @@ export function buildStartPromptAnalysisPayload({
     requestId: buildRequestId(normalizedProjectId, promptId, modelIds, now),
     promptTexts: [{ id: promptId, text: promptText }],
     modelIds,
+    modelCreditCostSum: Math.max(
+      1,
+      Math.floor(prompt.modelCreditCostSum ?? modelIds.length),
+    ),
     runType: "manual",
   };
 }

@@ -105,4 +105,89 @@ func TestAnalyzeContentIssuesCallsIAServiceAndParsesJSONIssues(t *testing.T) {
 	if len(issues) != 1 || issues[0].FixType != "ai_add_intent_coverage" {
 		t.Fatalf("expected parsed AI issue, got %#v", issues)
 	}
+	if issues[0].Source != "ai" {
+		t.Fatalf("expected AI issue source, got %#v", issues[0])
+	}
+}
+
+func TestGenerateOptimizeActionBriefUsesZAIModelOnOpenRouterByDefault(t *testing.T) {
+	var captured struct {
+		Path       string
+		PromptText string
+		ModelID    string
+		ProviderID string
+	}
+
+	httpClient := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		captured.Path = req.URL.Path
+		var body struct {
+			PromptText string `json:"promptText"`
+			ModelID    string `json:"modelId"`
+			ProviderID string `json:"providerId"`
+		}
+		if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		captured.PromptText = body.PromptText
+		captured.ModelID = body.ModelID
+		captured.ProviderID = body.ProviderID
+
+		raw, err := json.Marshal(map[string]any{
+			"success": true,
+			"data": map[string]any{
+				"rawResponse": "Objectif\nClarifier la page.\n\nBlocs prets a appliquer\n- FAQ: expliquer la categorie.",
+			},
+		})
+		if err != nil {
+			t.Fatalf("marshal response: %v", err)
+		}
+		return &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     make(http.Header),
+			Body:       io.NopCloser(bytes.NewReader(raw)),
+		}, nil
+	})}
+
+	client, err := NewClient(Config{
+		BaseURL:    "http://ia-service.test",
+		JWTSecret:  "secret",
+		JWTIssuer:  "issuer",
+		ModelID:    "gpt-oss-20b-free",
+		HTTPClient: httpClient,
+	})
+	if err != nil {
+		t.Fatalf("new client: %v", err)
+	}
+
+	brief, err := client.GenerateOptimizeActionBrief(context.Background(), usecase.OptimizeActionBriefInput{
+		ProjectID:        "project-1",
+		OrganizationID:   42,
+		Priority:         "high",
+		Type:             "website_copy",
+		Title:            "Clarifier la promesse",
+		Issue:            "Les IA classent mal la marque.",
+		GeneratedContent: "Suggestion initiale.",
+		Source:           "perception",
+		DetectedInModels: []string{"z-ai/glm-4.5-air:free"},
+	})
+	if err != nil {
+		t.Fatalf("generate optimize action brief: %v", err)
+	}
+
+	if captured.Path != "/ai/execute" {
+		t.Fatalf("expected /ai/execute, got %q", captured.Path)
+	}
+	if captured.ModelID != "z-ai/glm-4.5-air:free" {
+		t.Fatalf("expected model id, got %q", captured.ModelID)
+	}
+	if captured.ProviderID != "openrouter" {
+		t.Fatalf("expected openrouter provider, got %q", captured.ProviderID)
+	}
+	if !strings.Contains(captured.PromptText, "Clarifier la promesse") ||
+		!strings.Contains(captured.PromptText, "Blocs prets a appliquer") {
+		t.Fatalf("expected prompt to include action context and format, got %q", captured.PromptText)
+	}
+	if !strings.Contains(brief, "Objectif") {
+		t.Fatalf("expected returned brief, got %q", brief)
+	}
 }

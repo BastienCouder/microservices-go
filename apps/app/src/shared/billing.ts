@@ -16,6 +16,7 @@ export type BillingEntitlements = {
   modelSelectionLimit: number;
   monthlyModelChangeLimit: number;
   maxProjects: number;
+  allowAiBriefs: boolean;
 };
 
 export type BillingSubscriptionUpdateInput = {
@@ -33,6 +34,7 @@ export type BillingPlanSettings = {
   modelSelectionLimit: number;
   monthlyModelChangeLimit: number;
   maxProjects: number;
+  allowAiBriefs: boolean;
   isMostChosen: boolean;
 };
 
@@ -110,6 +112,7 @@ export function normalizeBillingEntitlements(value: unknown): BillingEntitlement
     modelSelectionLimit: asNumber(payload.model_selection_limit),
     monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
     maxProjects: asNumber(payload.max_projects),
+    allowAiBriefs: payload.allow_ai_briefs === true,
   };
 }
 
@@ -126,6 +129,7 @@ export function normalizeBillingPlanSettings(value: unknown): BillingPlanSetting
     modelSelectionLimit: asNumber(payload.model_selection_limit),
     monthlyModelChangeLimit: asNumber(payload.monthly_model_change_limit),
     maxProjects: asNumber(payload.max_projects),
+    allowAiBriefs: payload.allow_ai_briefs === true,
     isMostChosen: payload.is_most_chosen === true,
   };
 }
@@ -297,6 +301,7 @@ export async function updateBillingPlanSettings(
       model_selection_limit: Math.max(0, Math.floor(input.modelSelectionLimit)),
       monthly_model_change_limit: Math.max(0, Math.floor(input.monthlyModelChangeLimit)),
       max_projects: Math.max(0, Math.floor(input.maxProjects)),
+      allow_ai_briefs: input.allowAiBriefs === true,
       is_most_chosen: input.isMostChosen === true,
     }),
   });

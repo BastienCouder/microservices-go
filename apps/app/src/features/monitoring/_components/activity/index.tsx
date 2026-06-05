@@ -5,6 +5,8 @@ import { ActivityAlerts } from "./activity-alerts";
 import { ActivityPromptsStream } from "./activity-prompts-stream";
 import { ActivityAlertDetailSheet } from "./activity-alert-detail-sheet";
 import { ActivityPromptDetailSheet } from "./activity-prompt-detail-sheet";
+import { Button } from "@/components/ui/button";
+import { Download } from "lucide-react";
 
 function openPromptResponse(prompt: MonitoringData["recent_prompts"][number]) {
   const params = new URLSearchParams(window.location.search);
@@ -28,6 +30,20 @@ export function ActivityPanel() {
     <>
       <div className="h-auto px-0 md:px-1 lg:h-full lg:overflow-y-auto">
         <div className="flex flex-col gap-6 pb-4">
+          {viewModel.canExport ? (
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={viewModel.exportDisabled}
+                onClick={viewModel.handleExportMonitoringData}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            </div>
+          ) : null}
+
           <ActivityAlerts
             filteredAlerts={viewModel.filteredAlerts}
             previewCount={ALERTS_PREVIEW_COUNT}

@@ -69,6 +69,7 @@ type updatePlanSettingsRequest struct {
 	ModelSelectionLimit     int    `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int    `json:"monthly_model_change_limit"`
 	MaxProjects             int    `json:"max_projects"`
+	AllowAIBriefs           bool   `json:"allow_ai_briefs"`
 	IsMostChosen            bool   `json:"is_most_chosen"`
 }
 
@@ -148,6 +149,7 @@ func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
 		ModelSelectionLimit:     req.ModelSelectionLimit,
 		MonthlyModelChangeLimit: req.MonthlyModelChangeLimit,
 		MaxProjects:             req.MaxProjects,
+		AllowAIBriefs:           req.AllowAIBriefs,
 		IsMostChosen:            req.IsMostChosen,
 	})
 	if err != nil {

@@ -110,6 +110,7 @@ SELECT
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   is_most_chosen,
   updated_at
 FROM billing_plan_settings
@@ -138,6 +139,7 @@ ORDER BY
 			&item.ModelSelectionLimit,
 			&item.MonthlyModelChangeLimit,
 			&item.MaxProjects,
+			&item.AllowAIBriefs,
 			&item.IsMostChosen,
 			&item.UpdatedAt,
 		); err != nil {
@@ -175,10 +177,11 @@ INSERT INTO billing_plan_settings (
   model_selection_limit,
   monthly_model_change_limit,
   max_projects,
+  allow_ai_briefs,
   is_most_chosen,
   updated_at
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (plan)
 DO UPDATE SET
   monthly_price_cents = EXCLUDED.monthly_price_cents,
@@ -187,6 +190,7 @@ DO UPDATE SET
   model_selection_limit = EXCLUDED.model_selection_limit,
   monthly_model_change_limit = EXCLUDED.monthly_model_change_limit,
   max_projects = EXCLUDED.max_projects,
+  allow_ai_briefs = EXCLUDED.allow_ai_briefs,
   is_most_chosen = EXCLUDED.is_most_chosen,
   updated_at = EXCLUDED.updated_at`,
 		settings.Plan,
@@ -196,6 +200,7 @@ DO UPDATE SET
 		settings.ModelSelectionLimit,
 		settings.MonthlyModelChangeLimit,
 		settings.MaxProjects,
+		settings.AllowAIBriefs,
 		settings.IsMostChosen,
 		toPgTimestamptz(settings.UpdatedAt),
 	)

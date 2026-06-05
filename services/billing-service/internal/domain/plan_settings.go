@@ -16,6 +16,7 @@ type PlanSettings struct {
 	ModelSelectionLimit     int       `json:"model_selection_limit"`
 	MonthlyModelChangeLimit int       `json:"monthly_model_change_limit"`
 	MaxProjects             int       `json:"max_projects"`
+	AllowAIBriefs           bool      `json:"allow_ai_briefs"`
 	IsMostChosen            bool      `json:"is_most_chosen"`
 	UpdatedAt               time.Time `json:"updated_at"`
 }

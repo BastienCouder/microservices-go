@@ -1,10 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { pushErrorToast } from "@/components/ui/toast-actions";
 import { apiRoutes } from "@/lib/api-config";
 import type { ProjectModelMeta } from "@/lib/project-models";
 import { appQueryKeys } from "@/lib/query-keys";
+import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationID,
+} from "@/shared/selection";
 import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../client-api";
 import { getOptimizationActionMatchIds } from "../optimization-action-ids";
 import { resolvePerceptionGeneratedContent } from "../perception-i18n";
@@ -31,12 +37,15 @@ type PersistedOptimizeAction = {
   generatedContent: string;
   status?: OptimizeActionStatus | null;
   sourceErrorId?: string | null;
+  metadata?: Record<string, unknown> | null;
 };
 
 type UseOptimizationErrorsResult = {
   competitors: string[];
+  canGenerateAiBrief: boolean;
   data: OptimizationErrorsBoard | null;
   generatedIds: ReadonlySet<string>;
+  generatedContentByErrorId: ReadonlyMap<string, string>;
   actionStatusesByErrorId: ReadonlyMap<string, OptimizeActionStatus>;
   loading: boolean;
   markingDoneErrorIds: ReadonlySet<string>;
@@ -52,6 +61,12 @@ type UseOptimizationErrorsResult = {
 export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): UseOptimizationErrorsResult {
   const { locale, t } = useScopedI18n("perception");
   const projectId = readOptimizationProjectIdFromSearch(routeSearch);
+  const organizationId = useMemo(
+    () =>
+      readOrganizationIdFromSearch(routeSearch) ||
+      readSelectedOrganizationID(),
+    [routeSearch],
+  );
   const [persistedActions, setPersistedActions] = useState<PersistedOptimizeAction[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [markingDoneErrorIds, setMarkingDoneErrorIds] = useState<Set<string>>(new Set());
@@ -62,6 +77,13 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),
   });
   const activeProjectId = query.data?.projectId ?? projectId ?? "";
+  const billingQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
+    enabled: apiBaseURL.trim() !== "" && organizationId.trim() !== "",
+    queryFn: ({ signal }) =>
+      loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
+  });
+  const canGenerateAiBrief = billingQuery.data?.allowAiBriefs === true;
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -107,10 +129,20 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     }
     return statuses;
   }, [actionsByErrorId]);
+  const generatedContentByErrorId = useMemo(() => {
+    const content = new Map<string, string>();
+    for (const [errorId, action] of actionsByErrorId) {
+      if (action.metadata?.briefSource === "ai") {
+        content.set(errorId, action.generatedContent);
+      }
+    }
+    return content;
+  }, [actionsByErrorId]);
 
   const handleFix = useCallback(
     async (error: OptimizationError) => {
       setPersistError(null);
+      if (!canGenerateAiBrief) return;
       if (savingErrorIds.has(error.id) || generatedIds.has(error.id) || !activeProjectId) return;
 
       const localizedGeneratedContent = resolvePerceptionGeneratedContent(
@@ -121,7 +153,11 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
 
       setSavingErrorIds((current) => new Set(current).add(error.id));
       try {
-        const result = await postPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
+        const result = await postPerceptionClientJSON<{
+          id: string;
+          generatedContent?: string;
+          status: OptimizeActionStatus;
+        }>(
           apiRoutes.analysis.optimizeActions(activeProjectId),
           {
             priority: error.optimizePriority,
@@ -151,16 +187,18 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             title: error.title,
             issue: error.issue,
             impact: error.impact,
-            generatedContent: localizedGeneratedContent,
+            generatedContent: result.generatedContent || localizedGeneratedContent,
             status: result.status || "processing",
             sourceErrorId: error.id,
+            metadata: { briefSource: "ai" },
           },
           ...current,
         ]);
       } catch (err) {
-        setPersistError(
-          err instanceof Error ? err.message : t("optimizeActionsCreateError"),
-        );
+        const message =
+          err instanceof Error ? err.message : t("optimizeActionsCreateError");
+        setPersistError(message);
+        pushErrorToast(err, message);
       } finally {
         setSavingErrorIds((current) => {
           const next = new Set(current);
@@ -169,7 +207,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         });
       }
     },
-    [activeProjectId, generatedIds, locale, savingErrorIds, t],
+    [activeProjectId, canGenerateAiBrief, generatedIds, locale, savingErrorIds, t],
   );
 
   const handleMarkDone = useCallback(
@@ -198,9 +236,10 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         setPersistedActions((current) =>
           current.map((item) => (item.id === action.id ? { ...item, status: previousStatus } : item)),
         );
-        setPersistError(
-          err instanceof Error ? err.message : t("optimizeActionsCreateError"),
-        );
+        const message =
+          err instanceof Error ? err.message : t("optimizeActionsCreateError");
+        setPersistError(message);
+        pushErrorToast(err, message);
       } finally {
         setMarkingDoneErrorIds((current) => {
           const next = new Set(current);
@@ -218,8 +257,10 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
 
   return {
     competitors: query.data?.competitors ?? [],
+    canGenerateAiBrief,
     data: query.data?.data ?? null,
     generatedIds,
+    generatedContentByErrorId,
     actionStatusesByErrorId,
     loading: query.isLoading || (query.isFetching && !query.data),
     markingDoneErrorIds,

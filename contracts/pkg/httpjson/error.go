@@ -15,11 +15,15 @@ type apiErrorResponse struct {
 }
 
 func WriteError(w http.ResponseWriter, status int, message string) {
+	WriteErrorWithCode(w, status, ErrorCode(status), message)
+}
+
+func WriteErrorWithCode(w http.ResponseWriter, status int, code string, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(apiErrorResponse{
 		Error: apiErrorBody{
-			Code:    ErrorCode(status),
+			Code:    code,
 			Message: message,
 		},
 	})

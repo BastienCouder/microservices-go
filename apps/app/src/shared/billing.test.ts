@@ -22,6 +22,7 @@ describe("billing entitlements", () => {
         seats: 3,
         model_selection_limit: 6,
         monthly_model_change_limit: 2,
+        allow_ai_briefs: true,
       }),
     ).toEqual({
       organizationId: "7",
@@ -33,6 +34,7 @@ describe("billing entitlements", () => {
       modelSelectionLimit: 6,
       monthlyModelChangeLimit: 2,
       maxProjects: 0,
+      allowAiBriefs: true,
     });
   });
 
@@ -57,6 +59,7 @@ describe("billing plan settings", () => {
         model_selection_limit: 12,
         monthly_model_change_limit: 4,
         max_projects: 10,
+        allow_ai_briefs: true,
         is_most_chosen: true,
       }),
     ).toEqual({
@@ -67,6 +70,7 @@ describe("billing plan settings", () => {
       modelSelectionLimit: 12,
       monthlyModelChangeLimit: 4,
       maxProjects: 10,
+      allowAiBriefs: true,
       isMostChosen: true,
     });
   });
@@ -81,6 +85,7 @@ describe("billing plan settings", () => {
         model_selection_limit: 8,
         monthly_model_change_limit: 2,
         max_projects: 12,
+        allow_ai_briefs: false,
       }),
     ).toEqual({
       plan: "agency-plus",
@@ -90,6 +95,7 @@ describe("billing plan settings", () => {
       modelSelectionLimit: 8,
       monthlyModelChangeLimit: 2,
       maxProjects: 12,
+      allowAiBriefs: false,
       isMostChosen: false,
     });
   });
@@ -108,6 +114,7 @@ describe("billing plan settings", () => {
           model_selection_limit: 12,
           monthly_model_change_limit: 4,
           max_projects: 15,
+          allow_ai_briefs: true,
           is_most_chosen: true,
         }),
         {
@@ -127,6 +134,7 @@ describe("billing plan settings", () => {
         modelSelectionLimit: 12,
         monthlyModelChangeLimit: 4,
         maxProjects: 15,
+        allowAiBriefs: true,
         isMostChosen: true,
       });
     } finally {
@@ -144,6 +152,7 @@ describe("billing plan settings", () => {
       model_selection_limit: 12,
       monthly_model_change_limit: 4,
       max_projects: 15,
+      allow_ai_briefs: true,
       is_most_chosen: true,
     });
   });

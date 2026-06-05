@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DateRange } from "react-day-picker";
 import { useMonitoringData } from "@/features/monitoring/_lib/shared/use-monitoring-data";
@@ -271,6 +271,24 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
           usedPrompts: promptQuotaQuery.data.usedPrompts,
         })
       : fallbackPromptPlanUsage;
+  const modelCreditCosts = useMemo(() => {
+    const costs = new Map<string, number>();
+    for (const model of source.projectModels) {
+      const cost = Math.max(1, Math.floor(model.creditCost ?? 1));
+      for (const key of [
+        model.id,
+        model.providerModelId,
+        model.displayName,
+        model.groupName,
+      ]) {
+        const normalized = key.trim();
+        if (!normalized) continue;
+        costs.set(normalized, cost);
+        costs.set(normalized.toLowerCase(), cost);
+      }
+    }
+    return costs;
+  }, [source.projectModels]);
 
   const mutations = usePromptsMutations({
     apiBaseURL,
@@ -283,6 +301,8 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     promptSort,
     promptSortDirection,
     promptAvailableModels: source.promptAvailableModels,
+    modelCreditCosts,
+    quotaUsage: promptQuotaQuery.data ?? null,
     availablePersonas: source.availablePersonas,
     recentPrompts: monitoringData.recent_prompts,
     manualPrompts,
@@ -319,17 +339,32 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const runnableSelectedPrompts = derived.selectedPromptRows.filter((item) =>
     mutations.canRunPrompt(item),
   );
+  const selectedPromptCredits = mutations.estimatePromptRunsCredits(runnableSelectedPrompts);
   const runningSelectedPrompts =
     runnableSelectedPrompts.length > 0 &&
     runnableSelectedPrompts.every((item) => runningPromptRowIds.includes(item.id));
 
   const runPrompt = (prompt: (typeof derived.selectedPromptRows)[number]) => {
     if (!mutations.canRunPrompt(prompt) || mutations.runPromptsMutation.isPending) return;
+    const credits = mutations.estimatePromptRunsCredits([prompt]);
+    if (!mutations.hasEnoughCreditsFor(credits)) {
+      mutations.pushInsufficientCreditsToast(credits);
+      return;
+    }
     mutations.runPromptsMutation.mutate([prompt]);
   };
 
   const runSelectedPrompts = () => {
-    if (runnableSelectedPrompts.length === 0 || mutations.runPromptsMutation.isPending) return;
+    if (
+      runnableSelectedPrompts.length === 0 ||
+      mutations.runPromptsMutation.isPending
+    ) {
+      return;
+    }
+    if (!mutations.hasEnoughCreditsFor(selectedPromptCredits)) {
+      mutations.pushInsufficientCreditsToast(selectedPromptCredits);
+      return;
+    }
     mutations.runPromptsMutation.mutate(runnableSelectedPrompts);
   };
 

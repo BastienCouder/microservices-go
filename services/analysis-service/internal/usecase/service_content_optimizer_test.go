@@ -12,6 +12,7 @@ import (
 type recordingContentCrawler struct {
 	startInput ContentOptimizerCrawlStartInput
 	job        ContentOptimizerCrawlJob
+	startErr   error
 
 	resultJobID string
 	resultInput ContentOptimizerCrawlResultInput
@@ -34,6 +35,9 @@ func (a *recordingContentIssueAnalyzer) AnalyzeContentIssues(_ context.Context, 
 
 func (c *recordingContentCrawler) StartCrawl(_ context.Context, input ContentOptimizerCrawlStartInput) (ContentOptimizerCrawlJob, error) {
 	c.startInput = input
+	if c.startErr != nil {
+		return ContentOptimizerCrawlJob{}, c.startErr
+	}
 	return c.job, nil
 }
 
@@ -100,6 +104,59 @@ func TestStartContentOptimizerCrawlValidatesAccessAndNormalizesRequest(t *testin
 	}
 	if !reflect.DeepEqual(crawler.startInput.CrawlPurposes, []string{"search", "ai-input"}) {
 		t.Fatalf("expected conservative crawl purposes, got %#v", crawler.startInput.CrawlPurposes)
+	}
+	usage, err := svc.GetPromptQuotaUsage(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get quota usage: %v", err)
+	}
+	if usage.UsedCredits != 0 {
+		t.Fatalf("expected pending crawl to consume 0 credits, got %d", usage.UsedCredits)
+	}
+	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, svc.now().UTC()); reserved != 10 {
+		t.Fatalf("expected pending crawl to reserve 10 credits, got %d", reserved)
+	}
+}
+
+func TestStartContentOptimizerCrawlReleasesReservationOnCrawlerFailure(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{startErr: errors.New("cloudflare 503")}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ContentCrawler: crawler,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, err = svc.StartContentOptimizerCrawl(ctx, "project-1", 42, ContentOptimizerCrawlStartInput{
+		URL:   "https://example.com",
+		Limit: 5,
+	})
+	if err == nil {
+		t.Fatal("expected crawler error")
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 0 {
+		t.Fatalf("expected failed crawl start to consume 0 credits, got %d", used)
+	}
+	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, svc.now().UTC()); reserved != 0 {
+		t.Fatalf("expected failed crawl start to release reservation, got %d", reserved)
+	}
+}
+
+func TestContentOptimizerCrawlCreditCostUsesConfiguredTiers(t *testing.T) {
+	tests := []struct {
+		limit int
+		want  int
+	}{
+		{limit: 10, want: 10},
+		{limit: 50, want: 35},
+		{limit: 200, want: 100},
+		{limit: 215, want: 103},
+	}
+
+	for _, tt := range tests {
+		if got := contentOptimizerCrawlCreditCost(tt.limit); got != tt.want {
+			t.Fatalf("limit %d: expected %d credits, got %d", tt.limit, tt.want, got)
+		}
 	}
 }
 
@@ -213,6 +270,7 @@ func TestStartContentOptimizerCrawlRejectsUnsupportedURLSchemes(t *testing.T) {
 func TestGetContentOptimizerCrawlForwardsResultOptions(t *testing.T) {
 	ctx := context.Background()
 	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{ID: "crawl-123", Status: "running"},
 		result: ContentOptimizerCrawlResult{
 			ID:       "crawl-123",
 			Status:   "completed",
@@ -254,6 +312,10 @@ func TestGetContentOptimizerCrawlForwardsResultOptions(t *testing.T) {
 func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	ctx := context.Background()
 	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{
+			ID:     "crawl-123",
+			Status: "running",
+		},
 		result: ContentOptimizerCrawlResult{
 			ID:       "crawl-123",
 			Status:   "completed",
@@ -273,6 +335,12 @@ func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	}
 	svc.now = func() time.Time { return time.Date(2026, 5, 13, 10, 0, 0, 0, time.UTC) }
 
+	if _, err := svc.StartContentOptimizerCrawl(ctx, "project-1", 42, ContentOptimizerCrawlStartInput{
+		URL:   "https://example.com",
+		Limit: 5,
+	}); err != nil {
+		t.Fatalf("start content optimizer crawl: %v", err)
+	}
 	_, err = svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
 	if err != nil {
 		t.Fatalf("get content optimizer crawl: %v", err)
@@ -291,6 +359,9 @@ func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	}
 	if len(latest.Result.Records) != 1 || latest.Result.Records[0].Markdown != "# Docs" {
 		t.Fatalf("expected saved record markdown, got %#v", latest.Result.Records)
+	}
+	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 10 {
+		t.Fatalf("expected completed crawl to consume 10 credits, got %d", used)
 	}
 }
 
@@ -548,6 +619,11 @@ func TestGetContentOptimizerCrawlAnalyzesSEOAndGEOIssues(t *testing.T) {
 	if len(issues) == 0 {
 		t.Fatal("expected SEO/GEO issues")
 	}
+	for _, issue := range issues {
+		if issue.Source != "rule" {
+			t.Fatalf("expected deterministic issue source, got %#v", issue)
+		}
+	}
 	if !hasContentOptimizerIssueFixType(issues, "add_faq") {
 		t.Fatalf("expected FAQ issue, got %#v", issues)
 	}
@@ -672,6 +748,10 @@ func TestGetContentOptimizerCrawlEnrichesIssuesWithAIAnalyzer(t *testing.T) {
 	}
 	if !hasContentOptimizerIssueFixType(result.Records[0].Issues, "ai_add_intent_coverage") {
 		t.Fatalf("expected AI issue to be merged, got %#v", result.Records[0].Issues)
+	}
+	aiIssue := findContentOptimizerIssue(result.Records[0].Issues, "ai_add_intent_coverage")
+	if aiIssue == nil || aiIssue.Source != "ai" {
+		t.Fatalf("expected merged AI issue source, got %#v", result.Records[0].Issues)
 	}
 }
 

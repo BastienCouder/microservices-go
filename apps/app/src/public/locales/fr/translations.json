@@ -6,7 +6,7 @@
     "notFoundError": "La ressource demandée est introuvable.",
     "conflictError": "Cette action entre en conflit avec l'état actuel.",
     "rateLimitedError": "Trop de requêtes. Réessaie dans un instant.",
-    "quotaExceededError": "Ton quota est atteint pour le moment.",
+    "quotaExceededError": "Tu n'as plus de crédits disponibles.",
     "dependencyUnavailableError": "Le service est temporairement indisponible.",
     "internalError": "Une erreur interne est survenue.",
     "timeoutError": "La requête a expiré. Réessaie.",
