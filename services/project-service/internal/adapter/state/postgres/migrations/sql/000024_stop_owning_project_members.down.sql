@@ -1,0 +1,1 @@
+-- No-op. The legacy table is intentionally not dropped by the up migration.

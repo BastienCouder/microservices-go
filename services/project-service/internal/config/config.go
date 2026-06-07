@@ -7,31 +7,32 @@ import (
 )
 
 type Config struct {
-	HTTPAddr                 string
-	MetricsAddr              string
-	GRPCAddr                 string
-	DatabaseURL              string
-	BillingServiceURL        string
-	AnalysisServiceGRPCAddr  string
-	IAServiceGRPCAddr        string
-	IAPromptTimeout          time.Duration
-	AttributionServiceURL    string
-	SecretEncryptionKey      string
-	RabbitMQURL              string
-	RabbitMQExchange         string
-	RabbitMQFinalizeQueue    string
-	RabbitMQFinalizeRouteKey string
-	InternalJWTSecret        string
-	InternalJWTIssuer        string
-	GRPCAllowInsecure        bool
-	GRPCTLSCAFile            string
-	GRPCTLSCertFile          string
-	GRPCTLSKeyFile           string
-	GRPCTLSServerName        string
-	GRPCTLSClientCAFile      string
-	GRPCTLSRequireClientCert bool
-	GA4OAuthClientID         string
-	GA4OAuthClientSecret     string
+	HTTPAddr                     string
+	MetricsAddr                  string
+	GRPCAddr                     string
+	DatabaseURL                  string
+	BillingServiceURL            string
+	AnalysisServiceGRPCAddr      string
+	IAServiceGRPCAddr            string
+	OrganizationsServiceGRPCAddr string
+	IAPromptTimeout              time.Duration
+	AttributionServiceURL        string
+	SecretEncryptionKey          string
+	RabbitMQURL                  string
+	RabbitMQExchange             string
+	RabbitMQFinalizeQueue        string
+	RabbitMQFinalizeRouteKey     string
+	InternalJWTSecret            string
+	InternalJWTIssuer            string
+	GRPCAllowInsecure            bool
+	GRPCTLSCAFile                string
+	GRPCTLSCertFile              string
+	GRPCTLSKeyFile               string
+	GRPCTLSServerName            string
+	GRPCTLSClientCAFile          string
+	GRPCTLSRequireClientCert     bool
+	GA4OAuthClientID             string
+	GA4OAuthClientSecret         string
 }
 
 func Load() (Config, error) {
@@ -52,6 +53,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	iaServiceGRPCAddr, err := envcfg.RequiredEnv("IA_SERVICE_GRPC_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	organizationsServiceGRPCAddr, err := envcfg.RequiredEnv("ORGANIZATIONS_SERVICE_GRPC_ADDR")
 	if err != nil {
 		return Config{}, err
 	}
@@ -105,31 +110,32 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		HTTPAddr:                 httpAddr,
-		MetricsAddr:              envcfg.OptionalEnv("METRICS_ADDR"),
-		GRPCAddr:                 grpcAddr,
-		DatabaseURL:              databaseURL,
-		BillingServiceURL:        envcfg.OptionalEnv("BILLING_SERVICE_URL"),
-		AnalysisServiceGRPCAddr:  analysisServiceGRPCAddr,
-		IAServiceGRPCAddr:        iaServiceGRPCAddr,
-		IAPromptTimeout:          time.Duration(iaPromptTimeoutMS) * time.Millisecond,
-		AttributionServiceURL:    envcfg.OptionalEnv("ATTRIBUTION_SERVICE_URL"),
-		SecretEncryptionKey:      secretEncryptionKey,
-		RabbitMQURL:              rabbitMQURL,
-		RabbitMQExchange:         rabbitMQExchange,
-		RabbitMQFinalizeQueue:    rabbitMQFinalizeQueue,
-		RabbitMQFinalizeRouteKey: rabbitMQFinalizeRouteKey,
-		InternalJWTSecret:        internalJWTSecret,
-		InternalJWTIssuer:        internalJWTIssuer,
-		GRPCAllowInsecure:        grpcAllowInsecure,
-		GRPCTLSCAFile:            envcfg.OptionalEnv("GRPC_TLS_CA_FILE"),
-		GRPCTLSCertFile:          envcfg.OptionalEnv("GRPC_TLS_CERT_FILE"),
-		GRPCTLSKeyFile:           envcfg.OptionalEnv("GRPC_TLS_KEY_FILE"),
-		GRPCTLSServerName:        envcfg.OptionalEnv("GRPC_TLS_SERVER_NAME"),
-		GRPCTLSClientCAFile:      envcfg.OptionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
-		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
-		GA4OAuthClientID:         ga4OAuthClientID,
-		GA4OAuthClientSecret:     ga4OAuthClientSecret,
+		HTTPAddr:                     httpAddr,
+		MetricsAddr:                  envcfg.OptionalEnv("METRICS_ADDR"),
+		GRPCAddr:                     grpcAddr,
+		DatabaseURL:                  databaseURL,
+		BillingServiceURL:            envcfg.OptionalEnv("BILLING_SERVICE_URL"),
+		AnalysisServiceGRPCAddr:      analysisServiceGRPCAddr,
+		IAServiceGRPCAddr:            iaServiceGRPCAddr,
+		OrganizationsServiceGRPCAddr: organizationsServiceGRPCAddr,
+		IAPromptTimeout:              time.Duration(iaPromptTimeoutMS) * time.Millisecond,
+		AttributionServiceURL:        envcfg.OptionalEnv("ATTRIBUTION_SERVICE_URL"),
+		SecretEncryptionKey:          secretEncryptionKey,
+		RabbitMQURL:                  rabbitMQURL,
+		RabbitMQExchange:             rabbitMQExchange,
+		RabbitMQFinalizeQueue:        rabbitMQFinalizeQueue,
+		RabbitMQFinalizeRouteKey:     rabbitMQFinalizeRouteKey,
+		InternalJWTSecret:            internalJWTSecret,
+		InternalJWTIssuer:            internalJWTIssuer,
+		GRPCAllowInsecure:            grpcAllowInsecure,
+		GRPCTLSCAFile:                envcfg.OptionalEnv("GRPC_TLS_CA_FILE"),
+		GRPCTLSCertFile:              envcfg.OptionalEnv("GRPC_TLS_CERT_FILE"),
+		GRPCTLSKeyFile:               envcfg.OptionalEnv("GRPC_TLS_KEY_FILE"),
+		GRPCTLSServerName:            envcfg.OptionalEnv("GRPC_TLS_SERVER_NAME"),
+		GRPCTLSClientCAFile:          envcfg.OptionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
+		GRPCTLSRequireClientCert:     grpcTLSRequireClientCert,
+		GA4OAuthClientID:             ga4OAuthClientID,
+		GA4OAuthClientSecret:         ga4OAuthClientSecret,
 	}, nil
 }
 

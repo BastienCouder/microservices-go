@@ -186,6 +186,43 @@ func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromp
 	return result, nil
 }
 
+func (c *Client) ListModels(ctx context.Context, onlyActive bool) ([]usecase.AIModel, error) {
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "ia-service", "project-service", internalauth.Claims{})
+	if err != nil {
+		return nil, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	var grpcResp *iav1.ListModelsResponse
+	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, c.attemptTimeout, func(attemptCtx context.Context) (bool, error) {
+		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		resp, callErr := c.client.ListModels(callCtx, &iav1.ListModelsRequest{ActiveOnly: onlyActive})
+		if callErr != nil {
+			return isTransientGRPCError(callErr), callErr
+		}
+		grpcResp = resp
+		return false, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: ia model catalog unavailable: %v", usecase.ErrDependencyUnavailable, err)
+	}
+	models := make([]usecase.AIModel, 0, len(grpcResp.GetModels()))
+	for _, model := range grpcResp.GetModels() {
+		models = append(models, usecase.AIModel{
+			ID:                 strings.TrimSpace(model.GetId()),
+			Label:              strings.TrimSpace(model.GetDisplayName()),
+			Provider:           strings.TrimSpace(model.GetProvider()),
+			Group:              strings.TrimSpace(model.GetGroupName()),
+			IconKey:            strings.TrimSpace(model.GetIconKey()),
+			ModelID:            strings.TrimSpace(model.GetProviderModelId()),
+			IsActive:           model.GetIsActive(),
+			SupportsLiveSearch: model.GetSupportsLiveSearch(),
+			Source:             strings.TrimSpace(model.GetSource()),
+			CreditCost:         int(model.GetCreditCost()),
+		})
+	}
+	return models, nil
+}
+
 func (c *Client) executeWithResilience(
 	ctx context.Context,
 	attempts int,

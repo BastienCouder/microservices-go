@@ -10,7 +10,7 @@ FROM deps AS build
 
 COPY services/langgraph-scheduler/tsconfig.json ./tsconfig.json
 COPY services/langgraph-scheduler/src ./src
-COPY contracts/proto ./proto
+COPY services/contracts/proto ./proto
 RUN bun run build
 
 FROM oven/bun:1.2.22-alpine AS prod-deps

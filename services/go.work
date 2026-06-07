@@ -1,0 +1,17 @@
+go 1.25.7
+
+use (
+	./analysis-service
+	./api-gateway
+	./attribution-service
+	./auth-service
+	./billing-service
+	./contracts
+	./ia-service
+	./mcp-server
+	./notification-service
+	./organizations-service
+	./permission-service
+	./project-service
+	./user-service
+)

@@ -100,6 +100,14 @@ type Member struct {
 	DeletedAt      *time.Time
 }
 
+type ProjectMember struct {
+	ProjectID      string    `json:"projectId"`
+	OrganizationID int64     `json:"organizationId"`
+	UserID         int64     `json:"userId"`
+	Role           string    `json:"role"`
+	AddedAt        time.Time `json:"addedAt"`
+}
+
 type Membership struct {
 	OrganizationID int64
 	UserID         int64

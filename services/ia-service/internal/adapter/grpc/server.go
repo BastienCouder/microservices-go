@@ -48,6 +48,31 @@ func (s *Server) ExecutePrompt(ctx context.Context, req *iav1.ExecutePromptReque
 	}, nil
 }
 
+func (s *Server) ListModels(ctx context.Context, req *iav1.ListModelsRequest) (*iav1.ListModelsResponse, error) {
+	models, err := s.svc.ListModels(ctx, req.GetActiveOnly())
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	resp := &iav1.ListModelsResponse{
+		Models: make([]*iav1.AIModel, 0, len(models)),
+	}
+	for _, model := range models {
+		resp.Models = append(resp.Models, &iav1.AIModel{
+			Id:                 model.ID,
+			DisplayName:        model.Label,
+			Provider:           model.Provider,
+			GroupName:          model.Group,
+			IconKey:            model.IconKey,
+			ProviderModelId:    model.ModelID,
+			IsActive:           model.IsActive,
+			SupportsLiveSearch: model.SupportsLiveSearch,
+			Source:             model.Source,
+			CreditCost:         int32(model.CreditCost),
+		})
+	}
+	return resp, nil
+}
+
 func toStatus(err error) error {
 	switch {
 	case errors.Is(err, usecase.ErrValidation):

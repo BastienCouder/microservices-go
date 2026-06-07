@@ -111,6 +111,14 @@ func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userI
 		return nil, err
 	}
 
+	if s.projectMembershipClient != nil {
+		members, err := s.projectMembershipClient.ListProjectMembersByUser(ctx, organizationID, userID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
+		}
+		return s.listProjectsForMembershipsLocked(organizationID, members), nil
+	}
+
 	assignedProjectIDs := make(map[string]struct{})
 	for projectID, members := range s.projectMembers {
 		member, ok := members[userID]
@@ -135,6 +143,31 @@ func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userI
 		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
 	})
 	return projects, nil
+}
+
+func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members []ProjectMember) []Project {
+	if len(members) == 0 {
+		return listProjectsFromMap(s.projects, organizationID)
+	}
+	assignedProjectIDs := make(map[string]struct{}, len(members))
+	for _, member := range members {
+		if member.OrganizationID == organizationID {
+			assignedProjectIDs[member.ProjectID] = struct{}{}
+		}
+	}
+	if len(assignedProjectIDs) == 0 {
+		return listProjectsFromMap(s.projects, organizationID)
+	}
+	projects := make([]Project, 0, len(assignedProjectIDs))
+	for projectID := range assignedProjectIDs {
+		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID {
+			projects = append(projects, copyProject(project))
+		}
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
+	})
+	return projects
 }
 
 func (s *Service) GetProject(ctx context.Context, projectID string, organizationID int64) (Project, error) {

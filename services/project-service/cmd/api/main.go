@@ -23,6 +23,7 @@ import (
 	billingclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/billing"
 	googleanalyticsclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/googleanalytics"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
+	organizationsclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/organizations"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/http"
 	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/messaging/rabbitmq"
@@ -86,17 +87,24 @@ func main() {
 		billingHTTPClient = client
 	}
 
+	projectMembershipClient, err := organizationsclient.NewClient(cfg.OrganizationsServiceGRPCAddr, cfg.InternalJWTSecret, cfg.InternalJWTIssuer, grpcClientTLS)
+	if err != nil {
+		log.Fatalf("init organizations grpc client: %v", err)
+	}
+	defer projectMembershipClient.Close()
+
 	store, err := projectstate.NewStateStore(db, cfg.SecretEncryptionKey)
 	if err != nil {
 		log.Fatalf("init project state store: %v", err)
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(context.Background(), usecase.Dependencies{
-		Store:             store,
-		AnalysisClient:    analysisGRPCClient,
-		IAClient:          iaGRPCClient,
-		AttributionClient: attributionHTTPClient,
-		BillingClient:     billingHTTPClient,
+		Store:                   store,
+		AnalysisClient:          analysisGRPCClient,
+		IAClient:                iaGRPCClient,
+		ProjectMembershipClient: projectMembershipClient,
+		AttributionClient:       attributionHTTPClient,
+		BillingClient:           billingHTTPClient,
 	})
 	if err != nil {
 		log.Fatalf("initialize project service: %v", err)

@@ -25,6 +25,9 @@ BEGIN
    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'analysissvc') THEN
       CREATE ROLE analysissvc LOGIN PASSWORD 'analysissvc';
    END IF;
+   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'iasvc') THEN
+      CREATE ROLE iasvc LOGIN PASSWORD 'iasvc';
+   END IF;
    IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'attrsvc') THEN
       CREATE ROLE attrsvc LOGIN PASSWORD 'attrsvc';
    END IF;
@@ -54,6 +57,9 @@ WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'projectsvc')\gexec
 
 SELECT 'CREATE DATABASE analysissvc OWNER analysissvc'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'analysissvc')\gexec
+
+SELECT 'CREATE DATABASE iasvc OWNER iasvc'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'iasvc')\gexec
 
 SELECT 'CREATE DATABASE attrsvc OWNER attrsvc'
 WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'attrsvc')\gexec

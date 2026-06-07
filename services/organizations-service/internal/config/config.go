@@ -3,19 +3,27 @@ package config
 import "github.com/bastiencouder/microservices-go/contracts/pkg/envcfg"
 
 type Config struct {
-	HTTPAddr           string
-	MetricsAddr        string
-	DatabaseURL        string
-	ProjectServiceURL  string
-	UserServiceURL     string
-	AppBaseURL         string
-	InvitationLoginURL string
-	RabbitMQURL        string
-	RabbitMQExchange   string
-	RabbitMQEmailQueue string
-	RabbitMQEmailRoute string
-	InternalJWTSecret  string
-	InternalJWTIssuer  string
+	HTTPAddr                 string
+	MetricsAddr              string
+	GRPCAddr                 string
+	DatabaseURL              string
+	ProjectServiceURL        string
+	UserServiceURL           string
+	AppBaseURL               string
+	InvitationLoginURL       string
+	RabbitMQURL              string
+	RabbitMQExchange         string
+	RabbitMQEmailQueue       string
+	RabbitMQEmailRoute       string
+	InternalJWTSecret        string
+	InternalJWTIssuer        string
+	GRPCAllowInsecure        bool
+	GRPCTLSCAFile            string
+	GRPCTLSCertFile          string
+	GRPCTLSKeyFile           string
+	GRPCTLSServerName        string
+	GRPCTLSClientCAFile      string
+	GRPCTLSRequireClientCert bool
 }
 
 func Load() (Config, error) {
@@ -24,6 +32,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	metricsAddr, err := envcfg.OptionalValueFromEnv("METRICS_ADDR", "METRICS_ADDR_FILE")
+	if err != nil {
+		return Config{}, err
+	}
+	grpcAddr, err := envcfg.RequiredEnv("GRPC_ADDR")
 	if err != nil {
 		return Config{}, err
 	}
@@ -55,21 +67,37 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	grpcAllowInsecure, err := envcfg.OptionalBoolEnv("GRPC_ALLOW_INSECURE", false)
+	if err != nil {
+		return Config{}, err
+	}
+	grpcTLSRequireClientCert, err := envcfg.OptionalBoolEnv("GRPC_TLS_REQUIRE_CLIENT_CERT", false)
+	if err != nil {
+		return Config{}, err
+	}
 
 	return Config{
-		HTTPAddr:           httpAddr,
-		MetricsAddr:        metricsAddr,
-		DatabaseURL:        databaseURL,
-		ProjectServiceURL:  envcfg.OptionalEnv("PROJECT_SERVICE_URL"),
-		UserServiceURL:     envcfg.OptionalEnv("USER_SERVICE_URL"),
-		AppBaseURL:         envcfg.OptionalEnv("APP_BASE_URL"),
-		InvitationLoginURL: envcfg.OptionalEnv("INVITATION_LOGIN_URL"),
-		RabbitMQURL:        rabbitMQURL,
-		RabbitMQExchange:   rabbitMQExchange,
-		RabbitMQEmailQueue: rabbitMQEmailQueue,
-		RabbitMQEmailRoute: rabbitMQEmailRoute,
-		InternalJWTSecret:  internalJWTSecret,
-		InternalJWTIssuer:  internalJWTIssuer,
+		HTTPAddr:                 httpAddr,
+		MetricsAddr:              metricsAddr,
+		GRPCAddr:                 grpcAddr,
+		DatabaseURL:              databaseURL,
+		ProjectServiceURL:        envcfg.OptionalEnv("PROJECT_SERVICE_URL"),
+		UserServiceURL:           envcfg.OptionalEnv("USER_SERVICE_URL"),
+		AppBaseURL:               envcfg.OptionalEnv("APP_BASE_URL"),
+		InvitationLoginURL:       envcfg.OptionalEnv("INVITATION_LOGIN_URL"),
+		RabbitMQURL:              rabbitMQURL,
+		RabbitMQExchange:         rabbitMQExchange,
+		RabbitMQEmailQueue:       rabbitMQEmailQueue,
+		RabbitMQEmailRoute:       rabbitMQEmailRoute,
+		InternalJWTSecret:        internalJWTSecret,
+		InternalJWTIssuer:        internalJWTIssuer,
+		GRPCAllowInsecure:        grpcAllowInsecure,
+		GRPCTLSCAFile:            envcfg.OptionalEnv("GRPC_TLS_CA_FILE"),
+		GRPCTLSCertFile:          envcfg.OptionalEnv("GRPC_TLS_CERT_FILE"),
+		GRPCTLSKeyFile:           envcfg.OptionalEnv("GRPC_TLS_KEY_FILE"),
+		GRPCTLSServerName:        envcfg.OptionalEnv("GRPC_TLS_SERVER_NAME"),
+		GRPCTLSClientCAFile:      envcfg.OptionalEnv("GRPC_TLS_CLIENT_CA_FILE"),
+		GRPCTLSRequireClientCert: grpcTLSRequireClientCert,
 	}, nil
 }
 

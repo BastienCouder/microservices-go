@@ -129,6 +129,29 @@ type ProjectImpactContext struct {
 	Integrations   ProjectImpactIntegrations `json:"integrations"`
 }
 
+type BrandCanon struct {
+	ProjectID   string         `json:"projectId,omitempty"`
+	BrandName   string         `json:"brandName,omitempty"`
+	Category    string         `json:"category,omitempty"`
+	Positioning string         `json:"positioning,omitempty"`
+	Audience    []string       `json:"audience,omitempty"`
+	UseCases    []string       `json:"useCases,omitempty"`
+	Pricing     map[string]any `json:"pricing,omitempty"`
+	Features    []string       `json:"features,omitempty"`
+	CreatedAt   time.Time      `json:"createdAt,omitempty"`
+	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
+}
+
+type UpdateBrandCanonInput struct {
+	BrandName   *string
+	Category    *string
+	Positioning *string
+	Audience    *[]string
+	UseCases    *[]string
+	Pricing     *map[string]any
+	Features    *[]string
+}
+
 type LLMProviderCredentialStatus struct {
 	ProjectID string    `json:"projectId,omitempty"`
 	Provider  string    `json:"provider"`
@@ -547,6 +570,11 @@ type AnalysisClient interface {
 
 type IAClient interface {
 	ExecutePrompt(ctx context.Context, input IAExecutePromptInput) (IAExecutePromptResult, error)
+	ListModels(ctx context.Context, onlyActive bool) ([]AIModel, error)
+}
+
+type ProjectMembershipClient interface {
+	ListProjectMembersByUser(ctx context.Context, organizationID, userID int64) ([]ProjectMember, error)
 }
 
 type AttributionEventInput struct {
@@ -575,11 +603,12 @@ type StateStore interface {
 }
 
 type Dependencies struct {
-	Store             StateStore
-	AnalysisClient    AnalysisClient
-	IAClient          IAClient
-	AttributionClient AttributionClient
-	BillingClient     BillingClient
+	Store                   StateStore
+	AnalysisClient          AnalysisClient
+	IAClient                IAClient
+	ProjectMembershipClient ProjectMembershipClient
+	AttributionClient       AttributionClient
+	BillingClient           BillingClient
 }
 
 type persistedState struct {
@@ -588,6 +617,7 @@ type persistedState struct {
 	Prompts               map[string]*Prompt                                 `json:"prompts"`
 	Competitors           map[string]*Competitor                             `json:"competitors"`
 	Models                map[string]AIModel                                 `json:"models"`
+	BrandCanonByProject   map[string]*BrandCanon                             `json:"brandCanonByProject"`
 	ProjectModels         map[string]map[string]bool                         `json:"projectModels"`
 	ProjectMembers        map[string]map[int64]*ProjectMember                `json:"projectMembers"`
 	ModelSelectionChanges map[string]ProjectModelSelectionChangeUsage        `json:"modelSelectionChanges"`

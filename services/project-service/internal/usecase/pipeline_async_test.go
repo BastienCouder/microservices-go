@@ -59,6 +59,11 @@ func (s *iaClientSpy) ExecutePrompt(_ context.Context, input IAExecutePromptInpu
 	return result, nil
 }
 
+func (s *iaClientSpy) ListModels(_ context.Context, onlyActive bool) ([]AIModel, error) {
+	svc := NewService()
+	return svc.ListModels(context.Background(), onlyActive)
+}
+
 func TestFinalizeProjectEnqueuesOutboxWithoutBlockingPipeline(t *testing.T) {
 	ctx := context.Background()
 	analysisSpy := &analysisClientSpy{}

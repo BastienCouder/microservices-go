@@ -3,12 +3,11 @@ package http
 import (
 	"context"
 	"errors"
-	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 
+	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
 
@@ -39,35 +38,6 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
 	mux.HandleFunc("/competitors/", h.competitorRoutes)
-	mux.HandleFunc("POST /ai-models", h.createModel)
-	mux.HandleFunc("GET /ai-models", h.listModels)
-	mux.HandleFunc("POST /ai-models/seed", h.seedModels)
-	mux.HandleFunc("POST /ai-models/sync/openrouter", h.syncOpenRouterModels)
-	mux.HandleFunc("/ai-models/", h.aiModelRoutes)
-}
-
-func (h *Handler) aiModelRoutes(w http.ResponseWriter, r *http.Request) {
-	h.aiModelRoutesWithPrefix(w, r, "/ai-models/")
-}
-
-func (h *Handler) aiModelRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
-	parts := splitPathAfter(r.URL.EscapedPath(), prefix)
-	if len(parts) != 1 || parts[0] == "" {
-		http.NotFound(w, r)
-		return
-	}
-	modelID, err := url.PathUnescape(parts[0])
-	if err != nil || strings.TrimSpace(modelID) == "" {
-		httpjson.WriteError(w, http.StatusBadRequest, "invalid model id")
-		return
-	}
-
-	switch r.Method {
-	case http.MethodPatch:
-		h.updateModel(w, r, modelID)
-	default:
-		http.NotFound(w, r)
-	}
 }
 
 func (h *Handler) internalProjectRoutes(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +158,7 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 	projectID := parts[0]
 	if organizationID, ok := authenticatedOrganizationID(r); ok {
-		if !isProjectMembersRoute(parts) && !h.allowProjectRequest(w, r, projectID, organizationID) {
+		if !h.allowProjectRequest(w, r, projectID, organizationID) {
 			return
 		}
 	}
@@ -216,12 +186,6 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.addCompetitors(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "competitors" && r.Method == http.MethodGet:
 		h.listCompetitors(w, r, projectID)
-	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodPost:
-		h.assignProjectMember(w, r, projectID)
-	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodGet:
-		h.listProjectMembers(w, r, projectID)
-	case len(parts) == 3 && parts[1] == "members" && r.Method == http.MethodDelete:
-		h.removeProjectMember(w, r, projectID, parts[2])
 	case len(parts) == 2 && parts[1] == "llm-provider-credentials" && r.Method == http.MethodGet:
 		h.listLLMProviderCredentialsForProject(w, r, projectID)
 	case len(parts) == 3 && parts[1] == "llm-provider-credentials" && r.Method == http.MethodPut:
@@ -232,6 +196,10 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		h.listProjectModels(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "models" && r.Method == http.MethodPatch:
 		h.replaceProjectModels(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
+		h.getBrandCanon(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
+		h.updateBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodGet:
 		h.getProjectImpactIntegrations(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "impact-integrations" && r.Method == http.MethodPatch:
@@ -247,10 +215,6 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.NotFound(w, r)
 	}
-}
-
-func isProjectMembersRoute(parts []string) bool {
-	return len(parts) >= 2 && parts[1] == "members"
 }
 
 func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) bool {
@@ -290,66 +254,6 @@ func (h *Handler) allowCompetitorRequest(w http.ResponseWriter, r *http.Request,
 		return false
 	}
 	return true
-}
-
-type assignProjectMemberRequest struct {
-	UserID int64  `json:"userId"`
-	Role   string `json:"role"`
-}
-
-func (h *Handler) assignProjectMember(w http.ResponseWriter, r *http.Request, projectID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	var req assignProjectMemberRequest
-	if err := decodeJSON(w, r, &req); err != nil {
-		httpjson.WriteValidationError(w)
-		return
-	}
-
-	member, err := h.svc.AssignProjectMember(r.Context(), projectID, organizationID, req.UserID, req.Role)
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusCreated, member)
-}
-
-func (h *Handler) listProjectMembers(w http.ResponseWriter, r *http.Request, projectID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	members, err := h.svc.ListProjectMembers(r.Context(), projectID, organizationID)
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, members)
-}
-
-func (h *Handler) removeProjectMember(w http.ResponseWriter, r *http.Request, projectID string, rawUserID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-	userID, err := strconv.ParseInt(strings.TrimSpace(rawUserID), 10, 64)
-	if err != nil || userID <= 0 {
-		httpjson.WriteError(w, http.StatusBadRequest, "invalid user id")
-		return
-	}
-
-	if err := h.svc.RemoveProjectMember(r.Context(), projectID, organizationID, userID); err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) promptRoutes(w http.ResponseWriter, r *http.Request) {
@@ -965,22 +869,6 @@ func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, compe
 	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
-func (h *Handler) listModels(w http.ResponseWriter, r *http.Request) {
-	onlyActive := true
-	if value := strings.TrimSpace(r.URL.Query().Get("active_only")); value != "" {
-		parsed, err := strconv.ParseBool(value)
-		if err == nil {
-			onlyActive = parsed
-		}
-	}
-	models, err := h.svc.ListModels(r.Context(), onlyActive)
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, models)
-}
-
 func (h *Handler) listLLMProviderCredentials(w http.ResponseWriter, r *http.Request) {
 	projectID := strings.TrimSpace(r.URL.Query().Get("projectId"))
 	if projectID == "" {
@@ -1081,52 +969,6 @@ func (h *Handler) deleteLLMProviderCredentialForProject(w http.ResponseWriter, r
 	writeSuccess(w, http.StatusOK, credential)
 }
 
-func (h *Handler) seedModels(w http.ResponseWriter, r *http.Request) {
-	models, err := h.svc.SeedDefaultModels(r.Context())
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, models)
-}
-
-type syncOpenRouterModelsRequest struct {
-	OnlyFree                  bool     `json:"onlyFree"`
-	MinContext                int      `json:"minContext"`
-	SupportsTools             bool     `json:"supportsTools"`
-	Variant                   string   `json:"variant"`
-	Providers                 []string `json:"providers"`
-	SearchQuery               string   `json:"searchQuery"`
-	ActivateImported          bool     `json:"activateImported"`
-	PurgeUnsupportedProviders bool     `json:"purgeUnsupportedProviders"`
-	PurgeMissingModels        bool     `json:"purgeMissingModels"`
-}
-
-func (h *Handler) syncOpenRouterModels(w http.ResponseWriter, r *http.Request) {
-	var req syncOpenRouterModelsRequest
-	if err := decodeJSON(w, r, &req); err != nil {
-		httpjson.WriteValidationError(w)
-		return
-	}
-
-	result, err := h.svc.SyncOpenRouterModels(r.Context(), usecase.SyncOpenRouterModelsInput{
-		OnlyFree:                  req.OnlyFree,
-		MinContext:                req.MinContext,
-		SupportsTools:             req.SupportsTools,
-		Variant:                   req.Variant,
-		Providers:                 req.Providers,
-		SearchQuery:               req.SearchQuery,
-		ActivateImported:          req.ActivateImported,
-		PurgeUnsupportedProviders: req.PurgeUnsupportedProviders,
-		PurgeMissingModels:        req.PurgeMissingModels,
-	})
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, result)
-}
-
 func (h *Handler) listProjectModels(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -1164,77 +1006,55 @@ func (h *Handler) replaceProjectModels(w http.ResponseWriter, r *http.Request, p
 	writeSuccess(w, http.StatusOK, result)
 }
 
-type createAIModelRequest struct {
-	ID                 string `json:"id"`
-	Label              string `json:"displayName"`
-	Provider           string `json:"provider"`
-	Group              string `json:"groupName"`
-	IconKey            string `json:"iconKey"`
-	ModelID            string `json:"providerModelId"`
-	IsActive           *bool  `json:"isActive"`
-	SupportsLiveSearch bool   `json:"supportsLiveSearch"`
+func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+	brandCanon, err := h.svc.GetBrandCanon(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, brandCanon)
 }
 
-func (h *Handler) createModel(w http.ResponseWriter, r *http.Request) {
-	var req createAIModelRequest
+type updateBrandCanonRequest struct {
+	BrandName   *string         `json:"brandName"`
+	Category    *string         `json:"category"`
+	Positioning *string         `json:"positioning"`
+	Audience    *[]string       `json:"audience"`
+	UseCases    *[]string       `json:"useCases"`
+	Pricing     *map[string]any `json:"pricing"`
+	Features    *[]string       `json:"features"`
+}
+
+func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+	var req updateBrandCanonRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		httpjson.WriteValidationError(w)
 		return
 	}
-
-	isActive := true
-	if req.IsActive != nil {
-		isActive = *req.IsActive
-	}
-
-	model, err := h.svc.CreateModel(r.Context(), usecase.CreateAIModelInput{
-		ID:                 req.ID,
-		Label:              req.Label,
-		Provider:           req.Provider,
-		Group:              req.Group,
-		IconKey:            req.IconKey,
-		ModelID:            req.ModelID,
-		IsActive:           isActive,
-		SupportsLiveSearch: req.SupportsLiveSearch,
+	brandCanon, err := h.svc.UpdateBrandCanon(r.Context(), projectID, organizationID, usecase.UpdateBrandCanonInput{
+		BrandName:   req.BrandName,
+		Category:    req.Category,
+		Positioning: req.Positioning,
+		Audience:    req.Audience,
+		UseCases:    req.UseCases,
+		Pricing:     req.Pricing,
+		Features:    req.Features,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
-	writeSuccess(w, http.StatusCreated, model)
-}
-
-type updateAIModelRequest struct {
-	Label              *string `json:"displayName"`
-	Provider           *string `json:"provider"`
-	Group              *string `json:"groupName"`
-	IconKey            *string `json:"iconKey"`
-	ModelID            *string `json:"providerModelId"`
-	IsActive           *bool   `json:"isActive"`
-	SupportsLiveSearch *bool   `json:"supportsLiveSearch"`
-}
-
-func (h *Handler) updateModel(w http.ResponseWriter, r *http.Request, modelID string) {
-	var req updateAIModelRequest
-	if err := decodeJSON(w, r, &req); err != nil {
-		httpjson.WriteValidationError(w)
-		return
-	}
-
-	model, err := h.svc.UpdateModel(r.Context(), modelID, usecase.UpdateAIModelInput{
-		Label:              req.Label,
-		Provider:           req.Provider,
-		Group:              req.Group,
-		IconKey:            req.IconKey,
-		ModelID:            req.ModelID,
-		IsActive:           req.IsActive,
-		SupportsLiveSearch: req.SupportsLiveSearch,
-	})
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, model)
+	writeSuccess(w, http.StatusOK, brandCanon)
 }
 
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {

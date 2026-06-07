@@ -155,6 +155,46 @@ func (stubRepo) RemoveMember(_ context.Context, organizationID, userID int64, _ 
 	return nil
 }
 
+func (stubRepo) UpsertProjectMember(_ context.Context, member *domain.ProjectMember) error {
+	if member.OrganizationID <= 0 || member.UserID <= 0 || member.ProjectID == "" {
+		return domain.ErrInvalidMember
+	}
+	return nil
+}
+
+func (stubRepo) ListProjectMembers(_ context.Context, organizationID int64, projectID string) ([]domain.ProjectMember, error) {
+	if organizationID <= 0 || projectID == "" {
+		return nil, domain.ErrInvalidMember
+	}
+	return []domain.ProjectMember{{
+		ProjectID:      projectID,
+		OrganizationID: organizationID,
+		UserID:         42,
+		Role:           "viewer",
+		AddedAt:        time.Now().UTC(),
+	}}, nil
+}
+
+func (stubRepo) ListProjectMembersByUser(_ context.Context, organizationID, userID int64) ([]domain.ProjectMember, error) {
+	if organizationID <= 0 || userID <= 0 {
+		return nil, domain.ErrInvalidMember
+	}
+	return []domain.ProjectMember{{
+		ProjectID:      "project-1",
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Role:           "viewer",
+		AddedAt:        time.Now().UTC(),
+	}}, nil
+}
+
+func (stubRepo) RemoveProjectMember(_ context.Context, organizationID int64, projectID string, userID int64) error {
+	if organizationID <= 0 || projectID == "" || userID <= 0 {
+		return domain.ErrInvalidMember
+	}
+	return nil
+}
+
 func (stubRepo) CreateInvitation(_ context.Context, invitation *domain.Invitation) error {
 	invitation.ID = 1
 	return nil

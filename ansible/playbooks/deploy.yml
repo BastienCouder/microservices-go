@@ -131,6 +131,12 @@
           - compose
           - -f
           - "{{ deploy_path }}/docker-compose.yml"
+          - --profile
+          - frontend
+          - --profile
+          - backend
+          - --profile
+          - infra
           - up
           - -d
           - --build

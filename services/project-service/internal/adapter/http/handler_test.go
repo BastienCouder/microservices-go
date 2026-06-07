@@ -59,6 +59,11 @@ func (s *handlerIAClientSpy) ExecutePrompt(_ context.Context, _ usecase.IAExecut
 	return result, nil
 }
 
+func (s *handlerIAClientSpy) ListModels(_ context.Context, onlyActive bool) ([]usecase.AIModel, error) {
+	svc := usecase.NewService()
+	return svc.ListModels(context.Background(), onlyActive)
+}
+
 func (p handlerTestGA4OAuthProvider) AuthorizationURL(state, redirectURI string) (string, error) {
 	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state + "&redirect_uri=" + redirectURI, nil
 }
@@ -382,7 +387,7 @@ func TestGA4OAuthCallbackKeepsGenericMessageForOtherOAuthFailures(t *testing.T) 
 	}
 }
 
-func TestProjectMembersRoutes(t *testing.T) {
+func TestProjectMembersRoutesAreOwnedByOrganizationsService(t *testing.T) {
 	svc := usecase.NewService()
 	project, err := svc.CreateProject(context.Background(), usecase.CreateProjectInput{
 		OrganizationID: 42,
@@ -398,50 +403,21 @@ func TestProjectMembersRoutes(t *testing.T) {
 	mux := http.NewServeMux()
 	handler.Register(mux)
 
-	postReq := httptest.NewRequest(
-		http.MethodPost,
-		"/projects/"+project.ID+"/members",
-		strings.NewReader(`{"userId":99,"role":"viewer"}`),
-	)
-	postReq.Header.Set("Content-Type", "application/json")
-	postReq.Header.Set("X-Organization-ID", "42")
-	postReq.Header.Set("X-Authenticated-User-ID", "7")
-	postRec := httptest.NewRecorder()
+	for _, method := range []string{http.MethodGet, http.MethodPost, http.MethodDelete} {
+		path := "/projects/" + project.ID + "/members"
+		if method == http.MethodDelete {
+			path += "/99"
+		}
+		req := httptest.NewRequest(method, path, strings.NewReader(`{"userId":99,"role":"viewer"}`))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Organization-ID", "42")
+		req.Header.Set("X-Authenticated-User-ID", "7")
+		rec := httptest.NewRecorder()
 
-	mux.ServeHTTP(postRec, postReq)
-	if postRec.Code != http.StatusCreated {
-		t.Fatalf("expected POST 201, got %d: %s", postRec.Code, postRec.Body.String())
-	}
-
-	getReq := httptest.NewRequest(http.MethodGet, "/projects/"+project.ID+"/members", nil)
-	getReq.Header.Set("X-Organization-ID", "42")
-	getRec := httptest.NewRecorder()
-
-	mux.ServeHTTP(getRec, getReq)
-	if getRec.Code != http.StatusOK {
-		t.Fatalf("expected GET 200, got %d: %s", getRec.Code, getRec.Body.String())
-	}
-	var getResponse struct {
-		Success bool                    `json:"success"`
-		Data    []usecase.ProjectMember `json:"data"`
-	}
-	if err := json.Unmarshal(getRec.Body.Bytes(), &getResponse); err != nil {
-		t.Fatalf("unmarshal GET response: %v", err)
-	}
-	if len(getResponse.Data) != 1 {
-		t.Fatalf("expected 1 project member, got %d", len(getResponse.Data))
-	}
-	if getResponse.Data[0].UserID != 99 || getResponse.Data[0].Role != "viewer" {
-		t.Fatalf("unexpected project member: %+v", getResponse.Data[0])
-	}
-
-	deleteReq := httptest.NewRequest(http.MethodDelete, "/projects/"+project.ID+"/members/99", nil)
-	deleteReq.Header.Set("X-Organization-ID", "42")
-	deleteRec := httptest.NewRecorder()
-
-	mux.ServeHTTP(deleteRec, deleteReq)
-	if deleteRec.Code != http.StatusNoContent {
-		t.Fatalf("expected DELETE 204, got %d: %s", deleteRec.Code, deleteRec.Body.String())
+		mux.ServeHTTP(rec, req)
+		if rec.Code != http.StatusNotFound {
+			t.Fatalf("expected %s %s to be 404, got %d: %s", method, path, rec.Code, rec.Body.String())
+		}
 	}
 }
 
@@ -468,51 +444,6 @@ func TestActivateProjectRouteIsRemoved(t *testing.T) {
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected activate route 404, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestProjectMembersRoutesUseGatewayMemberPermissionWithoutProjectScope(t *testing.T) {
-	svc := usecase.NewService()
-	ctx := context.Background()
-	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
-		OrganizationID: 42,
-		CreatedBy:      7,
-		Name:           "Assigned",
-		Domain:         "assigned-members.test",
-		WebsiteURL:     "https://assigned-members.test",
-	})
-	if err != nil {
-		t.Fatalf("create assigned project: %v", err)
-	}
-	other, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
-		OrganizationID: 42,
-		CreatedBy:      7,
-		Name:           "Other",
-		Domain:         "other-members.test",
-		WebsiteURL:     "https://other-members.test",
-	})
-	if err != nil {
-		t.Fatalf("create other project: %v", err)
-	}
-	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign scoped project member: %v", err)
-	}
-	if _, err := svc.AssignProjectMember(ctx, other.ID, 42, 100, "viewer"); err != nil {
-		t.Fatalf("assign other project member: %v", err)
-	}
-
-	handler := NewHandler(svc)
-	mux := http.NewServeMux()
-	handler.Register(mux)
-
-	req := httptest.NewRequest(http.MethodGet, "/projects/"+other.ID+"/members", nil)
-	req.Header.Set("X-Organization-ID", "42")
-	req.Header.Set("X-Authenticated-User-ID", "99")
-	rec := httptest.NewRecorder()
-
-	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected gateway-authorized project members GET 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 

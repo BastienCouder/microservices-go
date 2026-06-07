@@ -3,6 +3,7 @@ package config
 import "testing"
 
 func TestLoadProviderModeDefaultsToOpenRouterBaseURL(t *testing.T) {
+	setRequiredDatabaseEnv(t)
 	t.Setenv("HTTP_ADDR", ":8091")
 	t.Setenv("GRPC_ADDR", ":9091")
 	t.Setenv("INTERNAL_JWT_SECRET", "secret")
@@ -21,6 +22,7 @@ func TestLoadProviderModeDefaultsToOpenRouterBaseURL(t *testing.T) {
 }
 
 func TestLoadProviderModeAllowsMissingFallbackProviderAPIKey(t *testing.T) {
+	setRequiredDatabaseEnv(t)
 	t.Setenv("HTTP_ADDR", ":8091")
 	t.Setenv("GRPC_ADDR", ":9091")
 	t.Setenv("INTERNAL_JWT_SECRET", "secret")
@@ -38,6 +40,7 @@ func TestLoadProviderModeAllowsMissingFallbackProviderAPIKey(t *testing.T) {
 }
 
 func TestLoadProviderModeReadsOpenRouterAttributionHeaders(t *testing.T) {
+	setRequiredDatabaseEnv(t)
 	t.Setenv("HTTP_ADDR", ":8091")
 	t.Setenv("GRPC_ADDR", ":9091")
 	t.Setenv("INTERNAL_JWT_SECRET", "secret")
@@ -59,4 +62,14 @@ func TestLoadProviderModeReadsOpenRouterAttributionHeaders(t *testing.T) {
 	if cfg.ProviderAppName != "microservices-go" {
 		t.Fatalf("expected app name, got %q", cfg.ProviderAppName)
 	}
+}
+
+func setRequiredDatabaseEnv(t *testing.T) {
+	t.Helper()
+	t.Setenv("IA_DB_HOST", "localhost")
+	t.Setenv("IA_DB_PORT", "5432")
+	t.Setenv("IA_DB_USER", "iasvc")
+	t.Setenv("IA_DB_NAME", "iasvc")
+	t.Setenv("IA_DB_SSLMODE", "disable")
+	t.Setenv("IA_DB_PASSWORD", "iasvc")
 }

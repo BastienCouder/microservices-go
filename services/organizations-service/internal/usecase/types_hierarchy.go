@@ -15,10 +15,6 @@ type ProjectUserLister interface {
 	ListProjectsByOrganizationForUser(ctx context.Context, organizationID, userID int64) ([]ProjectSummary, error)
 }
 
-type ProjectMemberAssigner interface {
-	AssignProjectMember(ctx context.Context, projectID string, organizationID, userID int64, role string) error
-}
-
 type InvitationNotifier interface {
 	SendInvitation(ctx context.Context, notification InvitationNotification) error
 }

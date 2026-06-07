@@ -94,8 +94,6 @@ func actionFromMethod(method string) string {
 
 func resourceFromPath(path, fallback string) string {
 	switch {
-	case strings.Contains(path, "/teams"):
-		return "teams"
 	case strings.Contains(path, "/members"):
 		return "members"
 	case strings.Contains(path, "/roles"):

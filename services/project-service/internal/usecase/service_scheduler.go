@@ -20,7 +20,17 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 		}
 		projectIDs = append(projectIDs, projectID)
 	}
-	sort.Strings(projectIDs)
+	sort.Slice(projectIDs, func(i, j int) bool {
+		left := s.projects[projectIDs[i]]
+		right := s.projects[projectIDs[j]]
+		if left == nil || right == nil {
+			return projectIDs[i] < projectIDs[j]
+		}
+		if left.CreatedAt.Equal(right.CreatedAt) {
+			return left.ID < right.ID
+		}
+		return left.CreatedAt.Before(right.CreatedAt)
+	})
 
 	jobs := make([]ScheduledAnalysisJob, 0)
 	for _, projectID := range projectIDs {

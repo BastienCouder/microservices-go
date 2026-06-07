@@ -114,6 +114,9 @@ func (s *Service) ListProjectModels(ctx context.Context, projectID string, organ
 	if err := s.reloadLocked(ctx); err != nil {
 		return nil, err
 	}
+	if err := s.refreshModelCatalogLocked(ctx); err != nil {
+		return nil, err
+	}
 
 	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
 		return nil, err
@@ -142,6 +145,9 @@ func (s *Service) ListEnabledProjectModelIDs(ctx context.Context, projectID stri
 	defer s.mu.Unlock()
 
 	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+	if err := s.refreshModelCatalogLocked(ctx); err != nil {
 		return nil, err
 	}
 
@@ -175,6 +181,9 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 	defer s.mu.Unlock()
 
 	if err := s.reloadLocked(ctx); err != nil {
+		return ReplaceProjectModelsResult{}, err
+	}
+	if err := s.refreshModelCatalogLocked(ctx); err != nil {
 		return ReplaceProjectModelsResult{}, err
 	}
 
@@ -230,6 +239,34 @@ func (s *Service) ReplaceProjectModels(ctx context.Context, projectID string, or
 
 	sort.Strings(normalized)
 	return ReplaceProjectModelsResult{ProjectID: projectID, ModelIDs: normalized, Count: len(normalized)}, nil
+}
+
+func (s *Service) refreshModelCatalogLocked(ctx context.Context) error {
+	if s.iaClient == nil {
+		return nil
+	}
+	models, err := s.iaClient.ListModels(ctx, false)
+	if err != nil {
+		return err
+	}
+	next := make(map[string]AIModel, len(s.models)+len(models))
+	for modelID, model := range s.models {
+		next[modelID] = model
+	}
+	for _, model := range models {
+		model.ID = strings.TrimSpace(model.ID)
+		if model.ID == "" {
+			continue
+		}
+		if model.CreditCost <= 0 {
+			model.CreditCost = 1
+		}
+		next[model.ID] = model
+	}
+	if len(next) > 0 {
+		s.models = next
+	}
+	return nil
 }
 
 func (s *Service) resolveBillingEntitlementsLocked(ctx context.Context, organizationID int64) (BillingEntitlements, error) {

@@ -295,9 +295,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 
 func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
 	repo := newFakeRepo()
-	assigner := &fakeProjectMemberAssigner{}
 	svc := NewService(repo)
-	svc.EnableProjectMemberAssignments(assigner)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -331,11 +329,15 @@ func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
 	if len(acceptedMember.Roles) != 1 || acceptedMember.Roles[0] != "member" {
 		t.Fatalf("expected invited organization role member, got %v", acceptedMember.Roles)
 	}
-	if len(assigner.calls) != 1 {
-		t.Fatalf("expected 1 project assignment, got %d", len(assigner.calls))
+	projectMembers, err := svc.ListProjectMembers(context.Background(), "prj-42", org.ID)
+	if err != nil {
+		t.Fatalf("list project members: %v", err)
 	}
-	call := assigner.calls[0]
-	if call.projectID != "prj-42" || call.organizationID != org.ID || call.userID != 42 || call.role != "viewer" {
-		t.Fatalf("unexpected project assignment call: %+v", call)
+	if len(projectMembers) != 1 {
+		t.Fatalf("expected 1 project member, got %d", len(projectMembers))
+	}
+	member := projectMembers[0]
+	if member.ProjectID != "prj-42" || member.OrganizationID != org.ID || member.UserID != 42 || member.Role != "viewer" {
+		t.Fatalf("unexpected project member: %+v", member)
 	}
 }

@@ -42,7 +42,6 @@ type Organization struct {
 type OrganizationMember struct {
 	OrganizationID int64
 	UserID         int64
-	TeamID         pgtype.Int8
 	AddedAt        pgtype.Timestamptz
 	DeletedAt      pgtype.Timestamptz
 }

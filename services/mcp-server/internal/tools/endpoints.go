@@ -29,8 +29,6 @@ func ListEndpoints(_ context.Context, _ *mcp.CallToolRequest, _ EndpointsInput) 
 			{Service: "user-service", Method: "GET", Path: "/users/by-auth/{auth_identity_id}"},
 			{Service: "organizations-service", Method: "POST", Path: "/organizations"},
 			{Service: "organizations-service", Method: "GET", Path: "/organizations/{id}"},
-			{Service: "organizations-service", Method: "POST", Path: "/organizations/{id}/teams"},
-			{Service: "organizations-service", Method: "GET", Path: "/organizations/{id}/teams"},
 			{Service: "organizations-service", Method: "POST", Path: "/organizations/{id}/members"},
 			{Service: "organizations-service", Method: "GET", Path: "/organizations/{id}/members"},
 			{Service: "organizations-service", Method: "POST", Path: "/organizations/{id}/members/{user_id}/roles"},

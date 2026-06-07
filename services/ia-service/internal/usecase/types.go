@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 )
 
 var (
@@ -82,6 +83,74 @@ type ProviderResult struct {
 	TokensUsed  int
 }
 
+const (
+	AIModelSourceManual     = "manual"
+	AIModelSourceOpenRouter = "openrouter"
+)
+
+type AIModel struct {
+	ID                    string         `json:"id"`
+	Label                 string         `json:"displayName"`
+	Provider              string         `json:"provider"`
+	Group                 string         `json:"groupName"`
+	IconKey               string         `json:"-"`
+	IconPath              string         `json:"iconPath"`
+	ModelID               string         `json:"providerModelId"`
+	Source                string         `json:"source,omitempty"`
+	IsActive              bool           `json:"isActive"`
+	SupportsLiveSearch    bool           `json:"supportsLiveSearch"`
+	CreditCost            int            `json:"creditCost"`
+	InputPricePerMillion  *float64       `json:"inputPricePerMillion,omitempty"`
+	OutputPricePerMillion *float64       `json:"outputPricePerMillion,omitempty"`
+	OpenRouterPricing     map[string]any `json:"openRouterPricing,omitempty"`
+}
+
+type CreateAIModelInput struct {
+	ID                 string
+	Label              string
+	Provider           string
+	Group              string
+	IconKey            string
+	ModelID            string
+	IsActive           bool
+	SupportsLiveSearch bool
+}
+
+type UpdateAIModelInput struct {
+	Label              *string
+	Provider           *string
+	Group              *string
+	IconKey            *string
+	ModelID            *string
+	IsActive           *bool
+	SupportsLiveSearch *bool
+}
+
+type SyncOpenRouterModelsInput struct {
+	OnlyFree                  bool
+	MinContext                int
+	SupportsTools             bool
+	Variant                   string
+	Providers                 []string
+	SearchQuery               string
+	ActivateImported          bool
+	PurgeUnsupportedProviders bool
+	PurgeMissingModels        bool
+}
+
+type SyncOpenRouterModelsResult struct {
+	Imported int       `json:"imported"`
+	Created  int       `json:"created"`
+	Updated  int       `json:"updated"`
+	Purged   int       `json:"purged"`
+	Models   []AIModel `json:"models"`
+}
+
+type ModelCatalogStore interface {
+	LoadModels(ctx context.Context) (map[string]AIModel, error)
+	SaveModels(ctx context.Context, models map[string]AIModel) error
+}
+
 type ProviderGenerateInput struct {
 	ProviderID string
 	ModelID    string
@@ -94,12 +163,16 @@ type PromptProvider interface {
 }
 
 type Dependencies struct {
-	Mode     ExecutionMode
-	Provider PromptProvider
+	Mode         ExecutionMode
+	Provider     PromptProvider
+	CatalogStore ModelCatalogStore
 }
 
 type Service struct {
+	mu              sync.RWMutex
 	supportedModels map[string]struct{}
+	models          map[string]AIModel
 	mode            ExecutionMode
 	provider        PromptProvider
+	catalogStore    ModelCatalogStore
 }

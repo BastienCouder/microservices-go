@@ -20,6 +20,7 @@ type Service struct {
 	prompts               map[string]*Prompt
 	competitors           map[string]*Competitor
 	models                map[string]AIModel
+	brandCanonByProject   map[string]*BrandCanon
 	projectModels         map[string]map[string]bool
 	projectMembers        map[string]map[int64]*ProjectMember
 	modelSelectionChanges map[string]ProjectModelSelectionChangeUsage
@@ -28,14 +29,15 @@ type Service struct {
 	outbox                map[string]*OutboxEvent
 	outboxOrder           []string
 
-	store               StateStore
-	analysisClient      AnalysisClient
-	iaClient            IAClient
-	attributionClient   AttributionClient
-	billingClient       BillingClient
-	ga4OAuthProvider    GA4OAuthProvider
-	ga4LLMSetupProvider GA4LLMSetupProvider
-	ga4OAuthStateKey    string
+	store                   StateStore
+	analysisClient          AnalysisClient
+	iaClient                IAClient
+	projectMembershipClient ProjectMembershipClient
+	attributionClient       AttributionClient
+	billingClient           BillingClient
+	ga4OAuthProvider        GA4OAuthProvider
+	ga4LLMSetupProvider     GA4LLMSetupProvider
+	ga4OAuthStateKey        string
 }
 
 func NewService() *Service {
@@ -45,6 +47,7 @@ func NewService() *Service {
 		prompts:               make(map[string]*Prompt),
 		competitors:           make(map[string]*Competitor),
 		models:                make(map[string]AIModel),
+		brandCanonByProject:   make(map[string]*BrandCanon),
 		projectModels:         make(map[string]map[string]bool),
 		projectMembers:        make(map[string]map[int64]*ProjectMember),
 		modelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage),
@@ -62,6 +65,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.store = deps.Store
 	svc.analysisClient = deps.AnalysisClient
 	svc.iaClient = deps.IAClient
+	svc.projectMembershipClient = deps.ProjectMembershipClient
 	svc.attributionClient = deps.AttributionClient
 	svc.billingClient = deps.BillingClient
 	if deps.Store != nil {
@@ -100,6 +104,7 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	s.prompts = nonNilPromptMap(state.Prompts)
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
+	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
 	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
@@ -135,6 +140,7 @@ func (s *Service) snapshotLocked() *persistedState {
 		Prompts:               make(map[string]*Prompt, len(s.prompts)),
 		Competitors:           make(map[string]*Competitor, len(s.competitors)),
 		Models:                make(map[string]AIModel, len(s.models)),
+		BrandCanonByProject:   make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 		ProjectModels:         make(map[string]map[string]bool, len(s.projectModels)),
 		ProjectMembers:        make(map[string]map[int64]*ProjectMember, len(s.projectMembers)),
 		ModelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage, len(s.modelSelectionChanges)),
@@ -157,6 +163,10 @@ func (s *Service) snapshotLocked() *persistedState {
 	}
 	for key, value := range s.models {
 		state.Models[key] = value
+	}
+	for key, value := range s.brandCanonByProject {
+		clone := copyBrandCanon(value)
+		state.BrandCanonByProject[key] = &clone
 	}
 	for projectID, models := range s.projectModels {
 		copied := make(map[string]bool, len(models))
@@ -199,6 +209,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.prompts = nonNilPromptMap(state.Prompts)
 	s.competitors = nonNilCompetitorMap(state.Competitors)
 	s.models = nonNilModelMap(state.Models)
+	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
 	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
@@ -376,6 +387,18 @@ func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpa
 	return *value
 }
 
+func copyBrandCanon(canon *BrandCanon) BrandCanon {
+	if canon == nil {
+		return BrandCanon{}
+	}
+	out := *canon
+	out.Audience = append([]string(nil), canon.Audience...)
+	out.UseCases = append([]string(nil), canon.UseCases...)
+	out.Features = append([]string(nil), canon.Features...)
+	out.Pricing = copyCanonMap(canon.Pricing)
+	return out
+}
+
 func copyPrompt(prompt *Prompt) Prompt {
 	if prompt == nil {
 		return Prompt{}
@@ -431,6 +454,18 @@ func nonNilModelMap(input map[string]AIModel) map[string]AIModel {
 		return make(map[string]AIModel)
 	}
 	return input
+}
+
+func nonNilBrandCanonMap(input map[string]*BrandCanon) map[string]*BrandCanon {
+	if input == nil {
+		return make(map[string]*BrandCanon)
+	}
+	out := make(map[string]*BrandCanon, len(input))
+	for key, value := range input {
+		clone := copyBrandCanon(value)
+		out[key] = &clone
+	}
+	return out
 }
 
 func nonNilProjectModelMap(input map[string]map[string]bool) map[string]map[string]bool {

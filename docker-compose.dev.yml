@@ -249,6 +249,18 @@ services:
       - go-mod-cache:/go/pkg/mod
       - go-build-cache:/root/.cache/go-build
 
+  ia-migrate:
+    build:
+      target: dev
+    image: microservices-go/ia-migrate:dev
+    pull_policy: never
+    working_dir: /workspace/services/ia-service
+    command: ["go", "run", "./cmd/migrate"]
+    volumes:
+      - ./:/workspace
+      - go-mod-cache:/go/pkg/mod
+      - go-build-cache:/root/.cache/go-build
+
   ia-service:
     build:
       target: dev

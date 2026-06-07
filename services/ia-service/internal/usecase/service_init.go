@@ -1,6 +1,10 @@
 package usecase
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+	"strings"
+)
 
 func NewService() *Service {
 	svc, _ := NewServiceWithDependencies(Dependencies{Mode: ExecutionModeMock})
@@ -19,7 +23,7 @@ func NewServiceWithDependencies(deps Dependencies) (*Service, error) {
 		return nil, fmt.Errorf("%w: provider dependency is required in provider mode", ErrValidation)
 	}
 
-	return &Service{
+	svc := &Service{
 		supportedModels: map[string]struct{}{
 			"gpt-4o-mini":                 {},
 			"openai/gpt-4o-mini":          {},
@@ -49,7 +53,78 @@ func NewServiceWithDependencies(deps Dependencies) (*Service, error) {
 			"zai/glm-4.5-air":             {},
 			"z-ai/glm-4.5-air":            {},
 		},
-		mode:     mode,
-		provider: deps.Provider,
-	}, nil
+		models:       make(map[string]AIModel),
+		mode:         mode,
+		provider:     deps.Provider,
+		catalogStore: deps.CatalogStore,
+	}
+	svc.seedDefaultModels()
+	if deps.CatalogStore != nil {
+		if err := svc.loadCatalog(context.Background()); err != nil {
+			return nil, err
+		}
+	}
+	return svc, nil
+}
+
+func (s *Service) loadCatalog(ctx context.Context) error {
+	if s.catalogStore == nil {
+		return nil
+	}
+	models, err := s.catalogStore.LoadModels(ctx)
+	if err != nil {
+		return fmt.Errorf("load ai model catalog: %w", err)
+	}
+	if len(models) == 0 {
+		s.seedDefaultModels()
+		return s.catalogStore.SaveModels(ctx, s.models)
+	}
+	s.models = models
+	s.normalizeCatalog()
+	return nil
+}
+
+func (s *Service) persistCatalog(ctx context.Context) error {
+	if s.catalogStore == nil {
+		return nil
+	}
+	if err := s.catalogStore.SaveModels(ctx, s.models); err != nil {
+		return fmt.Errorf("persist ai model catalog: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) seedDefaultModels() {
+	defaults := []AIModel{
+		{ID: "gpt-oss-20b-free", Label: "gpt-oss-20b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-20b:free", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gpt-oss-120b-free", Label: "gpt-oss-120b (free)", Provider: "openai", Group: "gpt-oss", IconKey: "openai", IconPath: "/models/openai.svg", ModelID: "openai/gpt-oss-120b:free", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gemma-3-4b-free", Label: "Gemma 3 4B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-4b-it", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+		{ID: "gemma-3-27b-free", Label: "Gemma 3 27B", Provider: "google", Group: "gemma", IconKey: "google", IconPath: "/models/google.svg", ModelID: "google/gemma-3-27b-it", Source: AIModelSourceOpenRouter, IsActive: true, CreditCost: 1},
+	}
+	for _, model := range defaults {
+		s.models[model.ID] = model
+	}
+	s.normalizeCatalog()
+}
+
+func (s *Service) normalizeCatalog() {
+	for id, model := range s.models {
+		model.ID = strings.TrimSpace(model.ID)
+		if model.ID == "" {
+			model.ID = id
+		}
+		model.Provider = strings.TrimSpace(model.Provider)
+		model.Label = strings.TrimSpace(model.Label)
+		model.Group = strings.TrimSpace(model.Group)
+		model.IconKey = strings.TrimSpace(model.IconKey)
+		model.ModelID = strings.TrimSpace(model.ModelID)
+		model.Source = normalizeAIModelSource(model)
+		if model.IconPath == "" {
+			model.IconPath = modelIconPath(model.IconKey)
+		}
+		if model.CreditCost <= 0 {
+			model.CreditCost = 1
+		}
+		s.models[id] = model
+	}
 }

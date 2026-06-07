@@ -93,7 +93,7 @@ func (s *Service) EnforceUserProjectAccess(ctx context.Context, projectID string
 	if err := s.reloadLocked(ctx); err != nil {
 		return err
 	}
-	return s.enforceUserProjectAccessLocked(projectID, organizationID, userID)
+	return s.enforceUserProjectAccessLocked(ctx, projectID, organizationID, userID)
 }
 
 func (s *Service) EnforceUserPromptAccess(ctx context.Context, promptID string, organizationID, userID int64) error {
@@ -111,7 +111,7 @@ func (s *Service) EnforceUserPromptAccess(ctx context.Context, promptID string, 
 	if !ok {
 		return fmt.Errorf("%w: prompt", ErrNotFound)
 	}
-	return s.enforceUserProjectAccessLocked(prompt.ProjectID, organizationID, userID)
+	return s.enforceUserProjectAccessLocked(ctx, prompt.ProjectID, organizationID, userID)
 }
 
 func (s *Service) EnforceUserCompetitorAccess(ctx context.Context, competitorID string, organizationID, userID int64) error {
@@ -129,13 +129,29 @@ func (s *Service) EnforceUserCompetitorAccess(ctx context.Context, competitorID 
 	if !ok {
 		return fmt.Errorf("%w: competitor", ErrNotFound)
 	}
-	return s.enforceUserProjectAccessLocked(competitor.ProjectID, organizationID, userID)
+	return s.enforceUserProjectAccessLocked(ctx, competitor.ProjectID, organizationID, userID)
 }
 
-func (s *Service) enforceUserProjectAccessLocked(projectID string, organizationID, userID int64) error {
+func (s *Service) enforceUserProjectAccessLocked(ctx context.Context, projectID string, organizationID, userID int64) error {
 	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return err
+	}
+
+	if s.projectMembershipClient != nil {
+		members, err := s.projectMembershipClient.ListProjectMembersByUser(ctx, organizationID, userID)
+		if err != nil {
+			return fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
+		}
+		if len(members) == 0 {
+			return nil
+		}
+		for _, member := range members {
+			if member.OrganizationID == organizationID && member.ProjectID == project.ID {
+				return nil
+			}
+		}
+		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
 
 	hasProjectScope := false

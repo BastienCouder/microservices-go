@@ -32,10 +32,77 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/api-keys/validate", h.validateOrganizationAPIKey)
 	mux.HandleFunc("/organizations/", h.organizationRoutes)
 	mux.HandleFunc("/invitations/", h.invitationRoutes)
+	mux.HandleFunc("/projects/", h.projectRoutes)
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
 	httpjson.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok", "service": "organizations-service"})
+}
+
+func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/projects/"), "/"), "/")
+	if len(parts) < 2 || parts[0] == "" || parts[1] != "members" {
+		http.NotFound(w, r)
+		return
+	}
+	projectID := parts[0]
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	switch {
+	case len(parts) == 2 && r.Method == http.MethodPost:
+		h.assignProjectMember(w, r, projectID, organizationID)
+	case len(parts) == 2 && r.Method == http.MethodGet:
+		h.listProjectMembers(w, r, projectID, organizationID)
+	case len(parts) == 3 && r.Method == http.MethodDelete:
+		userID, err := strconv.ParseInt(parts[2], 10, 64)
+		if err != nil || userID <= 0 {
+			httpjson.WriteError(w, http.StatusBadRequest, "invalid user id")
+			return
+		}
+		h.removeProjectMember(w, r, projectID, organizationID, userID)
+	default:
+		http.NotFound(w, r)
+	}
+}
+
+type assignProjectMemberRequest struct {
+	UserID int64  `json:"userId"`
+	Role   string `json:"role"`
+}
+
+func (h *Handler) assignProjectMember(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) {
+	var req assignProjectMemberRequest
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
+		return
+	}
+	member, err := h.svc.AssignProjectMember(r.Context(), projectID, organizationID, req.UserID, req.Role)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, member)
+}
+
+func (h *Handler) listProjectMembers(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) {
+	members, err := h.svc.ListProjectMembers(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, members)
+}
+
+func (h *Handler) removeProjectMember(w http.ResponseWriter, r *http.Request, projectID string, organizationID, userID int64) {
+	if err := h.svc.RemoveProjectMember(r.Context(), projectID, organizationID, userID); err != nil {
+		h.writeDomainError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
@@ -188,12 +255,6 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		h.deleteInvitation(w, r, organizationID, invitationID)
-		return
-	case len(parts) == 2 && parts[1] == "teams" && r.Method == http.MethodPost:
-		h.createTeam(w, r, organizationID)
-		return
-	case len(parts) == 2 && parts[1] == "teams" && r.Method == http.MethodGet:
-		h.listTeams(w, r, organizationID)
 		return
 	case len(parts) == 2 && parts[1] == "members" && r.Method == http.MethodPost:
 		h.addMember(w, r, organizationID)
@@ -494,7 +555,6 @@ func (h *Handler) listTeams(w http.ResponseWriter, r *http.Request, organization
 
 type addMemberRequest struct {
 	UserID int64 `json:"user_id"`
-	TeamID int64 `json:"team_id"`
 }
 
 func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organizationID int64) {
@@ -511,13 +571,12 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organization
 	}
 
 	// Prevent privilege escalation via forged payloads: membership creation is for caller identity.
-	member, err := h.svc.AddMember(r.Context(), organizationID, authUserID, req.TeamID)
+	member, err := h.svc.AddMember(r.Context(), organizationID, authUserID, 0)
 	if err != nil {
 		h.writeDomainError(w, err)
 		auditSecurityEvent("organization_member_add", map[string]any{
 			"organization_id": organizationID,
 			"user_id":         authUserID,
-			"team_id":         req.TeamID,
 			"result":          "error",
 		})
 		return
@@ -525,7 +584,6 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organization
 	auditSecurityEvent("organization_member_add", map[string]any{
 		"organization_id": organizationID,
 		"user_id":         authUserID,
-		"team_id":         req.TeamID,
 		"result":          "success",
 	})
 	writeJSON(w, http.StatusCreated, member)
@@ -759,45 +817,6 @@ type updateMemberRolesRequest struct {
 	Roles []string `json:"roles"`
 }
 
-// Teams are disabled in the organization page for now.
-// Keep this handler as a commented reference for the future member-team API.
-// type updateMemberTeamRequest struct {
-// 	TeamID int64 `json:"teamId"`
-// }
-//
-// func (h *Handler) updateMemberTeam(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
-// 	if _, ok := authenticatedUserID(r); !ok {
-// 		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
-// 		return
-// 	}
-//
-// 	var req updateMemberTeamRequest
-// 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-// 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-// 		httpjson.WriteError(w, http.StatusBadRequest, "invalid json payload")
-// 		return
-// 	}
-//
-// 	member, err := h.svc.UpdateMemberTeam(r.Context(), organizationID, userID, req.TeamID)
-// 	if err != nil {
-// 		h.writeDomainError(w, err)
-// 		auditSecurityEvent("organization_member_team_update", map[string]any{
-// 			"organization_id": organizationID,
-// 			"user_id":         userID,
-// 			"team_id":         req.TeamID,
-// 			"result":          "error",
-// 		})
-// 		return
-// 	}
-// 	auditSecurityEvent("organization_member_team_update", map[string]any{
-// 		"organization_id": organizationID,
-// 		"user_id":         userID,
-// 		"team_id":         req.TeamID,
-// 		"result":          "success",
-// 	})
-// 	writeJSON(w, http.StatusOK, member)
-// }
-
 func (h *Handler) updateMemberRoles(w http.ResponseWriter, r *http.Request, organizationID, userID int64) {
 	authUserID, ok := authenticatedUserID(r)
 	if !ok {
@@ -918,6 +937,18 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func authenticatedUserID(r *http.Request) (int64, bool) {
 	raw := strings.TrimSpace(r.Header.Get("X-Authenticated-User-ID"))
+	if raw == "" {
+		return 0, false
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		return 0, false
+	}
+	return id, true
+}
+
+func authenticatedOrganizationID(r *http.Request) (int64, bool) {
+	raw := strings.TrimSpace(r.Header.Get("X-Organization-ID"))
 	if raw == "" {
 		return 0, false
 	}

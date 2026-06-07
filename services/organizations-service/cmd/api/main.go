@@ -3,22 +3,27 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	organizationsv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/organizations/v1"
+	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	projectclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/project"
 	userclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/user"
+	grpcadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/http"
 	rabbitmqadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/messaging/rabbitmq"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -47,7 +52,6 @@ func main() {
 			log.Fatalf("init project client: %v", err)
 		}
 		svc.EnableProjectHierarchy(projectLister)
-		svc.EnableProjectMemberAssignments(projectLister)
 	}
 	if cfg.UserServiceURL != "" {
 		userResolver, err := userclient.NewClient(cfg.UserServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
@@ -68,6 +72,7 @@ func main() {
 	defer invitationNotifier.Close()
 	svc.EnableInvitationNotifications(invitationNotifier, cfg.AppBaseURL, cfg.InvitationLoginURL)
 	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
+	g := grpcadapter.NewServer(svc)
 
 	mux := http.NewServeMux()
 	h.Register(mux)
@@ -75,10 +80,36 @@ func main() {
 	server := httpsrv.NewServer(cfg.HTTPAddr, internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "organizations-service")(mux))
 	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "organizations-service")
 
+	grpcServerOptions, err := grpctls.ServerOptions(grpctls.ServerConfig{
+		AllowInsecure:     cfg.GRPCAllowInsecure,
+		CertFile:          cfg.GRPCTLSCertFile,
+		KeyFile:           cfg.GRPCTLSKeyFile,
+		ClientCAFile:      cfg.GRPCTLSClientCAFile,
+		RequireClientCert: cfg.GRPCTLSRequireClientCert,
+	})
+	if err != nil {
+		log.Fatalf("configure grpc tls: %v", err)
+	}
+	grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(internalauth.NewUnaryAuthInterceptor(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "organizations-service")))
+	grpcServer := grpc.NewServer(grpcServerOptions...)
+	organizationsv1.RegisterOrganizationsServiceServer(grpcServer, g)
+
+	grpcListener, err := net.Listen("tcp", cfg.GRPCAddr)
+	if err != nil {
+		log.Fatalf("listen grpc error: %v", err)
+	}
+	defer grpcListener.Close()
+
 	go func() {
 		log.Printf("organizations-service listening on %s", cfg.HTTPAddr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("listen error: %v", err)
+		}
+	}()
+	go func() {
+		log.Printf("organizations-service grpc listening on %s", cfg.GRPCAddr)
+		if err := grpcServer.Serve(grpcListener); err != nil {
+			log.Fatalf("grpc listen error: %v", err)
 		}
 	}()
 
@@ -96,4 +127,5 @@ func main() {
 	if err := server.Shutdown(ctx); err != nil {
 		log.Printf("shutdown error: %v", err)
 	}
+	grpcServer.GracefulStop()
 }

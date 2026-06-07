@@ -22,6 +22,11 @@ func (s *promptGenerationIAClientSpy) ExecutePrompt(_ context.Context, input IAE
 	return s.result, nil
 }
 
+func (s *promptGenerationIAClientSpy) ListModels(_ context.Context, onlyActive bool) ([]AIModel, error) {
+	svc := NewService()
+	return svc.ListModels(context.Background(), onlyActive)
+}
+
 func TestParseGeneratedPromptTextsAcceptsJSONArrayInCodeFence(t *testing.T) {
 	raw := "```json\n[\"Prompt 1\", \"Prompt 2\", \"Prompt 3\", \"Prompt 4\", \"Prompt 5\", \"Prompt 6\", \"Prompt 7\", \"Prompt 8\", \"Prompt 9\", \"Prompt 10\"]\n```"
 
@@ -62,9 +67,9 @@ func TestGenerateMonitoringPromptsCreatesTenPromptsWithOpenRouterModel(t *testin
 		Domain:            "acme.com",
 		WebsiteURL:        "https://acme.com",
 		BrandName:         "Acme",
-		BrandDescription: "CRM analytics platform",
+		BrandDescription:  "CRM analytics platform",
 		Industry:          "B2B SaaS",
-		PrimaryLanguage: "fr",
+		PrimaryLanguage:   "fr",
 		Country:           "FR",
 		AttributionSource: "organic search",
 	})

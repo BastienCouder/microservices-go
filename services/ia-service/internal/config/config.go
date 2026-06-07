@@ -11,6 +11,7 @@ type Config struct {
 	HTTPAddr                 string
 	MetricsAddr              string
 	GRPCAddr                 string
+	DatabaseURL              string
 	InternalJWTSecret        string
 	InternalJWTIssuer        string
 	GRPCAllowInsecure        bool
@@ -34,6 +35,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	grpcAddr, err := envcfg.RequiredEnv("GRPC_ADDR")
+	if err != nil {
+		return Config{}, err
+	}
+	databaseURL, err := DatabaseURLFromEnv()
 	if err != nil {
 		return Config{}, err
 	}
@@ -87,6 +92,7 @@ func Load() (Config, error) {
 		HTTPAddr:                 httpAddr,
 		MetricsAddr:              envcfg.OptionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
+		DatabaseURL:              databaseURL,
 		InternalJWTSecret:        internalJWTSecret,
 		InternalJWTIssuer:        internalJWTIssuer,
 		GRPCAllowInsecure:        grpcAllowInsecure,
@@ -103,4 +109,16 @@ func Load() (Config, error) {
 		ProviderAppName:          providerAppName,
 		ProviderTimeoutMS:        providerTimeoutMS,
 	}, nil
+}
+
+func DatabaseURLFromEnv() (string, error) {
+	return envcfg.PostgresURL(
+		"IA_DB_HOST",
+		"IA_DB_PORT",
+		"IA_DB_USER",
+		"IA_DB_NAME",
+		"IA_DB_SSLMODE",
+		"IA_DB_PASSWORD",
+		"IA_DB_PASSWORD_FILE",
+	)
 }

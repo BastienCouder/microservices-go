@@ -24,6 +24,10 @@ type Repository interface {
 	AssignRole(ctx context.Context, organizationID, userID int64, role string) (*Member, error)
 	UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*Member, error)
 	RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error
+	UpsertProjectMember(ctx context.Context, member *ProjectMember) error
+	ListProjectMembers(ctx context.Context, organizationID int64, projectID string) ([]ProjectMember, error)
+	ListProjectMembersByUser(ctx context.Context, organizationID, userID int64) ([]ProjectMember, error)
+	RemoveProjectMember(ctx context.Context, organizationID int64, projectID string, userID int64) error
 	CreateInvitation(ctx context.Context, invitation *Invitation) error
 	ListInvitations(ctx context.Context, organizationID int64) ([]Invitation, error)
 	GetInvitationByID(ctx context.Context, organizationID, invitationID int64) (*Invitation, error)

@@ -132,7 +132,7 @@ func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, e
 }
 
 const getMemberByOrgAndUser = `-- name: GetMemberByOrgAndUser :one
-SELECT organization_id, user_id, COALESCE(team_id, 0) AS team_id, added_at, deleted_at
+SELECT organization_id, user_id, added_at, deleted_at
 FROM organization_members
 WHERE organization_id = $1
   AND user_id = $2
@@ -147,7 +147,6 @@ type GetMemberByOrgAndUserParams struct {
 type GetMemberByOrgAndUserRow struct {
 	OrganizationID int64
 	UserID         int64
-	TeamID         int64
 	AddedAt        pgtype.Timestamptz
 	DeletedAt      pgtype.Timestamptz
 }
@@ -158,7 +157,6 @@ func (q *Queries) GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgA
 	err := row.Scan(
 		&i.OrganizationID,
 		&i.UserID,
-		&i.TeamID,
 		&i.AddedAt,
 		&i.DeletedAt,
 	)
@@ -543,23 +541,19 @@ func (q *Queries) UpdateInvitationByID(ctx context.Context, arg UpdateInvitation
 }
 
 const upsertMember = `-- name: UpsertMember :exec
-INSERT INTO organization_members (organization_id, user_id, team_id, added_at, deleted_at)
-SELECT o.id, $2, $3, $4, NULL
+INSERT INTO organization_members (organization_id, user_id, added_at, deleted_at)
+SELECT o.id, $2, $3, NULL
 FROM organizations o
-LEFT JOIN teams t ON t.id = $3 AND t.organization_id = o.id AND t.deleted_at IS NULL
 WHERE o.id = $1
   AND o.deleted_at IS NULL
-  AND ($3 IS NULL OR t.id IS NOT NULL)
 ON CONFLICT (organization_id, user_id)
-DO UPDATE SET team_id = EXCLUDED.team_id,
-              added_at = EXCLUDED.added_at,
+DO UPDATE SET added_at = EXCLUDED.added_at,
               deleted_at = NULL
 `
 
 type UpsertMemberParams struct {
 	ID      int64
 	UserID  int64
-	TeamID  pgtype.Int8
 	AddedAt pgtype.Timestamptz
 }
 
@@ -567,7 +561,6 @@ func (q *Queries) UpsertMember(ctx context.Context, arg UpsertMemberParams) erro
 	_, err := q.db.Exec(ctx, upsertMember,
 		arg.ID,
 		arg.UserID,
-		arg.TeamID,
 		arg.AddedAt,
 	)
 	return err

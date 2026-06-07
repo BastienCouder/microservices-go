@@ -15,15 +15,14 @@ import (
 )
 
 type Service struct {
-	repo                  domain.Repository
-	projectLister         ProjectLister
-	projectMemberAssigner ProjectMemberAssigner
-	invitationNotifier    InvitationNotifier
-	userEmailResolver     UserEmailResolver
-	userProfileResolver   UserProfileResolver
-	invitationAppBaseURL  string
-	invitationLoginURL    string
-	now                   func() time.Time
+	repo                 domain.Repository
+	projectLister        ProjectLister
+	invitationNotifier   InvitationNotifier
+	userEmailResolver    UserEmailResolver
+	userProfileResolver  UserProfileResolver
+	invitationAppBaseURL string
+	invitationLoginURL   string
+	now                  func() time.Time
 }
 
 func NewService(repo domain.Repository) *Service {
@@ -32,10 +31,6 @@ func NewService(repo domain.Repository) *Service {
 
 func (s *Service) EnableProjectHierarchy(projectLister ProjectLister) {
 	s.projectLister = projectLister
-}
-
-func (s *Service) EnableProjectMemberAssignments(assigner ProjectMemberAssigner) {
-	s.projectMemberAssigner = assigner
 }
 
 func (s *Service) EnableInvitationNotifications(notifier InvitationNotifier, appBaseURL, loginURL string) {
@@ -604,10 +599,7 @@ func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int
 		return nil, nil, fmt.Errorf("accept invitation: %w", err)
 	}
 	if strings.TrimSpace(invitation.ProjectID) != "" {
-		if s.projectMemberAssigner == nil {
-			return nil, nil, fmt.Errorf("%w: project invitation assignment is not configured", domain.ErrInvalidInvitation)
-		}
-		if err := s.projectMemberAssigner.AssignProjectMember(
+		if _, err := s.AssignProjectMember(
 			ctx,
 			invitation.ProjectID,
 			invitation.OrganizationID,

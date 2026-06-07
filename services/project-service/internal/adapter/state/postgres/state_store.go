@@ -22,8 +22,8 @@ type persistedState struct {
 	Prompts               map[string]*usecase.Prompt                          `json:"prompts"`
 	Competitors           map[string]*usecase.Competitor                      `json:"competitors"`
 	Models                map[string]usecase.AIModel                          `json:"models"`
+	BrandCanonByProject   map[string]*usecase.BrandCanon                      `json:"brandCanonByProject"`
 	ProjectModels         map[string]map[string]bool                          `json:"projectModels"`
-	ProjectMembers        map[string]map[int64]*usecase.ProjectMember         `json:"projectMembers"`
 	ModelSelectionChanges map[string]usecase.ProjectModelSelectionChangeUsage `json:"modelSelectionChanges"`
 	ImpactIntegrations    map[string]*usecase.ProjectImpactIntegrations       `json:"impactIntegrations"`
 	Outbox                map[string]*usecase.OutboxEvent                     `json:"outbox"`
@@ -49,8 +49,8 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		Prompts:               make(map[string]*usecase.Prompt),
 		Competitors:           make(map[string]*usecase.Competitor),
 		Models:                make(map[string]usecase.AIModel),
+		BrandCanonByProject:   make(map[string]*usecase.BrandCanon),
 		ProjectModels:         make(map[string]map[string]bool),
-		ProjectMembers:        make(map[string]map[int64]*usecase.ProjectMember),
 		ModelSelectionChanges: make(map[string]usecase.ProjectModelSelectionChangeUsage),
 		ImpactIntegrations:    make(map[string]*usecase.ProjectImpactIntegrations),
 		Outbox:                make(map[string]*usecase.OutboxEvent),
@@ -58,9 +58,6 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	}
 
 	if err := s.loadProjects(ctx, &state); err != nil {
-		return nil, false, err
-	}
-	if err := s.loadProjectMembers(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadPrompts(ctx, &state); err != nil {
@@ -72,7 +69,7 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadCompetitors(ctx, &state); err != nil {
 		return nil, false, err
 	}
-	if err := s.loadModels(ctx, &state); err != nil {
+	if err := s.loadBrandCanon(ctx, &state); err != nil {
 		return nil, false, err
 	}
 	if err := s.loadProjectModels(ctx, &state); err != nil {
@@ -121,24 +118,20 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		`DELETE FROM project_models`,
 		`DELETE FROM project_model_selection_changes`,
 		`DELETE FROM project_impact_integrations`,
-		`DELETE FROM project_members`,
+		`DELETE FROM brand_canon`,
 		`DELETE FROM competitors`,
 		`DELETE FROM prompts`,
 		`DELETE FROM projects`,
-		`DELETE FROM ai_models`,
 	} {
 		if _, err := tx.Exec(ctx, statement); err != nil {
 			return fmt.Errorf("reset project tables: %w", err)
 		}
 	}
 
-	if err := insertProjectModelsCatalog(ctx, tx, state.Models); err != nil {
-		return err
-	}
 	if err := insertProjects(ctx, tx, state.Projects); err != nil {
 		return err
 	}
-	if err := insertProjectMembers(ctx, tx, state.ProjectMembers); err != nil {
+	if err := insertBrandCanon(ctx, tx, state.BrandCanonByProject); err != nil {
 		return err
 	}
 	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
@@ -213,37 +206,6 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		item.Industry = stringValue(industry)
 		project := item
 		state.Projects[item.ID] = &project
-	}
-	return rows.Err()
-}
-
-func (s *StateStore) loadProjectMembers(ctx context.Context, state *persistedState) error {
-	rows, err := s.db.Query(ctx, `
-		SELECT project_id, organization_id, user_id, role, added_at
-		FROM project_members
-		ORDER BY project_id ASC, user_id ASC
-	`)
-	if err != nil {
-		return fmt.Errorf("select project members: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item usecase.ProjectMember
-		if err := rows.Scan(
-			&item.ProjectID,
-			&item.OrganizationID,
-			&item.UserID,
-			&item.Role,
-			&item.AddedAt,
-		); err != nil {
-			return fmt.Errorf("scan project member: %w", err)
-		}
-		if state.ProjectMembers[item.ProjectID] == nil {
-			state.ProjectMembers[item.ProjectID] = make(map[int64]*usecase.ProjectMember)
-		}
-		member := item
-		state.ProjectMembers[item.ProjectID][item.UserID] = &member
 	}
 	return rows.Err()
 }
@@ -379,6 +341,54 @@ func (s *StateStore) loadCompetitors(ctx context.Context, state *persistedState)
 	return rows.Err()
 }
 
+func (s *StateStore) loadBrandCanon(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+			SELECT project_id, brand_name, category, positioning, audience, use_cases, features, created_at, updated_at
+		FROM brand_canon
+		ORDER BY project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select brand canon: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			item        usecase.BrandCanon
+			brandName   *string
+			category    *string
+			positioning *string
+			rawAudience []byte
+			rawUseCases []byte
+			rawFeatures []byte
+		)
+		if err := rows.Scan(
+			&item.ProjectID,
+			&brandName,
+			&category,
+			&positioning,
+			&rawAudience,
+			&rawUseCases,
+			&rawFeatures,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan brand canon: %w", err)
+		}
+
+		item.BrandName = stringValue(brandName)
+		item.Category = stringValue(category)
+		item.Positioning = stringValue(positioning)
+		item.Audience = decodeStringSlice(rawAudience)
+		item.UseCases = decodeStringSlice(rawUseCases)
+		item.Features = decodeStringSlice(rawFeatures)
+
+		canon := item
+		state.BrandCanonByProject[item.ProjectID] = &canon
+	}
+	return rows.Err()
+}
+
 func (s *StateStore) loadModels(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT id, display_name, provider, group_name, icon_key, provider_model_id, is_active, supports_live_search,
@@ -496,16 +506,10 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 	rows, err := s.db.Query(ctx, `
 		SELECT project_id,
 		       ga4_property_id,
-		       ga4_service_account_ciphertext,
-		       ga4_oauth_refresh_token_ciphertext,
-		       ga4_connected_at,
-		       ga4_updated_at,
-		       stripe_webhook_secret_ciphertext,
-		       stripe_connected_at,
-		       stripe_updated_at,
-		       ingestion_signing_token_ciphertext,
-		       ingestion_connected_at,
-		       ingestion_updated_at
+			       ga4_service_account_ciphertext,
+			       ga4_oauth_refresh_token_ciphertext,
+			       ga4_connected_at,
+			       ga4_updated_at
 		FROM project_impact_integrations
 		ORDER BY project_id ASC
 	`)
@@ -522,12 +526,6 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 			ga4OAuthRefreshCipher   *string
 			ga4ConnectedAt          *time.Time
 			ga4UpdatedAt            *time.Time
-			stripeWebhookCipher     *string
-			stripeConnectedAt       *time.Time
-			stripeUpdatedAt         *time.Time
-			ingestionSigningCipher  *string
-			ingestionConnectedAt    *time.Time
-			ingestionUpdatedAt      *time.Time
 		)
 		if err := rows.Scan(
 			&projectID,
@@ -536,12 +534,6 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 			&ga4OAuthRefreshCipher,
 			&ga4ConnectedAt,
 			&ga4UpdatedAt,
-			&stripeWebhookCipher,
-			&stripeConnectedAt,
-			&stripeUpdatedAt,
-			&ingestionSigningCipher,
-			&ingestionConnectedAt,
-			&ingestionUpdatedAt,
 		); err != nil {
 			return fmt.Errorf("scan project impact integration: %w", err)
 		}
@@ -554,15 +546,6 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 		if err != nil {
 			return fmt.Errorf("decrypt ga4 oauth refresh token for project %s: %w", projectID, err)
 		}
-		stripeWebhookSecret, err := s.codec.Decrypt(stringValue(stripeWebhookCipher))
-		if err != nil {
-			return fmt.Errorf("decrypt stripe webhook secret for project %s: %w", projectID, err)
-		}
-		ingestionSigningToken, err := s.codec.Decrypt(stringValue(ingestionSigningCipher))
-		if err != nil {
-			return fmt.Errorf("decrypt ingestion signing token for project %s: %w", projectID, err)
-		}
-
 		value := usecase.ProjectImpactIntegrations{
 			ProjectID: projectID,
 			GA4: usecase.ProjectGA4Integration{
@@ -571,16 +554,6 @@ func (s *StateStore) loadImpactIntegrations(ctx context.Context, state *persiste
 				OAuthRefreshToken:  ga4OAuthRefreshToken,
 				ConnectedAt:        timeValue(ga4ConnectedAt),
 				UpdatedAt:          timeValue(ga4UpdatedAt),
-			},
-			Stripe: usecase.ProjectStripeIntegration{
-				WebhookSecret: stripeWebhookSecret,
-				ConnectedAt:   timeValue(stripeConnectedAt),
-				UpdatedAt:     timeValue(stripeUpdatedAt),
-			},
-			Ingestion: usecase.ProjectIngestionIntegration{
-				SigningToken: ingestionSigningToken,
-				ConnectedAt:  timeValue(ingestionConnectedAt),
-				UpdatedAt:    timeValue(ingestionUpdatedAt),
 			},
 		}
 		state.ImpactIntegrations[projectID] = &value
@@ -648,6 +621,35 @@ func insertProjectModelsCatalog(ctx context.Context, tx pgx.Tx, models map[strin
 	return nil
 }
 
+func insertBrandCanon(ctx context.Context, tx pgx.Tx, canonByProject map[string]*usecase.BrandCanon) error {
+	for _, projectID := range sortedBrandCanonProjectIDs(canonByProject) {
+		canon := canonByProject[projectID]
+		if canon == nil {
+			continue
+		}
+		audience, err := json.Marshal(canon.Audience)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon audience for project %s: %w", projectID, err)
+		}
+		useCases, err := json.Marshal(canon.UseCases)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon use cases for project %s: %w", projectID, err)
+		}
+		features, err := json.Marshal(canon.Features)
+		if err != nil {
+			return fmt.Errorf("marshal brand canon features for project %s: %w", projectID, err)
+		}
+
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO brand_canon (project_id, brand_name, category, positioning, audience, use_cases, features, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7::jsonb, $8, $9)
+		`, canon.ProjectID, nullIfEmpty(canon.BrandName), nullIfEmpty(canon.Category), nullIfEmpty(canon.Positioning), string(audience), string(useCases), string(features), canon.CreatedAt, canon.UpdatedAt); err != nil {
+			return fmt.Errorf("insert brand canon for project %s: %w", projectID, err)
+		}
+	}
+	return nil
+}
+
 func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase.Project) error {
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
@@ -656,29 +658,6 @@ func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
-		}
-	}
-	return nil
-}
-
-func insertProjectMembers(ctx context.Context, tx pgx.Tx, projectMembers map[string]map[int64]*usecase.ProjectMember) error {
-	for _, projectID := range sortedProjectMemberProjectIDs(projectMembers) {
-		userIDs := make([]int64, 0, len(projectMembers[projectID]))
-		for userID := range projectMembers[projectID] {
-			userIDs = append(userIDs, userID)
-		}
-		sort.Slice(userIDs, func(i, j int) bool { return userIDs[i] < userIDs[j] })
-		for _, userID := range userIDs {
-			member := projectMembers[projectID][userID]
-			if member == nil {
-				continue
-			}
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO project_members (project_id, organization_id, user_id, role, added_at)
-				VALUES ($1, $2, $3, $4, $5)
-			`, member.ProjectID, member.OrganizationID, member.UserID, member.Role, member.AddedAt); err != nil {
-				return fmt.Errorf("insert project member %s/%d: %w", member.ProjectID, member.UserID, err)
-			}
 		}
 	}
 	return nil
@@ -799,46 +778,25 @@ func (s *StateStore) insertImpactIntegrations(
 		if err != nil {
 			return fmt.Errorf("encrypt ga4 oauth refresh token for project %s: %w", projectID, err)
 		}
-		stripeWebhookCipher, err := s.codec.Encrypt(item.Stripe.WebhookSecret)
-		if err != nil {
-			return fmt.Errorf("encrypt stripe webhook secret for project %s: %w", projectID, err)
-		}
-		ingestionSigningCipher, err := s.codec.Encrypt(item.Ingestion.SigningToken)
-		if err != nil {
-			return fmt.Errorf("encrypt ingestion signing token for project %s: %w", projectID, err)
-		}
-
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO project_impact_integrations (
-				project_id,
-				ga4_property_id,
-				ga4_service_account_ciphertext,
-				ga4_oauth_refresh_token_ciphertext,
-				ga4_connected_at,
-				ga4_updated_at,
-				stripe_webhook_secret_ciphertext,
-				stripe_connected_at,
-				stripe_updated_at,
-				ingestion_signing_token_ciphertext,
-				ingestion_connected_at,
-				ingestion_updated_at,
-				created_at,
-				updated_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
-		`,
+				INSERT INTO project_impact_integrations (
+					project_id,
+					ga4_property_id,
+					ga4_service_account_ciphertext,
+					ga4_oauth_refresh_token_ciphertext,
+					ga4_connected_at,
+					ga4_updated_at,
+					created_at,
+					updated_at
+				)
+				VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+			`,
 			projectID,
 			nullIfEmpty(item.GA4.PropertyID),
 			nullIfEmpty(ga4ServiceAccountCipher),
 			nullIfEmpty(ga4OAuthRefreshCipher),
 			nullIfZeroTime(item.GA4.ConnectedAt),
 			nullIfZeroTime(item.GA4.UpdatedAt),
-			nullIfEmpty(stripeWebhookCipher),
-			nullIfZeroTime(item.Stripe.ConnectedAt),
-			nullIfZeroTime(item.Stripe.UpdatedAt),
-			nullIfEmpty(ingestionSigningCipher),
-			nullIfZeroTime(item.Ingestion.ConnectedAt),
-			nullIfZeroTime(item.Ingestion.UpdatedAt),
 		); err != nil {
 			return fmt.Errorf("insert project impact integration %s: %w", projectID, err)
 		}
@@ -872,15 +830,6 @@ func sortedProjectIDs(items map[string]*usecase.Project) []string {
 	return ids
 }
 
-func sortedProjectMemberProjectIDs(items map[string]map[int64]*usecase.ProjectMember) []string {
-	ids := make([]string, 0, len(items))
-	for id := range items {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 func sortedPromptIDs(items map[string]*usecase.Prompt) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
@@ -891,6 +840,15 @@ func sortedPromptIDs(items map[string]*usecase.Prompt) []string {
 }
 
 func sortedCompetitorIDs(items map[string]*usecase.Competitor) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedBrandCanonProjectIDs(items map[string]*usecase.BrandCanon) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)
@@ -965,6 +923,31 @@ func stringValue(value *string) string {
 		return ""
 	}
 	return *value
+}
+
+func decodeStringSlice(raw []byte) []string {
+	if len(raw) == 0 {
+		return []string{}
+	}
+	var values []string
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return []string{}
+	}
+	return values
+}
+
+func decodeMap(raw []byte) map[string]any {
+	if len(raw) == 0 {
+		return map[string]any{}
+	}
+	var values map[string]any
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return map[string]any{}
+	}
+	if values == nil {
+		return map[string]any{}
+	}
+	return values
 }
 
 func timeValue(value *time.Time) time.Time {

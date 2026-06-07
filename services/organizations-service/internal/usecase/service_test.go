@@ -10,51 +10,32 @@ import (
 )
 
 type fakeRepo struct {
-	organizations map[int64]*domain.Organization
-	apiKeys       map[int64]domain.OrganizationAPIKey
-	teams         map[int64][]domain.Team
-	members       map[[2]int64]domain.Member
-	invitations   map[int64]domain.Invitation
-	tokenIndex    map[string]int64
-	nextOrgID     int64
-	nextAPIKeyID  int64
-	nextTeamID    int64
-	nextInviteID  int64
-}
-
-type fakeProjectMemberAssigner struct {
-	calls []fakeProjectMemberAssignment
-}
-
-type fakeProjectMemberAssignment struct {
-	projectID      string
-	organizationID int64
-	userID         int64
-	role           string
-}
-
-func (f *fakeProjectMemberAssigner) AssignProjectMember(_ context.Context, projectID string, organizationID, userID int64, role string) error {
-	f.calls = append(f.calls, fakeProjectMemberAssignment{
-		projectID:      projectID,
-		organizationID: organizationID,
-		userID:         userID,
-		role:           role,
-	})
-	return nil
+	organizations  map[int64]*domain.Organization
+	apiKeys        map[int64]domain.OrganizationAPIKey
+	teams          map[int64][]domain.Team
+	members        map[[2]int64]domain.Member
+	projectMembers map[string]map[int64]domain.ProjectMember
+	invitations    map[int64]domain.Invitation
+	tokenIndex     map[string]int64
+	nextOrgID      int64
+	nextAPIKeyID   int64
+	nextTeamID     int64
+	nextInviteID   int64
 }
 
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
-		organizations: make(map[int64]*domain.Organization),
-		apiKeys:       make(map[int64]domain.OrganizationAPIKey),
-		teams:         make(map[int64][]domain.Team),
-		members:       make(map[[2]int64]domain.Member),
-		invitations:   make(map[int64]domain.Invitation),
-		tokenIndex:    make(map[string]int64),
-		nextOrgID:     1,
-		nextAPIKeyID:  1,
-		nextTeamID:    1,
-		nextInviteID:  1,
+		organizations:  make(map[int64]*domain.Organization),
+		apiKeys:        make(map[int64]domain.OrganizationAPIKey),
+		teams:          make(map[int64][]domain.Team),
+		members:        make(map[[2]int64]domain.Member),
+		projectMembers: make(map[string]map[int64]domain.ProjectMember),
+		invitations:    make(map[int64]domain.Invitation),
+		tokenIndex:     make(map[string]int64),
+		nextOrgID:      1,
+		nextAPIKeyID:   1,
+		nextTeamID:     1,
+		nextInviteID:   1,
 	}
 }
 
@@ -338,6 +319,55 @@ func (f *fakeRepo) RemoveMember(_ context.Context, organizationID, userID int64,
 	member.DeletedAt = &removedAt
 	member.Roles = nil
 	f.members[key] = member
+	return nil
+}
+
+func (f *fakeRepo) UpsertProjectMember(_ context.Context, member *domain.ProjectMember) error {
+	if _, ok := f.organizations[member.OrganizationID]; !ok {
+		return domain.ErrOrganizationNotFound
+	}
+	if f.projectMembers[member.ProjectID] == nil {
+		f.projectMembers[member.ProjectID] = make(map[int64]domain.ProjectMember)
+	}
+	clone := *member
+	f.projectMembers[member.ProjectID][member.UserID] = clone
+	return nil
+}
+
+func (f *fakeRepo) ListProjectMembers(_ context.Context, organizationID int64, projectID string) ([]domain.ProjectMember, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	out := make([]domain.ProjectMember, 0)
+	for _, member := range f.projectMembers[projectID] {
+		if member.OrganizationID == organizationID {
+			out = append(out, member)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) ListProjectMembersByUser(_ context.Context, organizationID, userID int64) ([]domain.ProjectMember, error) {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	out := make([]domain.ProjectMember, 0)
+	for _, membersByUser := range f.projectMembers {
+		member, ok := membersByUser[userID]
+		if ok && member.OrganizationID == organizationID {
+			out = append(out, member)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) RemoveProjectMember(_ context.Context, organizationID int64, projectID string, userID int64) error {
+	if _, ok := f.organizations[organizationID]; !ok {
+		return domain.ErrOrganizationNotFound
+	}
+	if f.projectMembers[projectID] != nil {
+		delete(f.projectMembers[projectID], userID)
+	}
 	return nil
 }
 

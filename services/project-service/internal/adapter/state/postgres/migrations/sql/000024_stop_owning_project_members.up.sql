@@ -1,0 +1,3 @@
+-- project_members is now owned by organizations-service.
+-- Keep the legacy project-service table in place until a cross-database backfill
+-- has copied existing memberships into organizations-service.

@@ -294,7 +294,7 @@ func (h *Handler) publicProjectSubroute(r *http.Request, path string, claims int
 		return publicRouteTarget{handler: h.projectProxy, service: "project-service", path: "/projects/" + url.PathEscape(projectID) + "/analysis/perception/run", query: r.URL.RawQuery, claims: claims}, true
 	}
 	if len(parts) >= 3 && parts[2] == "brand-canon" {
-		return publicRouteTarget{handler: h.analysisProxy, service: "analysis-service", path: "/analysis/projects/" + url.PathEscape(projectID) + "/brand-canon", query: r.URL.RawQuery, claims: claims}, true
+		return publicRouteTarget{handler: h.projectProxy, service: "project-service", path: "/projects/" + url.PathEscape(projectID) + "/brand-canon", query: r.URL.RawQuery, claims: claims}, true
 	}
 	if len(parts) >= 3 && parts[2] == "optimization-errors" {
 		return publicRouteTarget{handler: h.analysisProxy, service: "analysis-service", path: "/analysis/projects/" + url.PathEscape(projectID) + "/optimization-errors", query: r.URL.RawQuery, claims: claims}, true

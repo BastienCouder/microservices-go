@@ -22,6 +22,7 @@ import (
 	openai "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openai"
 	openrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/openrouter"
 	providerrouter "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/provider/router"
+	iastate "github.com/bastiencouder/microservices-go/services/ia-service/internal/adapter/state/postgres"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/ia-service/internal/usecase"
 )
@@ -34,6 +35,15 @@ func main() {
 	if code, ok := serviceboot.RunHealthcheckMode(); ok {
 		os.Exit(code)
 	}
+	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
+		os.Exit(code)
+	}
+
+	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "ia-service")
+	if err != nil {
+		log.Fatalf("wait for ia database: %v", err)
+	}
+	defer db.Close()
 
 	httpClient := &http.Client{
 		Transport: &http.Transport{
@@ -73,8 +83,9 @@ func main() {
 	}
 
 	svc, err := usecase.NewServiceWithDependencies(usecase.Dependencies{
-		Mode:     usecase.ExecutionMode(cfg.ExecutionMode),
-		Provider: provider,
+		Mode:         usecase.ExecutionMode(cfg.ExecutionMode),
+		Provider:     provider,
+		CatalogStore: iastate.NewCatalogStore(db),
 	})
 	if err != nil {
 		log.Fatalf("initialize ia service: %v", err)

@@ -34,4 +34,4 @@ require (
 	google.golang.org/protobuf v1.36.8 // indirect
 )
 
-replace github.com/bastiencouder/microservices-go/contracts => ../../contracts
+replace github.com/bastiencouder/microservices-go/contracts => ../contracts
