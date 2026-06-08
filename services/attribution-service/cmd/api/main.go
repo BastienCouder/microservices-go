@@ -14,10 +14,8 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	ga4client "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/ga4"
-	projectclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/project"
-	projectapiclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/projectapi"
+	projectgrpcclient "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/client/projectgrpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/http"
-	attributionrepo "github.com/bastiencouder/microservices-go/services/attribution-service/internal/adapter/repository/postgres"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/config"
 	"github.com/bastiencouder/microservices-go/services/attribution-service/internal/usecase"
 )
@@ -27,49 +25,30 @@ func main() {
 	if err != nil {
 		log.Fatalf("load config: %v", err)
 	}
-	if code, ok := serviceboot.RunDatabaseHealthcheckMode(cfg.DatabaseURL); ok {
-		os.Exit(code)
-	}
 
-	db, err := serviceboot.WaitForDatabase(context.Background(), cfg.DatabaseURL, "attribution-service")
-	if err != nil {
-		log.Fatalf("wait for attribution database: %v", err)
+	grpcClientTLS := grpctls.ClientConfig{
+		AllowInsecure: cfg.GRPCAllowInsecure,
+		CAFile:        cfg.GRPCTLSCAFile,
+		CertFile:      cfg.GRPCTLSCertFile,
+		KeyFile:       cfg.GRPCTLSKeyFile,
+		ServerName:    cfg.GRPCTLSServerName,
 	}
-	defer db.Close()
-
-	projectVerifier, err := projectclient.NewClient(
-		cfg.ProjectServiceGRPCAddr,
-		cfg.InternalJWTSecret,
-		cfg.InternalJWTIssuer,
-		grpctls.ClientConfig{
-			AllowInsecure: cfg.GRPCAllowInsecure,
-			CAFile:        cfg.GRPCTLSCAFile,
-			CertFile:      cfg.GRPCTLSCertFile,
-			KeyFile:       cfg.GRPCTLSKeyFile,
-			ServerName:    cfg.GRPCTLSServerName,
-		},
-	)
+	projectResolver, err := projectgrpcclient.NewClient(cfg.ProjectServiceGRPCAddr, cfg.InternalJWTSecret, cfg.InternalJWTIssuer, grpcClientTLS)
 	if err != nil {
 		log.Fatalf("init project grpc client: %v", err)
 	}
-	defer projectVerifier.Close()
-
-	repo := attributionrepo.NewRepository(db)
-	svc := usecase.NewService(repo, projectVerifier)
-	if cfg.ProjectServiceURL != "" {
-		projectResolver, err := projectapiclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
-		if err != nil {
-			log.Fatalf("init project api client: %v", err)
-		}
-		visitProvider := ga4client.NewClientWithOAuth(cfg.GA4.OAuthClientID, cfg.GA4.OAuthClientSecret)
-		visitProvider.SetFakeTrafficEnabled(cfg.GA4.FakeTrafficEnabled)
-		svc.EnableVisitProvider(projectResolver, visitProvider)
-		svc.EnableTrafficProvider(projectResolver, visitProvider)
-	}
-	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
+	defer projectResolver.Close()
+	trafficProvider := ga4client.NewClientWithOAuth(cfg.GA4.OAuthClientID, cfg.GA4.OAuthClientSecret)
+	trafficProvider.SetFakeTrafficEnabled(cfg.GA4.FakeTrafficEnabled)
+	svc := usecase.NewService(projectResolver, trafficProvider)
 
 	mux := http.NewServeMux()
-	h.Register(mux)
+	httpadapter.NewHandler(svc, func(ctx context.Context) error {
+		if err := projectResolver.Ready(ctx); err != nil {
+			return err
+		}
+		return trafficProvider.Ready(ctx)
+	}).Register(mux)
 
 	server := httpsrv.NewServer(
 		cfg.HTTPAddr,

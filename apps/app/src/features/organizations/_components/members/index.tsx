@@ -55,7 +55,7 @@ export function MembersPanel({
   const currentRoles = currentMember?.roles ?? [];
   const canShowAnyActions = getMemberActionPolicy({
     actorRoles: currentRoles,
-    targetRoles: ["member"],
+    targetRoles: ["viewer"],
   }).showActions;
   const emailByUserId = useMemo(() => {
     const emails = new Map<string, string>();

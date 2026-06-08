@@ -11,8 +11,6 @@ type Service struct {
 	repo              domain.Repository
 	stripe            StripeProvider
 	stripeCatalog     StripeCatalog
-	attribution       AttributionClient
-	projectResolver   ProjectResolver
 	defaultSuccessURL string
 	defaultCancelURL  string
 	defaultPortalURL  string
@@ -29,11 +27,6 @@ func (s *Service) EnableStripe(provider StripeProvider, catalog StripeCatalog, d
 	s.defaultSuccessURL = strings.TrimSpace(defaultSuccessURL)
 	s.defaultCancelURL = strings.TrimSpace(defaultCancelURL)
 	s.defaultPortalURL = strings.TrimSpace(defaultPortalURL)
-}
-
-func (s *Service) EnableAttribution(attribution AttributionClient, projectResolver ProjectResolver) {
-	s.attribution = attribution
-	s.projectResolver = projectResolver
 }
 
 func (s *Service) stripeEnabled() bool {

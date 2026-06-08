@@ -138,7 +138,9 @@ func (h *Handler) listProjects(w http.ResponseWriter, r *http.Request) {
 
 	var projects []usecase.Project
 	var err error
-	if userID, ok := authenticatedUserID(r); ok {
+	if hasOrganizationFullAccess(r) {
+		projects, err = h.svc.ListProjects(r.Context(), organizationID)
+	} else if userID, ok := authenticatedUserID(r); ok {
 		projects, err = h.svc.ListProjectsForUser(r.Context(), organizationID, userID)
 	} else {
 		projects, err = h.svc.ListProjects(r.Context(), organizationID)
@@ -225,7 +227,7 @@ func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, pr
 	if !ok {
 		return true
 	}
-	if err := h.svc.EnforceUserProjectAccess(r.Context(), projectID, organizationID, userID); err != nil {
+	if err := h.svc.EnforceUserProjectActionAccess(r.Context(), projectID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
 		h.writeUsecaseError(w, err)
 		return false
 	}
@@ -233,11 +235,14 @@ func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, pr
 }
 
 func (h *Handler) allowPromptRequest(w http.ResponseWriter, r *http.Request, promptID string, organizationID int64) bool {
+	if hasOrganizationFullAccess(r) {
+		return true
+	}
 	userID, ok := authenticatedUserID(r)
 	if !ok {
 		return true
 	}
-	if err := h.svc.EnforceUserPromptAccess(r.Context(), promptID, organizationID, userID); err != nil {
+	if err := h.svc.EnforceUserPromptActionAccess(r.Context(), promptID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
 		h.writeUsecaseError(w, err)
 		return false
 	}
@@ -245,11 +250,14 @@ func (h *Handler) allowPromptRequest(w http.ResponseWriter, r *http.Request, pro
 }
 
 func (h *Handler) allowCompetitorRequest(w http.ResponseWriter, r *http.Request, competitorID string, organizationID int64) bool {
+	if hasOrganizationFullAccess(r) {
+		return true
+	}
 	userID, ok := authenticatedUserID(r)
 	if !ok {
 		return true
 	}
-	if err := h.svc.EnforceUserCompetitorAccess(r.Context(), competitorID, organizationID, userID); err != nil {
+	if err := h.svc.EnforceUserCompetitorActionAccess(r.Context(), competitorID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
 		h.writeUsecaseError(w, err)
 		return false
 	}
@@ -359,7 +367,12 @@ func (h *Handler) deleteProject(w http.ResponseWriter, r *http.Request, projectI
 }
 
 func (h *Handler) getProjectImpactContext(w http.ResponseWriter, r *http.Request, projectID string) {
-	contextValue, err := h.svc.GetProjectImpactContext(r.Context(), projectID)
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+	contextValue, err := h.svc.GetProjectImpactContext(r.Context(), projectID, organizationID)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -391,9 +404,7 @@ func (h *Handler) getProjectImpactIntegrations(w http.ResponseWriter, r *http.Re
 }
 
 type updateProjectImpactIntegrationsRequest struct {
-	GA4       *updateProjectGA4IntegrationRequest       `json:"ga4"`
-	Stripe    *updateProjectStripeIntegrationRequest    `json:"stripe"`
-	Ingestion *updateProjectIngestionIntegrationRequest `json:"ingestion"`
+	GA4 *updateProjectGA4IntegrationRequest `json:"ga4"`
 }
 
 type updateProjectGA4IntegrationRequest struct {
@@ -417,16 +428,6 @@ type selectProjectGA4OAuthPropertyRequest struct {
 	PropertyID string `json:"propertyId"`
 }
 
-type updateProjectStripeIntegrationRequest struct {
-	WebhookSecret *string `json:"webhookSecret"`
-	Disconnect    bool    `json:"disconnect"`
-}
-
-type updateProjectIngestionIntegrationRequest struct {
-	Rotate     bool `json:"rotate"`
-	Disconnect bool `json:"disconnect"`
-}
-
 func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -448,19 +449,6 @@ func (h *Handler) updateProjectImpactIntegrations(w http.ResponseWriter, r *http
 			Disconnect:         req.GA4.Disconnect,
 		}
 	}
-	if req.Stripe != nil {
-		input.Stripe = &usecase.UpdateProjectStripeIntegrationInput{
-			WebhookSecret: req.Stripe.WebhookSecret,
-			Disconnect:    req.Stripe.Disconnect,
-		}
-	}
-	if req.Ingestion != nil {
-		input.Ingestion = &usecase.UpdateProjectIngestionIntegrationInput{
-			Rotate:     req.Ingestion.Rotate,
-			Disconnect: req.Ingestion.Disconnect,
-		}
-	}
-
 	value, err := h.svc.UpdateProjectImpactIntegrations(r.Context(), projectID, organizationID, input)
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -1021,13 +1009,12 @@ func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectI
 }
 
 type updateBrandCanonRequest struct {
-	BrandName   *string         `json:"brandName"`
-	Category    *string         `json:"category"`
-	Positioning *string         `json:"positioning"`
-	Audience    *[]string       `json:"audience"`
-	UseCases    *[]string       `json:"useCases"`
-	Pricing     *map[string]any `json:"pricing"`
-	Features    *[]string       `json:"features"`
+	BrandName   *string   `json:"brandName"`
+	Category    *string   `json:"category"`
+	Positioning *string   `json:"positioning"`
+	Audience    *[]string `json:"audience"`
+	UseCases    *[]string `json:"useCases"`
+	Features    *[]string `json:"features"`
 }
 
 func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -1047,7 +1034,6 @@ func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, proje
 		Positioning: req.Positioning,
 		Audience:    req.Audience,
 		UseCases:    req.UseCases,
-		Pricing:     req.Pricing,
 		Features:    req.Features,
 	})
 	if err != nil {
@@ -1139,6 +1125,19 @@ func hasOrganizationFullAccess(r *http.Request) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func projectActionFromMethod(method string) string {
+	switch method {
+	case http.MethodPost:
+		return "create"
+	case http.MethodPut, http.MethodPatch:
+		return "update"
+	case http.MethodDelete:
+		return "delete"
+	default:
+		return "read"
 	}
 }
 

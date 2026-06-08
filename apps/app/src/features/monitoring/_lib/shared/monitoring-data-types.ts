@@ -99,8 +99,7 @@ export type MonitoringRequestScope =
   | "project"
   | "models"
   | "competitors"
-  | "monitoring"
-  | "alerts";
+  | "monitoring";
 
 export class MonitoringRequestError extends Error {
   scope: MonitoringRequestScope;

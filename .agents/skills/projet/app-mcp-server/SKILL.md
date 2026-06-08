@@ -1,6 +1,6 @@
 ---
 name: app-mcp-server
-description: Use when designing, implementing, or reviewing a Model Context Protocol server for this microservices-go app. Covers MCP tools/resources/prompts for projects, prompts, competitors, analysis runs, AI Agent Ready scans, content crawls, attribution events, API-key authentication, public API-first routing, safety boundaries, pagination, idempotency, and validation.
+description: Use when designing, implementing, or reviewing a Model Context Protocol server for this microservices-go app. Covers MCP tools/resources/prompts for projects, prompts, competitors, analysis runs, AI Agent Ready scans, content crawls, API-key authentication, public API-first routing, safety boundaries, pagination, idempotency, and validation.
 ---
 
 # App MCP Server
@@ -82,7 +82,7 @@ Add MCP prompts only when they improve repeatable workflows:
 - `app_monitor_brand_visibility`
 - `app_audit_agent_readiness`
 - `app_analyze_content_opportunities`
-- `app_review_traffic_attribution`
+- `app_review_traffic_report`
 
 Prompts should ask for a `project_id` or enough filters to find one. They should instruct the assistant to list candidates before mutating anything when multiple projects match.
 
@@ -191,14 +191,10 @@ app_analyze_content_records
 
 `app_start_content_crawl` returns `crawl_id`/job ID and follow-up URL. The list tool exists because the product is API-first and clients must be able to recover IDs.
 
-### Attribution
+### Traffic
 
 ```text
-app_create_attribution_event
-app_list_attribution_events
-app_get_attribution_funnel
 app_get_traffic_report
-app_ingest_attribution_event
 ```
 
 Keep event ingestion simple and validate `stage`, `source`, `count`, `revenue_cents`, and `occurred_at`.

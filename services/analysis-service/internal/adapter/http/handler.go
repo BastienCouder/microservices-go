@@ -55,13 +55,11 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/analysis/agent-ready/scans/", h.handleAgentReadyScan)
 	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/analysis/runs/", h.analysisRunRoutes)
-	mux.HandleFunc("/analysis/alerts/", h.analysisAlertRoutes)
 	mux.HandleFunc("/onboarding/brand-profile", h.previewOnboardingBrandProfile)
 
 	// Compatibility aliases for direct service calls without /analysis prefix.
 	mux.HandleFunc("/projects/", h.projectRoutes)
 	mux.HandleFunc("/runs/", h.runRoutes)
-	mux.HandleFunc("/alerts/", h.alertRoutes)
 }
 
 func (h *Handler) health(w http.ResponseWriter, _ *http.Request) {
@@ -84,20 +82,12 @@ func (h *Handler) analysisRunRoutes(w http.ResponseWriter, r *http.Request) {
 	h.runRoutesWithPrefix(w, r, "/analysis/runs/")
 }
 
-func (h *Handler) analysisAlertRoutes(w http.ResponseWriter, r *http.Request) {
-	h.alertRoutesWithPrefix(w, r, "/analysis/alerts/")
-}
-
 func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	h.projectRoutesWithPrefix(w, r, "/projects/")
 }
 
 func (h *Handler) runRoutes(w http.ResponseWriter, r *http.Request) {
 	h.runRoutesWithPrefix(w, r, "/runs/")
-}
-
-func (h *Handler) alertRoutes(w http.ResponseWriter, r *http.Request) {
-	h.alertRoutesWithPrefix(w, r, "/alerts/")
 }
 
 func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
@@ -141,12 +131,6 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getBrandCanon(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodPatch:
 		h.updateBrandCanon(w, r, projectID)
-	case len(parts) == 2 && parts[1] == "alerts" && r.Method == http.MethodGet:
-		h.listAlerts(w, r, projectID)
-	case len(parts) == 2 && parts[1] == "alerts" && r.Method == http.MethodPost:
-		h.createAlert(w, r, projectID)
-	case len(parts) == 3 && parts[1] == "alerts" && parts[2] == "read-all" && r.Method == http.MethodPost:
-		h.markAllAlertsRead(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
@@ -160,19 +144,6 @@ func (h *Handler) runRoutesWithPrefix(w http.ResponseWriter, r *http.Request, pr
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "responses" && r.Method == http.MethodPost {
 		h.recordResponse(w, r, parts[0])
-		return
-	}
-	http.NotFound(w, r)
-}
-
-func (h *Handler) alertRoutesWithPrefix(w http.ResponseWriter, r *http.Request, prefix string) {
-	parts := splitPathAfter(r.URL.Path, prefix)
-	if len(parts) == 2 && parts[1] == "read" && r.Method == http.MethodPatch {
-		h.markAlertRead(w, r, parts[0])
-		return
-	}
-	if len(parts) == 1 && r.Method == http.MethodDelete {
-		h.deleteAlert(w, r, parts[0])
 		return
 	}
 	http.NotFound(w, r)
@@ -637,13 +608,12 @@ func (h *Handler) getBrandCanon(w http.ResponseWriter, r *http.Request, projectI
 }
 
 type updateBrandCanonRequest struct {
-	BrandName   *string         `json:"brandName"`
-	Category    *string         `json:"category"`
-	Positioning *string         `json:"positioning"`
-	Audience    *[]string       `json:"audience"`
-	UseCases    *[]string       `json:"useCases"`
-	Pricing     *map[string]any `json:"pricing"`
-	Features    *[]string       `json:"features"`
+	BrandName   *string   `json:"brandName"`
+	Category    *string   `json:"category"`
+	Positioning *string   `json:"positioning"`
+	Audience    *[]string `json:"audience"`
+	UseCases    *[]string `json:"useCases"`
+	Features    *[]string `json:"features"`
 }
 
 func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -665,7 +635,6 @@ func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, proje
 		Positioning: req.Positioning,
 		Audience:    req.Audience,
 		UseCases:    req.UseCases,
-		Pricing:     req.Pricing,
 		Features:    req.Features,
 	})
 	if err != nil {
@@ -673,97 +642,6 @@ func (h *Handler) updateBrandCanon(w http.ResponseWriter, r *http.Request, proje
 		return
 	}
 	writeSuccess(w, http.StatusOK, brandCanon)
-}
-
-type createAlertRequest struct {
-	AlertType   string `json:"alertType"`
-	Severity    string `json:"severity"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-}
-
-func (h *Handler) createAlert(w http.ResponseWriter, r *http.Request, projectID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	var req createAlertRequest
-	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
-		httpjson.WriteInvalidJSON(w)
-		return
-	}
-	alert, err := h.svc.CreateAlert(r.Context(), projectID, organizationID, usecase.CreateAlertInput{
-		AlertType:   req.AlertType,
-		Severity:    req.Severity,
-		Title:       req.Title,
-		Description: req.Description,
-	})
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusCreated, alert)
-}
-
-func (h *Handler) listAlerts(w http.ResponseWriter, r *http.Request, projectID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	unreadOnly := strings.EqualFold(strings.TrimSpace(r.URL.Query().Get("unreadOnly")), "true")
-	alerts, err := h.svc.ListAlerts(r.Context(), projectID, organizationID, unreadOnly)
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, alerts)
-}
-
-func (h *Handler) markAlertRead(w http.ResponseWriter, r *http.Request, alertID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	alert, err := h.svc.MarkAlertRead(r.Context(), alertID, organizationID)
-	if err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, alert)
-}
-
-func (h *Handler) markAllAlertsRead(w http.ResponseWriter, r *http.Request, projectID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	if err := h.svc.MarkAllAlertsRead(r.Context(), projectID, organizationID); err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, map[string]bool{"success": true})
-}
-
-func (h *Handler) deleteAlert(w http.ResponseWriter, r *http.Request, alertID string) {
-	organizationID, ok := authenticatedOrganizationID(r)
-	if !ok {
-		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-
-	if err := h.svc.DeleteAlert(r.Context(), alertID, organizationID); err != nil {
-		h.writeUsecaseError(w, err)
-		return
-	}
-	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
 }
 
 func (h *Handler) writeUsecaseError(w http.ResponseWriter, err error) {

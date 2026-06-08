@@ -89,9 +89,7 @@ function sortBillingPlans(plans: BillingPlanCode[]) {
 
 function canManageUsage(organization: OrganizationSummary) {
   return (
-    organization.role === "admin" ||
-    organization.role === "owner" ||
-    organization.role === "super_admin"
+    organization.role === "editor" || organization.role === "super_admin"
   );
 }
 

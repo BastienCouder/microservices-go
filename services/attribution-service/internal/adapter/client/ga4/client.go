@@ -26,54 +26,6 @@ const (
 	defaultTokenURI    = "https://oauth2.googleapis.com/token"
 )
 
-var aiSourceAliases = map[string]string{
-	"chatgpt":               "chatgpt",
-	"chatgpt.com":           "chatgpt",
-	"chat.openai.com":       "chatgpt",
-	"openai":                "chatgpt",
-	"openai.com":            "chatgpt",
-	"perplexity":            "perplexity",
-	"perplexity.ai":         "perplexity",
-	"claude":                "claude",
-	"claude.ai":             "claude",
-	"anthropic.com":         "claude",
-	"gemini":                "gemini",
-	"gemini.google.com":     "gemini",
-	"bard.google.com":       "gemini",
-	"mistral":               "mistral",
-	"chat.mistral.ai":       "mistral",
-	"mistral.ai":            "mistral",
-	"copilot":               "copilot",
-	"copilot.microsoft.com": "copilot",
-	"grok":                  "grok",
-	"grok.x.ai":             "grok",
-	"deepseek":              "deepseek",
-	"chat.deepseek.com":     "deepseek",
-	"deepseek.com":          "deepseek",
-	"qwen":                  "qwen",
-	"qwen.ai":               "qwen",
-	"chat.qwen.ai":          "qwen",
-	"tongyi.aliyun.com":     "qwen",
-	"alibaba":               "qwen",
-	"alibaba.com":           "qwen",
-	"z.ai":                  "zai",
-	"chat.z.ai":             "zai",
-	"you.com":               "you.com",
-	"phind.com":             "phind",
-	"poe":                   "poe",
-	"poe.com":               "poe",
-	"kimi":                  "kimi",
-	"kimi.com":              "kimi",
-	"kimi.moonshot.cn":      "kimi",
-	"moonshot":              "kimi",
-	"moonshot.ai":           "kimi",
-	"doubao":                "doubao",
-	"doubao.com":            "doubao",
-	"meta.ai":               "meta-ai",
-	"llama":                 "meta-ai",
-	"llama.meta.com":        "meta-ai",
-}
-
 type serviceAccount struct {
 	ClientEmail string `json:"client_email"`
 	PrivateKey  string `json:"private_key"`
@@ -104,142 +56,14 @@ func (c *Client) SetFakeTrafficEnabled(enabled bool) {
 	c.fakeTrafficEnabled = enabled
 }
 
-func (c *Client) ListVisitsBySource(
-	ctx context.Context,
-	project usecase.ProjectMetadata,
-	from, to time.Time,
-) ([]usecase.FunnelSource, error) {
-	propertyID := strings.TrimSpace(project.GA4.PropertyID)
-	if propertyID == "" {
-		return nil, fmt.Errorf("ga4 property id is required")
+func (c *Client) Ready(_ context.Context) error {
+	if c == nil {
+		return fmt.Errorf("ga4 client is not configured")
 	}
-
-	accessToken, err := c.getProjectAccessToken(ctx, project)
-	if err != nil {
-		return nil, err
+	if c.oauthClientID == "" || c.oauthClientSecret == "" {
+		return fmt.Errorf("ga4 oauth client credentials are not configured")
 	}
-
-	body, err := json.Marshal(buildRunReportRequest(from, to))
-	if err != nil {
-		return nil, fmt.Errorf("marshal ga4 runReport payload: %w", err)
-	}
-
-	endpoint := "https://analyticsdata.googleapis.com/v1beta/properties/" + url.PathEscape(propertyID) + ":runReport"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(body)))
-	if err != nil {
-		return nil, fmt.Errorf("create ga4 runReport request: %w", err)
-	}
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("send ga4 runReport request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
-		message := strings.TrimSpace(string(raw))
-		if message == "" {
-			message = http.StatusText(resp.StatusCode)
-		}
-		return nil, fmt.Errorf("ga4 runReport error (%d): %s", resp.StatusCode, message)
-	}
-
-	var response struct {
-		Rows []struct {
-			DimensionValues []struct {
-				Value string `json:"value"`
-			} `json:"dimensionValues"`
-			MetricValues []struct {
-				Value string `json:"value"`
-			} `json:"metricValues"`
-		} `json:"rows"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-		return nil, fmt.Errorf("decode ga4 runReport response: %w", err)
-	}
-
-	sourceTotals := make(map[string]int64)
-	for _, row := range response.Rows {
-		if len(row.DimensionValues) == 0 || len(row.MetricValues) == 0 {
-			continue
-		}
-		source := normalizeSource(row.DimensionValues[0].Value)
-		if source == "" {
-			continue
-		}
-		var visits int64
-		if _, err := fmt.Sscan(strings.TrimSpace(row.MetricValues[0].Value), &visits); err != nil || visits <= 0 {
-			continue
-		}
-		sourceTotals[source] += visits
-	}
-
-	sources := make([]usecase.FunnelSource, 0, len(sourceTotals))
-	for source, visits := range sourceTotals {
-		sources = append(sources, usecase.FunnelSource{
-			Source: source,
-			Visits: visits,
-		})
-	}
-	return sources, nil
-}
-
-func buildRunReportRequest(from, to time.Time) map[string]any {
-	sources := make([]string, 0, len(aiSourceAliases))
-	seen := make(map[string]struct{}, len(aiSourceAliases))
-	for source := range aiSourceAliases {
-		if _, ok := seen[source]; ok {
-			continue
-		}
-		seen[source] = struct{}{}
-		sources = append(sources, source)
-	}
-
-	filters := []map[string]any{
-		{
-			"filter": map[string]any{
-				"fieldName": "sessionSource",
-				"inListFilter": map[string]any{
-					"values":        sources,
-					"caseSensitive": false,
-				},
-			},
-		},
-	}
-	return map[string]any{
-		"dateRanges": []map[string]string{
-			{
-				"startDate": from.UTC().Format("2006-01-02"),
-				"endDate":   to.UTC().Format("2006-01-02"),
-			},
-		},
-		"dimensions": []map[string]string{
-			{"name": "sessionSource"},
-		},
-		"metrics": []map[string]string{
-			{"name": "sessions"},
-		},
-		"dimensionFilter": map[string]any{
-			"andGroup": map[string]any{
-				"expressions": filters,
-			},
-		},
-		"limit": "100",
-	}
-}
-
-func normalizeSource(value string) string {
-	normalized := strings.ToLower(strings.TrimSpace(value))
-	if normalized == "" {
-		return ""
-	}
-	if mapped, ok := aiSourceAliases[normalized]; ok {
-		return mapped
-	}
-	return ""
+	return nil
 }
 
 func parseServiceAccount(raw string) (serviceAccount, error) {

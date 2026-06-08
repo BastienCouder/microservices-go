@@ -120,7 +120,6 @@ export const apiRoutes = {
     brandCanon: (projectId: string) => `/analysis/projects/${projectId}/brand-canon`,
   },
   attribution: {
-    funnel: (projectId: string) => `/attribution/projects/${projectId}/funnel`,
     traffic: (
       projectId: string,
       options?: { from?: string; to?: string; search?: string; engine?: string },
@@ -133,15 +132,6 @@ export const apiRoutes = {
       const query = params.toString();
       return `/attribution/projects/${projectId}/traffic${query ? `?${query}` : ""}`;
     },
-    ingest: (projectId: string) => `/attribution/ingest/${projectId}`,
-    stripeWebhook: (projectId: string) => `/attribution/stripe/webhook/${projectId}`,
-    events: (projectId: string, options?: { limit?: number }) => {
-      const params = new URLSearchParams();
-      if (options?.limit && options.limit > 0) params.set("limit", String(options.limit));
-      const query = params.toString();
-      return `/attribution/projects/${projectId}/events${query ? `?${query}` : ""}`;
-    },
-    recordEvent: (projectId: string) => `/attribution/projects/${projectId}/events`,
   },
 } as const;
 

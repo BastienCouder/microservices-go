@@ -7,9 +7,9 @@ La colonne `Contraintes / defaut` reprend les informations utiles au niveau colo
 
 | Service | Tables |
 | --- | --- |
-| `analysis-service` | `analysis_runs`, `prompt_runs`, `ai_responses`, `alerts`, `content_optimizer_crawls`, `optimize_actions` |
+| `analysis-service` | `analysis_runs`, `prompt_runs`, `ai_responses`, `content_optimizer_crawls`, `optimize_actions` |
 | `api-gateway` | Aucune table PostgreSQL propre detectee |
-| `attribution-service` | `attribution_events` |
+| `attribution-service` | Aucune table PostgreSQL propre detectee |
 | `auth-service` | Aucune table PostgreSQL propre detectee |
 | `billing-service` | `billing_subscriptions`, `billing_stripe_webhook_events`, `billing_plan_settings`, `billing_pricing_tiers`, `billing_credit_cost_settings` |
 | `ia-service` | `ai_models` |
@@ -69,20 +69,6 @@ La colonne `Contraintes / defaut` reprend les informations utiles au niveau colo
 | `sentiment` | `TEXT` | NOT NULL DEFAULT 'neutral' |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
 
-### `alerts`
-
-| Colonne | Type | Contraintes / defaut |
-| --- | --- | --- |
-| `id` | `TEXT` | PRIMARY KEY |
-| `project_id` | `TEXT` | NOT NULL |
-| `alert_type` | `TEXT` | NOT NULL |
-| `severity` | `TEXT` | NOT NULL DEFAULT 'medium' |
-| `title` | `TEXT` | NOT NULL |
-| `description` | `TEXT` | NOT NULL |
-| `is_read` | `BOOLEAN` | NOT NULL DEFAULT FALSE |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
-
 ### `content_optimizer_crawls`
 
 | Colonne | Type | Contraintes / defaut |
@@ -118,18 +104,7 @@ Aucune table PostgreSQL propre detectee dans les migrations du service.
 
 ## attribution-service
 
-### `attribution_events`
-
-| Colonne | Type | Contraintes / defaut |
-| --- | --- | --- |
-| `id` | `BIGSERIAL` | PRIMARY KEY |
-| `project_id` | `TEXT` | NOT NULL |
-| `stage` | `TEXT` | NOT NULL |
-| `source` | `TEXT` | NOT NULL |
-| `count` | `BIGINT` | NOT NULL |
-| `revenue_cents` | `BIGINT` | NOT NULL DEFAULT 0 |
-| `occurred_at` | `TIMESTAMPTZ` | NOT NULL |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
+Aucune table PostgreSQL propre detectee. Le service lit les integrations projet et calcule les rapports traffic via providers externes.
 
 ## auth-service
 

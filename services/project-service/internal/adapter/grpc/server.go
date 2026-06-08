@@ -46,6 +46,46 @@ func (s *Server) CheckProjectAccess(ctx context.Context, req *projectv1.CheckPro
 	return nil, status.Error(codes.Internal, err.Error())
 }
 
+func (s *Server) GetProjectImpactContext(ctx context.Context, req *projectv1.GetProjectImpactContextRequest) (*projectv1.GetProjectImpactContextResponse, error) {
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+
+	claims, ok := internalauth.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
+	}
+
+	contextValue, err := s.svc.GetProjectImpactContext(ctx, req.GetProjectId(), claims.Organization)
+	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUnauthorized) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if errors.Is(err, usecase.ErrValidation) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &projectv1.GetProjectImpactContextResponse{
+		ProjectId:      contextValue.ProjectID,
+		OrganizationId: contextValue.OrganizationID,
+		Domain:         contextValue.Domain,
+		WebsiteUrl:     contextValue.WebsiteURL,
+		Integrations: &projectv1.ProjectImpactIntegrations{
+			ProjectId: contextValue.Integrations.ProjectID,
+			Ga4: &projectv1.ProjectGA4Integration{
+				PropertyId:         contextValue.Integrations.GA4.PropertyID,
+				ServiceAccountJson: contextValue.Integrations.GA4.ServiceAccountJSON,
+				OauthRefreshToken:  contextValue.Integrations.GA4.OAuthRefreshToken,
+			},
+		},
+	}, nil
+}
+
 func (s *Server) ListProjectCompetitors(ctx context.Context, req *projectv1.ListProjectCompetitorsRequest) (*projectv1.ListProjectCompetitorsResponse, error) {
 	if req.GetProjectId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "project_id is required")

@@ -12,8 +12,9 @@ export type MemberActionPolicy = {
   canAssignOwnerRole: boolean;
 };
 
-export const ASSIGNABLE_ORGANIZATION_ROLES = ["admin", "member"] as const;
-export const INVITABLE_ORGANIZATION_ROLES = ["admin", "member"] as const;
+export const ASSIGNABLE_ORGANIZATION_ROLES = ["editor", "viewer"] as const;
+export const INVITABLE_ORGANIZATION_ROLES = ["editor", "viewer"] as const;
+export const ASSIGNABLE_PROJECT_ROLES = ["editor", "viewer"] as const;
 
 const EMPTY_MEMBER_ACTION_POLICY: MemberActionPolicy = {
   showActions: false,
@@ -34,7 +35,7 @@ function hasRole(roles: string[], role: string): boolean {
 }
 
 export function memberHasOrganizationWideProjectAccess(roles: string[]): boolean {
-  return hasRole(roles, "owner");
+  return hasRole(roles, "editor");
 }
 
 export function getMemberActionPolicy({
@@ -46,21 +47,16 @@ export function getMemberActionPolicy({
   targetRoles: string[];
   isCurrentUser?: boolean;
 }): MemberActionPolicy {
-  const actorIsOwner = hasRole(actorRoles, "owner");
-  const actorIsAdminLike = hasRole(actorRoles, "admin") || hasRole(actorRoles, "super_admin");
-  const actorCanManageMembers = actorIsOwner || actorIsAdminLike;
-  if (!actorCanManageMembers) return EMPTY_MEMBER_ACTION_POLICY;
+  const actorIsEditor = hasRole(actorRoles, "editor");
+  if (!actorIsEditor) return EMPTY_MEMBER_ACTION_POLICY;
   if (isCurrentUser) return EMPTY_MEMBER_ACTION_POLICY;
-
-  const targetIsOwner = hasRole(targetRoles, "owner");
-  if (targetIsOwner && !actorIsOwner) return EMPTY_MEMBER_ACTION_POLICY;
 
   return {
     showActions: true,
     canEditRoles: true,
-    canEditProjects: !targetIsOwner,
-    canRemoveMember: actorIsAdminLike && !targetIsOwner,
-    canAssignOwnerRole: actorIsOwner,
+    canEditProjects: true,
+    canRemoveMember: true,
+    canAssignOwnerRole: false,
   };
 }
 

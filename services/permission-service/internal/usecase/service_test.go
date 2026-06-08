@@ -27,7 +27,7 @@ func (f *fakeRoleResolver) RolesForUser(_ context.Context, _, _ int64) ([]string
 func TestCheck(t *testing.T) {
 	svc := NewService(
 		&fakeRepo{result: domain.CheckResult{Allowed: true, Reason: "ok"}},
-		&fakeRoleResolver{roles: []string{"member"}},
+		&fakeRoleResolver{roles: []string{"viewer"}},
 	)
 	result, err := svc.Check(context.Background(), domain.CheckInput{
 		OrganizationID: 1,

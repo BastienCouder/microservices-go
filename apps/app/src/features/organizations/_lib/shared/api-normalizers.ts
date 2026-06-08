@@ -49,14 +49,21 @@ export function getArray(value: unknown): unknown[] {
 
 function getRole(value: unknown): OrganizationRole {
   const normalized = getString(value).toLowerCase();
-  if (
-    normalized === "owner" ||
-    normalized === "admin" ||
-    normalized === "super_admin"
-  ) {
+  if (normalized === "owner") return "editor";
+  if (normalized === "admin") return "editor";
+  if (normalized === "member") return "viewer";
+  if (normalized === "editor" || normalized === "viewer" || normalized === "super_admin") {
     return normalized;
   }
-  return "member";
+  return "viewer";
+}
+
+function normalizeRoleString(value: unknown): string {
+  const normalized = getString(value).toLowerCase();
+  if (normalized === "owner") return "editor";
+  if (normalized === "admin") return "editor";
+  if (normalized === "member") return "viewer";
+  return normalized;
 }
 
 export function normalizeMembership(value: unknown): Membership | null {
@@ -111,7 +118,7 @@ export function normalizeMember(value: unknown): OrganizationMember | null {
     email: getString(getField(value, ["email", "Email"])),
     firstName: getString(getField(value, ["firstName", "FirstName", "first_name"])),
     lastName: getString(getField(value, ["lastName", "LastName", "last_name"])),
-    roles: getArray(getField(value, ["roles", "Roles"])).map(getString).filter(Boolean),
+    roles: getArray(getField(value, ["roles", "Roles"])).map(normalizeRoleString).filter(Boolean),
     addedAt: getString(getField(value, ["addedAt", "AddedAt"])),
   };
 }
@@ -149,7 +156,7 @@ export function normalizeInvitation(value: unknown): OrganizationInvitation | nu
     organizationId: getIDString(getField(value, ["organizationId", "OrganizationID"])),
     projectId: getIDString(getField(value, ["projectId", "ProjectID"])),
     email: getString(getField(value, ["email", "Email"])),
-    role: getString(getField(value, ["role", "Role"])) || "member",
+    role: getString(getField(value, ["role", "Role"])) || "viewer",
     token: getString(getField(value, ["token", "Token"])),
     message: getString(getField(value, ["message", "Message"])),
     status: normalizeInvitationStatus(getField(value, ["status", "Status"])),

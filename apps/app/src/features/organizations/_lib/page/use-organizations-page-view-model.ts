@@ -164,7 +164,7 @@ export function useOrganizationsPageViewModel({
   const selectedOrganizationFromList = organizations.find(
     (organization) => organization.id === selectedOrganizationId,
   );
-  const selectedOrganizationRole = selectedOrganizationFromList?.role ?? "member";
+  const selectedOrganizationRole = selectedOrganizationFromList?.role ?? "viewer";
   const canManageOrganizationFromSummary = canManageOrganizationPages([selectedOrganizationRole]);
 
   useEffect(() => {
@@ -228,9 +228,7 @@ export function useOrganizationsPageViewModel({
     [currentUserRoles, selectedOrganizationRole],
   );
   const canManageProjects = canManageOrganizationPages(effectiveCurrentUserRoles);
-  const canDeleteProjects = effectiveCurrentUserRoles.some((role) =>
-    ["owner", "admin"].includes(role),
-  );
+  const canDeleteProjects = effectiveCurrentUserRoles.some((role) => role === "editor");
   const effectiveActiveTab = isOrganizationViewTabAvailable(activeTab, effectiveCurrentUserRoles)
     ? activeTab
     : DEFAULT_ORGANIZATION_VIEW_TAB;

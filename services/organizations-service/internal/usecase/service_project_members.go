@@ -11,7 +11,7 @@ import (
 
 func (s *Service) AssignProjectMember(ctx context.Context, projectID string, organizationID, userID int64, role string) (domain.ProjectMember, error) {
 	projectID = strings.TrimSpace(projectID)
-	normalizedRole, err := domain.NormalizeRole(role)
+	normalizedRole, err := domain.NormalizeProjectRole(role)
 	if err != nil {
 		return domain.ProjectMember{}, err
 	}

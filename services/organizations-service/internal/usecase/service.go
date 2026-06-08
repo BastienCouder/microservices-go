@@ -229,7 +229,7 @@ func (s *Service) userCanManageAllProjects(ctx context.Context, organization *do
 		}
 		for _, role := range membership.Roles {
 			switch strings.TrimSpace(strings.ToLower(role)) {
-			case "admin", "super_admin":
+			case domain.RoleEditor:
 				return true, nil
 			}
 		}
@@ -248,40 +248,11 @@ func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]
 	return memberships, nil
 }
 
-func (s *Service) CreateTeam(ctx context.Context, organizationID int64, name string) (*domain.Team, error) {
-	team := &domain.Team{
-		OrganizationID: organizationID,
-		Name:           strings.TrimSpace(name),
-		CreatedAt:      s.now().UTC(),
-	}
-	if err := team.Validate(); err != nil {
-		return nil, err
-	}
-
-	if err := s.repo.CreateTeam(ctx, team); err != nil {
-		return nil, fmt.Errorf("create team: %w", err)
-	}
-
-	return team, nil
-}
-
-func (s *Service) ListTeams(ctx context.Context, organizationID int64) ([]domain.Team, error) {
-	if organizationID <= 0 {
-		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidTeam)
-	}
-	teams, err := s.repo.ListTeams(ctx, organizationID)
-	if err != nil {
-		return nil, fmt.Errorf("list teams: %w", err)
-	}
-	return teams, nil
-}
-
-func (s *Service) AddMember(ctx context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
+func (s *Service) AddMember(ctx context.Context, organizationID, userID int64) (*domain.Member, error) {
 	member := &domain.Member{
 		OrganizationID: organizationID,
 		UserID:         userID,
-		TeamID:         teamID,
-		Roles:          []string{"member"},
+		Roles:          []string{domain.RoleViewer},
 		AddedAt:        s.now().UTC(),
 	}
 	if err := member.Validate(); err != nil {
@@ -315,21 +286,6 @@ func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]doma
 		}
 	}
 	return members, nil
-}
-
-func (s *Service) UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
-	if organizationID <= 0 || userID <= 0 {
-		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
-	}
-	if teamID < 0 {
-		return nil, fmt.Errorf("%w: team id must be zero or positive", domain.ErrInvalidMember)
-	}
-
-	member, err := s.repo.UpdateMemberTeam(ctx, organizationID, userID, teamID)
-	if err != nil {
-		return nil, fmt.Errorf("update member team: %w", err)
-	}
-	return member, nil
 }
 
 func (s *Service) AssignRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
@@ -385,9 +341,6 @@ func normalizeMemberRoles(roles []string) ([]string, error) {
 		if _, exists := seen[next]; exists {
 			continue
 		}
-		if next == "owner" {
-			return nil, fmt.Errorf("%w: owner role is no longer assignable", domain.ErrInvalidRole)
-		}
 		seen[next] = struct{}{}
 		normalized = append(normalized, next)
 	}
@@ -430,17 +383,13 @@ func (s *Service) createInvitation(
 		return nil, err
 	}
 
-	normalizedRole := "member"
+	normalizedRole := domain.RoleViewer
 	if strings.TrimSpace(role) != "" {
 		normalizedRole, err = domain.NormalizeRole(role)
 		if err != nil {
 			return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
 		}
 	}
-	if normalizedRole == "owner" {
-		return nil, fmt.Errorf("%w: owner role cannot be assigned by invitation", domain.ErrInvalidInvitation)
-	}
-
 	token, err := generateSecureTokenHex(24)
 	if err != nil {
 		return nil, fmt.Errorf("generate invitation token: %w", err)
@@ -555,10 +504,6 @@ func (s *Service) UpdateInvitation(
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidInvitation, err)
 	}
-	if normalizedRole == "owner" {
-		return nil, fmt.Errorf("%w: owner role cannot be assigned by invitation", domain.ErrInvalidInvitation)
-	}
-
 	invitation := &domain.Invitation{
 		ID:             invitationID,
 		OrganizationID: organizationID,

@@ -18,7 +18,7 @@ export const EMPTY_RESOURCES: OrganizationResources = {
 
 export const EMPTY_INVITATION_DRAFT: InvitationDraft = {
   email: "",
-  role: "member",
+  role: "viewer",
   message: "",
   projectId: "",
 };
@@ -33,7 +33,7 @@ export const ORGANIZATION_VIEW_TABS: { value: ViewTab; label: string }[] = [
   { value: "apiKeys", label: "API keys" },
 ];
 
-const MANAGER_ROLES = new Set(["owner", "admin", "super_admin"]);
+const MANAGER_ROLES = new Set(["editor"]);
 const MEMBER_VIEW_TABS = new Set<ViewTab>(["projects", "members"]);
 
 export function canManageOrganizationPages(roles: string[]): boolean {

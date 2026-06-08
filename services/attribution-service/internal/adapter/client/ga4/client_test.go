@@ -214,37 +214,6 @@ func TestBuildTrafficDimensionFilterAddsBackendSearchAndEngineFilters(t *testing
 	}
 }
 
-func TestBuildRunReportRequestDoesNotFilterByHostName(t *testing.T) {
-	from := time.Date(2026, 3, 29, 0, 0, 0, 0, time.UTC)
-	to := time.Date(2026, 4, 28, 0, 0, 0, 0, time.UTC)
-
-	request := buildRunReportRequest(from, to)
-	root, ok := request["dimensionFilter"].(map[string]any)["andGroup"].(map[string]any)
-	if !ok {
-		t.Fatalf("expected root andGroup, got %#v", request["dimensionFilter"])
-	}
-	expressions, ok := root["expressions"].([]map[string]any)
-	if !ok {
-		t.Fatalf("expected expressions, got %#v", root["expressions"])
-	}
-
-	for _, expression := range expressions {
-		filterNode := expression["filter"].(map[string]any)
-		if filterNode["fieldName"] == "hostName" {
-			t.Fatalf("expected no GA4 hostName filter, got %#v", expressions)
-		}
-		if filterNode["fieldName"] == "sessionSource" {
-			values := filterNode["inListFilter"].(map[string]any)["values"].([]string)
-			joined := strings.Join(values, ",")
-			for _, expected := range []string{"chat.qwen.ai", "z.ai", "poe.com"} {
-				if !strings.Contains(joined, expected) {
-					t.Fatalf("expected expanded AI source %q in GA4 request values, got %#v", expected, values)
-				}
-			}
-		}
-	}
-}
-
 func TestParseTrafficSourceRowsIgnoresPageReferrerOnlyTraffic(t *testing.T) {
 	rows := []ga4RunReportRow{
 		{

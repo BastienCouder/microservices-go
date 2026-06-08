@@ -734,6 +734,44 @@ services:
         max-size: "10m"
         max-file: "3"
  
+  attribution-service:
+    profiles: ["backend"]
+    build:
+      dockerfile: Dockerfile
+      args:
+        SERVICE_PATH: attribution-service/cmd/api
+    image: microservices-go/attribution-service:prod
+    restart: unless-stopped
+    networks:
+      - backend-net
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    environment:
+      HTTP_ADDR: :8092
+      METRICS_ADDR: :9090
+      PROJECT_SERVICE_GRPC_ADDR: project-service:9088
+      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
+      INTERNAL_JWT_ISSUER: api-gateway
+      GRPC_ALLOW_INSECURE: "true"
+      GA4_OAUTH_CLIENT_ID_FILE: /run/secrets/ga4_oauth_client_id
+      GA4_OAUTH_CLIENT_SECRET_FILE: /run/secrets/ga4_oauth_client_secret
+      ATTRIBUTION_ENABLE_FAKE_TRAFFIC: "false"
+    secrets:
+      - internal_jwt_secret
+      - ga4_oauth_client_id
+      - ga4_oauth_client_secret
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+ 
   langgraph-scheduler:
     profiles: ["backend"]
     build:
@@ -764,60 +802,6 @@ services:
       resources:
         limits:
           memory: 512M
-          cpus: '0.5'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
- 
-  attribution-service:
-    profiles: ["backend"]
-    build:
-      dockerfile: Dockerfile
-      args:
-        SERVICE_PATH: attribution-service/cmd/api
-    image: microservices-go/attribution-service:prod
-    restart: unless-stopped
-    networks:
-      - backend-net
-      - infra-net
-    dns:
-      - 1.1.1.1
-      - 8.8.8.8
-    environment:
-      HTTP_ADDR: :8092
-      METRICS_ADDR: :9090
-      ATTRIBUTION_DB_HOST: postgres
-      ATTRIBUTION_DB_PORT: "5432"
-      ATTRIBUTION_DB_USER: attrsvc
-      ATTRIBUTION_DB_NAME: attrsvc
-      ATTRIBUTION_DB_SSLMODE: disable
-      ATTRIBUTION_DB_PASSWORD_FILE: /run/secrets/attrsvc_db_password
-      PROJECT_SERVICE_GRPC_ADDR: project-service:9088
-      PROJECT_SERVICE_URL: http://project-service:8088
-      INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
-      INTERNAL_JWT_ISSUER: api-gateway
-      GRPC_ALLOW_INSECURE: "true"
-      GA4_OAUTH_CLIENT_ID_FILE: /run/secrets/ga4_oauth_client_id
-      GA4_OAUTH_CLIENT_SECRET_FILE: /run/secrets/ga4_oauth_client_secret
-      ATTRIBUTION_ENABLE_FAKE_TRAFFIC: "false"
-    secrets:
-      - attrsvc_db_password
-      - internal_jwt_secret
-      - ga4_oauth_client_id
-      - ga4_oauth_client_secret
-    # Port non exposé publiquement — accessible uniquement via api-gateway
-    healthcheck:
-      test: ["CMD", "/app/service", "healthcheck"]
-      interval: 20s
-      timeout: 3s
-      retries: 3
-      start_period: 15s
-    deploy:
-      resources:
-        limits:
-          memory: 256M
           cpus: '0.5'
     logging:
       driver: "json-file"
@@ -881,25 +865,6 @@ services:
       IA_DB_PASSWORD_FILE: /run/secrets/iasvc_db_password
     secrets:
       - iasvc_db_password
- 
-  attribution-migrate:
-    profiles: ["migrations"]
-    build:
-      dockerfile: Dockerfile
-      args:
-        SERVICE_PATH: attribution-service/cmd/migrate
-    image: microservices-go/attribution-migrate:prod
-    networks:
-      - infra-net
-    environment:
-      ATTRIBUTION_DB_HOST: postgres
-      ATTRIBUTION_DB_PORT: "5432"
-      ATTRIBUTION_DB_USER: attrsvc
-      ATTRIBUTION_DB_NAME: attrsvc
-      ATTRIBUTION_DB_SSLMODE: disable
-      ATTRIBUTION_DB_PASSWORD_FILE: /run/secrets/attrsvc_db_password
-    secrets:
-      - attrsvc_db_password
  
   notification-migrate:
     profiles: ["migrations"]
@@ -1216,8 +1181,6 @@ secrets:
     file: ./secrets/analysissvc_db_password.txt
   iasvc_db_password:
     file: ./secrets/iasvc_db_password.txt
-  attrsvc_db_password:
-    file: ./secrets/attrsvc_db_password.txt
   kratos_db_password:
     file: ./secrets/kratos_db_password.txt
   internal_jwt_secret:

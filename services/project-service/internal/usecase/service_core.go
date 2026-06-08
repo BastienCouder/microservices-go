@@ -33,7 +33,6 @@ type Service struct {
 	analysisClient          AnalysisClient
 	iaClient                IAClient
 	projectMembershipClient ProjectMembershipClient
-	attributionClient       AttributionClient
 	billingClient           BillingClient
 	ga4OAuthProvider        GA4OAuthProvider
 	ga4LLMSetupProvider     GA4LLMSetupProvider
@@ -66,7 +65,6 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.analysisClient = deps.AnalysisClient
 	svc.iaClient = deps.IAClient
 	svc.projectMembershipClient = deps.ProjectMembershipClient
-	svc.attributionClient = deps.AttributionClient
 	svc.billingClient = deps.BillingClient
 	if deps.Store != nil {
 		if err := svc.load(ctx); err != nil {
@@ -395,7 +393,6 @@ func copyBrandCanon(canon *BrandCanon) BrandCanon {
 	out.Audience = append([]string(nil), canon.Audience...)
 	out.UseCases = append([]string(nil), canon.UseCases...)
 	out.Features = append([]string(nil), canon.Features...)
-	out.Pricing = copyCanonMap(canon.Pricing)
 	return out
 }
 

@@ -191,7 +191,7 @@ export async function loadOrganizationResources(
 
   const organization = normalizeOrganization(organizationPayload, {
     organizationId,
-    role: options.organizationRole ?? "member",
+    role: options.organizationRole ?? "viewer",
   });
   let members = normalizeResourcesMembers(membersPayload);
   const currentUserId = options.currentUserId?.trim() ?? "";
@@ -203,7 +203,7 @@ export async function loadOrganizationResources(
         email: options.currentUserEmail?.trim() ?? "",
         firstName: "",
         lastName: "",
-        roles: [options.organizationRole ?? "member"],
+        roles: [options.organizationRole ?? "viewer"],
         addedAt: "",
       },
     ];
@@ -254,7 +254,7 @@ export async function updateOrganizationName(
   );
   return normalizeOrganization(payload, {
     organizationId,
-    role: "member",
+    role: "viewer",
   });
 }
 

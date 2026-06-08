@@ -96,7 +96,7 @@ func TestGetOrganizationHierarchyForUserUsesProjectScopedListing(t *testing.T) {
 	}
 }
 
-func TestGetOrganizationHierarchyForAdminUserIncludesAllProjects(t *testing.T) {
+func TestGetOrganizationHierarchyForEditorUserIncludesAllProjects(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
@@ -113,16 +113,16 @@ func TestGetOrganizationHierarchyForAdminUserIncludesAllProjects(t *testing.T) {
 	repo.members[[2]int64{org.ID, 42}] = domain.Member{
 		OrganizationID: org.ID,
 		UserID:         42,
-		Roles:          []string{"admin"},
+		Roles:          []string{"editor"},
 		AddedAt:        time.Now().UTC(),
 	}
 
 	hierarchy, err := svc.GetOrganizationHierarchyForUser(context.Background(), org.ID, 42)
 	if err != nil {
-		t.Fatalf("get admin hierarchy: %v", err)
+		t.Fatalf("get editor hierarchy: %v", err)
 	}
 	if len(hierarchy.Projects) != 2 {
-		t.Fatalf("expected all projects for admin, got %d", len(hierarchy.Projects))
+		t.Fatalf("expected all projects for editor, got %d", len(hierarchy.Projects))
 	}
 }
 

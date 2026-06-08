@@ -11,7 +11,7 @@ func TestBuildInvitationNotificationMessage(t *testing.T) {
 	message := buildInvitationNotificationMessage(usecase.InvitationNotification{
 		Email:            "invitee@example.com",
 		OrganizationName: "Acme",
-		Role:             "member",
+		Role:             "viewer",
 		Message:          "Welcome aboard",
 		AcceptURL:        "http://localhost:30004/invitations/token-123",
 	})

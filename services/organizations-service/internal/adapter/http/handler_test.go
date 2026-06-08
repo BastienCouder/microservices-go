@@ -92,35 +92,13 @@ func (stubRepo) RevokeAPIKey(_ context.Context, organizationID, keyID int64, _ t
 	return nil
 }
 
-func (stubRepo) CreateTeam(_ context.Context, team *domain.Team) error {
-	team.ID = 1
-	return nil
-}
-
-func (stubRepo) ListTeams(_ context.Context, _ int64) ([]domain.Team, error) {
-	return nil, nil
-}
-
 func (stubRepo) UpsertMember(_ context.Context, _ *domain.Member) error {
 	return nil
 }
 
 func (stubRepo) ListMembers(_ context.Context, organizationID int64) ([]domain.Member, error) {
 	return []domain.Member{
-		{OrganizationID: organizationID, UserID: 42, Roles: []string{"member"}, AddedAt: time.Now().UTC()},
-	}, nil
-}
-
-func (stubRepo) UpdateMemberTeam(_ context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
-	if organizationID <= 0 || userID <= 0 {
-		return nil, domain.ErrInvalidMember
-	}
-	return &domain.Member{
-		OrganizationID: organizationID,
-		UserID:         userID,
-		TeamID:         teamID,
-		Roles:          []string{"member"},
-		AddedAt:        time.Now().UTC(),
+		{OrganizationID: organizationID, UserID: 42, Roles: []string{"viewer"}, AddedAt: time.Now().UTC()},
 	}, nil
 }
 
@@ -131,7 +109,7 @@ func (stubRepo) AssignRole(_ context.Context, organizationID, userID int64, role
 	return &domain.Member{
 		OrganizationID: organizationID,
 		UserID:         userID,
-		Roles:          []string{"member", role},
+		Roles:          []string{"viewer", role},
 		AddedAt:        time.Now().UTC(),
 	}, nil
 }
@@ -311,7 +289,7 @@ func TestOrganizationRoutesRejectMismatchedScopedOrganization(t *testing.T) {
 func TestAssignRoleAllowsTargetUserDifferentFromCaller(t *testing.T) {
 	h := newTestHandler()
 
-	body, err := json.Marshal(map[string]string{"role": "admin"})
+	body, err := json.Marshal(map[string]string{"role": "editor"})
 	if err != nil {
 		t.Fatalf("marshal request: %v", err)
 	}
@@ -338,7 +316,7 @@ func TestMemberActionRoutes(t *testing.T) {
 			name:   "update roles",
 			method: http.MethodPatch,
 			path:   "/organizations/1/members/42",
-			body:   map[string][]string{"roles": []string{"admin", "editor"}},
+			body:   map[string][]string{"roles": []string{"editor", "editor"}},
 			want:   http.StatusOK,
 		},
 		{

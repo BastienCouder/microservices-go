@@ -15,7 +15,7 @@ PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
 
 SQLC_SERVICES := user-service organizations-service permission-service billing-service notification-service
-MIGRATION_SERVICES := user organizations permission billing notification project analysis ia attribution
+MIGRATION_SERVICES := user organizations permission billing notification project analysis ia
 
 REQUIRED_SECRETS := \
 	postgres_superuser_password.txt \
@@ -27,7 +27,6 @@ REQUIRED_SECRETS := \
 	projectsvc_db_password.txt \
 	analysissvc_db_password.txt \
 	iasvc_db_password.txt \
-	attrsvc_db_password.txt \
 	kratos_db_password.txt \
 	internal_jwt_secret.txt \
 	gateway_http_addr.txt \
@@ -87,9 +86,7 @@ OPTIONAL_SECRETS := \
 	analysis_http_addr.txt \
 	analysis_metrics_addr.txt \
 	ia_http_addr.txt \
-	ia_metrics_addr.txt \
-	attribution_http_addr.txt \
-	attribution_metrics_addr.txt
+	ia_metrics_addr.txt
 
 .DEFAULT_GOAL := help
 

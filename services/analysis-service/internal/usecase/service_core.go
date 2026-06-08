@@ -19,8 +19,6 @@ func NewService() *Service {
 		responsesByRun:      make(map[string][]string),
 		responseIndexByRun:  make(map[string]map[string]string),
 		runByRequest:        make(map[string]string),
-		alerts:              make(map[string]*Alert),
-		alertsByProject:     make(map[string][]string),
 		brandCanonByProject: make(map[string]*BrandCanon),
 		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
 		optimizeActions:     make(map[string]*OptimizeAction),
@@ -87,8 +85,6 @@ func (s *Service) snapshotLocked() *persistedState {
 		ResponsesByRun:      make(map[string][]string, len(s.responsesByRun)),
 		ResponseIndexByRun:  make(map[string]map[string]string, len(s.responseIndexByRun)),
 		RunByRequest:        make(map[string]string, len(s.runByRequest)),
-		Alerts:              make(map[string]*Alert, len(s.alerts)),
-		AlertsByProject:     make(map[string][]string, len(s.alertsByProject)),
 		BrandCanonByProject: make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 		ContentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot, len(s.contentCrawls)),
 		OptimizeActions:     make(map[string]*OptimizeAction, len(s.optimizeActions)),
@@ -127,13 +123,6 @@ func (s *Service) snapshotLocked() *persistedState {
 	for key, runID := range s.runByRequest {
 		state.RunByRequest[key] = runID
 	}
-	for key, value := range s.alerts {
-		clone := *value
-		state.Alerts[key] = &clone
-	}
-	for key, ids := range s.alertsByProject {
-		state.AlertsByProject[key] = append([]string(nil), ids...)
-	}
 	for key, value := range s.brandCanonByProject {
 		clone := copyBrandCanon(value)
 		state.BrandCanonByProject[key] = &clone
@@ -166,8 +155,6 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.responsesByRun = nonNilSliceMap(state.ResponsesByRun)
 	s.responseIndexByRun = nonNilIndexMap(state.ResponseIndexByRun)
 	s.runByRequest = nonNilRunByRequestMap(state.RunByRequest)
-	s.alerts = nonNilAlertMap(state.Alerts)
-	s.alertsByProject = nonNilSliceMap(state.AlertsByProject)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
 	s.optimizeActions = nonNilOptimizeActionMap(state.OptimizeActions)

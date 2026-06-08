@@ -53,21 +53,6 @@ CREATE TABLE IF NOT EXISTS ai_responses (
 CREATE INDEX IF NOT EXISTS ai_responses_run_id_idx ON ai_responses (run_id);
 CREATE INDEX IF NOT EXISTS ai_responses_prompt_run_id_idx ON ai_responses (prompt_run_id);
 
-CREATE TABLE IF NOT EXISTS alerts (
-  id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL,
-  alert_type TEXT NOT NULL,
-  severity TEXT NOT NULL DEFAULT 'medium',
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  is_read BOOLEAN NOT NULL DEFAULT FALSE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX IF NOT EXISTS alerts_project_read_idx ON alerts (project_id, is_read);
-CREATE INDEX IF NOT EXISTS alerts_project_created_idx ON alerts (project_id, created_at);
-
 INSERT INTO analysis_service_meta (id, seq, updated_at)
 SELECT
   1,
@@ -162,31 +147,5 @@ SELECT
   COALESCE(NULLIF(entry.value ->> 'createdAt', '')::TIMESTAMPTZ, NOW())
 FROM analysis_service_state state
 CROSS JOIN LATERAL jsonb_each(COALESCE(state.payload -> 'responses', '{}'::JSONB)) AS entry(key, value)
-WHERE state.id = 1
-ON CONFLICT (id) DO NOTHING;
-
-INSERT INTO alerts (
-  id,
-  project_id,
-  alert_type,
-  severity,
-  title,
-  description,
-  is_read,
-  created_at,
-  updated_at
-)
-SELECT
-  entry.key,
-  entry.value ->> 'projectId',
-  entry.value ->> 'alertType',
-  COALESCE(NULLIF(entry.value ->> 'severity', ''), 'medium'),
-  entry.value ->> 'title',
-  COALESCE(entry.value ->> 'description', ''),
-  COALESCE((entry.value ->> 'isRead')::BOOLEAN, FALSE),
-  COALESCE(NULLIF(entry.value ->> 'createdAt', '')::TIMESTAMPTZ, NOW()),
-  COALESCE(NULLIF(entry.value ->> 'updatedAt', '')::TIMESTAMPTZ, NOW())
-FROM analysis_service_state state
-CROSS JOIN LATERAL jsonb_each(COALESCE(state.payload -> 'alerts', '{}'::JSONB)) AS entry(key, value)
 WHERE state.id = 1
 ON CONFLICT (id) DO NOTHING;

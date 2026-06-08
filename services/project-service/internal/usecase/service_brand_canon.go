@@ -66,9 +66,6 @@ func (s *Service) UpdateBrandCanon(ctx context.Context, projectID string, organi
 	if input.Features != nil {
 		current.Features = normalizeCanonList(*input.Features)
 	}
-	if input.Pricing != nil {
-		current.Pricing = copyCanonMap(*input.Pricing)
-	}
 
 	current.ProjectID = projectID
 	if current.CreatedAt.IsZero() {
@@ -91,7 +88,6 @@ func emptyBrandCanon(projectID string) BrandCanon {
 		ProjectID: projectID,
 		Audience:  []string{},
 		UseCases:  []string{},
-		Pricing:   map[string]any{},
 		Features:  []string{},
 	}
 }
@@ -113,16 +109,5 @@ func normalizeCanonList(items []string) []string {
 		out = append(out, trimmed)
 	}
 
-	return out
-}
-
-func copyCanonMap(input map[string]any) map[string]any {
-	if input == nil {
-		return map[string]any{}
-	}
-	out := make(map[string]any, len(input))
-	for key, value := range input {
-		out[key] = value
-	}
 	return out
 }
