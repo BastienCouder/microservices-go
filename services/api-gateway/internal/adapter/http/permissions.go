@@ -98,6 +98,16 @@ func resourceFromPath(path, fallback string) string {
 		return "members"
 	case strings.Contains(path, "/roles"):
 		return "roles"
+	case strings.HasPrefix(path, "/prompts") || strings.Contains(path, "/prompts"):
+		return "prompts"
+	case strings.HasPrefix(path, "/competitors") || strings.Contains(path, "/competitors"):
+		return "competitors"
+	case strings.HasPrefix(path, "/analysis") || strings.Contains(path, "/analysis"):
+		return "analysis"
+	case strings.HasPrefix(path, "/ai-models") || strings.Contains(path, "/models"):
+		return "ia"
+	case strings.HasPrefix(path, "/projects"):
+		return "projects"
 	case strings.HasPrefix(path, "/organizations"):
 		return "organizations"
 	case strings.HasPrefix(path, "/permissions"):

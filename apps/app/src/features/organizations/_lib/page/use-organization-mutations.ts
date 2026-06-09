@@ -264,9 +264,6 @@ export function useOrganizationMutations({
       if (roles.length === 0) throw new Error("Au moins un role est obligatoire.");
       const policy = getPolicyForUser(userId);
       if (!policy.canEditRoles) throw new Error("Action interdite pour ce membre.");
-      if (roles.includes("owner") && !policy.canAssignOwnerRole) {
-        throw new Error("Seul un owner peut attribuer le role owner.");
-      }
       await updateOrganizationMemberRoles(apiBaseURL, selectedOrganizationId, userId, roles);
     },
     onSuccess: async () => {
@@ -311,7 +308,7 @@ export function useOrganizationMutations({
   const createInvitationMutation = useMutation({
     mutationFn: async () => {
       const email = invitationDraft.email.trim();
-      const role = invitationDraft.role.trim() || "member";
+      const role = invitationDraft.role.trim() || "viewer";
       if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
       if (!email) throw new Error("L'email est obligatoire.");
       await createOrganizationInvitation(apiBaseURL, selectedOrganizationId, {

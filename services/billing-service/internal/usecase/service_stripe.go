@@ -176,14 +176,11 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 	}
 
 	sub, err := s.repo.GetByOrganizationID(ctx, event.OrganizationID)
-	previousStatus := ""
 	if err != nil {
 		if !errors.Is(err, domain.ErrSubscriptionMissing) {
 			return fmt.Errorf("%w: load subscription: %v", ErrStripeWebhookProcessing, err)
 		}
 		sub = newSubscriptionFromWebhook(event, s.now().UTC())
-	} else {
-		previousStatus = sub.Status
 	}
 
 	mergeWebhookIntoSubscription(sub, event)
@@ -195,7 +192,6 @@ func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signa
 		return fmt.Errorf("%w: save subscription update: %v", ErrStripeWebhookProcessing, err)
 	}
 
-	s.emitStripeAttribution(ctx, previousStatus, event)
 	return nil
 }
 
@@ -459,6 +455,16 @@ func parseAbsoluteHTTPURL(raw string) (*url.URL, error) {
 
 func sameURLOrigin(a, b *url.URL) bool {
 	return strings.EqualFold(a.Scheme, b.Scheme) && strings.EqualFold(a.Host, b.Host)
+}
+
+func normalizeAttributionSource(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "unknown"
+	}
+	value = strings.ReplaceAll(value, "_", "-")
+	value = strings.ReplaceAll(value, " ", "-")
+	return value
 }
 
 func buildStripeIdempotencyKey(operation string, organizationID int64, requestID string) string {

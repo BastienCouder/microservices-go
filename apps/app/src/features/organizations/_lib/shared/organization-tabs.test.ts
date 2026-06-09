@@ -35,13 +35,14 @@ describe("organization view tabs", () => {
   });
 
   test("keeps restricted organization tabs for managers only", () => {
-    expect(canManageOrganizationPages(["member"])).toBe(false);
-    expect(canManageOrganizationPages(["admin"])).toBe(true);
-    expect(getOrganizationViewTabsForRoles(["member"]).map((tab) => tab.value)).toEqual([
+    expect(canManageOrganizationPages(["viewer"])).toBe(false);
+    expect(canManageOrganizationPages(["editor"])).toBe(true);
+    expect(canManageOrganizationPages(["super_admin"])).toBe(false);
+    expect(getOrganizationViewTabsForRoles(["viewer"]).map((tab) => tab.value)).toEqual([
       "projects",
       "members",
     ]);
-    expect(isOrganizationViewTabAvailable("apiKeys", ["member"])).toBe(false);
-    expect(isOrganizationViewTabAvailable("apiKeys", ["owner"])).toBe(true);
+    expect(isOrganizationViewTabAvailable("apiKeys", ["viewer"])).toBe(false);
+    expect(isOrganizationViewTabAvailable("apiKeys", ["editor"])).toBe(true);
   });
 });

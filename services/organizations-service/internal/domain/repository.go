@@ -16,11 +16,8 @@ type Repository interface {
 	GetAPIKeyByHash(ctx context.Context, keyHash string) (*OrganizationAPIKey, error)
 	MarkAPIKeyLastUsed(ctx context.Context, keyID int64, lastUsedAt time.Time) error
 	RevokeAPIKey(ctx context.Context, organizationID, keyID int64, revokedAt time.Time) error
-	CreateTeam(ctx context.Context, team *Team) error
-	ListTeams(ctx context.Context, organizationID int64) ([]Team, error)
 	UpsertMember(ctx context.Context, member *Member) error
 	ListMembers(ctx context.Context, organizationID int64) ([]Member, error)
-	UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*Member, error)
 	AssignRole(ctx context.Context, organizationID, userID int64, role string) (*Member, error)
 	UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*Member, error)
 	RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error

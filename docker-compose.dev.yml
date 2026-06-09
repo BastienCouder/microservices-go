@@ -279,19 +279,7 @@ services:
     image: microservices-go/attribution-service:dev
     pull_policy: never
     working_dir: /workspace/services/attribution-service
-    command: ["air", "-c", ".air.toml"]
-    volumes:
-      - ./:/workspace
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
-
-  attribution-migrate:
-    build:
-      target: dev
-    image: microservices-go/attribution-migrate:dev
-    pull_policy: never
-    working_dir: /workspace/services/attribution-service
-    command: ["go", "run", "./cmd/migrate"]
+    command: ["go", "run", "./cmd/api"]
     volumes:
       - ./:/workspace
       - go-mod-cache:/go/pkg/mod

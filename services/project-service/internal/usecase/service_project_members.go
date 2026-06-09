@@ -18,6 +18,9 @@ func (s *Service) AssignProjectMember(
 	if userID <= 0 || normalizedRole == "" {
 		return ProjectMember{}, fmt.Errorf("%w: userId and role are required", ErrValidation)
 	}
+	if !projectRoleAllowsAction(normalizedRole, "read") {
+		return ProjectMember{}, fmt.Errorf("%w: unsupported project role", ErrValidation)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -83,6 +86,10 @@ func (s *Service) ListProjectMembers(ctx context.Context, projectID string, orga
 }
 
 func (s *Service) EnforceUserProjectAccess(ctx context.Context, projectID string, organizationID, userID int64) error {
+	return s.EnforceUserProjectActionAccess(ctx, projectID, organizationID, userID, "read")
+}
+
+func (s *Service) EnforceUserProjectActionAccess(ctx context.Context, projectID string, organizationID, userID int64, action string) error {
 	if userID <= 0 {
 		return fmt.Errorf("%w: userId is required", ErrValidation)
 	}
@@ -93,10 +100,14 @@ func (s *Service) EnforceUserProjectAccess(ctx context.Context, projectID string
 	if err := s.reloadLocked(ctx); err != nil {
 		return err
 	}
-	return s.enforceUserProjectAccessLocked(ctx, projectID, organizationID, userID)
+	return s.enforceUserProjectActionAccessLocked(ctx, projectID, organizationID, userID, action)
 }
 
 func (s *Service) EnforceUserPromptAccess(ctx context.Context, promptID string, organizationID, userID int64) error {
+	return s.EnforceUserPromptActionAccess(ctx, promptID, organizationID, userID, "read")
+}
+
+func (s *Service) EnforceUserPromptActionAccess(ctx context.Context, promptID string, organizationID, userID int64, action string) error {
 	if userID <= 0 {
 		return fmt.Errorf("%w: userId is required", ErrValidation)
 	}
@@ -111,10 +122,14 @@ func (s *Service) EnforceUserPromptAccess(ctx context.Context, promptID string, 
 	if !ok {
 		return fmt.Errorf("%w: prompt", ErrNotFound)
 	}
-	return s.enforceUserProjectAccessLocked(ctx, prompt.ProjectID, organizationID, userID)
+	return s.enforceUserProjectActionAccessLocked(ctx, prompt.ProjectID, organizationID, userID, action)
 }
 
 func (s *Service) EnforceUserCompetitorAccess(ctx context.Context, competitorID string, organizationID, userID int64) error {
+	return s.EnforceUserCompetitorActionAccess(ctx, competitorID, organizationID, userID, "read")
+}
+
+func (s *Service) EnforceUserCompetitorActionAccess(ctx context.Context, competitorID string, organizationID, userID int64, action string) error {
 	if userID <= 0 {
 		return fmt.Errorf("%w: userId is required", ErrValidation)
 	}
@@ -129,26 +144,31 @@ func (s *Service) EnforceUserCompetitorAccess(ctx context.Context, competitorID 
 	if !ok {
 		return fmt.Errorf("%w: competitor", ErrNotFound)
 	}
-	return s.enforceUserProjectAccessLocked(ctx, competitor.ProjectID, organizationID, userID)
+	return s.enforceUserProjectActionAccessLocked(ctx, competitor.ProjectID, organizationID, userID, action)
 }
 
 func (s *Service) enforceUserProjectAccessLocked(ctx context.Context, projectID string, organizationID, userID int64) error {
+	return s.enforceUserProjectActionAccessLocked(ctx, projectID, organizationID, userID, "read")
+}
+
+func (s *Service) enforceUserProjectActionAccessLocked(ctx context.Context, projectID string, organizationID, userID int64, action string) error {
 	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
 	if err != nil {
 		return err
 	}
+	action = normalizeProjectAccessAction(action)
 
 	if s.projectMembershipClient != nil {
 		members, err := s.projectMembershipClient.ListProjectMembersByUser(ctx, organizationID, userID)
 		if err != nil {
 			return fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
 		}
-		if len(members) == 0 {
-			return nil
-		}
 		for _, member := range members {
 			if member.OrganizationID == organizationID && member.ProjectID == project.ID {
-				return nil
+				if projectRoleAllowsAction(member.Role, action) {
+					return nil
+				}
+				return fmt.Errorf("%w: project role denied", ErrUnauthorized)
 			}
 		}
 		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
@@ -165,14 +185,37 @@ func (s *Service) enforceUserProjectAccessLocked(ctx context.Context, projectID 
 		}
 		hasProjectScope = true
 		if scopedProjectID == project.ID {
-			return nil
+			if projectRoleAllowsAction(member.Role, action) {
+				return nil
+			}
+			return fmt.Errorf("%w: project role denied", ErrUnauthorized)
 		}
 	}
 
-	if hasProjectScope {
+	if hasProjectScope || s.projectMembershipClient != nil {
 		return fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
-	return nil
+	return fmt.Errorf("%w: project membership required", ErrUnauthorized)
+}
+
+func normalizeProjectAccessAction(action string) string {
+	switch strings.ToLower(strings.TrimSpace(action)) {
+	case "create", "update", "delete":
+		return strings.ToLower(strings.TrimSpace(action))
+	default:
+		return "read"
+	}
+}
+
+func projectRoleAllowsAction(role, action string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case "editor":
+		return true
+	case "viewer":
+		return normalizeProjectAccessAction(action) == "read"
+	default:
+		return false
+	}
 }
 
 func (s *Service) RemoveProjectMember(ctx context.Context, projectID string, organizationID, userID int64) error {

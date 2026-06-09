@@ -58,9 +58,7 @@ const EMPTY_PLANS: BillingPlanSettings[] = [];
 
 function canManageUsage(organization: OrganizationSummary) {
   return (
-    organization.role === "admin" ||
-    organization.role === "owner" ||
-    organization.role === "super_admin"
+    organization.role === "editor" || organization.role === "super_admin"
   );
 }
 

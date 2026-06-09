@@ -165,10 +165,10 @@ func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 
 	response := make([]membershipResponse, 0, len(memberships))
 	for _, membership := range memberships {
-		role := "member"
+		role := domain.RoleViewer
 		for _, candidate := range membership.Roles {
-			if candidate == "admin" || candidate == "super_admin" || candidate == "owner" {
-				role = "admin"
+			if candidate == domain.RoleEditor {
+				role = candidate
 			}
 		}
 		organizationID := strconv.FormatInt(membership.OrganizationID, 10)
@@ -524,35 +524,6 @@ func (h *Handler) getOrganizationHierarchy(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, hierarchy)
 }
 
-type createTeamRequest struct {
-	Name string `json:"name"`
-}
-
-func (h *Handler) createTeam(w http.ResponseWriter, r *http.Request, organizationID int64) {
-	var req createTeamRequest
-	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
-		httpjson.WriteInvalidJSON(w)
-		return
-	}
-
-	team, err := h.svc.CreateTeam(r.Context(), organizationID, req.Name)
-	if err != nil {
-		h.writeDomainError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusCreated, team)
-}
-
-func (h *Handler) listTeams(w http.ResponseWriter, r *http.Request, organizationID int64) {
-	teams, err := h.svc.ListTeams(r.Context(), organizationID)
-	if err != nil {
-		h.writeDomainError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, teams)
-}
-
 type addMemberRequest struct {
 	UserID int64 `json:"user_id"`
 }
@@ -571,7 +542,7 @@ func (h *Handler) addMember(w http.ResponseWriter, r *http.Request, organization
 	}
 
 	// Prevent privilege escalation via forged payloads: membership creation is for caller identity.
-	member, err := h.svc.AddMember(r.Context(), organizationID, authUserID, 0)
+	member, err := h.svc.AddMember(r.Context(), organizationID, authUserID)
 	if err != nil {
 		h.writeDomainError(w, err)
 		auditSecurityEvent("organization_member_add", map[string]any{
@@ -911,13 +882,11 @@ func (h *Handler) assignRole(w http.ResponseWriter, r *http.Request, organizatio
 func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrInvalidOrganization),
-		errors.Is(err, domain.ErrInvalidTeam),
 		errors.Is(err, domain.ErrInvalidMember),
 		errors.Is(err, domain.ErrInvalidRole),
 		errors.Is(err, domain.ErrInvalidInvitation):
 		httpjson.WriteValidationError(w)
 	case errors.Is(err, domain.ErrOrganizationNotFound),
-		errors.Is(err, domain.ErrTeamNotFound),
 		errors.Is(err, domain.ErrMemberNotFound),
 		errors.Is(err, domain.ErrInvitationNotFound):
 		httpjson.WriteNotFoundError(w)

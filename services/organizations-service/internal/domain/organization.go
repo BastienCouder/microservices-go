@@ -12,8 +12,6 @@ import (
 var (
 	ErrOrganizationNotFound     = errors.New("organization not found")
 	ErrInvalidOrganization      = errors.New("invalid organization")
-	ErrTeamNotFound             = errors.New("team not found")
-	ErrInvalidTeam              = errors.New("invalid team")
 	ErrMemberNotFound           = errors.New("member not found")
 	ErrInvalidMember            = errors.New("invalid member")
 	ErrInvalidRole              = errors.New("invalid role")
@@ -70,28 +68,9 @@ func (k *OrganizationAPIKey) ValidateForCreate() error {
 	return nil
 }
 
-type Team struct {
-	ID             int64
-	OrganizationID int64
-	Name           string
-	CreatedAt      time.Time
-	DeletedAt      *time.Time
-}
-
-func (t *Team) Validate() error {
-	if t.OrganizationID <= 0 {
-		return fmt.Errorf("%w: organization id must be positive", ErrInvalidTeam)
-	}
-	if strings.TrimSpace(t.Name) == "" {
-		return fmt.Errorf("%w: name is required", ErrInvalidTeam)
-	}
-	return nil
-}
-
 type Member struct {
 	OrganizationID int64
 	UserID         int64
-	TeamID         int64
 	Email          string
 	FirstName      string
 	LastName       string
@@ -121,9 +100,6 @@ func (m *Member) Validate() error {
 	if m.UserID <= 0 {
 		return fmt.Errorf("%w: user id must be positive", ErrInvalidMember)
 	}
-	if m.TeamID < 0 {
-		return fmt.Errorf("%w: team id must be zero or positive", ErrInvalidMember)
-	}
 	return nil
 }
 
@@ -132,7 +108,30 @@ func NormalizeRole(role string) (string, error) {
 	if normalized == "" {
 		return "", fmt.Errorf("%w: role is required", ErrInvalidRole)
 	}
+	if !IsOrganizationRole(normalized) {
+		return "", fmt.Errorf("%w: unsupported role %q", ErrInvalidRole, normalized)
+	}
 	return normalized, nil
+}
+
+func NormalizeProjectRole(role string) (string, error) {
+	normalized := strings.ToLower(strings.TrimSpace(role))
+	if normalized == "" {
+		return "", fmt.Errorf("%w: role is required", ErrInvalidRole)
+	}
+	if normalized != RoleViewer && normalized != RoleEditor {
+		return "", fmt.Errorf("%w: unsupported project role %q", ErrInvalidRole, normalized)
+	}
+	return normalized, nil
+}
+
+func IsOrganizationRole(role string) bool {
+	switch strings.ToLower(strings.TrimSpace(role)) {
+	case RoleEditor, RoleViewer, RoleSuperAdmin, RoleBanned:
+		return true
+	default:
+		return false
+	}
 }
 
 func AddRole(roles []string, role string) []string {
@@ -145,7 +144,10 @@ func AddRole(roles []string, role string) []string {
 type InvitationStatus string
 
 const (
-	RoleBanned = "banned"
+	RoleEditor     = "editor"
+	RoleViewer     = "viewer"
+	RoleSuperAdmin = "super_admin"
+	RoleBanned     = "banned"
 )
 
 const (

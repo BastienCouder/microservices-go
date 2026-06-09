@@ -211,16 +211,15 @@ type CreateOptimizeActionInput struct {
 }
 
 type BrandCanon struct {
-	ProjectID   string         `json:"projectId,omitempty"`
-	BrandName   string         `json:"brandName,omitempty"`
-	Category    string         `json:"category,omitempty"`
-	Positioning string         `json:"positioning,omitempty"`
-	Audience    []string       `json:"audience,omitempty"`
-	UseCases    []string       `json:"useCases,omitempty"`
-	Pricing     map[string]any `json:"pricing,omitempty"`
-	Features    []string       `json:"features,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
+	ProjectID   string    `json:"projectId,omitempty"`
+	BrandName   string    `json:"brandName,omitempty"`
+	Category    string    `json:"category,omitempty"`
+	Positioning string    `json:"positioning,omitempty"`
+	Audience    []string  `json:"audience,omitempty"`
+	UseCases    []string  `json:"useCases,omitempty"`
+	Features    []string  `json:"features,omitempty"`
+	CreatedAt   time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
 }
 
 type UpdateBrandCanonInput struct {
@@ -229,7 +228,6 @@ type UpdateBrandCanonInput struct {
 	Positioning *string
 	Audience    *[]string
 	UseCases    *[]string
-	Pricing     *map[string]any
 	Features    *[]string
 }
 
@@ -237,25 +235,6 @@ type AnalysisRunDetails struct {
 	AnalysisRun AnalysisRun  `json:"analysisRun"`
 	PromptRuns  []PromptRun  `json:"promptRuns"`
 	Responses   []AIResponse `json:"aiResponses"`
-}
-
-type Alert struct {
-	ID          string    `json:"id"`
-	ProjectID   string    `json:"projectId"`
-	AlertType   string    `json:"alertType"`
-	Severity    string    `json:"severity"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	IsRead      bool      `json:"isRead"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-type CreateAlertInput struct {
-	AlertType   string
-	Severity    string
-	Title       string
-	Description string
 }
 
 type StateStore interface {
@@ -365,8 +344,6 @@ type persistedState struct {
 	ResponsesByRun      map[string][]string                       `json:"responsesByRun"`
 	ResponseIndexByRun  map[string]map[string]string              `json:"responseIndexByRun"`
 	RunByRequest        map[string]string                         `json:"runByRequest"`
-	Alerts              map[string]*Alert                         `json:"alerts"`
-	AlertsByProject     map[string][]string                       `json:"alertsByProject"`
 	BrandCanonByProject map[string]*BrandCanon                    `json:"brandCanonByProject"`
 	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 	OptimizeActions     map[string]*OptimizeAction                `json:"optimizeActions"`
@@ -385,8 +362,6 @@ type Service struct {
 	responsesByRun      map[string][]string
 	responseIndexByRun  map[string]map[string]string
 	runByRequest        map[string]string
-	alerts              map[string]*Alert
-	alertsByProject     map[string][]string
 	brandCanonByProject map[string]*BrandCanon
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
 	optimizeActions     map[string]*OptimizeAction

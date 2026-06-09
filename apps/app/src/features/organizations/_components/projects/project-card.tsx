@@ -24,8 +24,11 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { buildScopedHref } from "@/shared/selection";
-import { memberLabel } from "../../_lib/shared/formatters";
-import { getProjectIdsForMember } from "../../_lib/shared/project-membership";
+import { formatLabel, memberLabel } from "../../_lib/shared/formatters";
+import {
+  ASSIGNABLE_PROJECT_ROLES,
+  getProjectIdsForMember,
+} from "../../_lib/shared/project-membership";
 import type {
   OrganizationMember,
   OrganizationProject,
@@ -306,7 +309,7 @@ export const ProjectCard = memo(function ProjectCard({
               </div>
 
               <div className="grid gap-3 border-t border-border/70 pt-4">
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_auto]">
+                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_120px_auto]">
                   <div className="relative">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                     <Input
@@ -337,6 +340,24 @@ export const ProjectCard = memo(function ProjectCard({
                               {member.email || "Email non renseigne"}
                             </span>
                           </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select
+                    value={memberDraft.role || "viewer"}
+                    onValueChange={(role) =>
+                      onMemberDraftChange(project.id, { ...memberDraft, role })
+                    }
+                  >
+                    <SelectTrigger className="h-9 rounded-lg bg-background text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {ASSIGNABLE_PROJECT_ROLES.map((role) => (
+                        <SelectItem key={role} value={role} className="text-xs">
+                          {formatLabel(role)}
                         </SelectItem>
                       ))}
                     </SelectContent>

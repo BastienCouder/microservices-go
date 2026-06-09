@@ -42,7 +42,7 @@ func TestInvitationCRUDFlow(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
-		"member",
+		"viewer",
 		"Welcome to the team",
 		&expiresAt,
 	)
@@ -80,15 +80,15 @@ func TestInvitationCRUDFlow(t *testing.T) {
 		org.ID,
 		invitation.ID,
 		"invitee+updated@acme.io",
-		"admin",
+		"editor",
 		"Updated note",
 		nil,
 	)
 	if err != nil {
 		t.Fatalf("update invitation: %v", err)
 	}
-	if updated.Role != "admin" {
-		t.Fatalf("expected updated role admin, got %s", updated.Role)
+	if updated.Role != "editor" {
+		t.Fatalf("expected updated role editor, got %s", updated.Role)
 	}
 
 	if err := svc.DeleteInvitation(context.Background(), org.ID, invitation.ID); err != nil {
@@ -117,7 +117,7 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
-		"member",
+		"viewer",
 		"Welcome to the team",
 		nil,
 	)
@@ -162,7 +162,7 @@ func TestAcceptInvitationRejectsAuthenticatedUserEmailMismatch(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
-		"member",
+		"viewer",
 		"",
 		nil,
 	)
@@ -211,7 +211,7 @@ func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 		org.ID,
 		1,
 		"member@acme.io",
-		"member",
+		"viewer",
 		"",
 		nil,
 	)
@@ -247,7 +247,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 		org.ID,
 		1,
 		"first@acme.io",
-		"member",
+		"viewer",
 		"",
 		nil,
 	)
@@ -276,7 +276,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 		org.ID,
 		1,
 		"second@acme.io",
-		"member",
+		"viewer",
 		"",
 		nil,
 	)
@@ -326,8 +326,8 @@ func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
 	if acceptedInvitation.Status != domain.InvitationStatusAccepted {
 		t.Fatalf("expected accepted status, got %s", acceptedInvitation.Status)
 	}
-	if len(acceptedMember.Roles) != 1 || acceptedMember.Roles[0] != "member" {
-		t.Fatalf("expected invited organization role member, got %v", acceptedMember.Roles)
+	if len(acceptedMember.Roles) != 1 || acceptedMember.Roles[0] != "viewer" {
+		t.Fatalf("expected invited organization role viewer, got %v", acceptedMember.Roles)
 	}
 	projectMembers, err := svc.ListProjectMembers(context.Background(), "prj-42", org.ID)
 	if err != nil {

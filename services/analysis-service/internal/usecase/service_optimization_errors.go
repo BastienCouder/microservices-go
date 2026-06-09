@@ -25,37 +25,13 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
-	alerts, err := s.ListAlerts(ctx, projectID, organizationID, false)
-	if err != nil {
-		return OptimizationErrorBoard{}, err
-	}
 
 	crawlerErrors, err := s.listCrawlerOptimizationErrors(ctx, projectID, organizationID)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
 
-	errors := make([]OptimizationError, 0, len(alerts)+len(perception.TopErrors)+len(crawlerErrors))
-	monitoringAlertCount := 0
-	for _, alert := range alerts {
-		severity := normalizeOptimizationSeverity(alert.Severity)
-		monitoringAlertCount++
-		errors = append(errors, OptimizationError{
-			ID:                  "monitoring:" + alert.ID,
-			Source:              "monitoring",
-			Origin:              "alert",
-			Severity:            severity,
-			Title:               strings.TrimSpace(alert.Title),
-			Issue:               strings.TrimSpace(alert.Description),
-			Impact:              "Alerte monitoring detectee sur les reponses IA du projet.",
-			Type:                strings.TrimSpace(alert.AlertType),
-			FixType:             "prompt_patch",
-			OptimizePriority:    severity,
-			GeneratedContent:    "Verifier les prompts, les reponses recentes et les sources qui declenchent cette alerte.",
-			GeneratedContentKey: "generatedContentMonitoringAlert",
-			CreatedAt:           alert.CreatedAt.UTC().Format(time.RFC3339Nano),
-		})
-	}
+	errors := make([]OptimizationError, 0, len(perception.TopErrors)+len(crawlerErrors))
 	perceptionCount := 0
 	for _, item := range perception.TopErrors {
 		perceptionCount++
@@ -98,8 +74,7 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			"projectId":               projectID,
 			"generatedAt":             time.Now().UTC().Format(time.RFC3339Nano),
 			"totalErrors":             len(errors),
-			"monitoringErrors":        monitoringAlertCount,
-			"monitoringAlertErrors":   monitoringAlertCount,
+			"monitoringErrors":        0,
 			"monitoringDerivedErrors": 0,
 			"perceptionErrors":        perceptionCount,
 			"crawlerErrors":           len(crawlerErrors),

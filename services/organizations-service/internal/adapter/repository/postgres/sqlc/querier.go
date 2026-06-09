@@ -11,7 +11,6 @@ import (
 type Querier interface {
 	CreateOrganization(ctx context.Context, arg CreateOrganizationParams) (Organization, error)
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) (OrganizationInvitation, error)
-	CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error)
 	GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgAndUserParams) (GetMemberByOrgAndUserRow, error)
 	GetInvitationByID(ctx context.Context, arg GetInvitationByIDParams) (OrganizationInvitation, error)
 	GetInvitationByTokenForUpdate(ctx context.Context, token string) (OrganizationInvitation, error)
@@ -19,7 +18,6 @@ type Querier interface {
 	InsertMemberRole(ctx context.Context, arg InsertMemberRoleParams) error
 	ListMemberRolesByOrgAndUser(ctx context.Context, arg ListMemberRolesByOrgAndUserParams) ([]string, error)
 	ListInvitationsByOrganization(ctx context.Context, organizationID int64) ([]OrganizationInvitation, error)
-	ListTeamsByOrganization(ctx context.Context, organizationID int64) ([]Team, error)
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (OrganizationInvitation, error)
 	MarkInvitationRefused(ctx context.Context, arg MarkInvitationRefusedParams) (OrganizationInvitation, error)
 	RevokeInvitationByID(ctx context.Context, arg RevokeInvitationByIDParams) (int64, error)

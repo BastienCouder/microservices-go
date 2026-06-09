@@ -16,7 +16,6 @@ type Config struct {
 	IAServiceGRPCAddr            string
 	OrganizationsServiceGRPCAddr string
 	IAPromptTimeout              time.Duration
-	AttributionServiceURL        string
 	SecretEncryptionKey          string
 	RabbitMQURL                  string
 	RabbitMQExchange             string
@@ -119,7 +118,6 @@ func Load() (Config, error) {
 		IAServiceGRPCAddr:            iaServiceGRPCAddr,
 		OrganizationsServiceGRPCAddr: organizationsServiceGRPCAddr,
 		IAPromptTimeout:              time.Duration(iaPromptTimeoutMS) * time.Millisecond,
-		AttributionServiceURL:        envcfg.OptionalEnv("ATTRIBUTION_SERVICE_URL"),
 		SecretEncryptionKey:          secretEncryptionKey,
 		RabbitMQURL:                  rabbitMQURL,
 		RabbitMQExchange:             rabbitMQExchange,

@@ -14,8 +14,6 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
-	attributionclient "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/client/attribution"
-	projectclient "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/client/project"
 	httpadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/http"
 	billingrepo "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/repository/postgres"
 	stripeadapter "github.com/bastiencouder/microservices-go/services/billing-service/internal/adapter/stripe"
@@ -56,17 +54,6 @@ func main() {
 			cfg.Stripe.CheckoutCancelURL,
 			cfg.Stripe.CustomerPortalReturnURL,
 		)
-	}
-	if cfg.AttributionServiceURL != "" && cfg.ProjectServiceURL != "" {
-		attribution, err := attributionclient.NewClient(cfg.AttributionServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
-		if err != nil {
-			log.Fatalf("init attribution client: %v", err)
-		}
-		projectResolver, err := projectclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
-		if err != nil {
-			log.Fatalf("init project client: %v", err)
-		}
-		svc.EnableAttribution(attribution, projectResolver)
 	}
 	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 

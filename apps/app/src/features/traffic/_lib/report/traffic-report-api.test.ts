@@ -132,6 +132,7 @@ describe("loadTrafficPageData", () => {
     expect(result.projectName).toBe("Acme");
     expect(result.integration.ga4.isConnected).toBe(true);
     expect(result.report.summary.totalTrafficSessions).toBe(12);
+    expect(result.reportError).toBe(null);
     expect(calls[0]?.url).toBe("http://api.test/projects");
     expect(calls.some((call) => call.url.includes("/projects/site-france"))).toBe(false);
     expect(calls[3]?.url.includes("/attribution/projects/prj_1/traffic")).toBe(true);
@@ -221,7 +222,7 @@ describe("loadTrafficPageData", () => {
       }),
     ]);
 
-    const result = await loadTrafficPageData("http://api.test", "?project=jjjj");
+    const result = await loadTrafficPageData("http://api.test", "?projectId=jjjj");
 
     expect(result.projectId).toBe(null);
     expect(result.organizationId).toBe("");
@@ -263,7 +264,9 @@ describe("loadTrafficPageData", () => {
     expect(result.projectId).toBe("prj_1");
     expect(result.integration.ga4.isConnected).toBe(true);
     expect(result.report.summary.totalTrafficSessions).toBe(0);
-    expect(result.reportError).toBe("Google Analytics est momentanément indisponible.");
+    expect(result.reportError).toBe(
+      "Connexion GA4 enregistrée. Le rapport est momentanément indisponible. Réessaie avec Actualiser.",
+    );
     expect(calls).toHaveLength(4);
     expect(calls[3]?.url.includes("/attribution/projects/prj_1/traffic")).toBe(true);
   });
@@ -547,6 +550,7 @@ describe("loadTrafficPageData", () => {
     const result = await loadTrafficPageData("http://api.test", "?project=site-france");
 
     expect(result.report.dataSource).toBe("ga4");
+    expect(result.report.summary.totalTrafficSessions).toBe(183);
     expect(consoleCalls).toHaveLength(0);
   });
 });

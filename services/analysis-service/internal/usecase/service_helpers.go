@@ -232,13 +232,6 @@ func copyResponse(response *AIResponse) AIResponse {
 	return out
 }
 
-func copyAlert(alert *Alert) Alert {
-	if alert == nil {
-		return Alert{}
-	}
-	return *alert
-}
-
 func copyBrandCanon(canon *BrandCanon) BrandCanon {
 	if canon == nil {
 		return BrandCanon{}
@@ -247,12 +240,6 @@ func copyBrandCanon(canon *BrandCanon) BrandCanon {
 	out.Audience = append([]string(nil), canon.Audience...)
 	out.UseCases = append([]string(nil), canon.UseCases...)
 	out.Features = append([]string(nil), canon.Features...)
-	if canon.Pricing != nil {
-		out.Pricing = make(map[string]any, len(canon.Pricing))
-		for key, value := range canon.Pricing {
-			out.Pricing[key] = value
-		}
-	}
 	return out
 }
 
@@ -309,13 +296,6 @@ func nonNilPromptRunMap(input map[string]*PromptRun) map[string]*PromptRun {
 func nonNilResponseMap(input map[string]*AIResponse) map[string]*AIResponse {
 	if input == nil {
 		return make(map[string]*AIResponse)
-	}
-	return input
-}
-
-func nonNilAlertMap(input map[string]*Alert) map[string]*Alert {
-	if input == nil {
-		return make(map[string]*Alert)
 	}
 	return input
 }

@@ -26,8 +26,7 @@ export function getInitials(value: string): string {
 export function getRoleBadgeVariant(
   role: OrganizationRole | string,
 ): "default" | "secondary" | "outline" {
-  if (role === "owner") return "default";
-  if (role === "admin") return "secondary";
+  if (role === "editor") return "secondary";
   return "outline";
 }
 

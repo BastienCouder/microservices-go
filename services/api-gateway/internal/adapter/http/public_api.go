@@ -302,15 +302,6 @@ func (h *Handler) publicProjectSubroute(r *http.Request, path string, claims int
 	if len(parts) >= 3 && parts[2] == "optimize-actions" {
 		return publicRouteTarget{handler: h.analysisProxy, service: "analysis-service", path: "/analysis/projects/" + url.PathEscape(projectID) + "/" + strings.Join(parts[2:], "/"), query: r.URL.RawQuery, claims: claims}, true
 	}
-	if len(parts) >= 3 && parts[2] == "events" {
-		return publicRouteTarget{handler: h.attributionProxy, service: "attribution-service", path: "/attribution/projects/" + url.PathEscape(projectID) + "/events", query: r.URL.RawQuery, claims: claims}, true
-	}
-	if len(parts) == 3 && (parts[2] == "funnel" || parts[2] == "traffic") {
-		return publicRouteTarget{handler: h.attributionProxy, service: "attribution-service", path: "/attribution/projects/" + url.PathEscape(projectID) + "/" + parts[2], query: r.URL.RawQuery, claims: claims}, true
-	}
-	if len(parts) == 3 && parts[2] == "ingest" && r.Method == http.MethodPost {
-		return publicRouteTarget{handler: h.attributionProxy, service: "attribution-service", path: "/attribution/ingest/" + url.PathEscape(projectID), query: r.URL.RawQuery, claims: claims}, true
-	}
 	if len(parts) >= 4 && parts[2] == "content" && parts[3] == "crawls" {
 		suffix := "crawl"
 		if len(parts) == 5 && parts[4] == "latest" {

@@ -44,8 +44,8 @@ func TestRepositoryIntegration_CheckPolicies(t *testing.T) {
 	if _, err := db.Exec(ctx, `
 		INSERT INTO permission_role_policies (organization_id, role, action, resource)
 		VALUES
-			(0, 'member', 'read', '*'),
-			(10, 'editor', 'write', 'organizations')
+			(0, 'viewer', 'read', '*'),
+			(10, 'editor', 'update', 'organizations')
 	`); err != nil {
 		t.Fatalf("seed permission policies: %v", err)
 	}
@@ -55,19 +55,19 @@ func TestRepositoryIntegration_CheckPolicies(t *testing.T) {
 		UserID:         7,
 		Action:         "read",
 		Resource:       "organizations",
-		Roles:          []string{"member"},
+		Roles:          []string{"viewer"},
 	})
 	if err != nil {
 		t.Fatalf("check global policy: %v", err)
 	}
 	if !allowedByGlobal.Allowed {
-		t.Fatalf("expected read to be allowed by global member policy")
+		t.Fatalf("expected read to be allowed by global viewer policy")
 	}
 
 	allowedByOrgPolicy, err := repo.Check(ctx, domain.CheckInput{
 		OrganizationID: 10,
 		UserID:         7,
-		Action:         "write",
+		Action:         "update",
 		Resource:       "organizations",
 		Roles:          []string{"editor"},
 	})
@@ -83,7 +83,7 @@ func TestRepositoryIntegration_CheckPolicies(t *testing.T) {
 		UserID:         7,
 		Action:         "delete",
 		Resource:       "organizations",
-		Roles:          []string{"member"},
+		Roles:          []string{"viewer"},
 	})
 	if err != nil {
 		t.Fatalf("check denied policy: %v", err)

@@ -68,12 +68,11 @@ Chargement avec `projectId` connu:
 - `GET /projects/{projectId}/models`
 - `GET /projects/{projectId}/competitors`
 - `GET /analysis/projects/{projectId}/dashboard`
-- `GET /analysis/projects/{projectId}/alerts`
 
 Variantes:
 
 - Sans projet dans l'URL: `GET /projects`, puis les requetes ci-dessus.
-- Slug public non resolu par le premier appel: `GET /projects/{slug}`, `GET /projects`, `GET /projects/{resolvedProjectId}`, puis les 4 requetes projet.
+- Slug public non resolu par le premier appel: `GET /projects/{slug}`, `GET /projects`, `GET /projects/{resolvedProjectId}`, puis les 3 requetes projet.
 
 ### `/prompts`
 
@@ -83,7 +82,6 @@ Reutilise le loader monitoring:
 - `GET /projects/{projectId}/models`
 - `GET /projects/{projectId}/competitors`
 - `GET /analysis/projects/{projectId}/dashboard`
-- `GET /analysis/projects/{projectId}/alerts`
 
 Ajoute:
 
@@ -107,7 +105,6 @@ Reutilise le loader monitoring:
 - `GET /projects/{projectId}/models`
 - `GET /projects/{projectId}/competitors`
 - `GET /analysis/projects/{projectId}/dashboard`
-- `GET /analysis/projects/{projectId}/alerts`
 
 ### `/traffic`
 

@@ -80,7 +80,6 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 	created := copyProject(project)
 	s.mu.Unlock()
 
-	s.emitProjectSignupAttribution(ctx, created)
 	return created, nil
 }
 
@@ -130,7 +129,7 @@ func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userI
 		}
 	}
 	if len(assignedProjectIDs) == 0 {
-		return listProjectsFromMap(s.projects, organizationID), nil
+		return []Project{}, nil
 	}
 
 	projects := make([]Project, 0, len(assignedProjectIDs))
@@ -147,7 +146,7 @@ func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userI
 
 func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members []ProjectMember) []Project {
 	if len(members) == 0 {
-		return listProjectsFromMap(s.projects, organizationID)
+		return []Project{}
 	}
 	assignedProjectIDs := make(map[string]struct{}, len(members))
 	for _, member := range members {
@@ -156,7 +155,7 @@ func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members
 		}
 	}
 	if len(assignedProjectIDs) == 0 {
-		return listProjectsFromMap(s.projects, organizationID)
+		return []Project{}
 	}
 	projects := make([]Project, 0, len(assignedProjectIDs))
 	for projectID := range assignedProjectIDs {
@@ -352,4 +351,14 @@ func countProjectsForOrganization(projectsByID map[string]*Project, organization
 		}
 	}
 	return count
+}
+
+func normalizeAttributionSource(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return "unknown"
+	}
+	value = strings.ReplaceAll(value, "_", "-")
+	value = strings.ReplaceAll(value, " ", "-")
+	return value
 }

@@ -12,7 +12,7 @@ Use this skill for changes that touch organization membership/hierarchy or proje
 There are two bounded contexts:
 
 - **Organization**: owns memberships, teams, roles, invitations, and the hierarchy endpoint that lists projects for an organization.
-- **Project**: owns project details, brand metadata, competitors, prompts, model selection, provider credentials, impact integrations, and downstream analysis/attribution scope.
+- **Project**: owns project details, brand metadata, competitors, prompts, model selection, provider credentials, impact integrations, and downstream analysis scope.
 
 `organizationId` is an `int64` in Go services but usually a `string` in the frontend. `projectId` is a string everywhere. Normalize at boundaries and do not silently mix route/query IDs with persisted local selection.
 
@@ -62,7 +62,6 @@ Cross-service:
 - `services/api-gateway/internal/adapter/http/routes.go` - public route proxying.
 - `services/api-gateway/internal/adapter/http/user_scope.go` and `permissions.go` - authenticated user/org context.
 - `services/analysis-service/internal/adapter/client/project/client.go` - analysis reads project access/data.
-- `services/attribution-service/internal/adapter/client/projectapi/client.go` - attribution reads project context.
 - `services/billing-service/internal/adapter/client/project/client.go` - billing/project dependency.
 
 ## Working Rules
@@ -112,7 +111,7 @@ Cross-service:
 ### Change cross-service project access
 
 - Start with `contracts/proto/project/v1/project.proto`, `project-service/internal/adapter/grpc/server.go`, and `project-service/internal/usecase/service_projects.go`.
-- Then update downstream clients in analysis, attribution, billing, organizations, or permission services.
+- Then update downstream clients in analysis, billing, organizations, or permission services.
 - Regenerate protobuf code if the proto contract changes.
 
 ## Validation

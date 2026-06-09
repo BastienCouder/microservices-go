@@ -27,6 +27,7 @@ import {
   getStatusBadgeVariant,
 } from "../../_lib/shared/formatters";
 import {
+  ASSIGNABLE_PROJECT_ROLES,
   INVITABLE_ORGANIZATION_ROLES,
 } from "../../_lib/shared/project-membership";
 import type {
@@ -34,8 +35,6 @@ import type {
   OrganizationInvitation,
   OrganizationProject,
 } from "../../_lib/shared/types";
-
-const PROJECT_ROLE_OPTIONS = ["viewer"] as const;
 
 type InvitationsPanelProps = {
   invitations: OrganizationInvitation[];
@@ -87,12 +86,12 @@ export function InvitationsPanel({
                 ...draft,
                 projectId,
                 role: projectId
-                  ? PROJECT_ROLE_OPTIONS[0]
+                  ? "viewer"
                   : INVITABLE_ORGANIZATION_ROLES.includes(
                       draft.role as (typeof INVITABLE_ORGANIZATION_ROLES)[number],
                     )
                     ? draft.role
-                    : "member",
+                    : "viewer",
               });
             }}
           >
@@ -113,7 +112,7 @@ export function InvitationsPanel({
               <SelectValue placeholder="Role" />
             </SelectTrigger>
             <SelectContent>
-              {(draft.projectId ? PROJECT_ROLE_OPTIONS : INVITABLE_ORGANIZATION_ROLES).map((role) => (
+              {(draft.projectId ? ASSIGNABLE_PROJECT_ROLES : INVITABLE_ORGANIZATION_ROLES).map((role) => (
                 <SelectItem key={role} value={role}>
                   {formatLabel(role)}
                 </SelectItem>

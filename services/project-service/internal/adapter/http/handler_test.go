@@ -412,6 +412,7 @@ func TestProjectMembersRoutesAreOwnedByOrganizationsService(t *testing.T) {
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Organization-ID", "42")
 		req.Header.Set("X-Authenticated-User-ID", "7")
+		req.Header.Set("X-Organization-Full-Access", "true")
 		rec := httptest.NewRecorder()
 
 		mux.ServeHTTP(rec, req)

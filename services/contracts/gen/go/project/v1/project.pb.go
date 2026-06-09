@@ -133,6 +133,238 @@ func (x *CheckProjectAccessResponse) GetReason() string {
 	return ""
 }
 
+type GetProjectImpactContextRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProjectImpactContextRequest) Reset() {
+	*x = GetProjectImpactContextRequest{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectImpactContextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectImpactContextRequest) ProtoMessage() {}
+
+func (x *GetProjectImpactContextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectImpactContextRequest.ProtoReflect.Descriptor instead.
+func (*GetProjectImpactContextRequest) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *GetProjectImpactContextRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+type ProjectGA4Integration struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	PropertyId         string                 `protobuf:"bytes,1,opt,name=property_id,json=propertyId,proto3" json:"property_id,omitempty"`
+	ServiceAccountJson string                 `protobuf:"bytes,2,opt,name=service_account_json,json=serviceAccountJson,proto3" json:"service_account_json,omitempty"`
+	OauthRefreshToken  string                 `protobuf:"bytes,3,opt,name=oauth_refresh_token,json=oauthRefreshToken,proto3" json:"oauth_refresh_token,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *ProjectGA4Integration) Reset() {
+	*x = ProjectGA4Integration{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProjectGA4Integration) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProjectGA4Integration) ProtoMessage() {}
+
+func (x *ProjectGA4Integration) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProjectGA4Integration.ProtoReflect.Descriptor instead.
+func (*ProjectGA4Integration) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *ProjectGA4Integration) GetPropertyId() string {
+	if x != nil {
+		return x.PropertyId
+	}
+	return ""
+}
+
+func (x *ProjectGA4Integration) GetServiceAccountJson() string {
+	if x != nil {
+		return x.ServiceAccountJson
+	}
+	return ""
+}
+
+func (x *ProjectGA4Integration) GetOauthRefreshToken() string {
+	if x != nil {
+		return x.OauthRefreshToken
+	}
+	return ""
+}
+
+type ProjectImpactIntegrations struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	Ga4           *ProjectGA4Integration `protobuf:"bytes,2,opt,name=ga4,proto3" json:"ga4,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProjectImpactIntegrations) Reset() {
+	*x = ProjectImpactIntegrations{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProjectImpactIntegrations) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProjectImpactIntegrations) ProtoMessage() {}
+
+func (x *ProjectImpactIntegrations) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProjectImpactIntegrations.ProtoReflect.Descriptor instead.
+func (*ProjectImpactIntegrations) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ProjectImpactIntegrations) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ProjectImpactIntegrations) GetGa4() *ProjectGA4Integration {
+	if x != nil {
+		return x.Ga4
+	}
+	return nil
+}
+
+type GetProjectImpactContextResponse struct {
+	state          protoimpl.MessageState     `protogen:"open.v1"`
+	ProjectId      string                     `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	OrganizationId int64                      `protobuf:"varint,2,opt,name=organization_id,json=organizationId,proto3" json:"organization_id,omitempty"`
+	Domain         string                     `protobuf:"bytes,3,opt,name=domain,proto3" json:"domain,omitempty"`
+	WebsiteUrl     string                     `protobuf:"bytes,4,opt,name=website_url,json=websiteUrl,proto3" json:"website_url,omitempty"`
+	Integrations   *ProjectImpactIntegrations `protobuf:"bytes,5,opt,name=integrations,proto3" json:"integrations,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *GetProjectImpactContextResponse) Reset() {
+	*x = GetProjectImpactContextResponse{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectImpactContextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectImpactContextResponse) ProtoMessage() {}
+
+func (x *GetProjectImpactContextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectImpactContextResponse.ProtoReflect.Descriptor instead.
+func (*GetProjectImpactContextResponse) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *GetProjectImpactContextResponse) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *GetProjectImpactContextResponse) GetOrganizationId() int64 {
+	if x != nil {
+		return x.OrganizationId
+	}
+	return 0
+}
+
+func (x *GetProjectImpactContextResponse) GetDomain() string {
+	if x != nil {
+		return x.Domain
+	}
+	return ""
+}
+
+func (x *GetProjectImpactContextResponse) GetWebsiteUrl() string {
+	if x != nil {
+		return x.WebsiteUrl
+	}
+	return ""
+}
+
+func (x *GetProjectImpactContextResponse) GetIntegrations() *ProjectImpactIntegrations {
+	if x != nil {
+		return x.Integrations
+	}
+	return nil
+}
+
 type ListProjectCompetitorsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
@@ -142,7 +374,7 @@ type ListProjectCompetitorsRequest struct {
 
 func (x *ListProjectCompetitorsRequest) Reset() {
 	*x = ListProjectCompetitorsRequest{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[2]
+	mi := &file_proto_project_v1_project_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -154,7 +386,7 @@ func (x *ListProjectCompetitorsRequest) String() string {
 func (*ListProjectCompetitorsRequest) ProtoMessage() {}
 
 func (x *ListProjectCompetitorsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[2]
+	mi := &file_proto_project_v1_project_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -167,7 +399,7 @@ func (x *ListProjectCompetitorsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectCompetitorsRequest.ProtoReflect.Descriptor instead.
 func (*ListProjectCompetitorsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{2}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *ListProjectCompetitorsRequest) GetProjectId() string {
@@ -186,7 +418,7 @@ type ListProjectCompetitorsResponse struct {
 
 func (x *ListProjectCompetitorsResponse) Reset() {
 	*x = ListProjectCompetitorsResponse{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[3]
+	mi := &file_proto_project_v1_project_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -198,7 +430,7 @@ func (x *ListProjectCompetitorsResponse) String() string {
 func (*ListProjectCompetitorsResponse) ProtoMessage() {}
 
 func (x *ListProjectCompetitorsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[3]
+	mi := &file_proto_project_v1_project_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -211,7 +443,7 @@ func (x *ListProjectCompetitorsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectCompetitorsResponse.ProtoReflect.Descriptor instead.
 func (*ListProjectCompetitorsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{3}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ListProjectCompetitorsResponse) GetCompetitors() []string {
@@ -230,7 +462,7 @@ type ListProjectEnabledModelsRequest struct {
 
 func (x *ListProjectEnabledModelsRequest) Reset() {
 	*x = ListProjectEnabledModelsRequest{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[4]
+	mi := &file_proto_project_v1_project_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -242,7 +474,7 @@ func (x *ListProjectEnabledModelsRequest) String() string {
 func (*ListProjectEnabledModelsRequest) ProtoMessage() {}
 
 func (x *ListProjectEnabledModelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[4]
+	mi := &file_proto_project_v1_project_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -255,7 +487,7 @@ func (x *ListProjectEnabledModelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectEnabledModelsRequest.ProtoReflect.Descriptor instead.
 func (*ListProjectEnabledModelsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{4}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ListProjectEnabledModelsRequest) GetProjectId() string {
@@ -274,7 +506,7 @@ type ListProjectEnabledModelsResponse struct {
 
 func (x *ListProjectEnabledModelsResponse) Reset() {
 	*x = ListProjectEnabledModelsResponse{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[5]
+	mi := &file_proto_project_v1_project_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -286,7 +518,7 @@ func (x *ListProjectEnabledModelsResponse) String() string {
 func (*ListProjectEnabledModelsResponse) ProtoMessage() {}
 
 func (x *ListProjectEnabledModelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[5]
+	mi := &file_proto_project_v1_project_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -299,7 +531,7 @@ func (x *ListProjectEnabledModelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectEnabledModelsResponse.ProtoReflect.Descriptor instead.
 func (*ListProjectEnabledModelsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{5}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *ListProjectEnabledModelsResponse) GetModelIds() []string {
@@ -321,7 +553,7 @@ type PromptSchedule struct {
 
 func (x *PromptSchedule) Reset() {
 	*x = PromptSchedule{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[6]
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -333,7 +565,7 @@ func (x *PromptSchedule) String() string {
 func (*PromptSchedule) ProtoMessage() {}
 
 func (x *PromptSchedule) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[6]
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -346,7 +578,7 @@ func (x *PromptSchedule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptSchedule.ProtoReflect.Descriptor instead.
 func (*PromptSchedule) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{6}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *PromptSchedule) GetMode() string {
@@ -396,7 +628,7 @@ type ScheduledAnalysisJob struct {
 
 func (x *ScheduledAnalysisJob) Reset() {
 	*x = ScheduledAnalysisJob{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[7]
+	mi := &file_proto_project_v1_project_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -408,7 +640,7 @@ func (x *ScheduledAnalysisJob) String() string {
 func (*ScheduledAnalysisJob) ProtoMessage() {}
 
 func (x *ScheduledAnalysisJob) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[7]
+	mi := &file_proto_project_v1_project_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -421,7 +653,7 @@ func (x *ScheduledAnalysisJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledAnalysisJob.ProtoReflect.Descriptor instead.
 func (*ScheduledAnalysisJob) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{7}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ScheduledAnalysisJob) GetProjectId() string {
@@ -512,7 +744,7 @@ type ScheduledModelProviderCredential struct {
 
 func (x *ScheduledModelProviderCredential) Reset() {
 	*x = ScheduledModelProviderCredential{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	mi := &file_proto_project_v1_project_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -524,7 +756,7 @@ func (x *ScheduledModelProviderCredential) String() string {
 func (*ScheduledModelProviderCredential) ProtoMessage() {}
 
 func (x *ScheduledModelProviderCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[8]
+	mi := &file_proto_project_v1_project_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -537,7 +769,7 @@ func (x *ScheduledModelProviderCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledModelProviderCredential.ProtoReflect.Descriptor instead.
 func (*ScheduledModelProviderCredential) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{8}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ScheduledModelProviderCredential) GetProviderId() string {
@@ -569,7 +801,7 @@ type ListScheduledAnalysisJobsRequest struct {
 
 func (x *ListScheduledAnalysisJobsRequest) Reset() {
 	*x = ListScheduledAnalysisJobsRequest{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[9]
+	mi := &file_proto_project_v1_project_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -581,7 +813,7 @@ func (x *ListScheduledAnalysisJobsRequest) String() string {
 func (*ListScheduledAnalysisJobsRequest) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[9]
+	mi := &file_proto_project_v1_project_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -594,7 +826,7 @@ func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScheduledAnalysisJobsRequest.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{9}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{13}
 }
 
 type ListScheduledAnalysisJobsResponse struct {
@@ -606,7 +838,7 @@ type ListScheduledAnalysisJobsResponse struct {
 
 func (x *ListScheduledAnalysisJobsResponse) Reset() {
 	*x = ListScheduledAnalysisJobsResponse{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	mi := &file_proto_project_v1_project_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -618,7 +850,7 @@ func (x *ListScheduledAnalysisJobsResponse) String() string {
 func (*ListScheduledAnalysisJobsResponse) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	mi := &file_proto_project_v1_project_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -631,7 +863,7 @@ func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListScheduledAnalysisJobsResponse.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{10}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListScheduledAnalysisJobsResponse) GetJobs() []*ScheduledAnalysisJob {
@@ -654,7 +886,27 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"\x1aCheckProjectAccessResponse\x12\x18\n" +
 	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x16\n" +
 	"\x06exists\x18\x02 \x01(\bR\x06exists\x12\x16\n" +
-	"\x06reason\x18\x03 \x01(\tR\x06reason\">\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"?\n" +
+	"\x1eGetProjectImpactContextRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"\x9a\x01\n" +
+	"\x15ProjectGA4Integration\x12\x1f\n" +
+	"\vproperty_id\x18\x01 \x01(\tR\n" +
+	"propertyId\x120\n" +
+	"\x14service_account_json\x18\x02 \x01(\tR\x12serviceAccountJson\x12.\n" +
+	"\x13oauth_refresh_token\x18\x03 \x01(\tR\x11oauthRefreshToken\"o\n" +
+	"\x19ProjectImpactIntegrations\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x123\n" +
+	"\x03ga4\x18\x02 \x01(\v2!.project.v1.ProjectGA4IntegrationR\x03ga4\"\xed\x01\n" +
+	"\x1fGetProjectImpactContextResponse\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12'\n" +
+	"\x0forganization_id\x18\x02 \x01(\x03R\x0eorganizationId\x12\x16\n" +
+	"\x06domain\x18\x03 \x01(\tR\x06domain\x12\x1f\n" +
+	"\vwebsite_url\x18\x04 \x01(\tR\n" +
+	"websiteUrl\x12I\n" +
+	"\fintegrations\x18\x05 \x01(\v2%.project.v1.ProjectImpactIntegrationsR\fintegrations\">\n" +
 	"\x1dListProjectCompetitorsRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"B\n" +
@@ -701,9 +953,10 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"\x10provider_api_key\x18\x03 \x01(\tR\x0eproviderApiKey\"\"\n" +
 	" ListScheduledAnalysisJobsRequest\"Y\n" +
 	"!ListScheduledAnalysisJobsResponse\x124\n" +
-	"\x04jobs\x18\x01 \x03(\v2 .project.v1.ScheduledAnalysisJobR\x04jobs2\xd7\x03\n" +
+	"\x04jobs\x18\x01 \x03(\v2 .project.v1.ScheduledAnalysisJobR\x04jobs2\xcb\x04\n" +
 	"\x0eProjectService\x12c\n" +
-	"\x12CheckProjectAccess\x12%.project.v1.CheckProjectAccessRequest\x1a&.project.v1.CheckProjectAccessResponse\x12o\n" +
+	"\x12CheckProjectAccess\x12%.project.v1.CheckProjectAccessRequest\x1a&.project.v1.CheckProjectAccessResponse\x12r\n" +
+	"\x17GetProjectImpactContext\x12*.project.v1.GetProjectImpactContextRequest\x1a+.project.v1.GetProjectImpactContextResponse\x12o\n" +
 	"\x16ListProjectCompetitors\x12).project.v1.ListProjectCompetitorsRequest\x1a*.project.v1.ListProjectCompetitorsResponse\x12u\n" +
 	"\x18ListProjectEnabledModels\x12+.project.v1.ListProjectEnabledModelsRequest\x1a,.project.v1.ListProjectEnabledModelsResponse\x12x\n" +
 	"\x19ListScheduledAnalysisJobs\x12,.project.v1.ListScheduledAnalysisJobsRequest\x1a-.project.v1.ListScheduledAnalysisJobsResponseBQZOgithub.com/bastiencouder/microservices-go/contracts/gen/go/project/v1;projectv1b\x06proto3"
@@ -720,41 +973,49 @@ func file_proto_project_v1_project_proto_rawDescGZIP() []byte {
 	return file_proto_project_v1_project_proto_rawDescData
 }
 
-var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
+var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_proto_project_v1_project_proto_goTypes = []any{
 	(*CheckProjectAccessRequest)(nil),         // 0: project.v1.CheckProjectAccessRequest
 	(*CheckProjectAccessResponse)(nil),        // 1: project.v1.CheckProjectAccessResponse
-	(*ListProjectCompetitorsRequest)(nil),     // 2: project.v1.ListProjectCompetitorsRequest
-	(*ListProjectCompetitorsResponse)(nil),    // 3: project.v1.ListProjectCompetitorsResponse
-	(*ListProjectEnabledModelsRequest)(nil),   // 4: project.v1.ListProjectEnabledModelsRequest
-	(*ListProjectEnabledModelsResponse)(nil),  // 5: project.v1.ListProjectEnabledModelsResponse
-	(*PromptSchedule)(nil),                    // 6: project.v1.PromptSchedule
-	(*ScheduledAnalysisJob)(nil),              // 7: project.v1.ScheduledAnalysisJob
-	(*ScheduledModelProviderCredential)(nil),  // 8: project.v1.ScheduledModelProviderCredential
-	(*ListScheduledAnalysisJobsRequest)(nil),  // 9: project.v1.ListScheduledAnalysisJobsRequest
-	(*ListScheduledAnalysisJobsResponse)(nil), // 10: project.v1.ListScheduledAnalysisJobsResponse
-	nil, // 11: project.v1.PromptSchedule.ModelCronsEntry
-	nil, // 12: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
+	(*GetProjectImpactContextRequest)(nil),    // 2: project.v1.GetProjectImpactContextRequest
+	(*ProjectGA4Integration)(nil),             // 3: project.v1.ProjectGA4Integration
+	(*ProjectImpactIntegrations)(nil),         // 4: project.v1.ProjectImpactIntegrations
+	(*GetProjectImpactContextResponse)(nil),   // 5: project.v1.GetProjectImpactContextResponse
+	(*ListProjectCompetitorsRequest)(nil),     // 6: project.v1.ListProjectCompetitorsRequest
+	(*ListProjectCompetitorsResponse)(nil),    // 7: project.v1.ListProjectCompetitorsResponse
+	(*ListProjectEnabledModelsRequest)(nil),   // 8: project.v1.ListProjectEnabledModelsRequest
+	(*ListProjectEnabledModelsResponse)(nil),  // 9: project.v1.ListProjectEnabledModelsResponse
+	(*PromptSchedule)(nil),                    // 10: project.v1.PromptSchedule
+	(*ScheduledAnalysisJob)(nil),              // 11: project.v1.ScheduledAnalysisJob
+	(*ScheduledModelProviderCredential)(nil),  // 12: project.v1.ScheduledModelProviderCredential
+	(*ListScheduledAnalysisJobsRequest)(nil),  // 13: project.v1.ListScheduledAnalysisJobsRequest
+	(*ListScheduledAnalysisJobsResponse)(nil), // 14: project.v1.ListScheduledAnalysisJobsResponse
+	nil, // 15: project.v1.PromptSchedule.ModelCronsEntry
+	nil, // 16: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
 }
 var file_proto_project_v1_project_proto_depIdxs = []int32{
-	11, // 0: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
-	6,  // 1: project.v1.ScheduledAnalysisJob.schedule:type_name -> project.v1.PromptSchedule
-	12, // 2: project.v1.ScheduledAnalysisJob.provider_credentials:type_name -> project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
-	7,  // 3: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
-	8,  // 4: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry.value:type_name -> project.v1.ScheduledModelProviderCredential
-	0,  // 5: project.v1.ProjectService.CheckProjectAccess:input_type -> project.v1.CheckProjectAccessRequest
-	2,  // 6: project.v1.ProjectService.ListProjectCompetitors:input_type -> project.v1.ListProjectCompetitorsRequest
-	4,  // 7: project.v1.ProjectService.ListProjectEnabledModels:input_type -> project.v1.ListProjectEnabledModelsRequest
-	9,  // 8: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
-	1,  // 9: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
-	3,  // 10: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
-	5,  // 11: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
-	10, // 12: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
-	9,  // [9:13] is the sub-list for method output_type
-	5,  // [5:9] is the sub-list for method input_type
-	5,  // [5:5] is the sub-list for extension type_name
-	5,  // [5:5] is the sub-list for extension extendee
-	0,  // [0:5] is the sub-list for field type_name
+	3,  // 0: project.v1.ProjectImpactIntegrations.ga4:type_name -> project.v1.ProjectGA4Integration
+	4,  // 1: project.v1.GetProjectImpactContextResponse.integrations:type_name -> project.v1.ProjectImpactIntegrations
+	15, // 2: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
+	10, // 3: project.v1.ScheduledAnalysisJob.schedule:type_name -> project.v1.PromptSchedule
+	16, // 4: project.v1.ScheduledAnalysisJob.provider_credentials:type_name -> project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
+	11, // 5: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
+	12, // 6: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry.value:type_name -> project.v1.ScheduledModelProviderCredential
+	0,  // 7: project.v1.ProjectService.CheckProjectAccess:input_type -> project.v1.CheckProjectAccessRequest
+	2,  // 8: project.v1.ProjectService.GetProjectImpactContext:input_type -> project.v1.GetProjectImpactContextRequest
+	6,  // 9: project.v1.ProjectService.ListProjectCompetitors:input_type -> project.v1.ListProjectCompetitorsRequest
+	8,  // 10: project.v1.ProjectService.ListProjectEnabledModels:input_type -> project.v1.ListProjectEnabledModelsRequest
+	13, // 11: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
+	1,  // 12: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
+	5,  // 13: project.v1.ProjectService.GetProjectImpactContext:output_type -> project.v1.GetProjectImpactContextResponse
+	7,  // 14: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
+	9,  // 15: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
+	14, // 16: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
+	12, // [12:17] is the sub-list for method output_type
+	7,  // [7:12] is the sub-list for method input_type
+	7,  // [7:7] is the sub-list for extension type_name
+	7,  // [7:7] is the sub-list for extension extendee
+	0,  // [0:7] is the sub-list for field type_name
 }
 
 func init() { file_proto_project_v1_project_proto_init() }
@@ -768,7 +1029,7 @@ func file_proto_project_v1_project_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_project_v1_project_proto_rawDesc), len(file_proto_project_v1_project_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   13,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

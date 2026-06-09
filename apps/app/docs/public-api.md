@@ -39,7 +39,7 @@ curl http://localhost:50000/v1/me \
 La surface publique actuelle n'est pas encore completement unifiee:
 
 - Les endpoints directs du gateway comme `/v1/me`, `/v1/usage`, `/v1/billing/entitlements` et `/v1/agent-ready/scans` renvoient du JSON brut.
-- Les endpoints proxifies vers `project-service`, `analysis-service` et `attribution-service` renvoient en general:
+- Les endpoints proxifies vers `project-service` et `analysis-service` renvoient en general:
 
 ```json
 {
@@ -280,14 +280,6 @@ Les routes suivantes sont routees sous `/v1`, mais le backend attend encore une 
 | `POST` | `/v1/projects` | `project-service` exige `authenticated user`. |
 | `POST` | `/v1/projects/{projectId}/analysis/runs` | Creation de run manuelle dependante d'un user. |
 | `POST` | `/v1/projects/{projectId}/perception/runs` | Creation de run perception dependante d'un user. |
-| `POST` | `/v1/projects/{projectId}/events` | `attribution-service` exige `authenticated user`. |
-| `GET` | `/v1/projects/{projectId}/events` | `attribution-service` exige `authenticated user`. |
-| `GET` | `/v1/projects/{projectId}/funnel` | `attribution-service` exige `authenticated user`. |
-| `GET` | `/v1/projects/{projectId}/traffic` | `attribution-service` exige `authenticated user`. |
-
-Cas particulier:
-
-- `POST /v1/projects/{projectId}/ingest` est bien route aujourd'hui, mais il n'est pas compatible tel quel avec l'auth publique par API key. Le service d'ingestion lit aussi `Authorization: Bearer ...` comme signing token d'ingestion, ce qui entre en conflit avec l'API key publique.
 
 ## Erreurs courantes
 

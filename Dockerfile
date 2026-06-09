@@ -14,7 +14,7 @@ WORKDIR /usr/src/app
 
 COPY services ./services
 
-RUN cd services && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/src/app/bin/service ${SERVICE_PATH}
+RUN cd services && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /usr/src/app/bin/service ./${SERVICE_PATH}
 
 FROM alpine:3.23 AS certs
 

@@ -19,7 +19,6 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	analysisclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/analysis"
-	attributionclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/attribution"
 	billingclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/billing"
 	googleanalyticsclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/googleanalytics"
 	iaclient "github.com/bastiencouder/microservices-go/services/project-service/internal/adapter/client/ia"
@@ -69,15 +68,6 @@ func main() {
 	}
 	defer iaGRPCClient.Close()
 
-	var attributionHTTPClient usecase.AttributionClient
-	if cfg.AttributionServiceURL != "" {
-		client, err := attributionclient.NewClient(cfg.AttributionServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
-		if err != nil {
-			log.Fatalf("init attribution http client: %v", err)
-		}
-		attributionHTTPClient = client
-	}
-
 	var billingHTTPClient usecase.BillingClient
 	if cfg.BillingServiceURL != "" {
 		client, err := billingclient.NewClient(cfg.BillingServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
@@ -103,7 +93,6 @@ func main() {
 		AnalysisClient:          analysisGRPCClient,
 		IAClient:                iaGRPCClient,
 		ProjectMembershipClient: projectMembershipClient,
-		AttributionClient:       attributionHTTPClient,
 		BillingClient:           billingHTTPClient,
 	})
 	if err != nil {

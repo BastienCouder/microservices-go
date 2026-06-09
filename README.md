@@ -1,6 +1,6 @@
 # microservices-go
 
-Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, organisations, permissions, billing, notifications, project/analysis/ia et attribution.
+Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, organisations, permissions, billing, notifications, project, analysis, ia et attribution traffic.
 
 ## Services
 
@@ -12,9 +12,9 @@ Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, o
 - `services/billing-service`: plans et quotas (PostgreSQL).
 - `services/notification-service`: envoi/listing notifications (PostgreSQL).
 - `services/project-service`: gestion des projets, prompts, concurrents, modèles IA.
-- `services/analysis-service`: orchestration des runs d’analyse, dashboard, perception, alertes.
+- `services/analysis-service`: orchestration des runs d’analyse, dashboard, perception.
 - `services/ia-service`: exécution IA et extraction de marque (sans LangGraph).
-- `services/attribution-service`: métriques de funnel IA (visits/signups/trials/paid/revenue) liées aux projets.
+- `services/attribution-service`: rapports traffic GA4 lies aux projets.
 - `services/mcp-server`: outils MCP backend.
 - `apps/web`: frontend Next.js.
 - `apps/doc`: documentation.
@@ -73,8 +73,6 @@ Services exposés:
 - `POST /analysis/projects/{project_id}/analyze`
 - `GET /analysis/projects/{project_id}/dashboard`
 - `POST /ai/execute`
-- `POST /attribution/projects/{project_id}/events`
-- `GET /attribution/projects/{project_id}/funnel`
 
 ## Parcours auth → app → permissions (dev)
 

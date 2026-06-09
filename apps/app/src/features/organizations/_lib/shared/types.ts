@@ -1,7 +1,6 @@
 export type OrganizationRole =
-  | "owner"
-  | "admin"
-  | "member"
+  | "editor"
+  | "viewer"
   | "super_admin";
 
 export type OrganizationSummary = {

@@ -755,7 +755,6 @@ func TestUpdateBrandCanonPersistsAndNormalizesLists(t *testing.T) {
 	audience := []string{"PME", " PME ", "", "Direction commerciale"}
 	useCases := []string{"Prospection", "prospection", "Pilotage"}
 	features := []string{"Automatisation", "automatisation", "Reporting"}
-	pricing := map[string]any{"plan": "pro", "amount": 49}
 
 	updated, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
 		BrandName:   &brandName,
@@ -764,7 +763,6 @@ func TestUpdateBrandCanonPersistsAndNormalizesLists(t *testing.T) {
 		Audience:    &audience,
 		UseCases:    &useCases,
 		Features:    &features,
-		Pricing:     &pricing,
 	})
 	if err != nil {
 		t.Fatalf("update brand canon: %v", err)
@@ -797,9 +795,6 @@ func TestUpdateBrandCanonPersistsAndNormalizesLists(t *testing.T) {
 	}
 	if canon.BrandName != "Acme" {
 		t.Fatalf("expected persisted brand name, got %q", canon.BrandName)
-	}
-	if got := canon.Pricing["plan"]; got != "pro" {
-		t.Fatalf("expected persisted pricing plan, got %#v", got)
 	}
 }
 
@@ -1274,7 +1269,7 @@ func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
 	}
 }
 
-func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t *testing.T) {
+func TestGetOptimizationErrorsGroupsPerceptionAndCrawlerErrors(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()
 
@@ -1292,16 +1287,6 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 		Features:    &features,
 	}); err != nil {
 		t.Fatalf("seed brand canon: %v", err)
-	}
-
-	_, err := svc.CreateAlert(ctx, "project-1", 42, CreateAlertInput{
-		AlertType:   "pricing_hallucination",
-		Severity:    "high",
-		Title:       "Pricing incoherent",
-		Description: "Des reponses surestiment les prix",
-	})
-	if err != nil {
-		t.Fatalf("create alert: %v", err)
 	}
 
 	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
@@ -1365,19 +1350,10 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 		t.Fatalf("expected high, medium, low column order, got %#v", board.Columns)
 	}
 
-	var hasMonitoringError, hasPerceptionError, hasCrawlerError, hasSeededCrawlerError bool
-	var hasMonitoringAlertOrigin bool
+	var hasPerceptionError, hasCrawlerError, hasSeededCrawlerError bool
 	var hasCrawlerResource bool
 	for _, item := range board.Errors {
 		switch item.Source {
-		case "monitoring":
-			hasMonitoringError = true
-			if item.Origin == "alert" {
-				hasMonitoringAlertOrigin = true
-			}
-			if item.Origin == "derived" {
-				t.Fatalf("expected error hub to expose monitoring alerts only, got derived item %#v", item)
-			}
 		case "perception":
 			hasPerceptionError = true
 		case "crawler":
@@ -1396,8 +1372,8 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 			t.Fatalf("expected optimization item to carry card-compatible fields, got %#v", item)
 		}
 	}
-	if !hasMonitoringError || !hasPerceptionError || !hasCrawlerError {
-		t.Fatalf("expected monitoring, perception and crawler errors, got %#v", board.Errors)
+	if !hasPerceptionError || !hasCrawlerError {
+		t.Fatalf("expected perception and crawler errors, got %#v", board.Errors)
 	}
 	if !hasSeededCrawlerError {
 		t.Fatalf("expected seeded crawler error to keep a stable id, got %#v", board.Errors)
@@ -1405,25 +1381,14 @@ func TestGetOptimizationErrorsGroupsMonitoringAlertsPerceptionAndCrawlerErrors(t
 	if !hasCrawlerResource {
 		t.Fatalf("expected seeded crawler error to expose its page resource, got %#v", board.Errors)
 	}
-	if !hasMonitoringAlertOrigin {
-		t.Fatalf("expected monitoring alert origin, got %#v", board.Errors)
-	}
-	for _, item := range board.Errors {
-		if item.Source == "monitoring" && item.GeneratedContentKey == "" {
-			t.Fatalf("expected monitoring error to expose generated content key, got %#v", item)
-		}
-	}
 	if board.Metadata["totalErrors"] != len(board.Errors) {
 		t.Fatalf("expected metadata totalErrors to match errors length, got %#v for %d errors", board.Metadata["totalErrors"], len(board.Errors))
-	}
-	if got, ok := board.Metadata["monitoringAlertErrors"].(int); !ok || got != 1 {
-		t.Fatalf("expected 1 monitoring alert error, got %#v", board.Metadata["monitoringAlertErrors"])
 	}
 	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got != 0 {
 		t.Fatalf("expected derived monitoring errors to be excluded, got %#v", board.Metadata["monitoringDerivedErrors"])
 	}
-	if got, ok := board.Metadata["monitoringErrors"].(int); !ok || got != 1 {
-		t.Fatalf("expected monitoring errors to include alerts only, got %#v", board.Metadata["monitoringErrors"])
+	if got, ok := board.Metadata["monitoringErrors"].(int); !ok || got != 0 {
+		t.Fatalf("expected monitoring errors metadata to stay at 0, got %#v", board.Metadata["monitoringErrors"])
 	}
 	if got, ok := board.Metadata["crawlerErrors"].(int); !ok || got < 1 {
 		t.Fatalf("expected crawlerErrors metadata to include crawler items, got %#v", board.Metadata["crawlerErrors"])
@@ -1748,33 +1713,6 @@ func TestOptimizeActionsCanBeDeleted(t *testing.T) {
 	}
 }
 
-func TestAlertsReadAll(t *testing.T) {
-	svc := NewService()
-	ctx := context.Background()
-
-	_, err := svc.CreateAlert(ctx, "project-1", 42, CreateAlertInput{
-		AlertType:   "pricing_hallucination",
-		Severity:    "high",
-		Title:       "Pricing incoherent",
-		Description: "Des reponses surestiment les prix",
-	})
-	if err != nil {
-		t.Fatalf("create alert: %v", err)
-	}
-
-	if err := svc.MarkAllAlertsRead(ctx, "project-1", 42); err != nil {
-		t.Fatalf("mark all alerts read: %v", err)
-	}
-
-	alerts, err := svc.ListAlerts(ctx, "project-1", 42, true)
-	if err != nil {
-		t.Fatalf("list alerts: %v", err)
-	}
-	if len(alerts) != 0 {
-		t.Fatalf("expected 0 unread alerts, got %d", len(alerts))
-	}
-}
-
 func TestGetDashboardReloadsStateFromStore(t *testing.T) {
 	ctx := context.Background()
 	store := &mutableAnalysisStore{}
@@ -1788,8 +1726,6 @@ func TestGetDashboardReloadsStateFromStore(t *testing.T) {
 		ResponsesByRun:     map[string][]string{},
 		ResponseIndexByRun: map[string]map[string]string{},
 		RunByRequest:       map[string]string{},
-		Alerts:             map[string]*Alert{},
-		AlertsByProject:    map[string][]string{},
 	})
 	if err != nil {
 		t.Fatalf("marshal initial state: %v", err)
@@ -1857,9 +1793,7 @@ func TestGetDashboardReloadsStateFromStore(t *testing.T) {
 		ResponseIndexByRun: map[string]map[string]string{
 			"seed-run-01": {"seed-prun-01|gpt-4o": "seed-resp-01"},
 		},
-		RunByRequest:    map[string]string{},
-		Alerts:          map[string]*Alert{},
-		AlertsByProject: map[string][]string{},
+		RunByRequest: map[string]string{},
 	})
 	if err != nil {
 		t.Fatalf("marshal updated state: %v", err)

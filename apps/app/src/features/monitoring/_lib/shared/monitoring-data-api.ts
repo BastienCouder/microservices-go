@@ -12,7 +12,6 @@ import {
   createEmptyMonitoringData,
   MonitoringRequestError,
   type MonitoringCompetitor,
-  type MonitoringAlert,
   type MonitoringData,
   type MonitoringLoadResult,
   type MonitoringModel,
@@ -393,7 +392,7 @@ export async function loadMonitoringData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [modelsRes, competitorsRes, monitoringRes, alertsRes] = await Promise.all([
+  const [modelsRes, competitorsRes, monitoringRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/models`, {
       method: "GET",
       signal: options?.signal,
@@ -406,17 +405,12 @@ export async function loadMonitoringData(
       method: "GET",
       signal: options?.signal,
     }),
-    gatewayJSON<unknown>(apiBaseURL, `/analysis/projects/${encodedProjectId}/alerts`, {
-      method: "GET",
-      signal: options?.signal,
-    }),
   ]);
 
   const project = asObject(unwrapRequiredEnvelope(projectRes, "project"));
   const modelsPayload = asArray(unwrapRequiredEnvelope(modelsRes, "models"));
   const competitorsPayload = asArray(unwrapRequiredEnvelope(competitorsRes, "competitors"));
   const monitoringPayload = asObject(unwrapRequiredEnvelope(monitoringRes, "monitoring"));
-  const alertsPayload = asArray(unwrapRequiredEnvelope(alertsRes, "alerts"));
 
   const projectModels: MonitoringModel[] = normalizeModelPayloadList(modelsPayload).map((model) =>
     toProjectModelMeta(model),
@@ -563,46 +557,6 @@ export async function loadMonitoringData(
     };
   });
 
-  const alerts: MonitoringAlert[] = alertsPayload.map((entry) => {
-    const row = asObject(entry);
-    const severity = asString(getField(row, ["severity", "Severity"])) || "warning";
-    const alertType =
-      asString(getField(row, ["alertType", "AlertType"])) ||
-      asString(getField(row, ["type", "Type"])) ||
-      "update";
-    const createdAt = asString(getField(row, ["createdAt", "CreatedAt"]));
-
-    return {
-      type: severity.toLowerCase() === "critical" ? "critical" : "warning",
-      prompts: alertType,
-      msg:
-        asString(getField(row, ["title", "Title"])) ||
-        asString(getField(row, ["description", "Description"])) ||
-        "",
-      time: createdAt ? toRelativeTime(createdAt) : "-",
-      isRead: asBool(getField(row, ["isRead", "IsRead"])),
-      createdAt: createdAt || undefined,
-      modelIds: (() => {
-        const modelIds = asStringArray(getField(row, ["modelIds", "ModelIDs"]));
-        if (modelIds.length > 0) return modelIds;
-        const modelId = asString(getField(row, ["modelId", "ModelID"])).trim();
-        return modelId ? [modelId] : undefined;
-      })(),
-      personas: (() => {
-        const personas = asStringArray(getField(row, ["personas", "Personas"]));
-        if (personas.length > 0) return personas;
-        const persona = asString(getField(row, ["persona", "Persona"])).trim();
-        return persona ? [persona] : undefined;
-      })(),
-      competitors: (() => {
-        const competitors = asStringArray(
-          getField(row, ["competitors", "Competitors", "competitorNames", "CompetitorNames"]),
-        );
-        return competitors.length > 0 ? competitors : undefined;
-      })(),
-    };
-  });
-
   const citedPagesCount = new Map<string, number>();
   for (const response of responses) {
     const urls = asArray(getField(response, ["citedUrls", "CitedURLs"]));
@@ -633,7 +587,7 @@ export async function loadMonitoringData(
     },
     models,
     recent_prompts: prompts,
-    alerts,
+    alerts: [],
     kpis: computeKpis(prompts),
     trends: {
       mention_rate: 0,

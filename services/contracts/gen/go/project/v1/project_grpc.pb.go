@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ProjectService_CheckProjectAccess_FullMethodName        = "/project.v1.ProjectService/CheckProjectAccess"
+	ProjectService_GetProjectImpactContext_FullMethodName   = "/project.v1.ProjectService/GetProjectImpactContext"
 	ProjectService_ListProjectCompetitors_FullMethodName    = "/project.v1.ProjectService/ListProjectCompetitors"
 	ProjectService_ListProjectEnabledModels_FullMethodName  = "/project.v1.ProjectService/ListProjectEnabledModels"
 	ProjectService_ListScheduledAnalysisJobs_FullMethodName = "/project.v1.ProjectService/ListScheduledAnalysisJobs"
@@ -30,6 +31,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProjectServiceClient interface {
 	CheckProjectAccess(ctx context.Context, in *CheckProjectAccessRequest, opts ...grpc.CallOption) (*CheckProjectAccessResponse, error)
+	GetProjectImpactContext(ctx context.Context, in *GetProjectImpactContextRequest, opts ...grpc.CallOption) (*GetProjectImpactContextResponse, error)
 	ListProjectCompetitors(ctx context.Context, in *ListProjectCompetitorsRequest, opts ...grpc.CallOption) (*ListProjectCompetitorsResponse, error)
 	ListProjectEnabledModels(ctx context.Context, in *ListProjectEnabledModelsRequest, opts ...grpc.CallOption) (*ListProjectEnabledModelsResponse, error)
 	ListScheduledAnalysisJobs(ctx context.Context, in *ListScheduledAnalysisJobsRequest, opts ...grpc.CallOption) (*ListScheduledAnalysisJobsResponse, error)
@@ -47,6 +49,16 @@ func (c *projectServiceClient) CheckProjectAccess(ctx context.Context, in *Check
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CheckProjectAccessResponse)
 	err := c.cc.Invoke(ctx, ProjectService_CheckProjectAccess_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetProjectImpactContext(ctx context.Context, in *GetProjectImpactContextRequest, opts ...grpc.CallOption) (*GetProjectImpactContextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProjectImpactContextResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetProjectImpactContext_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -88,6 +100,7 @@ func (c *projectServiceClient) ListScheduledAnalysisJobs(ctx context.Context, in
 // for forward compatibility.
 type ProjectServiceServer interface {
 	CheckProjectAccess(context.Context, *CheckProjectAccessRequest) (*CheckProjectAccessResponse, error)
+	GetProjectImpactContext(context.Context, *GetProjectImpactContextRequest) (*GetProjectImpactContextResponse, error)
 	ListProjectCompetitors(context.Context, *ListProjectCompetitorsRequest) (*ListProjectCompetitorsResponse, error)
 	ListProjectEnabledModels(context.Context, *ListProjectEnabledModelsRequest) (*ListProjectEnabledModelsResponse, error)
 	ListScheduledAnalysisJobs(context.Context, *ListScheduledAnalysisJobsRequest) (*ListScheduledAnalysisJobsResponse, error)
@@ -103,6 +116,9 @@ type UnimplementedProjectServiceServer struct{}
 
 func (UnimplementedProjectServiceServer) CheckProjectAccess(context.Context, *CheckProjectAccessRequest) (*CheckProjectAccessResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CheckProjectAccess not implemented")
+}
+func (UnimplementedProjectServiceServer) GetProjectImpactContext(context.Context, *GetProjectImpactContextRequest) (*GetProjectImpactContextResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProjectImpactContext not implemented")
 }
 func (UnimplementedProjectServiceServer) ListProjectCompetitors(context.Context, *ListProjectCompetitorsRequest) (*ListProjectCompetitorsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListProjectCompetitors not implemented")
@@ -148,6 +164,24 @@ func _ProjectService_CheckProjectAccess_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).CheckProjectAccess(ctx, req.(*CheckProjectAccessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetProjectImpactContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectImpactContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetProjectImpactContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetProjectImpactContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetProjectImpactContext(ctx, req.(*GetProjectImpactContextRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -216,6 +250,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CheckProjectAccess",
 			Handler:    _ProjectService_CheckProjectAccess_Handler,
+		},
+		{
+			MethodName: "GetProjectImpactContext",
+			Handler:    _ProjectService_GetProjectImpactContext_Handler,
 		},
 		{
 			MethodName: "ListProjectCompetitors",

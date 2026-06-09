@@ -1541,6 +1541,42 @@ func TestListProjectsForUserReturnsAssignedProjectsOnly(t *testing.T) {
 	}
 }
 
+func TestProjectMemberRolesControlProjectActions(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      1,
+		Name:           "Role scoped",
+		Domain:         "role-scoped.test",
+		WebsiteURL:     "https://role-scoped.test",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 100, "read"); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected missing membership to deny read, got %v", err)
+	}
+	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 99, "viewer"); err != nil {
+		t.Fatalf("assign viewer: %v", err)
+	}
+	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 99, "read"); err != nil {
+		t.Fatalf("viewer should read assigned project: %v", err)
+	}
+	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 99, "update"); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("expected viewer update denied, got %v", err)
+	}
+
+	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 98, "editor"); err != nil {
+		t.Fatalf("assign editor: %v", err)
+	}
+	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 98, "delete"); err != nil {
+		t.Fatalf("editor should mutate assigned project: %v", err)
+	}
+}
+
 func TestSaveAndListLLMProviderCredentials(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()

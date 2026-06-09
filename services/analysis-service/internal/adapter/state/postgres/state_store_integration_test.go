@@ -80,21 +80,7 @@ func TestAnalysisStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 		},
 		"responsesByRun": {"run-1": ["resp-1"]},
 		"responseIndexByRun": {"run-1": {"prun-1|gpt-4o": "resp-1"}},
-		"runByRequest": {"prj-1|request-1": "run-1"},
-		"alerts": {
-			"alt-1": {
-				"id": "alt-1",
-				"projectId": "prj-1",
-				"alertType": "visibility_drop",
-				"severity": "medium",
-				"title": "Baisse de visibilite",
-				"description": "Alerte seed",
-				"isRead": false,
-				"createdAt": "2026-03-01T10:30:00Z",
-				"updatedAt": "2026-03-01T11:30:00Z"
-			}
-		},
-		"alertsByProject": {"prj-1": ["alt-1"]}
+		"runByRequest": {"prj-1|request-1": "run-1"}
 	}`)
 
 	if err := store.Save(ctx, payload); err != nil {
@@ -104,7 +90,6 @@ func TestAnalysisStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	assertAnalysisTableCount(t, ctx, db, "analysis_runs", 1)
 	assertAnalysisTableCount(t, ctx, db, "prompt_runs", 1)
 	assertAnalysisTableCount(t, ctx, db, "ai_responses", 1)
-	assertAnalysisTableCount(t, ctx, db, "alerts", 1)
 
 	loaded, ok, err := store.Load(ctx)
 	if err != nil {
@@ -167,9 +152,7 @@ func TestRunMigrationsMigratesLegacyAnalysisPayload(t *testing.T) {
 		"responses": {},
 		"responsesByRun": {},
 		"responseIndexByRun": {},
-		"runByRequest": {"prj-legacy|req-legacy": "run-legacy"},
-		"alerts": {},
-		"alertsByProject": {}
+		"runByRequest": {"prj-legacy|req-legacy": "run-legacy"}
 	}`
 	if _, err := db.Exec(ctx, `
 		CREATE TABLE analysis_service_state (

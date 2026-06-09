@@ -143,29 +143,3 @@ type StripeCatalog struct {
 	ProYearlyPriceID         string
 	CorrectionCreditsPriceID string
 }
-
-type AttributionEventInput struct {
-	ProjectID      string
-	OrganizationID int64
-	Stage          string
-	Source         string
-	Count          int64
-	RevenueCents   int64
-	OccurredAt     time.Time
-}
-
-type AttributionClient interface {
-	RecordEvent(ctx context.Context, input AttributionEventInput) error
-}
-
-type ProjectSummary struct {
-	ID                string
-	OrganizationID    int64
-	Status            string
-	AttributionSource string
-	CreatedAt         time.Time
-}
-
-type ProjectResolver interface {
-	ListProjectsByOrganization(ctx context.Context, organizationID int64) ([]ProjectSummary, error)
-}

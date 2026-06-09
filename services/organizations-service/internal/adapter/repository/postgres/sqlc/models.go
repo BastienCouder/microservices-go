@@ -45,11 +45,3 @@ type OrganizationMember struct {
 	AddedAt        pgtype.Timestamptz
 	DeletedAt      pgtype.Timestamptz
 }
-
-type Team struct {
-	ID             int64
-	OrganizationID int64
-	Name           string
-	CreatedAt      pgtype.Timestamptz
-	DeletedAt      pgtype.Timestamptz
-}

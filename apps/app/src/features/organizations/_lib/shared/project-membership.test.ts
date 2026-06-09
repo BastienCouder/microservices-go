@@ -7,18 +7,18 @@ import {
 } from "./project-membership";
 
 describe("organization role options", () => {
-  test("exposes only admin and member for organization role assignment", () => {
-    expect([...ASSIGNABLE_ORGANIZATION_ROLES]).toEqual(["admin", "member"]);
+  test("exposes only editor and viewer for organization role assignment", () => {
+    expect([...ASSIGNABLE_ORGANIZATION_ROLES]).toEqual(["editor", "viewer"]);
   });
 
-  test("exposes only admin and member for organization invitations", () => {
-    expect([...INVITABLE_ORGANIZATION_ROLES]).toEqual(["admin", "member"]);
+  test("exposes only editor and viewer for organization invitations", () => {
+    expect([...INVITABLE_ORGANIZATION_ROLES]).toEqual(["editor", "viewer"]);
   });
 
   test("does not expose member banning as an organization action", () => {
     const policy = getMemberActionPolicy({
-      actorRoles: ["admin"],
-      targetRoles: ["member"],
+      actorRoles: ["editor"],
+      targetRoles: ["viewer"],
     });
 
     expect("canSetBanned" in policy).toBe(false);
@@ -26,8 +26,8 @@ describe("organization role options", () => {
 
   test("does not expose actions for the current user row", () => {
     const policy = getMemberActionPolicy({
-      actorRoles: ["admin"],
-      targetRoles: ["member"],
+      actorRoles: ["editor"],
+      targetRoles: ["viewer"],
       isCurrentUser: true,
     });
 

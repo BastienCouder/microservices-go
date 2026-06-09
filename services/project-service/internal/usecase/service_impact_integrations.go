@@ -2,16 +2,10 @@ package usecase
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
-	"net/url"
 	"strings"
 	"time"
 )
-
-const stripeWebhookPathPrefix = "/attribution/stripe/webhook/"
-const ingestionPathPrefix = "/attribution/ingest/"
 
 func (s *Service) GetProjectImpactIntegrations(
 	ctx context.Context,
@@ -50,7 +44,7 @@ func (s *Service) UpdateProjectImpactIntegrations(
 	}
 
 	current := normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
-	updated, generatedIngestionToken, err := applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
+	updated, err := applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
 	if err != nil {
 		s.mu.Unlock()
 		return UpdateProjectImpactIntegrationsResult{}, err
@@ -86,13 +80,11 @@ func (s *Service) UpdateProjectImpactIntegrations(
 		return UpdateProjectImpactIntegrationsResult{}, err
 	}
 	current = normalizeProjectImpactIntegrations(projectID, s.impactIntegrations[projectID])
-	updated, generatedIngestionToken, err = applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
+	updated, err = applyProjectImpactIntegrationUpdate(current, input, s.now().UTC())
 	if err != nil {
 		return UpdateProjectImpactIntegrationsResult{}, err
 	}
-	if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" && updated.GA4.OAuthRefreshToken == "" &&
-		updated.Stripe.WebhookSecret == "" &&
-		updated.Ingestion.SigningToken == "" {
+	if updated.GA4.PropertyID == "" && updated.GA4.ServiceAccountJSON == "" && updated.GA4.OAuthRefreshToken == "" {
 		delete(s.impactIntegrations, projectID)
 	} else {
 		value := updated
@@ -103,12 +95,12 @@ func (s *Service) UpdateProjectImpactIntegrations(
 		return UpdateProjectImpactIntegrationsResult{}, err
 	}
 	return UpdateProjectImpactIntegrationsResult{
-		Integration: buildProjectImpactIntegrationsView(updated, generatedIngestionToken),
+		Integration: buildProjectImpactIntegrationsView(updated, ""),
 		LLMSetup:    llmSetup,
 	}, nil
 }
 
-func (s *Service) GetProjectImpactContext(ctx context.Context, projectID string) (ProjectImpactContext, error) {
+func (s *Service) GetProjectImpactContext(ctx context.Context, projectID string, organizationID int64) (ProjectImpactContext, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -120,9 +112,12 @@ func (s *Service) GetProjectImpactContext(ctx context.Context, projectID string)
 	if projectID == "" {
 		return ProjectImpactContext{}, fmt.Errorf("%w: projectId is required", ErrValidation)
 	}
-	project := s.projects[projectID]
-	if project == nil {
-		return ProjectImpactContext{}, fmt.Errorf("%w: project", ErrNotFound)
+	if organizationID <= 0 {
+		return ProjectImpactContext{}, fmt.Errorf("%w: organizationId is required", ErrValidation)
+	}
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
+	if err != nil {
+		return ProjectImpactContext{}, err
 	}
 
 	return ProjectImpactContext{
@@ -138,10 +133,9 @@ func applyProjectImpactIntegrationUpdate(
 	current ProjectImpactIntegrations,
 	input UpdateProjectImpactIntegrationsInput,
 	now time.Time,
-) (ProjectImpactIntegrations, string, error) {
+) (ProjectImpactIntegrations, error) {
 	updated := current
 	currentTime := now
-	generatedIngestionToken := ""
 
 	if input.GA4 != nil {
 		if input.GA4.Disconnect {
@@ -162,9 +156,9 @@ func applyProjectImpactIntegrationUpdate(
 			if !hasProperty && !hasServiceAccount && !hasOAuthToken {
 				updated.GA4 = ProjectGA4Integration{}
 			} else if hasServiceAccount && !hasProperty {
-				return ProjectImpactIntegrations{}, "", fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
+				return ProjectImpactIntegrations{}, fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
 			} else if !hasServiceAccount && !hasOAuthToken {
-				return ProjectImpactIntegrations{}, "", fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
+				return ProjectImpactIntegrations{}, fmt.Errorf("%w: ga4 requires propertyId and serviceAccountJSON", ErrValidation)
 			} else {
 				if updated.GA4.ConnectedAt.IsZero() {
 					updated.GA4.ConnectedAt = currentTime
@@ -174,42 +168,7 @@ func applyProjectImpactIntegrationUpdate(
 		}
 	}
 
-	if input.Stripe != nil {
-		if input.Stripe.Disconnect {
-			updated.Stripe = ProjectStripeIntegration{}
-		} else {
-			if input.Stripe.WebhookSecret != nil {
-				updated.Stripe.WebhookSecret = strings.TrimSpace(*input.Stripe.WebhookSecret)
-			}
-			if updated.Stripe.WebhookSecret == "" {
-				updated.Stripe = ProjectStripeIntegration{}
-			} else {
-				if updated.Stripe.ConnectedAt.IsZero() {
-					updated.Stripe.ConnectedAt = currentTime
-				}
-				updated.Stripe.UpdatedAt = currentTime
-			}
-		}
-	}
-
-	if input.Ingestion != nil {
-		if input.Ingestion.Disconnect {
-			updated.Ingestion = ProjectIngestionIntegration{}
-		} else if input.Ingestion.Rotate || strings.TrimSpace(updated.Ingestion.SigningToken) == "" {
-			token, err := generateImpactSigningToken()
-			if err != nil {
-				return ProjectImpactIntegrations{}, "", fmt.Errorf("generate ingestion signing token: %w", err)
-			}
-			updated.Ingestion.SigningToken = token
-			generatedIngestionToken = token
-			if updated.Ingestion.ConnectedAt.IsZero() {
-				updated.Ingestion.ConnectedAt = currentTime
-			}
-			updated.Ingestion.UpdatedAt = currentTime
-		}
-	}
-
-	return updated, generatedIngestionToken, nil
+	return updated, nil
 }
 
 func normalizeProjectImpactIntegrations(
@@ -224,15 +183,10 @@ func normalizeProjectImpactIntegrations(
 	out.GA4.PropertyID = strings.TrimSpace(out.GA4.PropertyID)
 	out.GA4.ServiceAccountJSON = strings.TrimSpace(out.GA4.ServiceAccountJSON)
 	out.GA4.OAuthRefreshToken = strings.TrimSpace(out.GA4.OAuthRefreshToken)
-	out.Stripe.WebhookSecret = strings.TrimSpace(out.Stripe.WebhookSecret)
-	out.Ingestion.SigningToken = strings.TrimSpace(out.Ingestion.SigningToken)
 	return out
 }
 
-func buildProjectImpactIntegrationsView(
-	input ProjectImpactIntegrations,
-	generatedIngestionToken string,
-) ProjectImpactIntegrationsView {
+func buildProjectImpactIntegrationsView(input ProjectImpactIntegrations, _ string) ProjectImpactIntegrationsView {
 	projectID := strings.TrimSpace(input.ProjectID)
 	authMode := ""
 	if input.GA4.OAuthRefreshToken != "" {
@@ -252,28 +206,5 @@ func buildProjectImpactIntegrationsView(
 			ConnectedAt:       input.GA4.ConnectedAt,
 			UpdatedAt:         input.GA4.UpdatedAt,
 		},
-		Stripe: ProjectStripeIntegrationView{
-			HasWebhookSecret: input.Stripe.WebhookSecret != "",
-			IsConnected:      input.Stripe.WebhookSecret != "",
-			WebhookPath:      stripeWebhookPathPrefix + url.PathEscape(projectID),
-			ConnectedAt:      input.Stripe.ConnectedAt,
-			UpdatedAt:        input.Stripe.UpdatedAt,
-		},
-		Ingestion: ProjectIngestionIntegrationView{
-			HasSigningToken: input.Ingestion.SigningToken != "",
-			IsConnected:     input.Ingestion.SigningToken != "",
-			IngestPath:      ingestionPathPrefix + url.PathEscape(projectID),
-			ConnectedAt:     input.Ingestion.ConnectedAt,
-			UpdatedAt:       input.Ingestion.UpdatedAt,
-			GeneratedToken:  strings.TrimSpace(generatedIngestionToken),
-		},
 	}
-}
-
-func generateImpactSigningToken() (string, error) {
-	raw := make([]byte, 24)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	return "iat_" + hex.EncodeToString(raw), nil
 }

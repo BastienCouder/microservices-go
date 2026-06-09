@@ -21,18 +21,31 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 }
 
 func roleGrantsFullAccess(role string) bool {
-	return role == "owner" || role == "admin" || role == "super_admin"
+	return role == "editor"
+}
+
+func roleGrantsAdminAccess(role string) bool {
+	return role == "super_admin"
 }
 
 func (r *Repository) Check(ctx context.Context, in domain.CheckInput) (domain.CheckResult, error) {
+	action := strings.ToLower(strings.TrimSpace(in.Action))
+	resource := strings.ToLower(strings.TrimSpace(in.Resource))
+
+	if action == "admin" && resource == "users" {
+		for _, role := range in.Roles {
+			if roleGrantsAdminAccess(role) {
+				return domain.CheckResult{Allowed: true, Reason: "role grants admin access"}, nil
+			}
+		}
+		return domain.CheckResult{Allowed: false, Reason: "missing admin role for requested action"}, nil
+	}
+
 	for _, role := range in.Roles {
 		if roleGrantsFullAccess(role) {
 			return domain.CheckResult{Allowed: true, Reason: "role grants full access"}, nil
 		}
 	}
-
-	action := strings.ToLower(strings.TrimSpace(in.Action))
-	resource := strings.ToLower(strings.TrimSpace(in.Resource))
 
 	count, err := r.queries.CountMatchingPolicies(ctx, sqlc.CountMatchingPoliciesParams{
 		Column1: []int64{0, in.OrganizationID},

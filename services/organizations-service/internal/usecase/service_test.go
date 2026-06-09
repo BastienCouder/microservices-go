@@ -12,14 +12,12 @@ import (
 type fakeRepo struct {
 	organizations  map[int64]*domain.Organization
 	apiKeys        map[int64]domain.OrganizationAPIKey
-	teams          map[int64][]domain.Team
 	members        map[[2]int64]domain.Member
 	projectMembers map[string]map[int64]domain.ProjectMember
 	invitations    map[int64]domain.Invitation
 	tokenIndex     map[string]int64
 	nextOrgID      int64
 	nextAPIKeyID   int64
-	nextTeamID     int64
 	nextInviteID   int64
 }
 
@@ -27,14 +25,12 @@ func newFakeRepo() *fakeRepo {
 	return &fakeRepo{
 		organizations:  make(map[int64]*domain.Organization),
 		apiKeys:        make(map[int64]domain.OrganizationAPIKey),
-		teams:          make(map[int64][]domain.Team),
 		members:        make(map[[2]int64]domain.Member),
 		projectMembers: make(map[string]map[int64]domain.ProjectMember),
 		invitations:    make(map[int64]domain.Invitation),
 		tokenIndex:     make(map[string]int64),
 		nextOrgID:      1,
 		nextAPIKeyID:   1,
-		nextTeamID:     1,
 		nextInviteID:   1,
 	}
 }
@@ -75,16 +71,10 @@ func (f *fakeRepo) DeleteOrganization(_ context.Context, organizationID int64, d
 	org.Name = "Deleted organization"
 	org.DeletedAt = &deletedAt
 
-	for index, team := range f.teams[organizationID] {
-		team.Name = "Deleted team"
-		team.DeletedAt = &deletedAt
-		f.teams[organizationID][index] = team
-	}
 	for key, member := range f.members {
 		if key[0] != organizationID {
 			continue
 		}
-		member.TeamID = 0
 		member.Roles = nil
 		member.DeletedAt = &deletedAt
 		f.members[key] = member
@@ -186,42 +176,9 @@ func (f *fakeRepo) RevokeAPIKey(_ context.Context, organizationID, keyID int64, 
 	return nil
 }
 
-func (f *fakeRepo) CreateTeam(_ context.Context, team *domain.Team) error {
-	if _, ok := f.organizations[team.OrganizationID]; !ok {
-		return domain.ErrOrganizationNotFound
-	}
-	team.ID = f.nextTeamID
-	f.nextTeamID++
-	clone := *team
-	f.teams[team.OrganizationID] = append(f.teams[team.OrganizationID], clone)
-	return nil
-}
-
-func (f *fakeRepo) ListTeams(_ context.Context, organizationID int64) ([]domain.Team, error) {
-	if _, ok := f.organizations[organizationID]; !ok {
-		return nil, domain.ErrOrganizationNotFound
-	}
-	teams := f.teams[organizationID]
-	out := make([]domain.Team, len(teams))
-	copy(out, teams)
-	return out, nil
-}
-
 func (f *fakeRepo) UpsertMember(_ context.Context, member *domain.Member) error {
 	if _, ok := f.organizations[member.OrganizationID]; !ok {
 		return domain.ErrOrganizationNotFound
-	}
-	if member.TeamID > 0 {
-		found := false
-		for _, t := range f.teams[member.OrganizationID] {
-			if t.ID == member.TeamID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return domain.ErrTeamNotFound
-		}
 	}
 
 	key := [2]int64{member.OrganizationID, member.UserID}
@@ -244,34 +201,6 @@ func (f *fakeRepo) ListMembers(_ context.Context, organizationID int64) ([]domai
 		}
 	}
 	return out, nil
-}
-
-func (f *fakeRepo) UpdateMemberTeam(_ context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
-	if _, ok := f.organizations[organizationID]; !ok {
-		return nil, domain.ErrOrganizationNotFound
-	}
-	key := [2]int64{organizationID, userID}
-	member, ok := f.members[key]
-	if !ok {
-		return nil, domain.ErrMemberNotFound
-	}
-	if teamID > 0 {
-		found := false
-		for _, team := range f.teams[organizationID] {
-			if team.ID == teamID {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return nil, domain.ErrTeamNotFound
-		}
-	}
-	member.TeamID = teamID
-	f.members[key] = member
-	clone := member
-	clone.Roles = append([]string(nil), member.Roles...)
-	return &clone, nil
 }
 
 func (f *fakeRepo) AssignRole(_ context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
@@ -477,12 +406,11 @@ func (f *fakeRepo) AcceptInvitationByToken(_ context.Context, token string, user
 	member := domain.Member{
 		OrganizationID: invitation.OrganizationID,
 		UserID:         userID,
-		TeamID:         0,
 		Roles:          []string{invitation.Role},
 		AddedAt:        actedAt,
 	}
 	if invitation.ProjectID != "" {
-		member.Roles = []string{"member"}
+		member.Roles = []string{"viewer"}
 	}
 	key := [2]int64{member.OrganizationID, member.UserID}
 	f.members[key] = member
@@ -590,14 +518,10 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create org: %v", err)
 	}
-	team, err := svc.CreateTeam(context.Background(), org.ID, "Sensitive Team")
-	if err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-	if _, err := svc.AddMember(context.Background(), org.ID, 42, team.ID); err != nil {
+	if _, err := svc.AddMember(context.Background(), org.ID, 42); err != nil {
 		t.Fatalf("add member: %v", err)
 	}
-	if _, err := svc.AssignRole(context.Background(), org.ID, 42, "admin"); err != nil {
+	if _, err := svc.AssignRole(context.Background(), org.ID, 42, "editor"); err != nil {
 		t.Fatalf("assign role: %v", err)
 	}
 	if _, err := svc.CreateOrganizationAPIKey(context.Background(), org.ID, "Production key"); err != nil {
@@ -608,7 +532,7 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 		org.ID,
 		1,
 		"person@example.com",
-		"member",
+		"viewer",
 		"Private onboarding note",
 		nil,
 	); err != nil {
@@ -626,13 +550,8 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 	if stored.Name == "Acme" {
 		t.Fatalf("expected organization name to be anonymized")
 	}
-	for _, team := range repo.teams[org.ID] {
-		if team.DeletedAt == nil || team.Name == "Sensitive Team" {
-			t.Fatalf("expected team to be soft deleted and anonymized: %+v", team)
-		}
-	}
 	member := repo.members[[2]int64{org.ID, 42}]
-	if member.DeletedAt == nil || member.TeamID != 0 || len(member.Roles) != 0 {
+	if member.DeletedAt == nil || len(member.Roles) != 0 {
 		t.Fatalf("expected member access to be removed and soft deleted: %+v", member)
 	}
 	for _, invitation := range repo.invitations {
@@ -715,7 +634,7 @@ func TestValidateOrganizationAPIKeyReturnsScopedMetadataAndMarksLastUsed(t *test
 	}
 }
 
-func TestTeamsMembersRolesFlow(t *testing.T) {
+func TestMembersRolesFlow(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewService(repo)
 
@@ -724,12 +643,7 @@ func TestTeamsMembersRolesFlow(t *testing.T) {
 		t.Fatalf("create org: %v", err)
 	}
 
-	team, err := svc.CreateTeam(context.Background(), org.ID, "Platform")
-	if err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-
-	member, err := svc.AddMember(context.Background(), org.ID, 42, team.ID)
+	member, err := svc.AddMember(context.Background(), org.ID, 42)
 	if err != nil {
 		t.Fatalf("add member: %v", err)
 	}
@@ -737,20 +651,12 @@ func TestTeamsMembersRolesFlow(t *testing.T) {
 		t.Fatalf("unexpected member user id: %d", member.UserID)
 	}
 
-	updated, err := svc.AssignRole(context.Background(), org.ID, 42, "admin")
+	updated, err := svc.AssignRole(context.Background(), org.ID, 42, "editor")
 	if err != nil {
 		t.Fatalf("assign role: %v", err)
 	}
 	if len(updated.Roles) < 2 {
 		t.Fatalf("expected at least 2 roles, got %v", updated.Roles)
-	}
-
-	teams, err := svc.ListTeams(context.Background(), org.ID)
-	if err != nil {
-		t.Fatalf("list teams: %v", err)
-	}
-	if len(teams) != 1 {
-		t.Fatalf("expected 1 team, got %d", len(teams))
 	}
 
 	members, err := svc.ListMembers(context.Background(), org.ID)
@@ -773,16 +679,16 @@ func TestMemberActionsFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create org: %v", err)
 	}
-	member, err := svc.AddMember(context.Background(), org.ID, 42, 0)
+	member, err := svc.AddMember(context.Background(), org.ID, 42)
 	if err != nil {
 		t.Fatalf("add member: %v", err)
 	}
 
-	updated, err := svc.UpdateMemberRoles(context.Background(), org.ID, member.UserID, []string{" Admin ", "editor", "admin"})
+	updated, err := svc.UpdateMemberRoles(context.Background(), org.ID, member.UserID, []string{" Editor ", "viewer", "editor"})
 	if err != nil {
 		t.Fatalf("update member roles: %v", err)
 	}
-	if got, want := updated.Roles, []string{"admin", "editor"}; !equalStrings(got, want) {
+	if got, want := updated.Roles, []string{"editor", "viewer"}; !equalStrings(got, want) {
 		t.Fatalf("roles mismatch: got %v want %v", got, want)
 	}
 
@@ -799,7 +705,7 @@ func TestUpdateMemberRolesRejectsEmptyRoleSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create org: %v", err)
 	}
-	if _, err := svc.AddMember(context.Background(), org.ID, 42, 0); err != nil {
+	if _, err := svc.AddMember(context.Background(), org.ID, 42); err != nil {
 		t.Fatalf("add member: %v", err)
 	}
 
@@ -817,7 +723,7 @@ func TestUpdateMemberRolesRejectsOwnerRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create org: %v", err)
 	}
-	if _, err := svc.AddMember(context.Background(), org.ID, 42, 0); err != nil {
+	if _, err := svc.AddMember(context.Background(), org.ID, 42); err != nil {
 		t.Fatalf("add member: %v", err)
 	}
 

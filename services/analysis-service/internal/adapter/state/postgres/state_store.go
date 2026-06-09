@@ -23,8 +23,6 @@ type persistedState struct {
 	ResponsesByRun     map[string][]string                               `json:"responsesByRun"`
 	ResponseIndexByRun map[string]map[string]string                      `json:"responseIndexByRun"`
 	RunByRequest       map[string]string                                 `json:"runByRequest"`
-	Alerts             map[string]*usecase.Alert                         `json:"alerts"`
-	AlertsByProject    map[string][]string                               `json:"alertsByProject"`
 	ContentCrawls      map[string]*usecase.ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 	OptimizeActions    map[string]*usecase.OptimizeAction                `json:"optimizeActions"`
 	ActionsByProject   map[string][]string                               `json:"actionsByProject"`
@@ -48,8 +46,6 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		ResponsesByRun:     make(map[string][]string),
 		ResponseIndexByRun: make(map[string]map[string]string),
 		RunByRequest:       make(map[string]string),
-		Alerts:             make(map[string]*usecase.Alert),
-		AlertsByProject:    make(map[string][]string),
 		ContentCrawls:      make(map[string]*usecase.ContentOptimizerCrawlSnapshot),
 		OptimizeActions:    make(map[string]*usecase.OptimizeAction),
 		ActionsByProject:   make(map[string][]string),
@@ -64,9 +60,6 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadResponses(ctx, &state); err != nil {
 		return nil, false, err
 	}
-	if err := s.loadAlerts(ctx, &state); err != nil {
-		return nil, false, err
-	}
 	if err := s.loadContentCrawls(ctx, &state); err != nil {
 		return nil, false, err
 	}
@@ -74,7 +67,7 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		return nil, false, err
 	}
 
-	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 && len(state.Alerts) == 0 {
+	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 {
 		return nil, false, nil
 	}
 
@@ -104,7 +97,6 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	for _, statement := range []string{
 		`DELETE FROM content_optimizer_crawls`,
 		`DELETE FROM optimize_actions`,
-		`DELETE FROM alerts`,
 		`DELETE FROM ai_responses`,
 		`DELETE FROM prompt_runs`,
 		`DELETE FROM analysis_runs`,
@@ -121,9 +113,6 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertResponses(ctx, tx, state.Responses); err != nil {
-		return err
-	}
-	if err := insertAlerts(ctx, tx, state.Alerts); err != nil {
 		return err
 	}
 	if err := insertContentCrawls(ctx, tx, state.ContentCrawls); err != nil {
@@ -255,39 +244,6 @@ func (s *StateStore) loadResponses(ctx context.Context, state *persistedState) e
 	return rows.Err()
 }
 
-func (s *StateStore) loadAlerts(ctx context.Context, state *persistedState) error {
-	rows, err := s.db.Query(ctx, `
-		SELECT id, project_id, alert_type, severity, title, description, is_read, created_at, updated_at
-		FROM alerts
-		ORDER BY created_at ASC, id ASC
-	`)
-	if err != nil {
-		return fmt.Errorf("select alerts: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var item usecase.Alert
-		if err := rows.Scan(
-			&item.ID,
-			&item.ProjectID,
-			&item.AlertType,
-			&item.Severity,
-			&item.Title,
-			&item.Description,
-			&item.IsRead,
-			&item.CreatedAt,
-			&item.UpdatedAt,
-		); err != nil {
-			return fmt.Errorf("scan alert: %w", err)
-		}
-		alert := item
-		state.Alerts[item.ID] = &alert
-		state.AlertsByProject[item.ProjectID] = append(state.AlertsByProject[item.ProjectID], item.ID)
-	}
-	return rows.Err()
-}
-
 func (s *StateStore) loadContentCrawls(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT project_id, organization_id, job_id, result, created_at, updated_at
@@ -413,19 +369,6 @@ func insertResponses(ctx context.Context, tx pgx.Tx, responses map[string]*useca
 	return nil
 }
 
-func insertAlerts(ctx context.Context, tx pgx.Tx, alerts map[string]*usecase.Alert) error {
-	for _, alertID := range sortedAlertIDs(alerts) {
-		alert := alerts[alertID]
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO alerts (id, project_id, alert_type, severity, title, description, is_read, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-		`, alert.ID, alert.ProjectID, alert.AlertType, alert.Severity, alert.Title, alert.Description, alert.IsRead, alert.CreatedAt, alert.UpdatedAt); err != nil {
-			return fmt.Errorf("insert alert %s: %w", alert.ID, err)
-		}
-	}
-	return nil
-}
-
 func insertContentCrawls(ctx context.Context, tx pgx.Tx, crawls map[string]*usecase.ContentOptimizerCrawlSnapshot) error {
 	for _, key := range sortedContentCrawlKeys(crawls) {
 		crawl := crawls[key]
@@ -494,15 +437,6 @@ func sortedPromptRunIDs(items map[string]*usecase.PromptRun) []string {
 }
 
 func sortedResponseIDs(items map[string]*usecase.AIResponse) []string {
-	ids := make([]string, 0, len(items))
-	for id := range items {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func sortedAlertIDs(items map[string]*usecase.Alert) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)

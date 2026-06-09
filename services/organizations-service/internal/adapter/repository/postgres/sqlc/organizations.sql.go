@@ -103,34 +103,6 @@ func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationPara
 	return i, err
 }
 
-const createTeam = `-- name: CreateTeam :one
-INSERT INTO teams (organization_id, name, created_at, deleted_at)
-SELECT o.id, $2, $3, NULL
-FROM organizations o
-WHERE o.id = $1
-  AND o.deleted_at IS NULL
-RETURNING id, organization_id, name, created_at, deleted_at
-`
-
-type CreateTeamParams struct {
-	ID        int64
-	Name      string
-	CreatedAt pgtype.Timestamptz
-}
-
-func (q *Queries) CreateTeam(ctx context.Context, arg CreateTeamParams) (Team, error) {
-	row := q.db.QueryRow(ctx, createTeam, arg.ID, arg.Name, arg.CreatedAt)
-	var i Team
-	err := row.Scan(
-		&i.ID,
-		&i.OrganizationID,
-		&i.Name,
-		&i.CreatedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
 const getMemberByOrgAndUser = `-- name: GetMemberByOrgAndUser :one
 SELECT organization_id, user_id, added_at, deleted_at
 FROM organization_members
@@ -343,40 +315,6 @@ func (q *Queries) ListInvitationsByOrganization(ctx context.Context, organizatio
 			&i.CreatedAt,
 			&i.ExpiresAt,
 			&i.RespondedAt,
-			&i.DeletedAt,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listTeamsByOrganization = `-- name: ListTeamsByOrganization :many
-SELECT id, organization_id, name, created_at, deleted_at
-FROM teams
-WHERE organization_id = $1
-  AND deleted_at IS NULL
-ORDER BY id
-`
-
-func (q *Queries) ListTeamsByOrganization(ctx context.Context, organizationID int64) ([]Team, error) {
-	rows, err := q.db.Query(ctx, listTeamsByOrganization, organizationID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Team
-	for rows.Next() {
-		var i Team
-		if err := rows.Scan(
-			&i.ID,
-			&i.OrganizationID,
-			&i.Name,
-			&i.CreatedAt,
 			&i.DeletedAt,
 		); err != nil {
 			return nil, err

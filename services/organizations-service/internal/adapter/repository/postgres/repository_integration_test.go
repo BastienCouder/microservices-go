@@ -14,7 +14,7 @@ import (
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 )
 
-func TestRepositoryIntegration_TeamsMembersRoles(t *testing.T) {
+func TestRepositoryIntegration_MembersRoles(t *testing.T) {
 	dsn := os.Getenv("ORG_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("ORG_TEST_DATABASE_URL is required for integration tests")
@@ -39,7 +39,7 @@ func TestRepositoryIntegration_TeamsMembersRoles(t *testing.T) {
 
 	repo := NewRepository(db)
 
-	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, teams, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -51,33 +51,17 @@ func TestRepositoryIntegration_TeamsMembersRoles(t *testing.T) {
 		t.Fatalf("expected organization id > 0, got %d", org.ID)
 	}
 
-	team := &domain.Team{OrganizationID: org.ID, Name: "Platform", CreatedAt: time.Now().UTC()}
-	if err := repo.CreateTeam(ctx, team); err != nil {
-		t.Fatalf("create team: %v", err)
-	}
-	if team.ID <= 0 {
-		t.Fatalf("expected team id > 0, got %d", team.ID)
-	}
-
-	member := &domain.Member{OrganizationID: org.ID, UserID: 42, TeamID: team.ID, Roles: []string{"member"}, AddedAt: time.Now().UTC()}
+	member := &domain.Member{OrganizationID: org.ID, UserID: 42, Roles: []string{"viewer"}, AddedAt: time.Now().UTC()}
 	if err := repo.UpsertMember(ctx, member); err != nil {
 		t.Fatalf("upsert member: %v", err)
 	}
 
-	updated, err := repo.AssignRole(ctx, org.ID, 42, "admin")
+	updated, err := repo.AssignRole(ctx, org.ID, 42, "editor")
 	if err != nil {
 		t.Fatalf("assign role: %v", err)
 	}
 	if len(updated.Roles) < 2 {
 		t.Fatalf("expected at least 2 roles, got %v", updated.Roles)
-	}
-
-	teams, err := repo.ListTeams(ctx, org.ID)
-	if err != nil {
-		t.Fatalf("list teams: %v", err)
-	}
-	if len(teams) != 1 {
-		t.Fatalf("expected 1 team, got %d", len(teams))
 	}
 
 	members, err := repo.ListMembers(ctx, org.ID)
@@ -92,8 +76,8 @@ func TestRepositoryIntegration_TeamsMembersRoles(t *testing.T) {
 	for _, m := range members {
 		if m.UserID == org.OwnerIdentityID {
 			creatorFound = true
-			if len(m.Roles) != 1 || m.Roles[0] != "admin" {
-				t.Fatalf("expected organization creator to have role admin, got %v", m.Roles)
+			if len(m.Roles) != 1 || m.Roles[0] != "editor" {
+				t.Fatalf("expected organization creator to have role editor, got %v", m.Roles)
 			}
 		}
 	}
@@ -135,7 +119,7 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 
 	repo := NewRepository(db)
 
-	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, teams, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -148,7 +132,7 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 	invitation := &domain.Invitation{
 		OrganizationID:  org.ID,
 		Email:           "invitee@acme.io",
-		Role:            "member",
+		Role:            "viewer",
 		Token:           "token-accept",
 		Message:         "Welcome",
 		Status:          domain.InvitationStatusPending,
@@ -183,15 +167,15 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 		ID:             invitation.ID,
 		OrganizationID: org.ID,
 		Email:          "invitee+updated@acme.io",
-		Role:           "admin",
+		Role:           "editor",
 		Message:        "Updated",
 		ExpiresAt:      nil,
 	})
 	if err != nil {
 		t.Fatalf("update invitation: %v", err)
 	}
-	if updated.Role != "admin" {
-		t.Fatalf("expected role admin after update, got %s", updated.Role)
+	if updated.Role != "editor" {
+		t.Fatalf("expected role editor after update, got %s", updated.Role)
 	}
 
 	acceptedInvitation, acceptedMember, err := repo.AcceptInvitationByToken(ctx, invitation.Token, 42, time.Now().UTC())
@@ -204,14 +188,14 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 	if acceptedMember.UserID != 42 {
 		t.Fatalf("expected accepted member user_id=42, got %d", acceptedMember.UserID)
 	}
-	if len(acceptedMember.Roles) == 0 || acceptedMember.Roles[0] != "admin" {
-		t.Fatalf("expected accepted member role admin, got %v", acceptedMember.Roles)
+	if len(acceptedMember.Roles) == 0 || acceptedMember.Roles[0] != "editor" {
+		t.Fatalf("expected accepted member role editor, got %v", acceptedMember.Roles)
 	}
 
 	refused := &domain.Invitation{
 		OrganizationID:  org.ID,
 		Email:           "refuse@acme.io",
-		Role:            "member",
+		Role:            "viewer",
 		Token:           "token-refuse",
 		Message:         "Refuse",
 		Status:          domain.InvitationStatusPending,
@@ -232,7 +216,7 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 	deleted := &domain.Invitation{
 		OrganizationID:  org.ID,
 		Email:           "delete@acme.io",
-		Role:            "member",
+		Role:            "viewer",
 		Token:           "token-delete",
 		Message:         "Delete",
 		Status:          domain.InvitationStatusPending,

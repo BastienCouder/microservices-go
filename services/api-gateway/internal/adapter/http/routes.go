@@ -24,16 +24,6 @@ func isBillingPublicPlansRequest(r *http.Request) bool {
 		(r.URL.Path == "/billing/public/plans" || r.URL.Path == "/billing/public/pricing-tiers")
 }
 
-func isAttributionStripeWebhookRequest(r *http.Request) bool {
-	return r.Method == http.MethodPost &&
-		(r.URL.Path == "/attribution/stripe/webhook" || strings.HasPrefix(r.URL.Path, "/attribution/stripe/webhook/"))
-}
-
-func isAttributionIngestionRequest(r *http.Request) bool {
-	return r.Method == http.MethodPost &&
-		(r.URL.Path == "/attribution/ingest" || strings.HasPrefix(r.URL.Path, "/attribution/ingest/"))
-}
-
 func isAppEntryRequest(r *http.Request) bool {
 	return r.Method == http.MethodGet && r.URL.Path == "/auth/app-entry"
 }
@@ -94,17 +84,6 @@ func (h *Handler) buildRoutes() []routeEntry {
 	billingPublicPlansHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.billingProxy, "billing-service", internalTokenClaims{})
 	})
-	attributionStripeWebhookHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		h.serveProxyWithInternalAuth(w, r, h.attributionProxy, "attribution-service", internalTokenClaims{})
-	})
-	attributionIngestionHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		r2 := r.Clone(r.Context())
-		r2.Header = r.Header.Clone()
-		if authz := strings.TrimSpace(r.Header.Get("Authorization")); strings.HasPrefix(authz, "Bearer ") {
-			r2.Header.Set("X-Attribution-Key", strings.TrimSpace(strings.TrimPrefix(authz, "Bearer ")))
-		}
-		h.serveProxyWithInternalAuth(w, r2, h.attributionProxy, "attribution-service", internalTokenClaims{})
-	})
 	onboardingModelCatalogHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r2 := r.Clone(r.Context())
 		urlCopy := *r.URL
@@ -159,8 +138,6 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: matchPathPrefix("/permissions"), handler: h.withAuth(h.permissionProxy, "permission-service", "permissions"), service: "permission-service"},
 		{match: isBillingStripeWebhookRequest, handler: billingStripeWebhookHandler, service: "billing-service"},
 		{match: isBillingPublicPlansRequest, handler: billingPublicPlansHandler, service: "billing-service"},
-		{match: isAttributionStripeWebhookRequest, handler: attributionStripeWebhookHandler, service: "attribution-service"},
-		{match: isAttributionIngestionRequest, handler: attributionIngestionHandler, service: "attribution-service"},
 		{match: matchPathPrefix("/billing"), handler: h.withAuth(h.billingProxy, "billing-service", "billing"), service: "billing-service"},
 		{match: matchPathPrefix("/notifications"), handler: h.withAuth(h.notificationProxy, "notification-service", "notifications"), service: "notification-service"},
 		{match: matchPathPrefix("/onboarding"), handler: h.withAuth(h.analysisProxy, "analysis-service", "analysis"), service: "analysis-service"},

@@ -57,7 +57,7 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
 		OrganizationID: created.ID,
 		UserID:         organization.OwnerIdentityID,
-		Role:           "admin",
+		Role:           domain.RoleEditor,
 	}); err != nil {
 		return fmt.Errorf("insert organization creator role: %w", err)
 	}
@@ -356,46 +356,6 @@ func (r *Repository) RevokeAPIKey(ctx context.Context, organizationID, keyID int
 	return nil
 }
 
-func (r *Repository) CreateTeam(ctx context.Context, team *domain.Team) error {
-	created, err := r.queries.CreateTeam(ctx, sqlc.CreateTeamParams{
-		ID:        team.OrganizationID,
-		Name:      team.Name,
-		CreatedAt: toPgTimestamptz(team.CreatedAt),
-	})
-	if err != nil {
-		if isFKViolation(err) {
-			return domain.ErrOrganizationNotFound
-		}
-		return fmt.Errorf("insert team: %w", err)
-	}
-
-	team.ID = created.ID
-	return nil
-}
-
-func (r *Repository) ListTeams(ctx context.Context, organizationID int64) ([]domain.Team, error) {
-	if _, err := r.GetByID(ctx, organizationID); err != nil {
-		return nil, err
-	}
-
-	rows, err := r.queries.ListTeamsByOrganization(ctx, organizationID)
-	if err != nil {
-		return nil, fmt.Errorf("list teams: %w", err)
-	}
-
-	teams := make([]domain.Team, 0, len(rows))
-	for _, row := range rows {
-		teams = append(teams, domain.Team{
-			ID:             row.ID,
-			OrganizationID: row.OrganizationID,
-			Name:           row.Name,
-			CreatedAt:      fromPgTimestamptz(row.CreatedAt),
-			DeletedAt:      fromPgNullableTimestamptz(row.DeletedAt),
-		})
-	}
-	return teams, nil
-}
-
 func (r *Repository) UpsertMember(ctx context.Context, member *domain.Member) error {
 	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
@@ -482,37 +442,6 @@ func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]d
 	}
 
 	return members, nil
-}
-
-func (r *Repository) UpdateMemberTeam(ctx context.Context, organizationID, userID, teamID int64) (*domain.Member, error) {
-	memberRow, err := r.queries.GetMemberByOrgAndUser(ctx, sqlc.GetMemberByOrgAndUserParams{
-		OrganizationID: organizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			if _, orgErr := r.GetByID(ctx, organizationID); orgErr != nil {
-				return nil, orgErr
-			}
-			return nil, domain.ErrMemberNotFound
-		}
-		return nil, fmt.Errorf("get member: %w", err)
-	}
-
-	roles, err := r.queries.ListMemberRolesByOrgAndUser(ctx, sqlc.ListMemberRolesByOrgAndUserParams{
-		OrganizationID: organizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list member roles: %w", err)
-	}
-	return &domain.Member{
-		OrganizationID: memberRow.OrganizationID,
-		UserID:         memberRow.UserID,
-		AddedAt:        fromPgTimestamptz(memberRow.AddedAt),
-		DeletedAt:      fromPgNullableTimestamptz(memberRow.DeletedAt),
-		Roles:          append([]string(nil), roles...),
-	}, nil
 }
 
 func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
@@ -866,7 +795,7 @@ func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, 
 	}
 	memberRole := invitation.Role
 	if invitation.ProjectID != "" {
-		memberRole = "member"
+		memberRole = domain.RoleViewer
 	}
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
 		OrganizationID: invitation.OrganizationID,
@@ -944,13 +873,6 @@ func (r *Repository) RefuseInvitationByToken(ctx context.Context, token string, 
 
 	updated := mapInvitation(updatedRow)
 	return &updated, nil
-}
-
-func nullableTeamID(teamID int64) pgtype.Int8 {
-	if teamID <= 0 {
-		return pgtype.Int8{}
-	}
-	return pgtype.Int8{Int64: teamID, Valid: true}
 }
 
 func getActiveMember(ctx context.Context, tx pgx.Tx, organizationID, userID int64) (*domain.Member, error) {

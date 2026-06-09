@@ -101,7 +101,7 @@ export function MemberRow({
             disabled={memberActionBusy}
           >
             <SelectTrigger className="h-8 min-w-[132px] bg-background">
-              <SelectValue placeholder={formatLabel(member.roles[0] ?? "member")} />
+              <SelectValue placeholder={formatLabel(member.roles[0] ?? "viewer")} />
             </SelectTrigger>
             <SelectContent>
               {roleOptions.map((role) => (
@@ -114,7 +114,7 @@ export function MemberRow({
         ) : (
           <div className="flex flex-wrap gap-1">
             {member.roles.length === 0 ? (
-              <Badge variant="outline">member</Badge>
+              <Badge variant="outline">viewer</Badge>
             ) : (
               member.roles.map((role) => (
                 <Badge key={role} variant={getRoleBadgeVariant(role)}>

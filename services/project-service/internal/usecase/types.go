@@ -61,10 +61,8 @@ type ProjectMember struct {
 }
 
 type ProjectImpactIntegrations struct {
-	ProjectID string                      `json:"projectId"`
-	GA4       ProjectGA4Integration       `json:"ga4"`
-	Stripe    ProjectStripeIntegration    `json:"stripe"`
-	Ingestion ProjectIngestionIntegration `json:"ingestion"`
+	ProjectID string                `json:"projectId"`
+	GA4       ProjectGA4Integration `json:"ga4"`
 }
 
 type ProjectGA4Integration struct {
@@ -75,23 +73,9 @@ type ProjectGA4Integration struct {
 	UpdatedAt          time.Time `json:"updatedAt,omitempty"`
 }
 
-type ProjectStripeIntegration struct {
-	WebhookSecret string    `json:"webhookSecret,omitempty"`
-	ConnectedAt   time.Time `json:"connectedAt,omitempty"`
-	UpdatedAt     time.Time `json:"updatedAt,omitempty"`
-}
-
-type ProjectIngestionIntegration struct {
-	SigningToken string    `json:"signingToken,omitempty"`
-	ConnectedAt  time.Time `json:"connectedAt,omitempty"`
-	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
-}
-
 type ProjectImpactIntegrationsView struct {
-	ProjectID string                          `json:"projectId"`
-	GA4       ProjectGA4IntegrationView       `json:"ga4"`
-	Stripe    ProjectStripeIntegrationView    `json:"stripe"`
-	Ingestion ProjectIngestionIntegrationView `json:"ingestion"`
+	ProjectID string                    `json:"projectId"`
+	GA4       ProjectGA4IntegrationView `json:"ga4"`
 }
 
 type ProjectGA4IntegrationView struct {
@@ -104,23 +88,6 @@ type ProjectGA4IntegrationView struct {
 	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
 }
 
-type ProjectStripeIntegrationView struct {
-	HasWebhookSecret bool      `json:"hasWebhookSecret"`
-	IsConnected      bool      `json:"isConnected"`
-	WebhookPath      string    `json:"webhookPath"`
-	ConnectedAt      time.Time `json:"connectedAt,omitempty"`
-	UpdatedAt        time.Time `json:"updatedAt,omitempty"`
-}
-
-type ProjectIngestionIntegrationView struct {
-	HasSigningToken bool      `json:"hasSigningToken"`
-	IsConnected     bool      `json:"isConnected"`
-	IngestPath      string    `json:"ingestPath"`
-	ConnectedAt     time.Time `json:"connectedAt,omitempty"`
-	UpdatedAt       time.Time `json:"updatedAt,omitempty"`
-	GeneratedToken  string    `json:"generatedToken,omitempty"`
-}
-
 type ProjectImpactContext struct {
 	ProjectID      string                    `json:"projectId"`
 	OrganizationID int64                     `json:"organizationId"`
@@ -130,16 +97,15 @@ type ProjectImpactContext struct {
 }
 
 type BrandCanon struct {
-	ProjectID   string         `json:"projectId,omitempty"`
-	BrandName   string         `json:"brandName,omitempty"`
-	Category    string         `json:"category,omitempty"`
-	Positioning string         `json:"positioning,omitempty"`
-	Audience    []string       `json:"audience,omitempty"`
-	UseCases    []string       `json:"useCases,omitempty"`
-	Pricing     map[string]any `json:"pricing,omitempty"`
-	Features    []string       `json:"features,omitempty"`
-	CreatedAt   time.Time      `json:"createdAt,omitempty"`
-	UpdatedAt   time.Time      `json:"updatedAt,omitempty"`
+	ProjectID   string    `json:"projectId,omitempty"`
+	BrandName   string    `json:"brandName,omitempty"`
+	Category    string    `json:"category,omitempty"`
+	Positioning string    `json:"positioning,omitempty"`
+	Audience    []string  `json:"audience,omitempty"`
+	UseCases    []string  `json:"useCases,omitempty"`
+	Features    []string  `json:"features,omitempty"`
+	CreatedAt   time.Time `json:"createdAt,omitempty"`
+	UpdatedAt   time.Time `json:"updatedAt,omitempty"`
 }
 
 type UpdateBrandCanonInput struct {
@@ -148,7 +114,6 @@ type UpdateBrandCanonInput struct {
 	Positioning *string
 	Audience    *[]string
 	UseCases    *[]string
-	Pricing     *map[string]any
 	Features    *[]string
 }
 
@@ -285,9 +250,7 @@ type UpdateProjectInput struct {
 }
 
 type UpdateProjectImpactIntegrationsInput struct {
-	GA4       *UpdateProjectGA4IntegrationInput
-	Stripe    *UpdateProjectStripeIntegrationInput
-	Ingestion *UpdateProjectIngestionIntegrationInput
+	GA4 *UpdateProjectGA4IntegrationInput
 }
 
 type UpdateProjectGA4IntegrationInput struct {
@@ -374,16 +337,6 @@ type SelectProjectGA4OAuthPropertyInput struct {
 type SelectProjectGA4OAuthPropertyResult struct {
 	Integration ProjectImpactIntegrationsView `json:"integration"`
 	LLMSetup    GA4LLMSetupResult             `json:"llmSetup,omitempty"`
-}
-
-type UpdateProjectStripeIntegrationInput struct {
-	WebhookSecret *string
-	Disconnect    bool
-}
-
-type UpdateProjectIngestionIntegrationInput struct {
-	Rotate     bool
-	Disconnect bool
 }
 
 type UpdatePromptInput struct {
@@ -577,21 +530,6 @@ type ProjectMembershipClient interface {
 	ListProjectMembersByUser(ctx context.Context, organizationID, userID int64) ([]ProjectMember, error)
 }
 
-type AttributionEventInput struct {
-	ProjectID      string
-	OrganizationID int64
-	UserID         int64
-	Stage          string
-	Source         string
-	Count          int64
-	RevenueCents   int64
-	OccurredAt     time.Time
-}
-
-type AttributionClient interface {
-	RecordEvent(ctx context.Context, input AttributionEventInput) error
-}
-
 type BillingClient interface {
 	GetOrganizationEntitlements(ctx context.Context, organizationID int64) (BillingEntitlements, error)
 	GetCreditCostSettings(ctx context.Context) (CreditCostSettings, error)
@@ -607,7 +545,6 @@ type Dependencies struct {
 	AnalysisClient          AnalysisClient
 	IAClient                IAClient
 	ProjectMembershipClient ProjectMembershipClient
-	AttributionClient       AttributionClient
 	BillingClient           BillingClient
 }
 
