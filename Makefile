@@ -2,9 +2,13 @@
 
 SHELL := /bin/sh
 
+-include config/secrets.generated.mk
+
 COMPOSE := docker compose
-COMPOSE_DEV := $(COMPOSE) -p microservices-go-dev -f docker-compose.yml -f docker-compose.dev.yml
-COMPOSE_PROD := $(COMPOSE) -p microservices-go-prod -f docker-compose.yml
+COMPOSE_FILES := -f docker-compose.yml -f docker-compose.secrets.generated.yml
+COMPOSE_DEV := $(COMPOSE) -p microservices-go-dev $(COMPOSE_FILES) -f docker-compose.dev.yml
+COMPOSE_PROD := $(COMPOSE) -p microservices-go-prod $(COMPOSE_FILES)
+COMPOSE_PROD_SERIAL := COMPOSE_PARALLEL_LIMIT=1 $(COMPOSE_PROD)
 
 ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
@@ -17,80 +21,6 @@ PROFILES_PROD := --profile frontend --profile backend --profile infra
 SQLC_SERVICES := user-service organizations-service permission-service billing-service notification-service
 MIGRATION_SERVICES := user organizations permission billing notification project analysis ia attribution
 
-REQUIRED_SECRETS := \
-	postgres_superuser_password.txt \
-	usersvc_db_password.txt \
-	orgsvc_db_password.txt \
-	permsvc_db_password.txt \
-	billsvc_db_password.txt \
-	notifsvc_db_password.txt \
-	projectsvc_db_password.txt \
-	analysissvc_db_password.txt \
-	iasvc_db_password.txt \
-	attrsvc_db_password.txt \
-	kratos_db_password.txt \
-	internal_jwt_secret.txt \
-	gateway_http_addr.txt \
-	gateway_metrics_addr.txt \
-	db_host.txt \
-	db_port.txt \
-	db_sslmode.txt \
-	organizations_db_user.txt \
-	organizations_db_name.txt \
-	openrouter_api_key.txt \
-	cloudflare_account_id.txt \
-	cloudflare_api_token.txt \
-	resend_api_key.txt \
-	resend_from_email.txt \
-	resend_smtp_connection_uri.txt \
-	google_oidc_client_id.txt \
-	google_oidc_client_secret.txt \
-	stripe_secret_key.txt \
-	stripe_webhook_secret.txt \
-	stripe_enabled.txt \
-	stripe_checkout_success_url.txt \
-	stripe_checkout_cancel_url.txt \
-	stripe_customer_portal_return_url.txt \
-	stripe_price_starter_monthly.txt \
-	stripe_price_starter_yearly.txt \
-	stripe_price_growth_monthly.txt \
-	stripe_price_growth_yearly.txt \
-	stripe_price_pro_monthly.txt \
-	stripe_price_pro_yearly.txt \
-	stripe_price_correction_credits.txt \
-	rabbitmq_url.txt \
-	ga4_oauth_client_id.txt \
-	ga4_oauth_client_secret.txt \
-	redis_password.txt
-
-OPTIONAL_SECRETS := \
-	r2_bucket.txt \
-	r2_account_id.txt \
-	r2_access_key_id.txt \
-	r2_secret_access_key.txt \
-	grafana_admin_user.txt \
-	grafana_admin_password.txt \
-	auth_http_addr.txt \
-	auth_metrics_addr.txt \
-	user_http_addr.txt \
-	user_metrics_addr.txt \
-	organizations_http_addr.txt \
-	organizations_metrics_addr.txt \
-	permission_http_addr.txt \
-	permission_metrics_addr.txt \
-	billing_http_addr.txt \
-	billing_metrics_addr.txt \
-	notification_http_addr.txt \
-	notification_metrics_addr.txt \
-	project_http_addr.txt \
-	project_metrics_addr.txt \
-	analysis_http_addr.txt \
-	analysis_metrics_addr.txt \
-	ia_http_addr.txt \
-	ia_metrics_addr.txt \
-	attribution_http_addr.txt \
-	attribution_metrics_addr.txt
-
 .DEFAULT_GOAL := help
 
 .PHONY: help \
@@ -99,7 +29,7 @@ OPTIONAL_SECRETS := \
 	prod prod-build prod-down prod-logs prod-migrate prod-ping prod-check deploy-prod \
 	prod-doc prod-email prod-mcp prod-monitoring \
 	db-generate db-migrate \
-	secrets-init secrets-check \
+	secrets-generate secrets-verify-generated secrets-init secrets-check \
 	test lint lint-fix fmt ci \
 	seed-nike seed-nike-live \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
@@ -126,20 +56,22 @@ help:
 	@echo "    make db-migrate       Alias for dev migrations"
 	@echo ""
 	@echo "  Production"
-	@echo "    make prod             Start production stack"
-	@echo "    make prod-build       Rebuild and start production stack"
+	@echo "    make prod             Start production stack (one service at a time)"
+	@echo "    make prod-build       Rebuild and start production stack (one service at a time)"
 	@echo "    make prod-down        Stop production stack"
 	@echo "    make prod-logs        Follow prod logs (SERVICE=name optional)"
 	@echo "    make prod-migrate     Run all production migrations"
-	@echo "    make prod-doc         Start docs only"
-	@echo "    make prod-email       Start email renderer only"
-	@echo "    make prod-mcp         Start MCP server only"
-	@echo "    make prod-monitoring  Start monitoring only"
+	@echo "    make prod-doc         Start docs only, sequentially"
+	@echo "    make prod-email       Start email renderer only, sequentially"
+	@echo "    make prod-mcp         Start MCP server only, sequentially"
+	@echo "    make prod-monitoring  Start monitoring only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
 	@echo "    make prod-check       Ansible syntax check"
 	@echo "    make deploy-prod      Run production deploy playbook"
 	@echo ""
 	@echo "  Secrets"
+	@echo "    make secrets-generate Regenerate Makefile/Compose/Ansible secrets files"
+	@echo "    make secrets-verify-generated Fail if generated secrets files are stale"
 	@echo "    make secrets-init     Create missing secret files"
 	@echo "    make secrets-check    Ensure required secrets are non-empty"
 	@echo ""
@@ -192,10 +124,10 @@ db-generate:
 db-migrate: dev-migrate
 
 prod: secrets-check
-	$(COMPOSE_PROD) $(PROFILES_PROD) up -d
+	$(COMPOSE_PROD_SERIAL) $(PROFILES_PROD) up -d
 
 prod-build: secrets-check
-	$(COMPOSE_PROD) $(PROFILES_PROD) up -d --build
+	$(COMPOSE_PROD_SERIAL) $(PROFILES_PROD) up -d --build
 
 prod-down:
 	$(COMPOSE_PROD) down --remove-orphans
@@ -204,19 +136,19 @@ prod-logs:
 	$(COMPOSE_PROD) logs -f $(SERVICE)
 
 prod-migrate: secrets-check
-	$(COMPOSE_PROD) --profile migrations up --build
+	$(COMPOSE_PROD_SERIAL) --profile migrations up --build
 
 prod-doc: secrets-check
-	$(COMPOSE_PROD) --profile doc up -d
+	$(COMPOSE_PROD_SERIAL) --profile doc up -d
 
 prod-email: secrets-check
-	$(COMPOSE_PROD) --profile email up -d
+	$(COMPOSE_PROD_SERIAL) --profile email up -d
 
 prod-mcp: secrets-check
-	$(COMPOSE_PROD) --profile mcp up -d
+	$(COMPOSE_PROD_SERIAL) --profile mcp up -d
 
 prod-monitoring: secrets-check
-	$(COMPOSE_PROD) --profile monitoring up -d
+	$(COMPOSE_PROD_SERIAL) --profile monitoring up -d
 
 prod-ping:
 	ansible -i $(ANSIBLE_INVENTORY) production -m ping --ask-become-pass
@@ -226,6 +158,12 @@ prod-check:
 
 deploy-prod:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass
+
+secrets-generate:
+	python3 scripts/generate_secrets_config.py
+
+secrets-verify-generated:
+	python3 scripts/generate_secrets_config.py --check
 
 secrets-init:
 	@mkdir -p $(SECRETS_DIR)
@@ -266,6 +204,7 @@ fmt:
 	gofmt -w services
 
 ci:
+	$(MAKE) secrets-verify-generated
 	@test -z "$$(gofmt -l services)" || (echo "Go files need formatting:"; gofmt -l services; exit 1)
 	$(MAKE) lint
 	$(MAKE) test

@@ -4,6 +4,7 @@
   become: true
   vars_files:
     - ../group_vars/production.yml
+    - ../group_vars/generated_secrets.yml
   tasks:
     - name: Ensure deploy parent directory exists
       ansible.builtin.file:
@@ -73,16 +74,7 @@
       ansible.builtin.stat:
         path: "{{ deploy_path }}/secrets/{{ item }}"
       register: docker_secret_files
-      loop:
-        - postgres_db.txt
-        - postgres_host.txt
-        - postgres_password.txt
-        - postgres_port.txt
-        - postgres_user.txt
-        - shotgun_organizer_id.txt
-        - shotgun_events_key.txt
-        - next_public_ga_measurement_id.txt
-        - next_public_site_url.txt
+      loop: "{{ docker_required_secret_files }}"
 
     - name: Stop deploy if a Docker secret is missing
       ansible.builtin.fail:
