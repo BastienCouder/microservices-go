@@ -27,8 +27,12 @@ import { buildProviderLabel } from "@/lib/project-models";
 import { cn } from "@/lib/utils";
 import { SectionTitle } from "@/components/shared/section-title";
 import { buildScopedHref } from "@/shared/selection";
-import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  translateI18nText,
+  useScopedI18n,
+} from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
+import i18n from "@/shared/i18n";
 import {
   formatPerceptionErrorTypeLabel as formatPerceptionErrorTypeLabelI18n,
   formatPerceptionPriorityLabel as formatPerceptionPriorityLabelI18n,
@@ -570,14 +574,14 @@ function getPerceptionModelBadgeMeta(
     return {
       iconPath: providerVisual?.iconPath || model.iconPath,
       name,
-      provider: provider || "AI provider",
-      title: `${provider || "AI provider"} - ${name}`,
+      provider: provider || translateI18nText("shared-ui", "aiProvider", i18n.language),
+      title: `${provider || translateI18nText("shared-ui", "aiProvider", i18n.language)} - ${name}`,
     };
   }
 
   const providerVisual = findProviderVisual("", modelName);
-  const provider = providerVisual?.provider ?? "AI provider";
-  const name = getProviderModelName(modelName) || modelName || "Modele IA";
+  const provider = providerVisual?.provider ?? translateI18nText("shared-ui", "aiProvider", i18n.language);
+  const name = getProviderModelName(modelName) || modelName || translateI18nText("shared-ui", "aiModel", i18n.language);
 
   return {
     iconPath: providerVisual?.iconPath ?? "",

@@ -1,0 +1,14 @@
+{
+  "pageTitle": "Configured AI",
+  "pageBaseline": "Choose the active models directly for this project.",
+  "selectedCount": "{{count}} selected",
+  "selectedModelsStatus": "{{selected}}/{{limit}} active models",
+  "searchPlaceholder": "Search a model",
+  "saving": "Saving...",
+  "save": "Save",
+  "plan": "plan {{label}}",
+  "apiKeysRequired": "API keys required",
+  "selectOrganizationFirst": "Select an organization first.",
+  "noModelAvailable": "No model available.",
+  "missingProviderWarning": "Add an API key for {{providers}} before saving these models."
+}

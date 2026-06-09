@@ -2,12 +2,14 @@ import { Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type CopyPromptButtonProps = {
   prompt: string;
 };
 
 export function CopyPromptButton({ prompt }: CopyPromptButtonProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function CopyPromptButton({ prompt }: CopyPromptButtonProps) {
   return (
     <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
       {copied ? <Check className="size-3.5" aria-hidden="true" /> : <Copy className="size-3.5" aria-hidden="true" />}
-      {copied ? "Copié" : "Copier le prompt"}
+      {copied ? t("copyPromptCopied") : t("copyPrompt")}
     </Button>
   );
 }

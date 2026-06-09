@@ -1,0 +1,45 @@
+{
+  "headline": {
+    "title": "API-first.",
+    "subtitle": "Prêt pour l'automatisation."
+  },
+  "description": "Récupérez les données brutes, branchez vos workflows et injectez Visia dans vos outils internes sans dépendance à l'interface.",
+  "status": "Sandbox active",
+  "docsLink": "Voir la documentation",
+  "features": {
+    "api": {
+      "title": "API REST",
+      "description": "Listez les analyses, scores, citations et recommandations depuis vos propres dashboards."
+    },
+    "mcp": {
+      "title": "Serveur MCP",
+      "description": "Exposez vos données de visibilité directement à vos agents et assistants internes."
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "description": "Déclenchez des workflows à chaque nouvelle analyse, alerte ou variation de score."
+    },
+    "export": {
+      "title": "Exports propres",
+      "description": "Récupérez les données en JSON ou CSV pour vos rapports, notebooks et pipelines."
+    },
+    "docs": {
+      "title": "Documentation concise",
+      "description": "Des endpoints simples, des schémas clairs et des exemples utilisables tout de suite."
+    }
+  },
+  "examples": {
+    "rest": {
+      "label": "REST",
+      "code": "curl -X GET \"https://api.visia.io/v1/analyses?brand=acme\" \\\n  -H \"Authorization: Bearer visia_test_key\" \\\n  -H \"Accept: application/json\""
+    },
+    "mcp": {
+      "label": "MCP",
+      "code": "{\n  \"server\": \"visia\",\n  \"tool\": \"brand.visibility\",\n  \"input\": {\n    \"brand\": \"acme\",\n    \"market\": \"fr\",\n    \"question\": \"quel outil choisir pour gérer la facturation ?\"\n  }\n}"
+    },
+    "webhooks": {
+      "label": "Webhooks",
+      "code": "POST /webhooks/analysis.completed\n{\n  \"brand\": \"acme\",\n  \"score\": 71,\n  \"delta\": 8,\n  \"top_model\": \"ChatGPT\",\n  \"tracked_at\": \"2026-03-19T09:00:00Z\"\n}"
+    }
+  }
+}

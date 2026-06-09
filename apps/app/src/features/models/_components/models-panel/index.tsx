@@ -6,6 +6,7 @@ import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/shared/page-header";
 import { pushWarningToast } from "@/components/ui/toast-actions";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { ProviderApiKeysPanel } from "../provider-keys/provider-api-keys-panel";
 import {
@@ -25,16 +26,17 @@ type ModelsPanelProps = {
 };
 
 export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
+  const { t } = useScopedI18n("models");
   const viewModel = useModelsPanelViewModel({ apiBaseURL, routeSearch });
   const missingProviderLabels = viewModel.missingProviderLabels.join(", ");
 
   useEffect(() => {
     if (viewModel.developerPlanMissingKeys) {
       pushWarningToast(
-        `Ajoutez une cle API pour ${missingProviderLabels} avant d'enregistrer ces modeles.`,
+        t("missingProviderWarning", { providers: missingProviderLabels }),
       );
     }
-  }, [missingProviderLabels, viewModel.developerPlanMissingKeys]);
+  }, [missingProviderLabels, t, viewModel.developerPlanMissingKeys]);
 
   if (viewModel.redirectHref) {
     return <Navigate to={viewModel.redirectHref} replace />;
@@ -43,8 +45,8 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
-        title="IA configurées"
-        baseline="Choisissez directement les modeles actifs pour le projet."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="rounded-xl rounded-bl-none rounded-br-none"
         meta={
@@ -53,18 +55,18 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
               <Skeleton className="h-6 w-28 rounded-full" />
             ) : (
               <Badge variant="default">
-                {viewModel.selectedModelIds.length} selectionnes
+                {t("selectedCount", { count: viewModel.selectedModelIds.length })}
               </Badge>
             )}
             {viewModel.loadingPlan ? (
               <Skeleton className="h-6 w-24 rounded-full" />
             ) : viewModel.planLabel ? (
               <Badge variant="outline" className="capitalize">
-                plan {viewModel.planLabel}
+                {t("plan", { label: viewModel.planLabel })}
               </Badge>
             ) : null}
             {viewModel.isDeveloperPlan ? (
-              <Badge variant="outline">cles API requises</Badge>
+              <Badge variant="outline">{t("apiKeysRequired")}</Badge>
             ) : null}
           </>
         }
@@ -103,9 +105,9 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
 
         <div className="px-4 py-4 md:px-6">
           {!viewModel.organizationId ? (
-            <EmptyStateCard label="Selectionne d'abord une organisation." />
+            <EmptyStateCard label={t("selectOrganizationFirst")} />
           ) : viewModel.loading ? <CatalogTemplate /> : viewModel.filteredCatalog.length === 0 ? (
-            <EmptyStateCard label={viewModel.displayError || "Aucun modele disponible."} />
+            <EmptyStateCard label={viewModel.displayError || t("noModelAvailable")} />
           ) : (<>
             <ModelCatalogGrid
               models={viewModel.filteredCatalog}

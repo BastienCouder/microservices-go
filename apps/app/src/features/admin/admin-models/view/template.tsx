@@ -53,6 +53,7 @@ import {
   readSelectedOrganizationID,
 } from "@/shared/selection";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type AdminModelsTemplateProps = {
   apiBaseURL: string;
@@ -77,6 +78,7 @@ export function AdminModelsTemplate({
   apiBaseURL,
   routeSearch,
 }: AdminModelsTemplateProps) {
+  const { t } = useScopedI18n("admin-models");
   const queryClient = useQueryClient();
   const [organizationId, setOrganizationId] = useState("");
   const [search, setSearch] = useState("");
@@ -161,14 +163,13 @@ export function AdminModelsTemplate({
         appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
         appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
       ]);
-      pushSuccessToast(
-        `${updatedModel.name} est maintenant ${
-          updatedModel.isActive ? "actif" : "inactif"
-        }.`,
-      );
+      pushSuccessToast(t("modelUpdateSuccess", {
+        name: updatedModel.name,
+        status: updatedModel.isActive ? t("activeState") : t("inactiveState"),
+      }));
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre a jour ce modele.");
+      pushErrorToast(error, t("modelUpdateError"));
     },
   });
 
@@ -191,12 +192,10 @@ export function AdminModelsTemplate({
         appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "active"),
         appQueryKeys.modelsCatalog(apiBaseURL, "__onboarding__", "active"),
       ]);
-      pushSuccessToast(
-        `OpenRouter synchronise : ${result.imported} modeles importes (${result.created} nouveaux, ${result.updated} mis a jour, ${result.purged} purges).`,
-      );
+      pushSuccessToast(t("openRouterSyncSuccess", result));
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de synchroniser les modeles OpenRouter.");
+      pushErrorToast(error, t("openRouterSyncError"));
     },
   });
 
@@ -207,14 +206,14 @@ export function AdminModelsTemplate({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
-        title="Admin modeles LLM"
-        baseline="Gerez le catalogue partage utilise par la page Modeles et l'onboarding."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         meta={
           <>
-            <Badge variant="default">{activeCount} actifs</Badge>
-            <Badge variant="outline">{inactiveCount} inactifs</Badge>
-            <Badge variant="outline">{providerOptions.length} providers</Badge>
+            <Badge variant="default">{t("activeCount", { count: activeCount })}</Badge>
+            <Badge variant="outline">{t("inactiveCount", { count: inactiveCount })}</Badge>
+            <Badge variant="outline">{t("providersCount", { count: providerOptions.length })}</Badge>
           </>
         }
         actions={
@@ -226,7 +225,7 @@ export function AdminModelsTemplate({
               disabled={catalogQuery.isFetching}
             >
               <RefreshCw data-icon="inline-start" />
-              {catalogQuery.isFetching ? "Actualisation..." : "Actualiser"}
+              {catalogQuery.isFetching ? t("refreshing") : t("refresh")}
             </Button>
             <Button
               type="button"
@@ -237,8 +236,8 @@ export function AdminModelsTemplate({
             >
               <CloudDownload data-icon="inline-start" />
               {syncOpenRouterMutation.isPending
-                ? "Import OpenRouter..."
-                : "Importer OpenRouter"}
+                ? t("importingOpenRouter")
+                : t("importOpenRouter")}
             </Button>
           </div>
         }
@@ -255,17 +254,17 @@ export function AdminModelsTemplate({
               <Input
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
-                placeholder="Rechercher par nom, id ou provider"
+                placeholder={t("searchPlaceholder")}
                 className="pl-9"
               />
             </div>
 
             <Select value={provider} onValueChange={setProvider}>
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Provider" />
+                <SelectValue placeholder={t("providerPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les providers</SelectItem>
+                <SelectItem value="all">{t("allProviders")}</SelectItem>
                 {providerOptions.map((providerId) => (
                   <SelectItem key={providerId} value={providerId}>
                     {buildProviderLabel(providerId)}
@@ -281,12 +280,12 @@ export function AdminModelsTemplate({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Statut" />
+                <SelectValue placeholder={t("statusPlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous</SelectItem>
-                <SelectItem value="active">Actifs</SelectItem>
-                <SelectItem value="inactive">Inactifs</SelectItem>
+                <SelectItem value="all">{t("allStatuses")}</SelectItem>
+                <SelectItem value="active">{t("active")}</SelectItem>
+                <SelectItem value="inactive">{t("inactive")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -297,12 +296,12 @@ export function AdminModelsTemplate({
               }
             >
               <SelectTrigger className="w-full">
-                <SelectValue placeholder="Type" />
+                <SelectValue placeholder={t("typePlaceholder")} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous</SelectItem>
-                <SelectItem value="chat">Chat</SelectItem>
-                <SelectItem value="instruct">Instruct</SelectItem>
+                <SelectItem value="all">{t("allTypes")}</SelectItem>
+                <SelectItem value="chat">{t("chat")}</SelectItem>
+                <SelectItem value="instruct">{t("instruct")}</SelectItem>
               </SelectContent>
             </Select>
 
@@ -311,14 +310,14 @@ export function AdminModelsTemplate({
                 checked={toolsOnly}
                 onCheckedChange={(checked) => setToolsOnly(checked === true)}
               />
-              Tools
+              {t("toolsLabel")}
             </label>
 
             <Input
               value={minContext}
               onChange={(event) => setMinContext(event.target.value)}
               inputMode="numeric"
-              placeholder="Contexte min"
+              placeholder={t("minContextPlaceholder")}
             />
 
             <label className="flex min-h-8 items-center gap-2 rounded-lg border border-border/70 px-3 text-sm text-muted-foreground">
@@ -326,7 +325,7 @@ export function AdminModelsTemplate({
                 checked={onlyFree}
                 onCheckedChange={(checked) => setOnlyFree(checked === true)}
               />
-              Free
+              {t("freeLabel")}
             </label>
 
             <label className="flex min-h-8 items-center gap-2 rounded-lg border border-border/70 px-3 text-sm text-muted-foreground">
@@ -336,7 +335,7 @@ export function AdminModelsTemplate({
                   setPurgeUnsupportedProviders(checked === true)
                 }
               />
-              Purger
+              {t("purgeLabel")}
             </label>
 
             <label className="flex min-h-8 items-center gap-2 rounded-lg border border-border/70 px-3 text-sm text-muted-foreground">
@@ -344,40 +343,35 @@ export function AdminModelsTemplate({
                 checked={purgeMissingModels}
                 onCheckedChange={(checked) => setPurgeMissingModels(checked === true)}
               />
-              Purger absents
+              {t("purgeMissingLabel")}
             </label>
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            L'import OpenRouter utilise la recherche, le provider, le type
-            chat/instruct, le contexte minimum et Tools comme filtres. `Free`
-            filtre seulement la liste affichee dans cette page. Purger supprime
-            les anciens imports OpenRouter dont le provider n'est plus
-            supporte. Purger absents retire les imports OpenRouter qui ne sont
-            plus renvoyes par l'API OpenRouter.
+            {t("importHelp")}
           </p>
         </div>
 
         <div className="px-4 py-4 md:px-6">
           {!organizationId ? (
-            <EmptyState label="Selectionnez une organisation pour charger le catalogue." />
+            <EmptyState label={t("noOrganizationSelected")} />
           ) : catalogQuery.isLoading ? (
-            <EmptyState label="Chargement du catalogue LLM..." />
+            <EmptyState label={t("loadingCatalog")} />
           ) : filteredCatalog.length === 0 ? (
-            <EmptyState label="Aucun modele ne correspond a ces filtres." />
+            <EmptyState label={t("noModelMatches")} />
           ) : (
             <div className="overflow-hidden rounded-xl border border-border/70">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Modele</TableHead>
-                    <TableHead>Provider</TableHead>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead>OpenRouter pricing</TableHead>
-                    <TableHead className="text-right">Input / 1M</TableHead>
-                    <TableHead className="text-right">Output / 1M</TableHead>
-                    <TableHead className="text-center">Credits</TableHead>
-                    <TableHead className="text-center">Tools</TableHead>
-                    <TableHead className="w-[140px] text-right">Statut</TableHead>
+                    <TableHead>{t("columnModel")}</TableHead>
+                    <TableHead>{t("columnProvider")}</TableHead>
+                    <TableHead>{t("columnModelId")}</TableHead>
+                    <TableHead>{t("columnOpenRouterPricing")}</TableHead>
+                    <TableHead className="text-right">{t("columnInputPerMillion")}</TableHead>
+                    <TableHead className="text-right">{t("columnOutputPerMillion")}</TableHead>
+                    <TableHead className="text-center">{t("columnCredits")}</TableHead>
+                    <TableHead className="text-center">{t("columnTools")}</TableHead>
+                    <TableHead className="w-[140px] text-right">{t("columnStatus")}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -436,12 +430,12 @@ export function AdminModelsTemplate({
                         </TableCell>
                         <TableCell className="text-center">
                           <Badge variant="secondary">
-                            {model.creditCost} / appel
+                            {t("callCost", { count: model.creditCost })}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
                           {model.supportsLiveSearch ? (
-                            <Badge variant="secondary">Oui</Badge>
+                            <Badge variant="secondary">{t("yes")}</Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
@@ -456,7 +450,7 @@ export function AdminModelsTemplate({
                                   : "text-muted-foreground",
                               )}
                             >
-                              {model.isActive ? "Actif" : "Inactif"}
+                              {model.isActive ? t("activeBadge") : t("inactiveBadge")}
                             </span>
                             <Switch
                               checked={model.isActive}
@@ -464,7 +458,7 @@ export function AdminModelsTemplate({
                               onCheckedChange={(checked) =>
                                 toggleModel(model, checked)
                               }
-                              aria-label={`Changer le statut de ${model.name}`}
+                              aria-label={t("changeStatusAria", { name: model.name })}
                             />
                           </div>
                         </TableCell>
@@ -479,8 +473,7 @@ export function AdminModelsTemplate({
 
         <div className="border-t px-4 py-3 text-xs text-muted-foreground md:px-6">
           <SlidersHorizontal data-icon="inline-start" />
-          Les providers affiches dans le panel de cles API viennent uniquement
-          des modeles actifs de ce catalogue.
+          {t("providersPanelHint")}
         </div>
       </div>
     </div>

@@ -1,0 +1,23 @@
+{
+  "eyebrow": "Capabilities",
+  "title": "Everything you need.",
+  "subtitle": "Nothing you don't.",
+  "items": [
+    {
+      "title": "Measure your AI visibility",
+      "description": "Run targeted prompts across multiple LLMs and finally see whether your brand appears, how it is described and which competitors show up instead."
+    },
+    {
+      "title": "Find what is holding you back",
+      "description": "Spot the pages, brand signals and content gaps that keep AIs from understanding, citing or recommending you."
+    },
+    {
+      "title": "Prioritize the right fixes",
+      "description": "Turn observations into a concrete action plan for SEO, content, social proof and the structure of your pages."
+    },
+    {
+      "title": "Prove impact over time",
+      "description": "Track visibility trends, compare outcomes by model and show progress clearly to the rest of your team."
+    }
+  ]
+}

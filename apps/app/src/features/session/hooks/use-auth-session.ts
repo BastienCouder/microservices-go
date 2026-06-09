@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { navigateToWebAuth } from "@/shared/auth/web-auth";
 import type { UserProfile } from "@/shared/models";
@@ -54,7 +56,7 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
       if (!response.ok) {
         return `logout: ${response.status} ${response.error}`;
       }
-      return "Déconnexion effectuée";
+      return translateI18nText("shared-ui", "loggedOut", i18n.resolvedLanguage || i18n.language || "fr");
     },
     onSuccess: (nextFeedback) => {
       queryClient.setQueryData(appQueryKeys.session(apiBaseURL), null);

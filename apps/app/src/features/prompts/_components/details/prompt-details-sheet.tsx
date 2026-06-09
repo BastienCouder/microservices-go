@@ -100,7 +100,7 @@ function PromptDetailsContent({
               className="min-w-0 rounded-full"
               onClick={() => onEditPrompt(prompt)}
             >
-              <span className="truncate">Modifier</span>
+              <span className="truncate">{t("editLabel")}</span>
             </Button>
             <Button
               type="button"
@@ -108,7 +108,7 @@ function PromptDetailsContent({
               className="min-w-0 rounded-full"
               onClick={() => onSeeMoreResponses(prompt)}
             >
-              <span className="truncate">Voir les réponses</span>
+              <span className="truncate">{t("viewResponsesLabel")}</span>
             </Button>
             <Button
               type="button"
@@ -118,9 +118,9 @@ function PromptDetailsContent({
             >
               <span className="truncate">
                 {copyState === "done"
-                  ? "Prompt copié"
+                  ? t("promptCopied")
                   : copyState === "error"
-                    ? "Copie indisponible"
+                    ? t("promptCopyUnavailable")
                     : t("copyPrompt")}
               </span>
             </Button>
@@ -131,7 +131,7 @@ function PromptDetailsContent({
       <div className={cn("flex-1 px-8", mobile ? "px-6" : "overflow-y-auto")}>
         <div className="grid grid-cols-1 gap-y-12 pb-8">
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-bold tracking-widest text-primary">Score SOV</span>
+            <span className="text-xs font-bold tracking-widest text-primary">{t("sovScoreLabel")}</span>
             <div className="flex items-baseline gap-3">
               <span className="text-4xl md:text-6xl font-extralight tracking-tighter text-primary">{prompt.sov}%</span>
             </div>
@@ -206,8 +206,8 @@ function PromptDetailsContent({
             locale={locale}
             responses={lastResponses}
             getModelVisual={getModelVisual}
-            emptyLabel="No responses yet"
-            title="Last responses"
+            emptyLabel={t("noResponsesYet")}
+            title={t("lastResponsesTitle")}
             onSeeMore={() => onSeeMoreResponses(prompt)}
             onOpenResponse={(responseId) => onOpenResponse(prompt, responseId)}
           />
@@ -243,6 +243,8 @@ function LastResponses({
   onSeeMore: () => void;
   onOpenResponse: (responseId: string) => void;
 }) {
+  const { t } = useScopedI18n("prompts-workspace");
+
   if (responses.length === 0) {
     return (
       <div className="space-y-3 pt-2">
@@ -305,15 +307,15 @@ function LastResponses({
               <div className="flex items-center justify-between border-t border-border/40 pt-3">
                 <div className="flex items-center gap-3">
                   {response.mention ? (
-                    <span className="rounded-sm text-xs font-semibold text-emerald-600">Mentioned</span>
+                    <span className="rounded-sm text-xs font-semibold text-emerald-600">{t("mentionedLabel")}</span>
                   ) : (
-                    <span className="rounded-sm text-xs font-medium text-destructive">Missing</span>
+                    <span className="rounded-sm text-xs font-medium text-destructive">{t("missingLabel")}</span>
                   )}
                   {response.rank ? (
                     <>
                       <div className="h-[12px] w-[1px] bg-border" />
                       <span className={cn("text-xs", response.rank === 1 ? "font-semibold text-primary" : "text-muted-foreground")}>
-                        {response.rank === 1 ? "rank 1" : `#${response.rank}`}
+                        {t("rankLabel", { rank: response.rank })}
                       </span>
                     </>
                   ) : null}
@@ -338,7 +340,7 @@ function LastResponses({
         className="w-full min-w-0 text-xs md:text-sm"
         onClick={onSeeMore}
       >
-        <span className="truncate">Voir plus</span>
+        <span className="truncate">{t("seeMoreLabel")}</span>
       </Button>
     </div>
   );

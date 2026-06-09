@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { SectionTitle } from "@/components/shared/section-title";
 import { usePerceptionData } from "@/features/perception/_lib/shared/use-perception-data";
 import { PageHeader } from "@/components/shared/page-header";
-import { PERCEPTION_TEXT } from "@/lib/app-data";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
 import {
   deriveShortDescription,
@@ -21,6 +21,7 @@ type BrandsOverviewPanelProps = {
 };
 
 export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewPanelProps) {
+  const { t } = useScopedI18n("brands-overview");
   const { data, error, loading } = usePerceptionData(apiBaseURL, routeSearch);
 
   if (loading && !data) {
@@ -28,20 +29,20 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
   }
 
   const viewData = data ?? createEmptyPerceptionViewData(routeSearch);
-  const emptyLabel = error || PERCEPTION_TEXT.brandCanon.empty;
+  const emptyLabel = error || t("emptyLabel");
   const shortDescription = deriveShortDescription(viewData.brandCanon);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
       <PageHeader
-        title="Profil de marque"
-        baseline="Toutes les informations essentielles de la marque sont réunies sur un seul écran pour être relues rapidement."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="gap-3 md:gap-4"
         actions={
           <Button asChild variant="default" className="w-auto max-w-full whitespace-nowrap">
             <Link to={buildBrandCanonLocation(routeSearch)}>
-              Modifier le profil de marque
+              {t("editBrandProfile")}
             </Link>
           </Button>
         }
@@ -51,31 +52,31 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
         <Card className="border-border/60 rounded-tr-none">
           <CardHeader>
             <CardTitle className="text-base">
-              <SectionTitle showIndicator={false}>Résumé rapide</SectionTitle>
+              <SectionTitle showIndicator={false}>{t("quickSummaryTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription>
-              Les informations les plus utiles pour comprendre la marque immédiatement.
+              {t("quickSummaryDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <BrandField label="Nom de la marque" value={viewData.brandCanon.brandName} emptyLabel={emptyLabel} />
-            <BrandField label="Secteur" value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
-            <BrandField label="Résumé court" value={shortDescription} emptyLabel={emptyLabel} />
+            <BrandField label={t("brandNameLabel")} value={viewData.brandCanon.brandName} emptyLabel={emptyLabel} />
+            <BrandField label={t("sectorLabel")} value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
+            <BrandField label={t("shortSummaryLabel")} value={shortDescription} emptyLabel={emptyLabel} />
           </CardContent>
         </Card>
 
         <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-base">
-              <SectionTitle showIndicator={false}>Description de référence</SectionTitle>
+              <SectionTitle showIndicator={false}>{t("referenceDescriptionTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription>
-              La formulation qui décrit précisément la marque et son positionnement.
+              {t("referenceDescriptionDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <BrandField
-              label="Description"
+              label={t("descriptionLabel")}
               value={viewData.brandCanon.positioning}
               emptyLabel={emptyLabel}
               multiline
@@ -86,13 +87,13 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
         <div className="grid gap-3 sm:gap-4 xl:grid-cols-2 2xl:grid-cols-3">
        
           <BrandListSection
-            label="Cas d’usage prioritaires"
+            label={t("priorityUseCasesTitle")}
             items={viewData.brandCanon.useCases}
             emptyLabel={emptyLabel}
             variant="numbered"
           />
           <BrandListSection
-            label="Fonctionnalités clés"
+            label={t("keyFeaturesTitle")}
             items={viewData.brandCanon.features}
             emptyLabel={emptyLabel}
             variant="stack"
@@ -100,6 +101,7 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
           <BrandCompetitorsSection
             competitors={viewData.competitors}
             emptyLabel={emptyLabel}
+            title={t("competitorsTitle")}
           />
         </div>
       </div>
@@ -108,12 +110,12 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
 }
 
 function BrandField({
-  emptyLabel = PERCEPTION_TEXT.brandCanon.empty,
+  emptyLabel,
   label,
   value,
   multiline = false,
 }: {
-  emptyLabel?: string;
+  emptyLabel: string;
   label: string;
   value: string;
   multiline?: boolean;
@@ -208,10 +210,12 @@ function BrandListSection({
 function BrandCompetitorsSection({
   competitors,
   emptyLabel,
+  title,
   action,
 }: {
   competitors: Array<{ name: string; website: string }>;
   emptyLabel: string;
+  title: string;
   action?: ReactNode;
 }) {
   const content = competitors.length === 0 ? (
@@ -237,7 +241,7 @@ function BrandCompetitorsSection({
       <CardHeader className="flex flex-col items-start gap-3 space-y-0 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
           <CardTitle className="text-base">
-            <SectionTitle showIndicator={false}>Concurrents</SectionTitle>
+            <SectionTitle showIndicator={false}>{title}</SectionTitle>
           </CardTitle>
         </div>
         {action ? <div className="shrink-0">{action}</div> : null}

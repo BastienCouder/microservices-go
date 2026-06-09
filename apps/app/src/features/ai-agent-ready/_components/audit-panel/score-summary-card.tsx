@@ -1,6 +1,7 @@
 import { CheckCircle2, CircleAlert, CircleX } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type { AuditScanResult } from "../../_lib/shared/types";
 import { ScoreGauge } from "./score-gauge";
@@ -10,12 +11,13 @@ type ScoreSummaryCardProps = {
 };
 
 export function ScoreSummaryCard({ result }: ScoreSummaryCardProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const levelLabel =
     result.level === "Ready"
-      ? "Prêt"
+      ? t("levelReady")
       : result.level === "Partially Ready"
-        ? "Partiellement prêt"
-        : "Non prêt";
+        ? t("levelPartial")
+        : t("levelNotReady");
 
   return (
     <Card className="border-border/60">
@@ -26,30 +28,30 @@ export function ScoreSummaryCard({ result }: ScoreSummaryCardProps) {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h2 className="text-2xl font-semibold text-foreground">{levelLabel}</h2>
-              <span className="text-sm text-muted-foreground">Score global</span>
+              <span className="text-sm text-muted-foreground">{t("scoreGlobal")}</span>
             </div>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
               {result.summary.failed > 0
-                ? "Les points ci-dessous sont ceux à traiter en priorité pour éviter que les agents ratent ou exploitent mal le site."
-                : "Aucun point bloquant détecté sur les contrôles lancés."}
+                ? t("summaryWithIssues")
+                : t("summaryNoIssues")}
             </p>
 
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               <Counter
                 icon={CheckCircle2}
-                label="Validés"
+                label={t("passed")}
                 value={result.summary.passed}
                 className="text-green-700"
               />
               <Counter
                 icon={CircleAlert}
-                label="Alertes"
+                label={t("warnings")}
                 value={result.summary.warning}
                 className="text-amber-700"
               />
               <Counter
                 icon={CircleX}
-                label="Bloquants"
+                label={t("blocking")}
                 value={result.summary.failed}
                 className="text-destructive"
               />

@@ -40,23 +40,7 @@ fi
 
 export DSN="postgres://${KRATOS_DB_USER}:${KRATOS_DB_PASSWORD}@${KRATOS_DB_HOST}:${KRATOS_DB_PORT}/${KRATOS_DB_NAME}?sslmode=${KRATOS_DB_SSLMODE}"
 
-CONFIG_TEMPLATE="/etc/config/kratos/kratos.yml"
 CONFIG_RENDERED="/tmp/kratos.yml"
-
-esc() {
-  printf '%s' "$1" | sed 's/[\/&]/\\&/g'
-}
-
-ESC_DSN="$(esc "${DSN}")"
-ESC_KRATOS_PUBLIC_BASE_URL="$(esc "${KRATOS_PUBLIC_BASE_URL}")"
-ESC_GOOGLE_CLIENT_ID="$(esc "${KRATOS_OIDC_GOOGLE_CLIENT_ID}")"
-ESC_GOOGLE_CLIENT_SECRET="$(esc "${KRATOS_OIDC_GOOGLE_CLIENT_SECRET}")"
-
-sed \
-  -e "s|\${DSN}|${ESC_DSN}|g" \
-  -e "s|\${KRATOS_PUBLIC_BASE_URL}|${ESC_KRATOS_PUBLIC_BASE_URL}|g" \
-  -e "s|\${KRATOS_OIDC_GOOGLE_CLIENT_ID}|${ESC_GOOGLE_CLIENT_ID}|g" \
-  -e "s|\${KRATOS_OIDC_GOOGLE_CLIENT_SECRET}|${ESC_GOOGLE_CLIENT_SECRET}|g" \
-  "${CONFIG_TEMPLATE}" > "${CONFIG_RENDERED}"
+sh /etc/config/kratos/render-config.sh > "${CONFIG_RENDERED}"
 
 exec kratos serve -c "${CONFIG_RENDERED}" --watch-courier

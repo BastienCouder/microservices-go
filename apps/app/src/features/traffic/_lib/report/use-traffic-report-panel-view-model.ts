@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { appQueryKeys } from "@/lib/query-keys";
 import { useClientExportAccess } from "@/shared/export-entitlements";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   completeTrafficGA4OAuth,
   disconnectTrafficGA4Integration,
@@ -153,56 +154,70 @@ function toTrafficErrorMessage(err: unknown): string | null {
     return null;
   }
   if (err instanceof TrafficRequestError && err.status === 400) {
-    return "GA4 n'est pas encore configuré pour ce projet.";
+    return null;
   }
   if (err instanceof TrafficRequestError && err.scope === "traffic" && err.status === 503) {
     return err.message;
   }
-  return "Impossible de charger le rapport Traffic.";
+  return null;
 }
 
-function ga4LLMSetupToastDescription(setup: TrafficGA4LLMSetupResult | null): string {
+function ga4LLMSetupToastDescription(
+  setup: TrafficGA4LLMSetupResult | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   if (!setup) {
-    return "Le tracking LLM GA4 sera disponible après sélection d'une propriété.";
+    return t("ga4SetupPendingProperty");
   }
   if (setup.setupStatus === "success") {
-    return "Channel group Default + AI et canal AI configurés.";
+    return t("ga4SetupSuccessDescription");
   }
   if (setup.setupStatus === "partial_success") {
-    return "Une partie du tracking LLM GA4 a été configurée. Vérifie les détails dans la carte GA4.";
+    return t("ga4SetupPartialDescription");
   }
-  return "Le tracking LLM GA4 n'a pas pu être configuré automatiquement.";
+  return t("ga4SetupErrorDescription");
 }
 
-function buildKpis(report: TrafficReport | null): TrafficKpiItem[] {
+function buildKpis(
+  report: TrafficReport | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): TrafficKpiItem[] {
   const summary = report?.summary;
   return [
     {
-      title: "Visites IA détectées",
+      title: t("kpiAiVisitsTitle"),
       value: formatInteger(summary?.totalTrafficSessions ?? 0),
-      sub: `${formatPercent(summary?.trafficShareOfTotal ?? 0)} de toutes les visites GA4`,
-      description: "Sessions GA4 dont la source ou le référent permet d'identifier un moteur génératif, par exemple ChatGPT ou Perplexity.",
+      sub: t("kpiAiVisitsSub", {
+        share: formatPercent(summary?.trafficShareOfTotal ?? 0),
+      }),
+      description: t("kpiAiVisitsDescription"),
       tone: "primary",
     },
     {
-      title: "Taux d'engagement",
+      title: t("kpiEngagementRateTitle"),
       value: formatPercent(summary?.trafficEngagementRate ?? 0),
-      sub: `${formatInteger(summary?.trafficEngagedSessions ?? 0)} sessions engagées`,
-      description: "Part des visites IA détectées considérées comme engagées par GA4: durée significative, conversion ou au moins deux pages vues.",
+      sub: t("kpiEngagementRateSub", {
+        count: formatInteger(summary?.trafficEngagedSessions ?? 0),
+      }),
+      description: t("kpiEngagementRateDescription"),
       tone: "default",
     },
     {
-      title: "Conversions",
+      title: t("kpiConversionsTitle"),
       value: formatInteger(summary?.trafficConversions ?? 0),
-      sub: `${formatPercent(summary?.trafficConversionRate ?? 0)} de conversion`,
-      description: "Événements marqués comme conversions ou key events dans GA4 pendant ces visites IA détectées.",
+      sub: t("kpiConversionsSub", {
+        rate: formatPercent(summary?.trafficConversionRate ?? 0),
+      }),
+      description: t("kpiConversionsDescription"),
       tone: "default",
     },
     {
-      title: "Durée moyenne des visites",
+      title: t("kpiAvgVisitDurationTitle"),
       value: formatDuration(summary?.trafficAvgSessionSeconds ?? 0),
-      sub: `${formatPercent(summary?.trafficBounceRate ?? 0)} rebond`,
-      description: "Durée moyenne d'une visite IA détectée, calculée depuis la métrique GA4 de durée moyenne de session.",
+      sub: t("kpiAvgVisitDurationSub", {
+        rate: formatPercent(summary?.trafficBounceRate ?? 0),
+      }),
+      description: t("kpiAvgVisitDurationDescription"),
       tone: "default",
     },
   ];
@@ -212,6 +227,7 @@ export function useTrafficReportPanelViewModel({
   apiBaseURL,
   routeSearch,
 }: UseTrafficReportPanelViewModelInput) {
+  const { t } = useScopedI18n("traffic-report");
   const initialPeriod = useMemo(
     () => getTrafficQueryContext(routeSearch).period,
     [routeSearch],
@@ -363,19 +379,19 @@ export function useTrafficReportPanelViewModel({
       setOAuthProperties(properties);
       setOAuthPropertiesLoadedForProject(projectKey);
       if (options?.showToast) {
-        pushSuccessToast("Propriétés GA4 actualisées.");
+        pushSuccessToast(t("propertiesRefreshed"));
       }
     } catch (err) {
       setOAuthPropertiesLoadedForProject(projectKey);
       if (options?.showToast) {
-        showCaughtFormError(err, "Impossible de charger les propriétés GA4.");
+        showCaughtFormError(err, t("loadPropertiesError"));
       } else {
-        setFormError(err instanceof Error ? err.message : "Impossible de charger les propriétés GA4.");
+        setFormError(err instanceof Error ? err.message : t("loadPropertiesError"));
       }
     } finally {
       setOAuthPropertiesLoading(false);
     }
-  }, [apiBaseURL, result, showCaughtFormError]);
+  }, [apiBaseURL, result, showCaughtFormError, t]);
 
   useEffect(() => {
     if (!hasOAuthToken || !result?.projectId || !result.organizationId) {
@@ -427,8 +443,8 @@ export function useTrafficReportPanelViewModel({
         clearOAuthCallbackParams(pendingOAuth?.routeSearch ?? "");
         await query.refetch();
         pushSuccessToast(
-          "Google Analytics connecté.",
-          ga4LLMSetupToastDescription(response.llmSetup),
+          t("googleAnalyticsConnected"),
+          ga4LLMSetupToastDescription(response.llmSetup, t),
         );
       })
       .catch((err) => {
@@ -437,7 +453,7 @@ export function useTrafficReportPanelViewModel({
         clearPendingGA4OAuth();
         showCaughtFormError(
           err,
-          "Impossible de terminer la connexion Google Analytics.",
+          t("completeGoogleAnalyticsConnectionError"),
         );
       })
       .finally(() => {
@@ -451,15 +467,16 @@ export function useTrafficReportPanelViewModel({
     result,
     routeSearch,
     showCaughtFormError,
+    t,
   ]);
 
   const connect = useCallback(async () => {
     if (!result?.projectId || !result.organizationId) {
-      showFormError("Sélectionne un projet avant de connecter GA4.");
+      showFormError(t("selectProjectBeforeConnectGa4"));
       return;
     }
     if (propertyId.trim() === "" || serviceAccountJSON.trim() === "") {
-      showFormError("Renseigne le Property ID et le JSON du service account.");
+      showFormError(t("fillPropertyIdAndServiceJson"));
       return;
     }
     setLLMSetup(null);
@@ -476,24 +493,24 @@ export function useTrafficReportPanelViewModel({
       setServiceAccountJSON("");
       await query.refetch();
       pushSuccessToast(
-        "Google Analytics connecté.",
-        ga4LLMSetupToastDescription(response.llmSetup),
+        t("googleAnalyticsConnected"),
+        ga4LLMSetupToastDescription(response.llmSetup, t),
       );
     } catch (err) {
-      showCaughtFormError(err, "Impossible de connecter GA4 pour ce projet.");
+      showCaughtFormError(err, t("connectGa4Error"));
     } finally {
       setSaving(false);
     }
-  }, [apiBaseURL, propertyId, query, result, serviceAccountJSON, showCaughtFormError, showFormError]);
+  }, [apiBaseURL, propertyId, query, result, serviceAccountJSON, showCaughtFormError, showFormError, t]);
 
   const startOAuth = useCallback(async () => {
     if (!result?.projectId || !result.organizationId) {
-      showFormError("Sélectionne un projet avant de connecter Google Analytics.");
+      showFormError(t("selectProjectBeforeConnectGoogleAnalytics"));
       return;
     }
     const redirectUri = getOAuthRedirectURI();
     if (!redirectUri) {
-      showFormError("Impossible de préparer la redirection Google Analytics.");
+      showFormError(t("prepareGoogleAnalyticsRedirectError"));
       return;
     }
     setLLMSetup(null);
@@ -506,7 +523,7 @@ export function useTrafficReportPanelViewModel({
         redirectUri,
       });
       if (!response.authorizationUrl) {
-        throw new Error("Google Analytics n'a pas retourné d'URL de connexion.");
+        throw new Error(t("missingGoogleAnalyticsConnectionUrl"));
       }
       savePendingGA4OAuth({
         projectId: result.projectId,
@@ -519,11 +536,11 @@ export function useTrafficReportPanelViewModel({
     } catch (err) {
       showCaughtFormError(
         err,
-        "Impossible de démarrer la connexion Google Analytics.",
+        t("startGoogleAnalyticsConnectionError"),
       );
       setSaving(false);
     }
-  }, [apiBaseURL, propertyId, result, routeSearch, showCaughtFormError, showFormError]);
+  }, [apiBaseURL, propertyId, result, routeSearch, showCaughtFormError, showFormError, t]);
 
   const refreshOAuthProperties = useCallback(async () => {
     await loadOAuthProperties({ showToast: true });
@@ -531,7 +548,7 @@ export function useTrafficReportPanelViewModel({
 
   const selectOAuthProperty = useCallback(async () => {
     if (!result?.projectId || !result.organizationId || !selectedOAuthPropertyId) {
-      showFormError("Sélectionne une propriété GA4.");
+      showFormError(t("selectGa4Property"));
       return;
     }
     setLLMSetup(null);
@@ -546,15 +563,15 @@ export function useTrafficReportPanelViewModel({
       setLLMSetup(response.llmSetup);
       await query.refetch();
       pushSuccessToast(
-        "Propriété GA4 sélectionnée.",
-        ga4LLMSetupToastDescription(response.llmSetup),
+        t("ga4PropertySelected"),
+        ga4LLMSetupToastDescription(response.llmSetup, t),
       );
     } catch (err) {
-      showCaughtFormError(err, "Impossible de sélectionner cette propriété GA4.");
+      showCaughtFormError(err, t("selectGa4PropertyError"));
     } finally {
       setSaving(false);
     }
-  }, [apiBaseURL, query, result, selectedOAuthPropertyId, showCaughtFormError, showFormError]);
+  }, [apiBaseURL, query, result, selectedOAuthPropertyId, showCaughtFormError, showFormError, t]);
 
   const disconnect = useCallback(async () => {
     if (!result?.projectId || !result.organizationId) {
@@ -574,13 +591,13 @@ export function useTrafficReportPanelViewModel({
       setOAuthPropertiesLoadedForProject("");
       setLLMSetup(null);
       await query.refetch();
-      pushSuccessToast("Google Analytics déconnecté.");
+      pushSuccessToast(t("googleAnalyticsDisconnected"));
     } catch (err) {
-      showCaughtFormError(err, "Impossible de déconnecter GA4 pour ce projet.");
+      showCaughtFormError(err, t("disconnectGa4Error"));
     } finally {
       setSaving(false);
     }
-  }, [apiBaseURL, query, result, showCaughtFormError]);
+  }, [apiBaseURL, query, result, showCaughtFormError, t]);
 
   const exportTrafficData = useCallback(() => {
     if (!report) return;
@@ -607,7 +624,10 @@ export function useTrafficReportPanelViewModel({
     generatedAt: report?.generatedAt ?? "",
     loading: query.isLoading || (query.isFetching && !query.data),
     refreshing: query.isFetching,
-    error: result?.reportError ?? toTrafficErrorMessage(query.error),
+    error:
+      result?.reportError ??
+      toTrafficErrorMessage(query.error) ??
+      (query.error ? t("loadTrafficReportError") : null),
     formError,
     saving,
     form: {
@@ -629,7 +649,7 @@ export function useTrafficReportPanelViewModel({
     canExport: exportAccess.canExport,
     exportDisabled: !hasData || !report,
     exportTrafficData,
-    kpis: buildKpis(report),
+    kpis: buildKpis(report, t),
     filters: {
       search: trafficSearchDraft,
       engine: trafficEngine,

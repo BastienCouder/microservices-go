@@ -1,0 +1,21 @@
+{
+  "eyebrow": "Cas d'usage par segment",
+  "title": "Les IA B2B",
+  "subtitle": "filtrent déjà par rôle et taille d'entreprise.",
+  "description": "Si votre positionnement n'est pas clair pour chaque profil, vous disparaissez des recommandations. Visia aide à aligner vos signaux de marque, vos pages et vos messages avec les segments qui comptent.",
+  "cardLabel": "Profil",
+  "items": [
+    {
+      "title": "Pour les Head of Growth",
+      "description": "Identifiez comment les IA vous comparent sur l'acquisition, l'activation et la performance, puis corrigez les angles qui vous excluent des shortlists."
+    },
+    {
+      "title": "Pour les CMO de scale-ups",
+      "description": "Mesurez si votre marque ressort comme un choix crédible pour une équipe en phase d'acceleration, avec les bons signaux de catégorie, de maturité et de preuve."
+    },
+    {
+      "title": "Pour les éditeurs SaaS B2B",
+      "description": "Clarifiez votre proposition de valeur, vos cas d'usage et votre position sur le marché pour remonter dans les réponses IA face aux alternatives déjà bien comprises."
+    }
+  ]
+}

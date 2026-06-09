@@ -1,0 +1,22 @@
+{
+  "title": "Branchez vos sources.",
+  "subtitle": "En quelques minutes.",
+  "description": "Croisez visibilité IA, trafic, pipeline et revenus avec les outils déjà en place dans votre stack.",
+  "items": {
+    "ga4": {
+      "category": "analytics"
+    },
+    "hubspot": {
+      "category": "crm"
+    },
+    "stripe": {
+      "category": "revenus"
+    },
+    "webflow": {
+      "category": "cms"
+    },
+    "markdown": {
+      "category": "contenu"
+    }
+  }
+}

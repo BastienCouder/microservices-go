@@ -3,6 +3,8 @@ import type {
   MonitoringPrompt,
 } from "@/features/monitoring/_lib/shared/monitoring-data";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import i18n from "@/shared/i18n";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 import type {
   CitationSource,
@@ -14,6 +16,10 @@ import type {
   PagesOpportunity,
   PagesPanelModel,
 } from "./types";
+
+function currentLocale() {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
 
 type MutablePageInsight = {
   url: string;
@@ -42,6 +48,7 @@ type MutableModelLeader = PageModelBadge & {
 };
 
 export function buildPagesPanelViewModel(monitoring: MonitoringData): PagesPanelModel {
+  const locale = currentLocale();
   const projectHosts = inferProjectHosts(monitoring);
   const pages = buildPageInsights(monitoring, projectHosts);
   const metrics = buildPageMetrics(pages, monitoring, projectHosts);
@@ -51,7 +58,7 @@ export function buildPagesPanelViewModel(monitoring: MonitoringData): PagesPanel
     metrics,
     modelLeaders: buildModelLeaders(monitoring, projectHosts),
     citationSources: buildCitationSources(monitoring, projectHosts),
-    opportunities: buildPagesOpportunities(pages, metrics),
+    opportunities: buildPagesOpportunities(pages, metrics, locale),
   };
 }
 
@@ -159,8 +166,8 @@ function buildPageInsights(monitoring: MonitoringData, projectHosts: Set<string>
       }
       existing.samples.push({
         id: `${prompt.responseId || prompt.promptId}-${url}`,
-        prompt: prompt.text.trim() || "Prompt sans libelle",
-        response: prompt.response.trim() || "Réponse sans contenu",
+        prompt: prompt.text.trim() || translateI18nText("pages", "responseWithoutLabel", currentLocale()),
+        response: prompt.response.trim() || translateI18nText("pages", "responseWithoutContent", currentLocale()),
         promptId: prompt.promptId.trim(),
         responseId: prompt.responseId.trim(),
         model: modelBadge,
@@ -300,15 +307,15 @@ function buildCitationSources(
 function buildPagesOpportunities(
   pages: PageInsight[],
   metrics: PagesMetrics,
+  locale: string,
 ): PagesOpportunity[] {
   const opportunities: PagesOpportunity[] = [];
   const topPage = pages[0];
 
   if (metrics.pageCount > 0 && metrics.topThreeShare >= 70) {
     opportunities.push({
-      title: "Étendre la longue traîne",
-      description:
-        "Les citations se concentrent sur quelques URLs. Déclinez les angles gagnants en pages plus ciblées pour capter davantage de prompts.",
+      title: translateI18nText("pages", "extendLongTailTitle", locale),
+      description: translateI18nText("pages", "extendLongTailDescription", locale),
       metric: `${metrics.topThreeShare}% top 3`,
       tone: "primary",
     });
@@ -316,9 +323,8 @@ function buildPagesOpportunities(
 
   if (topPage && topPage.modelCount <= 1) {
     opportunities.push({
-      title: "Diversifier les LLMs",
-      description:
-        "La meilleure page est encore portée par peu de modèles. Retravaillez les signaux de preuve pour augmenter sa reprise multi-LLM.",
+      title: translateI18nText("pages", "diversifyLlmsTitle", locale),
+      description: translateI18nText("pages", "diversifyLlmsDescription", locale),
       metric: `${topPage.modelCount} LLM`,
       tone: "warning",
     });
@@ -326,10 +332,9 @@ function buildPagesOpportunities(
 
   if (metrics.citationSourceCount === 0) {
     opportunities.push({
-      title: "Créer des relais externes",
-      description:
-        "Aucun domaine tiers ne ressort encore. Les comparatifs, annuaires et partenaires peuvent renforcer la crédibilité reprise par les IA.",
-      metric: "0 source",
+      title: translateI18nText("pages", "createExternalRelayTitle", locale),
+      description: translateI18nText("pages", "createExternalRelayDescription", locale),
+      metric: translateI18nText("pages", "sourceMetric", locale, { count: 0 }),
       tone: "neutral",
     });
   }

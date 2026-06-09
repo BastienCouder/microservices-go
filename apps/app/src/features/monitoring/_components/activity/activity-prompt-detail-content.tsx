@@ -38,7 +38,7 @@ export function ActivityPromptDetailContent({
   const selectedPromptSentiment = getSentimentMeta(selectedPrompt.sentiment, content);
   const citationCount = selectedPrompt.citedUrls.length;
   const noDataLabel = content.noDataAvailable;
-  const rankLabel = selectedPrompt.rank ? `#${selectedPrompt.rank}` : "Non classé";
+  const rankLabel = selectedPrompt.rank ? `#${selectedPrompt.rank}` : content.rankUnranked;
 
   return (
     <div className={cn("flex h-full flex-col bg-white font-sans antialiased", mobile && "overflow-y-auto")}>
@@ -81,7 +81,7 @@ export function ActivityPromptDetailContent({
               className="min-w-0 rounded-full"
               onClick={() => onViewResponse(selectedPrompt)}
             >
-              <span className="truncate">Voir la réponse</span>
+              <span className="truncate">{content.viewResponse}</span>
             </Button>
             <Button
               type="button"

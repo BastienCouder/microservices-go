@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Account",
+  "pageBaseline": "First name, last name, and email of the connected account.",
+  "sessionTitle": "Session",
+  "noSession": "No user session is currently loaded.",
+  "profileTitle": "Profile",
+  "firstName": "First name",
+  "lastName": "Last name",
+  "email": "Email",
+  "save": "Save",
+  "profileUpdated": "Account updated.",
+  "updateProfileError": "Unable to update the account.",
+  "logout": "Log out",
+  "deleteAccount": "Delete account",
+  "deleteAccountTitle": "Delete your account?",
+  "deleteAccountDescription": "The account will be disabled and anonymized. Data useful for reporting will remain stored.",
+  "delete": "Delete",
+  "accountDeleted": "Account deleted.",
+  "deleteAccountError": "Unable to delete the account."
+}

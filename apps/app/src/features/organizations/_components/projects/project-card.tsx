@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import { buildScopedHref } from "@/shared/selection";
 import { formatLabel, memberLabel } from "../../_lib/shared/formatters";
@@ -80,6 +81,7 @@ export const ProjectCard = memo(function ProjectCard({
   onMemberDraftChange,
   onAssignProjectMember,
 }: ProjectCardProps) {
+  const { t } = useScopedI18n("organizations");
   const [membersOpen, setMembersOpen] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -120,7 +122,7 @@ export const ProjectCard = memo(function ProjectCard({
         <div className="mb-4 flex-1">
           <h3 className="truncate text-base font-semibold text-primary">{project.name}</h3>
           <p className="truncate text-sm text-muted-foreground">
-            {project.brandName || "Marque non renseignee"}
+            {project.brandName || t("brandNotProvided")}
           </p>
         </div>
       </div>
@@ -130,7 +132,7 @@ export const ProjectCard = memo(function ProjectCard({
           project: project.slug,
           projectId: project.id,
         })}>
-          Acceder au projet
+          {t("accessProject")}
         </Link>
       </Button>
 
@@ -142,12 +144,12 @@ export const ProjectCard = memo(function ProjectCard({
             className="mt-2 w-full justify-center gap-2 rounded-lg"
             onClick={() => setSettingsOpen(true)}
           >
-            Parametres projet
+            {t("projectSettings")}
           </Button>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Parametres projet</DialogTitle>
-              <DialogDescription>Modifiez le nom du projet.</DialogDescription>
+              <DialogTitle>{t("projectSettingsTitle")}</DialogTitle>
+              <DialogDescription>{t("projectSettingsDescription")}</DialogDescription>
             </DialogHeader>
             <form
               className="grid gap-4"
@@ -161,7 +163,7 @@ export const ProjectCard = memo(function ProjectCard({
               }}
             >
               <div className="grid gap-2">
-                <Label htmlFor={`project-name-${project.id}`}>Nom</Label>
+                <Label htmlFor={`project-name-${project.id}`}>{t("name")}</Label>
                 <Input
                   id={`project-name-${project.id}`}
                   value={settingsName}
@@ -180,12 +182,12 @@ export const ProjectCard = memo(function ProjectCard({
                         className="sm:mr-auto"
                       >
                         <Trash2 data-icon="inline-start" />
-                        Supprimer
+                        {t("delete")}
                       </Button>
                     }
-                    title="Supprimer ce projet ?"
-                    description="Cette action supprimera le projet et ses donnees associees."
-                    confirmLabel="Supprimer"
+                    title={t("deleteProjectTitle")}
+                    description={t("deleteProjectDescription")}
+                    confirmLabel={t("delete")}
                     loading={deleteProjectBusy}
                     media={<Trash2 />}
                     onConfirm={() => {
@@ -196,11 +198,11 @@ export const ProjectCard = memo(function ProjectCard({
                 ) : null}
                 <DialogClose asChild>
                   <Button type="button" variant="outline" disabled={updateProjectBusy}>
-                    Annuler
+                    {t("cancel")}
                   </Button>
                 </DialogClose>
                 <Button type="submit" disabled={updateProjectBusy || !canSaveSettings}>
-                  Enregistrer
+                  {t("save")}
                 </Button>
               </DialogFooter>
             </form>
@@ -223,33 +225,31 @@ export const ProjectCard = memo(function ProjectCard({
             onClick={() => setMembersOpen(true)}
           >
             <Users data-icon="inline-start" />
-            Gerer les membres
+            {t("manageMembers")}
             <Badge variant="secondary" className="h-5 px-1.5 text-[10px] font-mono">
               {assignedMembers.length}
             </Badge>
           </Button>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Membres de {project.name}</DialogTitle>
-              <DialogDescription>
-                Ajoutez ou retirez les acces specifiques a ce projet.
-              </DialogDescription>
+              <DialogTitle>{t("projectMembersTitle", { projectName: project.name })}</DialogTitle>
+              <DialogDescription>{t("projectMembersDescription")}</DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-5">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary">{assignedMembers.length} rattaches</Badge>
-                <Badge variant="outline">{availableMembers.length} disponibles</Badge>
+                <Badge variant="secondary">{t("attachedCount", { count: assignedMembers.length })}</Badge>
+                <Badge variant="outline">{t("availableCount", { count: availableMembers.length })}</Badge>
               </div>
 
               <div className="grid gap-2">
                 <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-medium text-foreground">Membres rattaches</p>
+                  <p className="text-sm font-medium text-foreground">{t("attachedMembers")}</p>
                 </div>
                 <div className="max-h-64 overflow-y-auto rounded-lg border border-border/70">
                   {assignedMembers.length === 0 ? (
                     <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                      Aucun acces specifique
+                      {t("noSpecificAccess")}
                     </div>
                   ) : (
                     assignedMembers.map((member) => {
@@ -262,10 +262,10 @@ export const ProjectCard = memo(function ProjectCard({
                         (member.userId === currentUserId && currentUserProjectCount <= 1);
                       const removeTitle =
                         assignedMembers.length <= 1
-                          ? "Impossible de laisser ce projet sans utilisateur."
+                          ? t("cannotOrphanProject")
                           : member.userId === currentUserId && currentUserProjectCount <= 1
-                            ? "Votre compte doit rester rattache a au moins un projet."
-                            : "Retirer ce membre";
+                            ? t("currentUserMustKeepProject")
+                            : t("removeMemberFromProject");
 
                       return (
                         <div
@@ -279,13 +279,13 @@ export const ProjectCard = memo(function ProjectCard({
                               </span>
                               {member.userId === currentUserId ? (
                                 <Badge variant="secondary" className="h-5">
-                                  Vous
+                                  {t("you")}
                                 </Badge>
                               ) : null}
                             </div>
                             <div className="flex min-w-0 flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                              <span className="truncate">{displayEmail || "Email non renseigne"}</span>
-                              <span>Role projet: {member.role || "viewer"}</span>
+                              <span className="truncate">{displayEmail || t("emailNotProvided")}</span>
+                              <span>{t("projectRole", { role: member.role || "viewer" })}</span>
                             </div>
                           </div>
 
@@ -315,7 +315,7 @@ export const ProjectCard = memo(function ProjectCard({
                     <Input
                       value={memberSearch}
                       onChange={(event) => setMemberSearch(event.target.value)}
-                      placeholder="Filtrer"
+                      placeholder={t("filter")}
                       className="h-9 pl-9"
                     />
                   </div>
@@ -328,7 +328,7 @@ export const ProjectCard = memo(function ProjectCard({
                     disabled={filteredAvailableMembers.length === 0}
                   >
                     <SelectTrigger className="h-9 rounded-lg bg-background text-xs">
-                      <SelectValue placeholder="Ajouter un membre..." />
+                      <SelectValue placeholder={t("addMemberPlaceholder")} />
                     </SelectTrigger>
 
                     <SelectContent>
@@ -337,7 +337,7 @@ export const ProjectCard = memo(function ProjectCard({
                           <span className="flex min-w-0 flex-col">
                             <span className="truncate font-medium">{memberLabel(member)}</span>
                             <span className="truncate text-muted-foreground">
-                              {member.email || "Email non renseigne"}
+                              {member.email || t("emailNotProvided")}
                             </span>
                           </span>
                         </SelectItem>
@@ -370,12 +370,12 @@ export const ProjectCard = memo(function ProjectCard({
                     disabled={memberBusy || !memberDraft.userId}
                   >
                     <UserPlus className="size-3.5" />
-                    Ajouter
+                    {t("add")}
                   </Button>
                 </div>
                 {availableMembers.length === 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Tous les membres disponibles sont deja rattaches a ce projet.
+                    {t("allMembersAlreadyAttached")}
                   </p>
                 ) : null}
               </div>

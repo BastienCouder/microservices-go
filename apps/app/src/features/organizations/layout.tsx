@@ -12,6 +12,7 @@ import { LoadingState } from "./_components/shared/template";
 import { EmptyBlock } from "./_components/shared/empty-block";
 import { OrganizationSummaryPanel } from "./_components/summary";
 import type { OrganizationsPageViewModel } from "./_lib/page/use-organizations-page-view-model";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 export function OrganizationsLayout({
   activeTab,
@@ -62,6 +63,8 @@ export function OrganizationsLayout({
   onClearCreatedAPIKey,
   onRefetchOrganizations,
 }: OrganizationsPageViewModel) {
+  const { t } = useScopedI18n("organizations");
+
   useEffect(() => {
     if (actionError) {
       pushErrorToast(new Error(actionError), actionError);
@@ -77,8 +80,8 @@ export function OrganizationsLayout({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
-        title="Organisations"
-        baseline="Projets, membres et invitations de l'organisation active."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="hidden md:block"
       />
@@ -167,12 +170,12 @@ export function OrganizationsLayout({
         </div>
       ) : (
         <EmptyBlock
-          title="Aucune organisation"
-          description="Aucune organisation n'est disponible pour ce compte."
+          title={t("emptyOrganizationTitle")}
+          description={t("emptyOrganizationDescription")}
           action={
             <Button variant="outline" onClick={onRefetchOrganizations}>
               <RefreshCw data-icon="inline-start" />
-              Recharger
+              {t("reload")}
             </Button>
           }
         />

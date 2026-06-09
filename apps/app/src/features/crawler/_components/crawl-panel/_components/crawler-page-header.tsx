@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 type CreditConfirmation = {
@@ -37,6 +38,17 @@ type CrawlerPageHeaderProps = {
     analyzeRunningLabel?: string;
     reviewAnalyzedPagesLabel?: string;
     reviewAnalyzedPagesRunningLabel?: string;
+    analyzeConfirmTitle?: string;
+    discoverConfirmTitle?: string;
+    reviewConfirmTitle?: string;
+    confirmLoadingLabel?: string;
+    cancelLabel?: string;
+    discoverAriaLabel?: string;
+    newSelectionAriaLabel?: string;
+    creditQuotaCurrentPlanFallback?: string;
+    creditQuotaLoadingLabel?: string;
+    creditQuotaCheckingLabel?: string;
+    creditConsumptionTemplate?: string;
   };
 };
 
@@ -44,21 +56,26 @@ function creditDialogDescription(
   actionLabel: string,
   credits: number,
   creditConfirmation: CreditConfirmation,
+  copy?: CrawlerPageHeaderProps["copy"],
 ) {
   const quotaLabel =
     creditConfirmation.hasQuota && creditConfirmation.monthlyCredits > 0
-      ? `Solde actuel: ${creditConfirmation.remainingCredits}/${creditConfirmation.monthlyCredits} crédits restants sur le plan ${creditConfirmation.planLabel || "actuel"}.`
+      ? `Current balance: ${creditConfirmation.remainingCredits}/${creditConfirmation.monthlyCredits} credits remaining on the ${creditConfirmation.planLabel || copy?.creditQuotaCurrentPlanFallback || "current"} plan.`
       : creditConfirmation.isLoading
-        ? "Chargement du quota de crédits de l'organisation."
-        : "Le quota de crédits de l'organisation sera vérifié avant l'exécution.";
+        ? copy?.creditQuotaLoadingLabel || "Loading the organization credit quota."
+        : copy?.creditQuotaCheckingLabel || "The organization credit quota will be checked before execution.";
 
-  return `${actionLabel} consommera environ ${credits} crédits. ${quotaLabel}`;
+  return (
+    copy?.creditConsumptionTemplate?.replace("{{actionLabel}}", actionLabel).replace("{{credits}}", String(credits)).replace("{{quotaLabel}}", quotaLabel) ||
+    `${actionLabel} will consume about ${credits} credits. ${quotaLabel}`
+  );
 }
 
 function CreditConfirmDialog({
   actionLabel,
   children,
   confirmLabel,
+  copy,
   credits,
   creditConfirmation,
   disabled,
@@ -75,13 +92,14 @@ function CreditConfirmDialog({
   loading: boolean;
   onConfirm: () => void;
   title: string;
+  copy?: CrawlerPageHeaderProps["copy"];
 }) {
   return (
     <ConfirmDialog
       title={title}
-      description={creditDialogDescription(actionLabel, credits, creditConfirmation)}
-      confirmLabel={loading ? "Traitement..." : confirmLabel}
-      cancelLabel="Annuler"
+      description={creditDialogDescription(actionLabel, credits, creditConfirmation, copy)}
+      confirmLabel={loading ? copy?.confirmLoadingLabel || "Processing..." : confirmLabel}
+      cancelLabel={copy?.cancelLabel || "Cancel"}
       confirmVariant="default"
       confirmDisabled={disabled}
       loading={loading}
@@ -106,20 +124,46 @@ export function CrawlerPageHeader({
   creditConfirmation,
   copy,
 }: CrawlerPageHeaderProps) {
+  const { t } = useScopedI18n("crawler-panel");
   const labels = {
-    title: copy?.title ?? "Audit du site",
+    title: copy?.title ?? t("siteAuditTitle"),
     baseline:
       copy?.baseline ??
-      "Workflow: 1. découvrir les URLs avec Cloudflare, 2. choisir les pages, 3. analyser le contenu sélectionné.",
-    discoverInitial: copy?.discoverInitialLabel ?? "Découvrir les URLs",
-    discoverRunning: copy?.discoverRunningLabel ?? "Découverte en cours",
-    analyzeSelection: copy?.analyzeSelectionLabel ?? "Analyser la sélection",
-    analyzeRunning: copy?.analyzeRunningLabel ?? "Analyse en cours",
+      t("siteAuditBaseline"),
+    discoverInitial: copy?.discoverInitialLabel ?? t("discoverUrls"),
+    discoverRunning: copy?.discoverRunningLabel ?? t("discoveringInProgress"),
+    analyzeSelection: copy?.analyzeSelectionLabel ?? t("analyzeSelection"),
+    analyzeRunning: copy?.analyzeRunningLabel ?? t("analysisInProgress"),
     reviewAnalyzedPages:
-      copy?.reviewAnalyzedPagesLabel ?? "Nouvelle sélection",
+      copy?.reviewAnalyzedPagesLabel ?? t("newSelection"),
     reviewAnalyzedPagesRunning:
-      copy?.reviewAnalyzedPagesRunningLabel ?? "Découverte en cours",
+      copy?.reviewAnalyzedPagesRunningLabel ?? t("discoveringInProgress"),
   };
+  const localizedCopy = {
+    ...copy,
+    analyzeConfirmTitle:
+      copy?.analyzeConfirmTitle ?? t("confirmContentAnalysisTitle"),
+    discoverConfirmTitle:
+      copy?.discoverConfirmTitle ?? t("confirmPageDiscoveryTitle"),
+    reviewConfirmTitle:
+      copy?.reviewConfirmTitle ?? t("confirmPageDiscoveryTitle"),
+    confirmLoadingLabel:
+      copy?.confirmLoadingLabel ?? t("processing"),
+    cancelLabel: copy?.cancelLabel ?? t("cancel"),
+    discoverAriaLabel:
+      copy?.discoverAriaLabel ?? t("discoverSiteUrlsAriaLabel"),
+    newSelectionAriaLabel:
+      copy?.newSelectionAriaLabel ?? t("newPageSelectionAriaLabel"),
+    creditQuotaCurrentPlanFallback:
+      copy?.creditQuotaCurrentPlanFallback ?? t("creditQuotaCurrentPlanFallback"),
+    creditQuotaLoadingLabel:
+      copy?.creditQuotaLoadingLabel ?? t("creditQuotaLoadingLabel"),
+    creditQuotaCheckingLabel:
+      copy?.creditQuotaCheckingLabel ?? t("creditQuotaCheckingLabel"),
+    creditConsumptionTemplate:
+      copy?.creditConsumptionTemplate ?? t("creditConsumptionTemplate"),
+  };
+
   return (
     <PageHeader
       title={labels.title}
@@ -135,7 +179,8 @@ export function CrawlerPageHeader({
               disabled={!canCrawlSelected || reanalyzing}
               loading={reanalyzing}
               onConfirm={onCrawlSelected}
-              title="Confirmer l'analyse de contenu"
+              title={localizedCopy.analyzeConfirmTitle}
+              copy={localizedCopy}
             >
               <Button
                 type="button"
@@ -156,12 +201,13 @@ export function CrawlerPageHeader({
               disabled={loadingLatest || reanalyzing}
               loading={reanalyzing}
               onConfirm={onReviewSelection}
-              title="Confirmer la découverte des pages"
+              title={localizedCopy.reviewConfirmTitle}
+              copy={localizedCopy}
             >
               <Button
                 type="button"
                 disabled={loadingLatest || reanalyzing}
-                aria-label="Nouvelle sélection de pages"
+                aria-label={localizedCopy.newSelectionAriaLabel}
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
@@ -180,16 +226,17 @@ export function CrawlerPageHeader({
               disabled={!canReanalyze || loadingLatest}
               loading={reanalyzing}
               onConfirm={onAnalyzeSite}
-              title="Confirmer la découverte des pages"
+              title={localizedCopy.discoverConfirmTitle}
+              copy={localizedCopy}
             >
               <Button
                 type="button"
                 disabled={!canReanalyze || loadingLatest}
-                aria-label="Découvrir les URLs du site"
+                aria-label={localizedCopy.discoverAriaLabel}
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
-                />
+              />
                 {reanalyzing ? labels.discoverRunning : labels.discoverInitial}
               </Button>
             </CreditConfirmDialog>

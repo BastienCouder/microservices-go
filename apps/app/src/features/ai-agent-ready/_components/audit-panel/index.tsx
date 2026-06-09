@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/shared/page-header";
 import { SectionTitle } from "@/components/shared/section-title";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { useAgentReadyAuditViewModel } from "../../_lib/audit/use-agent-ready-audit-view-model";
 import type { AuditCheckResult } from "../../_lib/shared/types";
@@ -18,6 +19,7 @@ type AgentReadyAuditPanelProps = {
 };
 
 export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAuditPanelProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const viewModel = useAgentReadyAuditViewModel({ apiBaseURL, routeSearch });
   const [openCheckIDs, setOpenCheckIDs] = useState<string[]>([]);
 
@@ -71,8 +73,8 @@ export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAudi
   return (
     <main className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
       <PageHeader
-        title="AI Agent Ready"
-        baseline="Audit minimal du site public pour les agents."
+        title={t("title")}
+        baseline={t("pageBaseline")}
         className="gap-3 md:gap-4"
       />
 
@@ -80,7 +82,7 @@ export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAudi
         {scanCard}
 
         <div aria-live="polite" className="sr-only">
-          {viewModel.isScanning ? "Scan in progress" : "Scan idle"}
+          {viewModel.isScanning ? t("scanInProgress") : t("scanIdle")}
         </div>
 
         {viewModel.error ? (
@@ -105,6 +107,7 @@ export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAudi
 }
 
 function LoadingState() {
+  const { t } = useScopedI18n("ai-agent-ready");
   return (
     <Card className="border-border/60">
       <CardContent className="pt-4">
@@ -113,10 +116,9 @@ function LoadingState() {
             <FlaskConical className="size-5 animate-pulse" aria-hidden="true" />
           </div>
           <div>
-            <h2 className="text-base font-semibold text-foreground">Audit en cours</h2>
+            <h2 className="text-base font-semibold text-foreground">{t("loadingTitle")}</h2>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              Vérification des headers, de `robots.txt`, du sitemap et de la négociation
-              Markdown.
+              {t("loadingDescription")}
             </p>
           </div>
         </div>
@@ -137,13 +139,14 @@ function ActionableChecksCard({
   openCheckIDs: string[];
   onToggleCheck: (checkID: string) => void;
 }) {
+  const { t } = useScopedI18n("ai-agent-ready");
   if (checks.length === 0) {
     return (
       <Card className="border-border/60">
         <CardContent className="py-6">
-          <div className="text-sm font-medium text-foreground">Rien de prioritaire à corriger.</div>
+          <div className="text-sm font-medium text-foreground">{t("nothingPriorityTitle")}</div>
           <p className="mt-2 text-sm leading-6 text-muted-foreground">
-            Les contrôles lancés n&apos;ont pas révélé de point bloquant ou d&apos;alerte majeure.
+            {t("nothingPriorityDescription")}
           </p>
         </CardContent>
       </Card>
@@ -154,11 +157,9 @@ function ActionableChecksCard({
     <Card className="border-border/60">
       <CardHeader>
         <CardTitle className="text-base">
-          <SectionTitle showIndicator={false}>Actions prioritaires</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("priorityActionsTitle")}</SectionTitle>
         </CardTitle>
-        <CardDescription>
-          Seulement les points qui demandent une correction ou une vérification.
-        </CardDescription>
+        <CardDescription>{t("priorityActionsDescription")}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {checks.map((check) => (

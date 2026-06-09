@@ -1,0 +1,25 @@
+{
+  "headline": {
+    "title": "A simple loop.",
+    "subtitle": "An actionable signal."
+  },
+  "status": "Analysis synced",
+  "steps": [
+    {
+      "title": "Connect your brand",
+      "description": "Add your site, key pages and competitors to define the comparison space."
+    },
+    {
+      "title": "Run your scenarios",
+      "description": "Test the real questions your buyers already ask in ChatGPT, Perplexity, Claude, Gemini and more."
+    },
+    {
+      "title": "Get the diagnosis",
+      "description": "See who gets cited, which narratives surface and what content angles are missing for your brand."
+    },
+    {
+      "title": "Fix and monitor",
+      "description": "Apply recommendations, rerun the tests and measure whether your brand is gaining presence."
+    }
+  ]
+}

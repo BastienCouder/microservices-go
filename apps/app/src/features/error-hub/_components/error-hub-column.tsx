@@ -3,6 +3,7 @@ import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {
   PerceptionTopErrorCard,
@@ -51,6 +52,8 @@ export function ErrorHubColumn({
   tone,
   totalColumns,
 }: ErrorHubColumnProps) {
+  const { t } = useScopedI18n("error-hub");
+
   return (
     <section
       className="relative flex min-h-[420px] flex-col rounded-xl bg-muted/20 p-2 lg:min-h-0"
@@ -100,7 +103,7 @@ export function ErrorHubColumn({
           ))
         ) : (
           <EmptyStateCard
-            label={emptyLabel || "Aucune erreur à afficher dans cette colonne pour les filtres sélectionnés."}
+            label={emptyLabel || t("emptyColumn")}
             className="h-24 bg-background/60"
           />
         )}

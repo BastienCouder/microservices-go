@@ -1,14 +1,18 @@
 import type { ReactNode } from "react";
 import { Building2, Globe, ListChecks, Radar, Sparkles } from "lucide-react";
 import { useOnboarding } from "@/hooks/use-onboarding";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
+
+const locale = i18n.resolvedLanguage || i18n.language || "fr";
 
 const STEP_LABELS = [
-  "Website",
-  "Brand profile",
-  "Competitors",
-  "Prompts",
-  "Models",
-  "Analysis",
+  translateI18nText("onboarding", "stepWebsite", locale),
+  translateI18nText("onboarding", "stepBrandProfile", locale),
+  translateI18nText("onboarding", "stepCompetitors", locale),
+  translateI18nText("onboarding", "stepPrompts", locale),
+  translateI18nText("onboarding", "stepModels", locale),
+  translateI18nText("onboarding", "stepAnalysis", locale),
 ] as const;
 
 export function OnboardingLeftPanel() {

@@ -28,6 +28,7 @@ import {
 import { startPromptAnalyses } from "./prompt-run";
 import type { PromptQuotaUsageData } from "./prompt-quota";
 import { promptScheduleLabel } from "./utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type {
   AIModel,
   PromptItem,
@@ -77,6 +78,7 @@ type UsePromptsMutationsParams = {
 };
 
 export function usePromptsMutations(params: UsePromptsMutationsParams) {
+  const { t } = useScopedI18n("prompts-workspace");
   const getModelCreditCost = (modelId: string) => {
     const normalized = modelId.trim();
     const cost =
@@ -113,10 +115,14 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
   const pushInsufficientCreditsToast = (credits: number) => {
     const quota = params.quotaUsage;
     pushWarningToast(
-      "Crédits insuffisants",
+      t("insufficientCreditsTitle"),
       quota?.hasQuota && quota.monthlyCredits > 0
-        ? `Cette analyse coûte ${credits} crédits. Il reste ${quota.remainingCredits}/${quota.monthlyCredits} crédits sur votre quota mensuel.`
-        : `Cette analyse coûte ${credits} crédits.`,
+        ? t("insufficientCreditsQuotaDescription", {
+            credits,
+            remaining: quota.remainingCredits,
+            total: quota.monthlyCredits,
+          })
+        : t("insufficientCreditsDescription", { credits }),
     );
   };
 
@@ -145,7 +151,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         },
       );
 
-      requireGatewayResult(response, "Impossible de mettre a jour le statut des prompts.");
+      requireGatewayResult(response, t("updatePromptStatusError"));
 
       return { promptIds, status };
     },
@@ -183,7 +189,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
     }: SavePromptEditorInput) => {
       const trimmedText = text.trim();
       if (!trimmedText) {
-        throw new Error("Le prompt ne peut pas etre vide.");
+        throw new Error(t("emptyPromptError"));
       }
 
       const resolvedModels = dedupeModels(modelIds).filter((model) =>
@@ -240,7 +246,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       }
 
       if (!promptId) {
-        throw new Error("Prompt introuvable.");
+        throw new Error(t("promptNotFoundError"));
       }
 
       if (manualPromptIds.has(promptId)) {
@@ -264,7 +270,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       }
 
       if (!params.organizationId || !params.activeProjectId) {
-        throw new Error("Impossible d'enregistrer le prompt.");
+        throw new Error(t("savePromptError"));
       }
 
       await patchPrompt(params.apiBaseURL, params.organizationId, promptId, {
@@ -297,7 +303,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       const requestedCredits = estimatePromptRunsCredits(promptsToRun);
       if (!hasEnoughCreditsFor(requestedCredits)) {
         pushInsufficientCreditsToast(requestedCredits);
-        throw new Error("Crédits insuffisants pour lancer cette analyse.");
+        throw new Error(t("runPromptInsufficientCreditsError"));
       }
       await startPromptAnalyses({
         apiBaseURL: params.apiBaseURL,
@@ -357,7 +363,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
   const generatePromptsMutation = useMutation({
     mutationFn: async () => {
       if (!params.organizationId || !params.activeProjectId) {
-        throw new Error("Impossible de generer les prompts.");
+        throw new Error(t("generatePromptsError"));
       }
 
       return generateProjectPrompts(
@@ -375,12 +381,12 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         params.refreshMonitoringData(),
       ]);
       pushSuccessToast(
-        "Prompts generes",
-        `${generatedPrompts.length} prompts utilisateur ont ete crees.`,
+        t("generatedPromptsTitle"),
+        t("generatedPromptsDescription", { count: generatedPrompts.length }),
       );
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de generer les prompts.");
+      pushErrorToast(error, t("generatePromptsError"));
     },
   });
 

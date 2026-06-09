@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { OrganizationAPIKey } from "../../_lib/shared/types";
 
 type ApiKeysPanelProps = {
@@ -38,6 +39,7 @@ export function ApiKeysPanel({
   onRevokeAPIKey,
   onClearCreatedAPIKey,
 }: ApiKeysPanelProps) {
+  const { t } = useScopedI18n("organizations");
   const [name, setName] = useState("");
   const canCreate = name.trim() !== "";
   const visibleAPIKeys =
@@ -49,11 +51,11 @@ export function ApiKeysPanel({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle showIndicator={false}>API keys</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("apiKeysTitle")}</SectionTitle>
         </div>
         <div className="divide-y divide-border/60">
           {visibleAPIKeys.length === 0 ? (
-            <div className="p-4 text-sm text-muted-foreground">Aucune API key active.</div>
+            <div className="p-4 text-sm text-muted-foreground">{t("noActiveApiKey")}</div>
           ) : (
             visibleAPIKeys.map((apiKey) => {
               const oneTimeSecret = createdAPIKey?.id === apiKey.id ? createdAPIKey.key : "";
@@ -67,19 +69,19 @@ export function ApiKeysPanel({
                         <Badge variant="outline">{apiKey.prefix}...</Badge>
                       </div>
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Creee le {formatDateTime(apiKey.createdAt)}
+                        {t("createdAt", { date: formatDateTime(apiKey.createdAt) })}
                       </p>
                     </div>
                     <ConfirmDialog
                       trigger={
                         <Button type="button" variant="destructive" size="sm" disabled={revokeBusy}>
                           <Trash2 data-icon="inline-start" />
-                          Supprimer
+                          {t("delete")}
                         </Button>
                       }
-                      title="Supprimer cette API key ?"
-                      description="Cette action est definitive. Les integrations qui utilisent cette key ne pourront plus appeler l'API."
-                      confirmLabel="Supprimer"
+                      title={t("deleteApiKeyTitle")}
+                      description={t("deleteApiKeyDescription")}
+                      confirmLabel={t("delete")}
                       loading={revokeBusy}
                       media={<Trash2 />}
                       onConfirm={() => onRevokeAPIKey(apiKey.id)}
@@ -90,14 +92,14 @@ export function ApiKeysPanel({
                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 text-sm font-semibold">
-                          Key generee
+                          {t("generatedKey")}
                         </div>
                         <Button
                           type="button"
                           variant="ghost"
                           size="icon-sm"
                           onClick={onClearCreatedAPIKey}
-                          aria-label="Masquer l'API key"
+                          aria-label={t("hideApiKey")}
                         >
                           <X />
                         </Button>
@@ -110,7 +112,7 @@ export function ApiKeysPanel({
                           onClick={() => void navigator.clipboard?.writeText(oneTimeSecret)}
                         >
                           <Copy data-icon="inline-start" />
-                          Copier
+                          {t("copy")}
                         </Button>
                       </div>
                     </div>
@@ -124,7 +126,7 @@ export function ApiKeysPanel({
 
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle showIndicator={false}>Nouvelle key</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("newKeyTitle")}</SectionTitle>
         </div>
         <form
           className="grid gap-4 p-4"
@@ -136,18 +138,18 @@ export function ApiKeysPanel({
           }}
         >
           <div className="grid gap-2">
-            <Label htmlFor="api-key-name">Nom</Label>
+            <Label htmlFor="api-key-name">{t("keyName")}</Label>
             <Input
               id="api-key-name"
               value={name}
               disabled={createBusy}
-              placeholder="Production"
+              placeholder={t("production")}
               onChange={(event) => setName(event.target.value)}
             />
           </div>
           <Button type="submit" disabled={createBusy || !canCreate}>
             <Plus data-icon="inline-start" />
-            Creer
+            {t("create")}
           </Button>
         </form>
       </section>

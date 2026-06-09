@@ -1,0 +1,13 @@
+{
+  "confirmMessage": "Confirm the invitation to join the project.",
+  "notFound": "Invitation not found.",
+  "acceptError": "Unable to accept this invitation.",
+  "accepting": "Accepting invitation...",
+  "accepted": "Invitation accepted. The project is now available.",
+  "dialogTitle": "Project invitation",
+  "dialogDescription": "You have been invited. By confirming, your account will be added to the project linked to this invitation.",
+  "continue": "Continue",
+  "cancel": "Cancel",
+  "retry": "Retry",
+  "confirm": "Confirm"
+}

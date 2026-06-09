@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
+import { useScopedI18n } from "@/shared/hooks/use-i18n"
 import { cn } from "@/shared/utils"
 import { Button } from "@/components/ui/button"
 import { XIcon } from "lucide-react"
@@ -52,6 +53,8 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const { t } = useScopedI18n("shared-ui")
+
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -67,7 +70,7 @@ function SheetContent({
             <Button variant="default" className="z-[9999] border-2 border-background absolute top-3 right-3" size="icon-sm">
               <XIcon
               />
-              <span className="sr-only">Close</span>
+              <span className="sr-only">{t("close")}</span>
             </Button>
           </SheetPrimitive.Close>
         )}

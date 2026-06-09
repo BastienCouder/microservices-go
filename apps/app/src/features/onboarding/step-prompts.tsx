@@ -14,7 +14,7 @@ type StepPromptsProps = {
   nextLabel?: string;
 };
 
-export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPromptsProps) {
+export function StepPrompts({ hideBack = false, nextLabel }: StepPromptsProps) {
   const {
     brandName,
     competitors,
@@ -146,7 +146,7 @@ export function StepPrompts({ hideBack = false, nextLabel = "Next" }: StepPrompt
           onBack={prevStep}
           onNext={nextStep}
           // nextDisabled={selectedPrompts.length < 1}
-          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+          nextLabel={nextLabel}
         />
       }
     >

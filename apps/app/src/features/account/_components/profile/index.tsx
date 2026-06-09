@@ -5,6 +5,7 @@ import { SectionTitle } from "@/components/shared/section-title";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { AccountProfileViewData } from "../../_lib/profile/account-profile-view-data";
 import type { AccountProfileUpdateInput } from "../../_lib/profile/use-account-profile-view-model";
 
@@ -33,6 +34,7 @@ export function AccountProfilePanel({
   onDeleteAccount,
   onUpdateProfile,
 }: AccountProfilePanelProps) {
+  const { t } = useScopedI18n("account");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
 
@@ -54,9 +56,9 @@ export function AccountProfilePanel({
   if (!profile) {
     return (
       <section className="rounded-lg border border-border/60 bg-card p-4">
-        <SectionTitle>Session</SectionTitle>
+        <SectionTitle>{t("sessionTitle")}</SectionTitle>
         <p className="mt-2 text-sm text-muted-foreground">
-          Aucune session utilisateur n'est chargee pour le moment.
+          {t("noSession")}
         </p>
       </section>
     );
@@ -66,7 +68,7 @@ export function AccountProfilePanel({
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle showIndicator={false}>Profil</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("profileTitle")}</SectionTitle>
         </div>
         <form
           className="grid gap-5 p-4"
@@ -90,7 +92,7 @@ export function AccountProfilePanel({
 
           <div className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2">
-              <Label htmlFor="account-first-name">Prenom</Label>
+              <Label htmlFor="account-first-name">{t("firstName")}</Label>
               <Input
                 id="account-first-name"
                 value={firstName}
@@ -99,7 +101,7 @@ export function AccountProfilePanel({
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="account-last-name">Nom</Label>
+              <Label htmlFor="account-last-name">{t("lastName")}</Label>
               <Input
                 id="account-last-name"
                 value={lastName}
@@ -108,7 +110,7 @@ export function AccountProfilePanel({
               />
             </div>
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="account-email">Email</Label>
+              <Label htmlFor="account-email">{t("email")}</Label>
               <Input
                 id="account-email"
                 disabled
@@ -121,7 +123,7 @@ export function AccountProfilePanel({
           <div className="flex justify-end">
             <Button type="submit" disabled={busy || !canSave}>
               <Save data-icon="inline-start" />
-              Enregistrer
+              {t("save")}
             </Button>
           </div>
         </form>
@@ -129,7 +131,7 @@ export function AccountProfilePanel({
 
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle showIndicator={false}>Session</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("sessionTitle")}</SectionTitle>
         </div>
         <div className="grid gap-3 p-4">
           <Button
@@ -140,18 +142,18 @@ export function AccountProfilePanel({
             onClick={() => void onLogout?.()}
           >
             <LogOut data-icon="inline-start" />
-            Deconnexion
+            {t("logout")}
           </Button>
           <ConfirmDialog
             trigger={
               <Button type="button" variant="destructive" className="w-full justify-center" disabled={busy}>
                 <Trash2 data-icon="inline-start" />
-                Supprimer le compte
+                {t("deleteAccount")}
               </Button>
             }
-            title="Supprimer votre compte ?"
-            description="Le compte sera desactive et anonymise. Les donnees utiles aux rapports restent conservees."
-            confirmLabel="Supprimer"
+            title={t("deleteAccountTitle")}
+            description={t("deleteAccountDescription")}
+            confirmLabel={t("delete")}
             loading={busy}
             media={<Trash2 />}
             onConfirm={() => onDeleteAccount()}

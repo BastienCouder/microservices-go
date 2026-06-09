@@ -33,14 +33,13 @@ describe("crawl panel", () => {
   test("moves filter controls into the results view component", () => {
     expect(source.includes("<CrawlerResultsView")).toBe(true);
     expect(resultsViewSource.includes("PeriodFilterPicker")).toBe(true);
-    expect(resultsViewSource.includes("STATUS_FILTER_OPTIONS")).toBe(true);
-    expect(resultsViewSource.includes("SEVERITY_FILTER_OPTIONS")).toBe(true);
-    expect(resultsViewSource.includes('label="Statut"')).toBe(true);
-    expect(resultsViewSource.includes('label="Sévérité"')).toBe(true);
-    expect(resultsViewSource.includes("Diagnostic GEO")).toBe(true);
-    expect(resultsViewSource.includes("Opportunités d'amélioration")).toBe(true);
-    expect(resultsViewSource.includes("Aucune opportunité prioritaire")).toBe(true);
-    expect(resultsViewSource.includes("issueSourceLabel")).toBe(true);
+    expect(resultsViewSource.includes('useScopedI18n("crawler-panel")')).toBe(true);
+    expect(resultsViewSource.includes("statusDisplayLabel")).toBe(true);
+    expect(resultsViewSource.includes("severityDisplayLabel")).toBe(true);
+    expect(resultsViewSource.includes('t("geoDiagnosis")')).toBe(true);
+    expect(resultsViewSource.includes('t("improvementsTitle")')).toBe(true);
+    expect(resultsViewSource.includes('t("noPriorityOpportunity")')).toBe(true);
+    expect(resultsViewSource.includes("issueSourceDisplayLabel")).toBe(true);
     expect(resultsViewSource.includes("SelectTrigger")).toBe(false);
   });
 
@@ -50,9 +49,8 @@ describe("crawl panel", () => {
     ).toBe(true);
     expect(source.includes("function handleAnalyzeSiteClick()")).toBe(true);
     expect(source.includes("<InitialSetupCard")).toBe(true);
-    expect(initialSetupSource.includes("Découvrir les URLs du site")).toBe(
-      true,
-    );
+    expect(initialSetupSource.includes('useScopedI18n("crawler-panel")')).toBe(true);
+    expect(initialSetupSource.includes('t("discoverSiteTitle")')).toBe(true);
     expect(initialSetupSource.includes('placeholder="https://example.com"')).toBe(
       true,
     );
@@ -63,21 +61,20 @@ describe("crawl panel", () => {
   test("separates header actions without a scoped reanalysis dialog", () => {
     expect(source.includes("<CrawlerPageHeader")).toBe(true);
     expect(headerSource.includes("Actualiser les URLs")).toBe(false);
-    expect(headerSource.includes("Analyser la sélection")).toBe(true);
-    expect(headerSource.includes("Nouvelle sélection")).toBe(true);
+    expect(headerSource.includes('useScopedI18n("crawler-panel")')).toBe(true);
+    expect(headerSource.includes('t("analyzeSelection")')).toBe(true);
+    expect(headerSource.includes('t("newSelection")')).toBe(true);
     expect(headerSource.includes("ConfirmDialog")).toBe(true);
     expect(headerSource.includes("estimatedDiscoverCredits")).toBe(true);
     expect(headerSource.includes("estimatedAnalyzeCredits")).toBe(true);
-    expect(viewModelSource.includes("Crédits insuffisants")).toBe(true);
+    expect(viewModelSource.includes('t("insufficientCreditsTitle")')).toBe(true);
     expect(viewModelSource.includes("pushWarningToast")).toBe(true);
     expect(headerSource.includes("Modifier la sélection")).toBe(false);
     expect(source.includes("Relancer la découverte")).toBe(false);
     expect(headerSource.includes("Réanalyser toutes les pages")).toBe(false);
     expect(headerSource.includes("Réanalyser certaines pages")).toBe(false);
     expect(headerSource.includes("Choisir les pages")).toBe(false);
-    expect(
-      source.includes("Découverte des pages en cours."),
-    ).toBe(true);
+    expect(source.includes('crawlerT("discoveryToastTitle")')).toBe(true);
     expect(source.includes("viewModel.discover()")).toBe(true);
     expect(source.includes("viewModel.crawlSelected()")).toBe(true);
     expect(source.includes("function handleReanalyzeAllClick()")).toBe(false);
@@ -95,7 +92,7 @@ describe("crawl panel", () => {
     expect(source.includes("estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}")).toBe(true);
     expect(source.includes("creditConfirmation={creditConfirmation}")).toBe(true);
     expect(initialSetupSource.includes("ConfirmDialog")).toBe(true);
-    expect(initialSetupSource.includes("Solde actuel")).toBe(true);
+    expect(initialSetupSource.includes('t("creditQuotaLoadingLabel")')).toBe(true);
   });
 
   test("shows crawler URLs as selectable rows for analysis", () => {
@@ -105,10 +102,8 @@ describe("crawl panel", () => {
       ),
     ).toBe(true);
     expect(source.includes("<DiscoveredPagesSelectionView")).toBe(true);
-    expect(selectionViewSource.includes("Pages découvertes")).toBe(true);
-    expect(selectionViewSource.includes("Tout sélectionner")).toBe(
-      true,
-    );
+    expect(selectionViewSource.includes('t("discoveredPagesTitle")')).toBe(true);
+    expect(selectionViewSource.includes('t("selectAll")')).toBe(true);
     expect(selectionViewSource.includes("Contenu extrait")).toBe(false);
     expect(resultsViewSource.includes("selectedCount")).toBe(false);
     expect(resultsViewSource.includes("Tout sélectionner")).toBe(false);
@@ -212,17 +207,16 @@ describe("crawl panel", () => {
 
   test("groups analyzed content into GEO insight dimensions", () => {
     expect(utilsSource.includes("geoInsightGroups")).toBe(true);
-    expect(utilsSource.includes("Lecture IA")).toBe(true);
-    expect(utilsSource.includes("Compréhension IA")).toBe(true);
-    expect(utilsSource.includes("Réponse générative")).toBe(true);
-    expect(utilsSource.includes("Crédibilité")).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoGroupQualitativeLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoGroupUnderstandingLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoGroupAnswerLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoGroupCredibilityLabel"')).toBe(true);
     expect(utilsSource.includes('issue.source === "ai"')).toBe(true);
     expect(utilsSource.includes("issueSourceLabel")).toBe(true);
-    expect(utilsSource.includes("Signaux")).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "signalCount"')).toBe(true);
     expect(utilsSource.includes("Prochaine action")).toBe(false);
-    expect(utilsSource.includes('label: "Priorité"')).toBe(true);
-    expect(utilsSource.includes("formatSignalCount")).toBe(true);
-    expect(resultsViewSource.includes("formatSignalCount")).toBe(true);
+    expect(utilsSource.includes('label: "Priority"')).toBe(true);
+    expect(resultsViewSource.includes("signalCountLabel")).toBe(true);
   });
 
   test("decodes crawled HTML entities before displaying text", () => {
@@ -237,10 +231,10 @@ describe("crawl panel", () => {
   test("adds compact GEO KPIs for analyzed content", () => {
     expect(utilsSource.includes("computeGeoKpiSummaries")).toBe(true);
     expect(resultsViewSource.includes("CrawlerKpiStrip")).toBe(true);
-    expect(utilsSource.includes("Score GEO moyen")).toBe(true);
-    expect(utilsSource.includes("Pages à risque")).toBe(true);
-    expect(utilsSource.includes("Compréhension OK")).toBe(true);
-    expect(utilsSource.includes("Réponses prêtes")).toBe(true);
-    expect(utilsSource.includes("Crédibilité OK")).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoKpiScoreLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoKpiRiskPagesLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoKpiUnderstandingLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoKpiAnswerLabel"')).toBe(true);
+    expect(utilsSource.includes('translateI18nText("crawler-panel", "geoKpiCredibilityLabel"')).toBe(true);
   });
 });

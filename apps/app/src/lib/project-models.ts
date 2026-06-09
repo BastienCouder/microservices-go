@@ -1,4 +1,6 @@
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import i18n from "@/shared/i18n";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 export type ProjectModelMeta = {
   id: string;
@@ -102,7 +104,9 @@ function getIDString(value: unknown): string {
 
 export function buildProviderLabel(value: string): string {
   const normalized = value.trim();
-  if (!normalized) return "AI provider";
+  if (!normalized) {
+    return translateI18nText("shared-ui", "aiProvider", i18n.language);
+  }
   if (normalized.toLowerCase() === "xai" || normalized.toLowerCase() === "grok") {
     return "xAI";
   }
@@ -119,7 +123,11 @@ export function buildModelDescription(input: {
   if (input.supportsLiveSearch) {
     return `${input.provider} · recherche web`;
   }
-  return input.providerModelId || input.provider || "Modele IA";
+  return (
+    input.providerModelId ||
+    input.provider ||
+    translateI18nText("shared-ui", "aiModel", i18n.language)
+  );
 }
 
 export function normalizeModelPayload(value: unknown): NormalizedModelPayload | null {

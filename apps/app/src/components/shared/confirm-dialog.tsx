@@ -2,6 +2,7 @@
 
 import type { ComponentProps, ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,8 +53,8 @@ export function ConfirmDialog({
   trigger,
   title,
   description,
-  confirmLabel = "Confirmer",
-  cancelLabel = "Annuler",
+  confirmLabel,
+  cancelLabel,
   onConfirm,
   loading = false,
   confirmDisabled = false,
@@ -66,7 +67,10 @@ export function ConfirmDialog({
   previewOverflowLabel,
   children,
 }: ConfirmDialogProps) {
+  const { t } = useScopedI18n("shared-ui");
   const preview = buildConfirmDialogPreview(previewItems, previewLimit);
+  const resolvedConfirmLabel = confirmLabel ?? t("confirm");
+  const resolvedCancelLabel = cancelLabel ?? t("cancel");
 
   return (
     <AlertDialog open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
@@ -87,7 +91,7 @@ export function ConfirmDialog({
                   <div className="text-muted-foreground">
                     {previewOverflowLabel
                       ? previewOverflowLabel(preview.remainingCount)
-                      : `+${preview.remainingCount} more`}
+                      : t("moreCount", { count: preview.remainingCount })}
                   </div>
                 ) : null}
               </div>
@@ -97,14 +101,14 @@ export function ConfirmDialog({
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={loading || cancelDisabled}>
-            {cancelLabel}
+            {resolvedCancelLabel}
           </AlertDialogCancel>
           <AlertDialogAction
             variant={confirmVariant}
             disabled={loading || confirmDisabled}
             onClick={() => onConfirm?.()}
           >
-            {confirmLabel}
+            {resolvedConfirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

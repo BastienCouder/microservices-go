@@ -269,7 +269,7 @@ function ModelVisibilityTooltip({
 }) {
   const item = payload?.[0];
   const row = item?.payload;
-
+  const content = useI18nScope("monitoring-analytics-panel");
   if (!active || !item || !row) {
     return null;
   }
@@ -283,7 +283,7 @@ function ModelVisibilityTooltip({
         </span>
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>Visibility</span>
+        <span>{content.visibilityLabel}</span>
         <span className="font-mono tabular-nums">{row.value}</span>
       </div>
     </div>

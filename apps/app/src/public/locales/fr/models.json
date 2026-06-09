@@ -1,0 +1,14 @@
+{
+  "pageTitle": "IA configurées",
+  "pageBaseline": "Choisissez directement les modèles actifs pour le projet.",
+  "selectedCount": "{{count}} sélectionnés",
+  "selectedModelsStatus": "{{selected}}/{{limit}} modèles actifs",
+  "searchPlaceholder": "Rechercher un modèle",
+  "saving": "Enregistrement...",
+  "save": "Enregistrer",
+  "plan": "plan {{label}}",
+  "apiKeysRequired": "clés API requises",
+  "selectOrganizationFirst": "Sélectionne d’abord une organisation.",
+  "noModelAvailable": "Aucun modèle disponible.",
+  "missingProviderWarning": "Ajoutez une clé API pour {{providers}} avant d’enregistrer ces modèles."
+}

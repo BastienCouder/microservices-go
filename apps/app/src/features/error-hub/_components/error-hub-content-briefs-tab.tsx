@@ -33,16 +33,16 @@ type ErrorHubContentBriefsTabProps = {
 };
 
 const SOURCE_LABELS: Record<OptimizationError["source"], string> = {
-  crawler: "Site",
-  monitoring: "Monitoring",
-  perception: "Perception",
+  crawler: "sourceSite",
+  monitoring: "sourceMonitoring",
+  perception: "sourcePerception",
 };
 
 const FIX_TYPE_LABELS: Record<OptimizationError["fixType"], string> = {
-  faq_snippet: "FAQ",
-  prompt_patch: "Prompt",
-  schema_update: "Structure",
-  website_copy: "Contenu",
+  faq_snippet: "fixTypeFaq",
+  prompt_patch: "fixTypePrompt",
+  schema_update: "fixTypeStructure",
+  website_copy: "fixTypeContent",
 };
 
 function priorityRank(error: OptimizationError) {
@@ -51,10 +51,13 @@ function priorityRank(error: OptimizationError) {
   return 2;
 }
 
-function priorityLabel(error: OptimizationError) {
-  if (priorityRank(error) === 0) return "Priorite forte";
-  if (priorityRank(error) === 1) return "Priorite moyenne";
-  return "Priorite faible";
+function priorityLabel(
+  error: OptimizationError,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (priorityRank(error) === 0) return t("priorityHigh");
+  if (priorityRank(error) === 1) return t("priorityMedium");
+  return t("priorityLow");
 }
 
 function priorityTone(error: OptimizationError) {
@@ -112,11 +115,15 @@ function getBriefContent({
   return (actionContent || "").trim();
 }
 
-function getActionStatusLabel(status: string | undefined, generated: boolean) {
-  if (status === "done") return "Termine";
-  if (status === "processing") return "Action IA en cours";
-  if (generated) return "Action IA creee";
-  return "A generer";
+function getActionStatusLabel(
+  status: string | undefined,
+  generated: boolean,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (status === "done") return t("statusDone");
+  if (status === "processing") return t("statusProcessing");
+  if (generated) return t("statusGenerated");
+  return t("statusToGenerate");
 }
 
 export function ErrorHubContentBriefsTab({
@@ -131,6 +138,7 @@ export function ErrorHubContentBriefsTab({
   savingErrorIds,
 }: ErrorHubContentBriefsTabProps) {
   const { locale } = useScopedI18n("perception");
+  const { t } = useScopedI18n("error-hub");
   const [query, setQuery] = useState("");
   const [selectedErrorId, setSelectedErrorId] = useState("");
 
@@ -173,7 +181,7 @@ export function ErrorHubContentBriefsTab({
     return (
       <div className="pt-4">
         <EmptyStateCard
-          label="Aucune opportunite contenu pour les filtres selectionnes."
+          label={t("noContentOpportunity")}
           className="h-36 bg-background/70"
         />
       </div>
@@ -208,10 +216,10 @@ export function ErrorHubContentBriefsTab({
     if (!canGenerateAiBrief || !selectedError || selectedSaving) return;
     if (selectedGenerated) {
       pushInfoToast(
-        "Action deja creee",
+        t("alreadyCreatedTitle"),
         selectedBrief
-          ? "Le brief IA est disponible dans ce panneau."
-          : "La suggestion initiale reste disponible dans le panneau Actions.",
+          ? t("alreadyCreatedWithBrief")
+          : t("alreadyCreatedWithoutBrief"),
       );
       return;
     }
@@ -224,9 +232,9 @@ export function ErrorHubContentBriefsTab({
         <div className="border-b p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-sm font-semibold">Opportunites</h3>
+              <h3 className="text-sm font-semibold">{t("opportunitiesTitle")}</h3>
               <p className="text-xs text-muted-foreground">
-                Perception, monitoring, concurrents, prompts
+                {t("opportunitiesDescription")}
               </p>
             </div>
             <Badge variant="secondary" className="rounded-sm px-2 text-xs">
@@ -238,7 +246,7 @@ export function ErrorHubContentBriefsTab({
             <Input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Filtrer les opportunites"
+              placeholder={t("filterOpportunitiesPlaceholder")}
               className="pl-9"
             />
           </div>
@@ -247,7 +255,7 @@ export function ErrorHubContentBriefsTab({
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
           {filteredErrors.length === 0 ? (
             <EmptyStateCard
-              label="Aucune opportunite ne correspond a la recherche."
+              label={t("noOpportunityMatchesSearch")}
               className="h-24 bg-muted/30"
             />
           ) : (
@@ -271,10 +279,10 @@ export function ErrorHubContentBriefsTab({
                       variant="outline"
                       className={cn("rounded-sm px-1.5 text-[10px]", priorityTone(error))}
                     >
-                      {priorityLabel(error)}
+                      {priorityLabel(error, t)}
                     </Badge>
                     <Badge variant="secondary" className="rounded-sm px-1.5 text-[10px]">
-                      {SOURCE_LABELS[error.source]}
+                      {t(SOURCE_LABELS[error.source])}
                     </Badge>
                   </div>
                   <p className="line-clamp-2 text-sm font-semibold leading-5">
@@ -282,7 +290,7 @@ export function ErrorHubContentBriefsTab({
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="truncate text-xs text-muted-foreground">
-                      {error.resource || FIX_TYPE_LABELS[error.fixType]}
+                      {error.resource || t(FIX_TYPE_LABELS[error.fixType])}
                     </span>
                     {generated ? (
                       <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -306,13 +314,13 @@ export function ErrorHubContentBriefsTab({
                       variant="outline"
                       className={cn("rounded-sm px-2 text-xs", priorityTone(selectedError))}
                     >
-                      {priorityLabel(selectedError)}
+                      {priorityLabel(selectedError, t)}
                     </Badge>
                     <Badge variant="secondary" className="rounded-sm px-2 text-xs">
-                      {SOURCE_LABELS[selectedError.source]}
+                      {t(SOURCE_LABELS[selectedError.source])}
                     </Badge>
                     <Badge variant="outline" className="rounded-sm px-2 text-xs">
-                      {getActionStatusLabel(selectedActionStatus, selectedGenerated)}
+                      {getActionStatusLabel(selectedActionStatus, selectedGenerated, t)}
                     </Badge>
                   </div>
                   <h2 className="text-base font-semibold leading-7">
@@ -330,7 +338,7 @@ export function ErrorHubContentBriefsTab({
                   size="sm"
                   onClick={() => onOpenDetails(selectedError)}
                 >
-                  Voir l'erreur
+                  {t("viewError")}
                 </Button>
               </div>
             </div>
@@ -340,7 +348,7 @@ export function ErrorHubContentBriefsTab({
                 <div className="mb-4 rounded-md border bg-muted/20 p-4">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary">
                     <Sparkles className="h-4 w-4" />
-                    Brief IA
+                    {t("aiBrief")}
                   </div>
                   {selectedBrief ? (
                     <div className="whitespace-pre-line text-sm leading-7 text-foreground/90">
@@ -349,9 +357,7 @@ export function ErrorHubContentBriefsTab({
                   ) : (
                     <div className="space-y-3">
                       <p className="text-sm leading-7 text-muted-foreground">
-                        Aucun brief IA n'a encore ete genere par l'IA pour cette opportunite.
-                        Lance une action IA pour produire le brief a partir de l'erreur,
-                        des modeles impactes et du contexte disponible.
+                        {t("noAiBriefYet")}
                       </p>
                       <Button
                         type="button"
@@ -363,7 +369,7 @@ export function ErrorHubContentBriefsTab({
                         ) : (
                           <Sparkles className="h-4 w-4" />
                         )}
-                        {selectedSaving ? "Generation..." : "Generer le brief IA"}
+                        {selectedSaving ? t("generating") : t("generateAiBrief")}
                       </Button>
                     </div>
                   )}
@@ -373,18 +379,18 @@ export function ErrorHubContentBriefsTab({
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="rounded-md border p-4">
                   <div className="mb-2 text-xs font-semibold text-primary">
-                    Probleme detecte
+                    {t("detectedProblem")}
                   </div>
                   <p className="text-sm leading-6 text-foreground/90">
-                    {selectedError.issue || "Aucun detail fourni."}
+                    {selectedError.issue || t("noDetailsProvided")}
                   </p>
                 </div>
                 <div className="rounded-md border p-4">
                   <div className="mb-2 text-xs font-semibold text-primary">
-                    Impact
+                    {t("impact")}
                   </div>
                   <p className="text-sm leading-6 text-foreground/90">
-                    {selectedError.impact || "Impact a qualifier dans l'analyse IA."}
+                    {selectedError.impact || t("impactToQualify")}
                   </p>
                 </div>
               </div>
@@ -392,7 +398,7 @@ export function ErrorHubContentBriefsTab({
           </>
         ) : (
           <EmptyStateCard
-            label="Selectionne une opportunite pour afficher le brief IA."
+            label={t("selectOpportunityForBrief")}
             className="m-4 h-36 bg-muted/30"
           />
         )}
@@ -400,9 +406,9 @@ export function ErrorHubContentBriefsTab({
 
       <aside className="flex min-h-[420px] flex-col rounded-md border bg-background">
         <div className="border-b p-4">
-          <h3 className="text-sm font-semibold">Actions</h3>
+          <h3 className="text-sm font-semibold">{t("actionsTitle")}</h3>
           <p className="text-xs text-muted-foreground">
-            Suggestion initiale
+            {t("initialSuggestion")}
           </p>
         </div>
 
@@ -418,7 +424,7 @@ export function ErrorHubContentBriefsTab({
                       ) : (
                         <ListChecks className="h-4 w-4" />
                       )}
-                      Suggestion {index + 1}
+                      {t("suggestionLabel", { count: index + 1 })}
                     </div>
                     <p className="whitespace-pre-line text-sm leading-6 text-foreground/90">
                       {block}
@@ -427,7 +433,7 @@ export function ErrorHubContentBriefsTab({
                 ))
               ) : (
                 <EmptyStateCard
-                  label="Aucune suggestion initiale disponible pour cette opportunite."
+                  label={t("noInitialSuggestion")}
                   className="h-32 bg-muted/30"
                 />
               )}
@@ -444,13 +450,13 @@ export function ErrorHubContentBriefsTab({
                   ) : (
                     <Sparkles className="h-4 w-4" />
                   )}
-                  {selectedGenerated ? "Action IA creee" : "Generer l'action IA"}
+                  {selectedGenerated ? t("actionAiCreated") : t("generateAiAction")}
                 </Button>
               ) : null}
             </div>
           ) : (
             <EmptyStateCard
-              label="Selectionne une opportunite pour voir les actions."
+              label={t("selectOpportunityForActions")}
               className="h-32 bg-muted/30"
             />
           )}

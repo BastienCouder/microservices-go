@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
 import { hostnameFromURL, pathnameFromURL } from "../_lib/crawl-panel-utils";
@@ -33,10 +34,12 @@ export function DiscoveredPagesSelectionView({
   onTogglePage,
   onToggleAll,
 }: DiscoveredPagesSelectionViewProps) {
+  const { t } = useScopedI18n("crawler-panel");
+
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background px-4 py-4">
       <div className="flex items-center justify-between gap-2">
-        <SectionTitle showIndicator={false}>Pages découvertes</SectionTitle>
+        <SectionTitle showIndicator={false}>{t("discoveredPagesTitle")}</SectionTitle>
         <Badge
           variant="secondary"
           className="h-6 bg-primary/10 px-2 font-mono text-xs text-primary"
@@ -51,7 +54,7 @@ export function DiscoveredPagesSelectionView({
           <Input
             value={query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Filtrer les pages découvertes"
+            placeholder={t("filterDiscoveredPagesPlaceholder")}
             className="pl-9"
           />
         </div>
@@ -61,7 +64,7 @@ export function DiscoveredPagesSelectionView({
             variant="outline"
             className="h-8 rounded-sm px-2 font-mono text-xs"
           >
-            {selectedCount} sélectionnée(s)
+            {t("selectedCount", { count: selectedCount })}
           </Badge>
           <Button
             type="button"
@@ -69,7 +72,7 @@ export function DiscoveredPagesSelectionView({
             size="sm"
             onClick={() => onToggleAll(!allSelected)}
           >
-            {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
+            {allSelected ? t("deselectAll") : t("selectAll")}
           </Button>
         </div>
       </div>
@@ -79,8 +82,8 @@ export function DiscoveredPagesSelectionView({
           <EmptyStateCard
             label={
               records.length === 0
-                ? "Aucune page du domaine n'a été détectée."
-                : "Aucune page ne correspond à la recherche."
+                ? t("noDomainPagesDetected")
+                : t("noPagesMatchingSearch")
             }
             className="h-32"
           />
@@ -115,7 +118,7 @@ export function DiscoveredPagesSelectionView({
 
                     <Checkbox
                       checked={checked}
-                      aria-label={`Sélectionner ${recordURL}`}
+                      aria-label={t("selectPageAria", { url: recordURL })}
                       onCheckedChange={(nextChecked) =>
                         onTogglePage(recordURL, nextChecked === true)
                       }
@@ -132,7 +135,7 @@ export function DiscoveredPagesSelectionView({
                       variant={checked ? "secondary" : "outline"}
                       className="h-6 shrink-0 rounded-sm px-2 text-xs font-bold"
                     >
-                      {checked ? "Sélectionnée" : record.status}
+                      {checked ? t("selectedBadge") : record.status}
                     </Badge>
                   </div>
                 </button>

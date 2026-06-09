@@ -5,18 +5,12 @@ import {
   ChartTooltip,
   type ChartConfig,
 } from "@/components/ui/chart";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type {
   BrandVisibilityRow,
 } from "../../_lib/analytics/use-brand-visibility-view-model";
 import { BrandVisibilityTooltip } from "./brand-visibility-tooltip";
-
-const BRAND_VISIBILITY_CHART_CONFIG = {
-  brand: { label: "Brand", color: "hsl(var(--chart-brand-primary))" },
-  competitor1: { label: "Competitor 1", color: "hsl(var(--chart-series-2))" },
-  competitor2: { label: "Competitor 2", color: "hsl(var(--chart-series-3))" },
-  competitor3: { label: "Competitor 3", color: "hsl(var(--chart-series-4))" },
-} satisfies ChartConfig;
 
 const AXIS_COLOR = "hsl(var(--chart-axis))";
 const TOOLTIP_CURSOR = "hsl(var(--chart-cursor) / 0.2)";
@@ -30,10 +24,18 @@ export function BrandVisibilityChart({
   rows,
   totalScopedPrompts,
 }: BrandVisibilityChartProps) {
+  const { t } = useScopedI18n("monitoring-analytics-panel");
+  const brandVisibilityChartConfig = {
+    brand: { label: t("chartBrandLabel"), color: "hsl(var(--chart-brand-primary))" },
+    competitor1: { label: t("chartCompetitor1Label"), color: "hsl(var(--chart-series-2))" },
+    competitor2: { label: t("chartCompetitor2Label"), color: "hsl(var(--chart-series-3))" },
+    competitor3: { label: t("chartCompetitor3Label"), color: "hsl(var(--chart-series-4))" },
+  } satisfies ChartConfig;
+
   return (
     <div className="min-w-0 border-b border-border/50 md:p-3 xl:col-span-7 xl:border-b-0 xl:border-r">
       <ChartContainer
-        config={BRAND_VISIBILITY_CHART_CONFIG}
+        config={brandVisibilityChartConfig}
         className="h-[170px] w-full xl:h-[280px]"
       >
         <BarChart data={rows} margin={{ top: 20, right: 20, bottom: 20, left: 0 }}>

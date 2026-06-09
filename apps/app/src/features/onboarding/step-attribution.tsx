@@ -24,7 +24,7 @@ const PRESET_SOURCES = [
 
 export function StepAttribution({
   hideBack = false,
-  nextLabel = "Next",
+  nextLabel,
 }: StepAttributionProps) {
   const { attributionSource, setAttributionSource, nextStep, prevStep } =
     useOnboarding();
@@ -47,7 +47,7 @@ export function StepAttribution({
           hideBack={hideBack}
           onBack={prevStep}
           onNext={nextStep}
-          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+          nextLabel={nextLabel}
         />
       }
     >

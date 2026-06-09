@@ -13,6 +13,8 @@ import {
   type PeriodFilter,
   type SourceFilter,
 } from "./error-hub-types";
+import i18n from "@/shared/i18n";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 export function readSourceFilterFromSearch(routeSearch: string): SourceFilter {
   const normalized = routeSearch.startsWith("?")
@@ -289,9 +291,9 @@ export function getModelVisual(
 
   return {
     icon: "",
-    description: "Modele IA",
+    description: translateI18nText("shared-ui", "aiModel", i18n.language),
     label: model,
-    provider: "AI provider",
+    provider: translateI18nText("shared-ui", "aiProvider", i18n.language),
     name: model,
   };
 }
@@ -304,9 +306,7 @@ export function getMonitoringOriginBadge(
 
   if (error.origin === "alert") {
     return {
-      label: locale.startsWith("fr")
-        ? "Alerte monitoring"
-        : "Monitoring alert",
+      label: translateI18nText("error-hub", "monitoringAlert", locale),
       className:
         "border-amber-200 bg-amber-500/10 text-amber-700 dark:border-amber-400/30 dark:text-amber-300",
     };
@@ -314,9 +314,7 @@ export function getMonitoringOriginBadge(
 
   if (error.origin === "derived") {
     return {
-      label: locale.startsWith("fr")
-        ? "Monitoring diagnostic"
-        : "Monitoring diagnostic",
+      label: translateI18nText("error-hub", "monitoringDiagnostic", locale),
       className:
         "border-sky-200 bg-sky-500/10 text-sky-700 dark:border-sky-400/30 dark:text-sky-300",
     };
@@ -333,17 +331,15 @@ function getMonitoringOriginMeta(
 
   if (error.origin === "alert") {
     return {
-      label: locale.startsWith("fr") ? "Nature" : "Kind",
-      value: locale.startsWith("fr") ? "Alerte monitoring" : "Monitoring alert",
+      label: translateI18nText("error-hub", "contextKind", locale),
+      value: translateI18nText("error-hub", "monitoringAlert", locale),
     };
   }
 
   if (error.origin === "derived") {
     return {
-      label: locale.startsWith("fr") ? "Nature" : "Kind",
-      value: locale.startsWith("fr")
-        ? "Diagnostic monitoring"
-        : "Monitoring diagnostic",
+      label: translateI18nText("error-hub", "contextKind", locale),
+      value: translateI18nText("error-hub", "monitoringDiagnostic", locale),
     };
   }
 
@@ -375,9 +371,7 @@ export function getCrawlerGroupLabel(
   if (error.source !== "crawler") return undefined;
   const resourceLabel = formatErrorResource(error.resource);
   if (!resourceLabel) return undefined;
-  return locale.startsWith("fr")
-    ? `Page • ${resourceLabel}`
-    : `Page • ${resourceLabel}`;
+  return `${translateI18nText("error-hub", "crawlerPage", locale)} • ${resourceLabel}`;
 }
 
 export function getErrorContextMeta(
@@ -389,7 +383,7 @@ export function getErrorContextMeta(
 
     if (resourceLabel) {
       return {
-        label: locale.startsWith("fr") ? "Page" : "Page",
+        label: translateI18nText("error-hub", "crawlerPage", locale),
         value: resourceLabel,
       };
     }

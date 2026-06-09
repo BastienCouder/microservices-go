@@ -4,6 +4,7 @@ import { FolderPlus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SectionTitle } from "@/components/shared/section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { EmptyBlock } from "../shared/empty-block";
 import { ProjectCard } from "./project-card";
 import type {
@@ -59,6 +60,7 @@ export function ProjectsPanel({
   memberBusy,
   removeMemberBusy,
 }: ProjectsPanelProps) {
+  const { t } = useScopedI18n("organizations");
   const filteredProjects = useMemo(() => {
     const needle = search.trim().toLowerCase();
     if (!needle) return projects;
@@ -75,7 +77,7 @@ export function ProjectsPanel({
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="flex flex-col gap-3 border-b border-border/60 px-4 py-2 md:flex-row md:items-center md:justify-between">
           <div>
-            <SectionTitle showIndicator={false}>Projets</SectionTitle>
+            <SectionTitle showIndicator={false}>{t("projectsTitle")}</SectionTitle>
           </div>
           <div className="flex w-full flex-col gap-2 sm:flex-row md:w-auto">
             <div className="relative w-full sm:w-72">
@@ -83,7 +85,7 @@ export function ProjectsPanel({
               <Input
                 value={search}
                 onChange={(event) => onSearchChange(event.target.value)}
-                placeholder="Rechercher"
+                placeholder={t("search")}
                 className="pl-9"
               />
             </div>
@@ -91,7 +93,7 @@ export function ProjectsPanel({
               <Button asChild className="w-full sm:w-auto">
                 <Link to={onboardingHref} onClick={onStartOnboarding}>
                   <FolderPlus data-icon="inline-start" />
-                  Creer un nouveau projet
+                  {t("createProject")}
                 </Link>
               </Button>
             ) : null}
@@ -101,11 +103,11 @@ export function ProjectsPanel({
         <div className="p-4">
           {filteredProjects.length === 0 ? (
             <EmptyBlock
-              title="Aucun projet"
+              title={t("noProjectTitle")}
               description={
                 canManageProjects
-                  ? "Cree un premier projet pour alimenter cette organisation."
-                  : "Aucun projet n'est disponible pour votre compte."
+                  ? t("noProjectManageDescription")
+                  : t("noProjectUserDescription")
               }
             />
           ) : (

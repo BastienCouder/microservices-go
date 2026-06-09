@@ -13,13 +13,19 @@ services:
       args:
         NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
         NEXT_PUBLIC_APP_URL: http://localhost:30004
+        NEXT_PUBLIC_SITE_URL: http://localhost:30000
+        NEXT_PUBLIC_WEB_URL: http://localhost:30000
     image: microservices-go/web:prod
     restart: unless-stopped
     networks:
       - frontend-net
+      - backend-net
     environment:
+      KRATOS_PUBLIC_PROXY_URL: http://kratos:4433
       NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
       NEXT_PUBLIC_APP_URL: http://localhost:30004
+      NEXT_PUBLIC_SITE_URL: http://localhost:30000
+      NEXT_PUBLIC_WEB_URL: http://localhost:30000
     ports:
       - "127.0.0.1:30000:3000"
     deploy:
@@ -27,7 +33,7 @@ services:
         limits:
           memory: 512M
           cpus: '0.5'
- 
+
   app:
     profiles: ["frontend"]
     build:
@@ -152,7 +158,7 @@ services:
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
-      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004,http://localhost:30005
+      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004
     secrets:
       - gateway_http_addr
       - gateway_metrics_addr
@@ -647,17 +653,19 @@ services:
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
       REDIS_ADDR: redis:6379
+      REDIS_PASSWORD_FILE: /run/secrets/redis_password
       DASHBOARD_CACHE_TTL: 30s
       CLOUDFLARE_ACCOUNT_ID_FILE: /run/secrets/cloudflare_account_id
       CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cloudflare_api_token
       IA_SERVICE_URL: http://ia-service:8091
-      CONTENT_ISSUE_ANALYZER_MODEL_ID: "${CONTENT_ISSUE_ANALYZER_MODEL_ID:-gpt-oss-20b-free}"
-      CONTENT_ISSUE_ANALYZER_PROVIDER_ID: "${CONTENT_ISSUE_ANALYZER_PROVIDER_ID:-openrouter}"
-      OPTIMIZE_ACTION_BRIEF_MODEL_ID: "${OPTIMIZE_ACTION_BRIEF_MODEL_ID:-z-ai/glm-4.5-air:free}"
-      OPTIMIZE_ACTION_BRIEF_PROVIDER_ID: "${OPTIMIZE_ACTION_BRIEF_PROVIDER_ID:-openrouter}"
+      CONTENT_ISSUE_ANALYZER_MODEL_ID: gpt-oss-20b-free
+      CONTENT_ISSUE_ANALYZER_PROVIDER_ID: openrouter
+      OPTIMIZE_ACTION_BRIEF_MODEL_ID: z-ai/glm-4.5-air:free
+      OPTIMIZE_ACTION_BRIEF_PROVIDER_ID: openrouter
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret
+      - redis_password
       - cloudflare_account_id
       - cloudflare_api_token
     # gRPC port exposé uniquement en interne (pas de port HTTP public)
@@ -701,11 +709,11 @@ services:
       IA_DB_NAME: iasvc
       IA_DB_SSLMODE: disable
       IA_DB_PASSWORD_FILE: /run/secrets/iasvc_db_password
-      IA_EXECUTION_MODE: "${IA_EXECUTION_MODE:-provider}"
-      IA_PROVIDER_BASE_URL: "${IA_PROVIDER_BASE_URL:-https://openrouter.ai/api/v1}"
+      IA_EXECUTION_MODE: provider
+      IA_PROVIDER_BASE_URL: https://openrouter.ai/api/v1
       IA_PROVIDER_API_KEY_FILE: /run/secrets/openrouter_api_key
-      IA_PROVIDER_HTTP_REFERER: "${IA_PROVIDER_HTTP_REFERER:-http://localhost:30004}"
-      IA_PROVIDER_APP_NAME: "${IA_PROVIDER_APP_NAME:-microservices-go}"
+      IA_PROVIDER_HTTP_REFERER: http://localhost:30004
+      IA_PROVIDER_APP_NAME: microservices-go
       IA_PROVIDER_TIMEOUT_MS: "30000"
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
@@ -976,22 +984,21 @@ services:
     networks:
       - infra-net
     command:
-      - "redis-server"
-      - "--appendonly"
-      - "yes"
-      - "--requirepass-file"
-      - "/run/secrets/redis_password"
-      - "--maxmemory"
-      - "512mb"
-      - "--maxmemory-policy"
-      - "allkeys-lru"
+      - "sh"
+      - "-ec"
+      - >
+        exec redis-server
+        --appendonly yes
+        --requirepass "$$(cat /run/secrets/redis_password)"
+        --maxmemory 512mb
+        --maxmemory-policy allkeys-lru
     secrets:
       - redis_password
     # Port non exposé publiquement — accessible uniquement via le réseau infra-net
     volumes:
       - redis-data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$(cat /run/secrets/redis_password)\" ping | grep -q PONG"]
       interval: 10s
       timeout: 3s
       retries: 5
@@ -1028,7 +1035,7 @@ services:
           cpus: '0.5'
  
   postgres:
-    profiles: ["backend", "infra"]
+    profiles: ["backend", "infra", "migrations"]
     image: postgres:18.1-alpine
     restart: unless-stopped
     networks:
@@ -1105,6 +1112,10 @@ services:
       KRATOS_DB_SSLMODE: disable
       KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
       KRATOS_PUBLIC_BASE_URL: http://localhost:35433
+      WEB_PUBLIC_URL: http://localhost:30000
+      APP_PUBLIC_URL: http://localhost:30004
+      DOC_PUBLIC_URL: http://localhost:30001
+      WEB_AUTH_URL: http://localhost:30000/auth
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
@@ -1132,6 +1143,10 @@ services:
       KRATOS_DB_SSLMODE: disable
       KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
       KRATOS_PUBLIC_BASE_URL: http://localhost:35433
+      WEB_PUBLIC_URL: http://localhost:30000
+      APP_PUBLIC_URL: http://localhost:30004
+      DOC_PUBLIC_URL: http://localhost:30001
+      WEB_AUTH_URL: http://localhost:30000/auth
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
@@ -1152,6 +1167,28 @@ services:
         limits:
           memory: 256M
           cpus: '0.5'
+
+  postgres-bootstrap:
+    profiles: ["backend", "infra", "migrations"]
+    image: postgres:18.1-alpine
+    restart: "no"
+    networks:
+      - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
+      POSTGRES_COMPOSE_FILE: /workspace/docker-compose.yml
+    secrets:
+      - postgres_superuser_password
+    volumes:
+      - ./scripts/postgres/bootstrap-databases.sh:/opt/postgres/bootstrap-databases.sh:ro
+      - ./docker-compose.yml:/workspace/docker-compose.yml:ro
+    entrypoint: ["sh", "/opt/postgres/bootstrap-databases.sh"]
  
 volumes:
   redis-data:

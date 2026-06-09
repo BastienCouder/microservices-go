@@ -5,6 +5,7 @@ import { AnimatedWave } from "@/features/onboarding/animated-wave";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type CreditConfirmation = {
   monthlyCredits: number;
@@ -29,21 +30,32 @@ type InitialSetupCardProps = {
     description?: string;
     discoverLabel?: string;
     discoveringLabel?: string;
+    confirmTitle?: string;
+    confirmLoadingLabel?: string;
+    cancelLabel?: string;
+    creditQuotaCurrentPlanFallback?: string;
+    creditQuotaLoadingLabel?: string;
+    creditQuotaCheckingLabel?: string;
+    creditConsumptionTemplate?: string;
   };
 };
 
 function creditDialogDescription(
   credits: number,
   creditConfirmation: CreditConfirmation,
+  copy?: InitialSetupCardProps["copy"],
 ) {
   const quotaLabel =
     creditConfirmation.hasQuota && creditConfirmation.monthlyCredits > 0
-      ? `Solde actuel: ${creditConfirmation.remainingCredits}/${creditConfirmation.monthlyCredits} crédits restants sur le plan ${creditConfirmation.planLabel || "actuel"}.`
+      ? `Current balance: ${creditConfirmation.remainingCredits}/${creditConfirmation.monthlyCredits} credits remaining on the ${creditConfirmation.planLabel || copy?.creditQuotaCurrentPlanFallback || "current"} plan.`
       : creditConfirmation.isLoading
-        ? "Chargement du quota de crédits de l'organisation."
-        : "Le quota de crédits de l'organisation sera vérifié avant l'exécution.";
+        ? copy?.creditQuotaLoadingLabel || "Loading the organization credit quota."
+        : copy?.creditQuotaCheckingLabel || "The organization credit quota will be checked before execution.";
 
-  return `Découvrir les pages consommera environ ${credits} crédits. ${quotaLabel}`;
+  return (
+    copy?.creditConsumptionTemplate?.replace("{{credits}}", String(credits)).replace("{{quotaLabel}}", quotaLabel) ||
+    `Discovering pages will consume about ${credits} credits. ${quotaLabel}`
+  );
 }
 
 export function InitialSetupCard({
@@ -56,9 +68,28 @@ export function InitialSetupCard({
   creditConfirmation,
   copy,
 }: InitialSetupCardProps) {
+  const { t } = useScopedI18n("crawler-panel");
   const title = projectName
-    ? copy?.titleWithProject?.(projectName) ?? `Découvrir les URLs de ${projectName}`
-    : copy?.title ?? "Découvrir les URLs du site";
+    ? copy?.titleWithProject?.(projectName) ?? t("discoverProjectTitle", { projectName })
+    : copy?.title ?? t("discoverSiteTitle");
+  const localizedCopy = {
+    ...copy,
+    confirmTitle: copy?.confirmTitle ?? t("confirmPageDiscoveryTitle"),
+    confirmLoadingLabel:
+      copy?.confirmLoadingLabel ?? t("discoveringEllipsis"),
+    cancelLabel: copy?.cancelLabel ?? t("cancel"),
+    discoverLabel: copy?.discoverLabel ?? t("discoverUrls"),
+    discoveringLabel:
+      copy?.discoveringLabel ?? t("discoveringInProgress"),
+    creditQuotaCurrentPlanFallback:
+      copy?.creditQuotaCurrentPlanFallback ?? t("creditQuotaCurrentPlanFallback"),
+    creditQuotaLoadingLabel:
+      copy?.creditQuotaLoadingLabel ?? t("creditQuotaLoadingLabel"),
+    creditQuotaCheckingLabel:
+      copy?.creditQuotaCheckingLabel ?? t("creditQuotaCheckingLabel"),
+    creditConsumptionTemplate:
+      copy?.creditConsumptionTemplate ?? t("discoverPagesCreditConsumptionTemplate"),
+  };
 
   return (
     <div className="relative flex flex-1 items-center overflow-hidden bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.08),_transparent_34%),linear-gradient(180deg,_#f8f9fc_0%,_#f1f3f8_100%)]">
@@ -88,17 +119,18 @@ export function InitialSetupCard({
 
             <div className="flex justify-end">
               <ConfirmDialog
-                title="Confirmer la découverte des pages"
+                title={localizedCopy.confirmTitle}
                 description={creditDialogDescription(
                   estimatedDiscoverCredits,
                   creditConfirmation,
+                  localizedCopy,
                 )}
                 confirmLabel={
                   reanalyzing
-                    ? "Découverte..."
-                    : copy?.discoverLabel ?? "Découvrir les URLs"
+                    ? localizedCopy.confirmLoadingLabel
+                    : localizedCopy.discoverLabel
                 }
-                cancelLabel="Annuler"
+                cancelLabel={localizedCopy.cancelLabel}
                 confirmVariant="default"
                 confirmDisabled={!canReanalyze}
                 loading={reanalyzing}
@@ -110,8 +142,8 @@ export function InitialSetupCard({
                     className="min-w-44"
                   >
                     {reanalyzing
-                      ? copy?.discoveringLabel ?? "Découverte en cours"
-                      : copy?.discoverLabel ?? "Découvrir les URLs"}
+                      ? localizedCopy.discoveringLabel
+                      : localizedCopy.discoverLabel}
                   </Button>
                 }
               />

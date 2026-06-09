@@ -1,0 +1,16 @@
+{
+  "headline": {
+    "line1": "Wide coverage.",
+    "line2": "Reliable signal."
+  },
+  "description": "Monitor the engines that matter with stable histories, clean answer parsing and a dependable view of how your brand appears over time.",
+  "stats": {
+    "covered": "LLMs covered",
+    "uptime": "uptime",
+    "responseTime": "response time"
+  },
+  "panel": {
+    "allLlms": "All LLMs",
+    "liveMonitoring": "live monitoring"
+  }
+}

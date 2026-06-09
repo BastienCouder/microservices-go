@@ -1,6 +1,7 @@
 import type { DateRange } from "react-day-picker";
 import { useMemo } from "react";
-import { useI18nScope } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
+import { translateI18nText, useI18nScope } from "@/shared/hooks/use-i18n";
 import { PeriodFilterOption, PeriodFilterPicker } from "./period-filter-picker";
 
 type DatePickerWithRangeProps = {
@@ -25,15 +26,15 @@ const PERIOD_OPTION_KEYS = [
 ] as const;
 
 export const MONITORING_PERIOD_OPTIONS = [
-  { value: "today", label: "Aujourd'hui" },
-  { value: "7d", label: "7 jours" },
-  { value: "14d", label: "14 jours" },
-  { value: "30d", label: "30 jours" },
-  { value: "90d", label: "3 mois" },
-  { value: "180d", label: "6 mois" },
-  { value: "365d", label: "1 an" },
-  { value: "ytd", label: "Cette année" },
-  { value: "custom", label: "Personnalisée" },
+  { value: "today", label: translateI18nText("monitoring-filters-panel", "today", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "7d", label: translateI18nText("monitoring-filters-panel", "days7", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "14d", label: translateI18nText("monitoring-filters-panel", "days14", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "30d", label: translateI18nText("monitoring-filters-panel", "days30", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "90d", label: translateI18nText("monitoring-filters-panel", "months3", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "180d", label: translateI18nText("monitoring-filters-panel", "months6", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "365d", label: translateI18nText("monitoring-filters-panel", "year1", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "ytd", label: translateI18nText("monitoring-filters-panel", "yearToDate", i18n.resolvedLanguage || i18n.language || "fr") },
+  { value: "custom", label: translateI18nText("monitoring-filters-panel", "custom", i18n.resolvedLanguage || i18n.language || "fr") },
 ] as const satisfies readonly PeriodFilterOption[];
 
 function getMonitoringPeriodOptions(

@@ -9,6 +9,7 @@ import {
   loadUserOrganizationSummaries,
   type UserOrganizationSummary,
 } from "@/shared/organizations";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   createBillingOrganization,
   createStripeCheckoutSession,
@@ -32,49 +33,56 @@ export type PricingPlan = {
   highlighted?: boolean;
 };
 
-const PRICING_PLANS: PricingPlan[] = [
-  {
-    id: "starter",
-    name: getBillingPlanLabel("starter"),
-    price: "49 EUR",
-    yearlyPrice: "39 EUR",
-    quota: "50 crédits / mois",
-    description: "Pour lancer un premier projet GEO sans complexite.",
-    features: ["1 siege inclus", "3 modeles suivis", "Monitoring de marque"],
-  },
-  {
-    id: "growth",
-    name: getBillingPlanLabel("growth"),
-    price: "149 EUR",
-    yearlyPrice: "119 EUR",
-    quota: "200 crédits / mois",
-    description: "Pour une equipe qui pilote plusieurs contenus et concurrents.",
-    features: ["Jusqu'a 3 sieges", "6 modeles suivis", "Prompts et pages prioritaires"],
-    highlighted: true,
-  },
-  {
-    id: "pro",
-    name: getBillingPlanLabel("pro"),
-    price: "399 EUR",
-    yearlyPrice: "319 EUR",
-    quota: "Usage etendu",
-    description: "Pour une organisation qui industrialise le suivi IA.",
-    features: ["Sieges avances", "Quota etendu", "Accompagnement de lancement"],
-  },
-];
-
 function getInitialOrganizationName(userEmail?: string): string {
   const emailPrefix = userEmail?.split("@", 1)[0]?.trim();
   return emailPrefix ? `${emailPrefix} workspace` : "";
 }
 
-function getCheckoutNotice(search: string): string {
+function buildPricingPlans(
+  t: (key: string, options?: Record<string, unknown>) => string,
+): PricingPlan[] {
+  return [
+    {
+      id: "starter",
+      name: getBillingPlanLabel("starter"),
+      price: "49 EUR",
+      yearlyPrice: "39 EUR",
+      quota: t("starterQuota"),
+      description: t("starterDescription"),
+      features: [t("starterFeatureSeats"), t("starterFeatureModels"), t("starterFeatureMonitoring")],
+    },
+    {
+      id: "growth",
+      name: getBillingPlanLabel("growth"),
+      price: "149 EUR",
+      yearlyPrice: "119 EUR",
+      quota: t("growthQuota"),
+      description: t("growthDescription"),
+      features: [t("growthFeatureSeats"), t("growthFeatureModels"), t("growthFeaturePrompts")],
+      highlighted: true,
+    },
+    {
+      id: "pro",
+      name: getBillingPlanLabel("pro"),
+      price: "399 EUR",
+      yearlyPrice: "319 EUR",
+      quota: t("proQuota"),
+      description: t("proDescription"),
+      features: [t("proFeatureSeats"), t("proFeatureQuota"), t("proFeatureLaunch")],
+    },
+  ];
+}
+
+function getCheckoutNotice(
+  search: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   const params = new URLSearchParams(search);
   if (params.get("checkout") === "success") {
-    return "Paiement en cours de confirmation. La redirection vers l'app se fera des que Stripe confirme l'abonnement.";
+    return t("checkoutSuccessNotice");
   }
   if (params.get("checkout") === "cancel") {
-    return "Paiement annule. Tu peux relancer un plan quand tu es pret.";
+    return t("checkoutCancelNotice");
   }
   return "";
 }
@@ -88,11 +96,13 @@ export function useBillingGateViewModel({
   routeSearch: string;
   userEmail?: string;
 }) {
+  const { t } = useScopedI18n("billing-gate");
   const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [organizationName, setOrganizationName] = useState(() => getInitialOrganizationName(userEmail));
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [localError, setLocalError] = useState("");
+  const plans = useMemo(() => buildPricingPlans(t), [t]);
 
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
@@ -136,7 +146,9 @@ export function useBillingGateViewModel({
       window.location.assign(checkoutURL);
     },
     onError: (error) => {
-      setLocalError(error instanceof Error ? error.message : "Impossible de demarrer le paiement.");
+      setLocalError(
+        error instanceof Error ? error.message : t("startPaymentError"),
+      );
     },
   });
 
@@ -151,7 +163,7 @@ export function useBillingGateViewModel({
     actionError: localError || "",
     billingCycle,
     billingStatus: billingQuery.data?.subscriptionStatus ?? "",
-    checkoutNotice: getCheckoutNotice(routeSearch),
+    checkoutNotice: getCheckoutNotice(routeSearch, t),
     error:
       localError ||
       (organizationsQuery.error instanceof Error ? organizationsQuery.error.message : "") ||
@@ -162,7 +174,7 @@ export function useBillingGateViewModel({
     isSubmitting: checkoutMutation.isPending,
     organizationName,
     organizations,
-    plans: PRICING_PLANS,
+    plans,
     selectedOrganization,
     selectedOrganizationId: activeOrganizationId,
     setBillingCycle,

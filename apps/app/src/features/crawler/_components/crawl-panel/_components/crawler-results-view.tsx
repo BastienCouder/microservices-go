@@ -18,44 +18,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/shared/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
 import {
-  columns,
   computeGeoKpiSummaries,
   computePriority,
   decodeHTMLText,
-  formatSignalCount,
   geoInsightGroups,
   hostnameFromURL,
-  issueSourceLabel,
   issuesForGeoInsightGroup,
   pathnameFromURL,
   primaryIssue,
-  severityLabel,
   severityTone,
-  statusLabel,
   statusTone,
-  type CrawlColumn,
   type SeverityFilter,
   type SortKey,
   type StatusFilter,
 } from "../_lib/crawl-panel-utils";
-
-export const STATUS_FILTER_OPTIONS = [
-  { value: "all", label: "Tous les statuts" },
-  { value: "completed", label: "Terminé" },
-  { value: "running", label: "En cours" },
-  { value: "errored", label: "En erreur" },
-  { value: "cancelled", label: "Annulé" },
-] as const satisfies readonly PeriodFilterOption[];
-
-export const SEVERITY_FILTER_OPTIONS = [
-  { value: "all", label: "Toutes les sévérités" },
-  { value: "high", label: "Haute" },
-  { value: "medium", label: "Moyenne" },
-  { value: "low", label: "Faible" },
-  { value: "none", label: "Aucune erreur" },
-] as const satisfies readonly PeriodFilterOption[];
 
 type CrawlerResultsViewProps = {
   errorLabel?: string | null;
@@ -106,17 +85,66 @@ function loadingRows() {
   ));
 }
 
+function signalCountLabel(
+  count: number,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  return t("signalCount", { count });
+}
+
+function statusDisplayLabel(
+  status: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (status === "completed") return t("statusCompleted");
+  if (status === "running") return t("statusRunning");
+  if (status === "errored") return t("statusErrored");
+  if (status.includes("cancelled")) return t("statusCancelled");
+  return status;
+}
+
+function severityDisplayLabel(
+  severity: string,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (severity === "high") return t("severityHigh");
+  if (severity === "medium") return t("severityMedium");
+  if (severity === "low") return t("severityLow");
+  return "-";
+}
+
+function priorityDisplayLabel(
+  rank: number,
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (rank >= 4) return t("priorityCritical");
+  if (rank === 3) return t("priorityHigh");
+  if (rank === 2) return t("priorityMedium");
+  return t("priorityLow");
+}
+
+function issueSourceDisplayLabel(
+  issue: { source?: string; fixType?: string },
+  t: (key: string, options?: Record<string, unknown>) => string,
+) {
+  if (issue.source === "ai" || issue.fixType?.startsWith("ai_")) {
+    return t("issueSourceAi");
+  }
+  return t("issueSourceRule");
+}
+
 function CrawlerKpiStrip({
   records,
 }: {
   records: ContentOptimizerCrawlRecord[];
 }) {
+  const { t } = useScopedI18n("crawler-panel");
   const kpis = computeGeoKpiSummaries(records);
 
   return (
     <section
       className="border-b bg-muted/20 px-4 py-3"
-      aria-label="KPIs GEO du contenu analysé"
+      aria-label={t("resultsKpiAriaLabel")}
     >
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
         {kpis.map((kpi) => (
@@ -151,11 +179,13 @@ function CrawlerDetailPane({
 }: {
   selectedRecord: ContentOptimizerCrawlRecord | null;
 }) {
+  const { t } = useScopedI18n("crawler-panel");
+
   if (!selectedRecord) {
     return (
       <div className="flex h-full items-center justify-center p-6">
         <EmptyStateCard
-          label="Sélectionnez une page pour afficher le détail."
+          label={t("selectPageForDetails")}
           className="h-24 w-full"
         />
       </div>
@@ -181,17 +211,17 @@ function CrawlerDetailPane({
         <div className="mt-3 flex flex-wrap gap-2">
           <Badge variant="outline">HTTP {selectedRecord.httpStatus ?? "-"}</Badge>
           <Badge variant="outline">
-            {formatSignalCount(selectedRecord.issues?.length ?? 0)}
+            {signalCountLabel(selectedRecord.issues?.length ?? 0, t)}
           </Badge>
           <Badge className={computePriority(selectedRecord).className}>
-            {computePriority(selectedRecord).label}
+            {priorityDisplayLabel(computePriority(selectedRecord).rank, t)}
           </Badge>
         </div>
       </div>
 
       <div className="space-y-4 px-4 py-4">
         <section className="space-y-3">
-          <SectionTitle showIndicator={false}>Diagnostic GEO</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("geoDiagnosis")}</SectionTitle>
           <div className="grid gap-2">
             {geoInsightGroups.map((group) => {
               const groupIssues = issuesForGeoInsightGroup(
@@ -225,7 +255,7 @@ function CrawlerDetailPane({
                       variant={hasIssues ? "secondary" : "outline"}
                       className="h-6 shrink-0 rounded-sm px-2 text-xs font-bold"
                     >
-                      {hasIssues ? formatSignalCount(groupIssues.length) : "OK"}
+                      {hasIssues ? signalCountLabel(groupIssues.length, t) : t("ok")}
                     </Badge>
                   </div>
                 </div>
@@ -236,7 +266,7 @@ function CrawlerDetailPane({
 
         {(selectedRecord.issues?.length ?? 0) > 0 ? (
           <section className="space-y-4">
-            <SectionTitle showIndicator={false}>Opportunités d'amélioration</SectionTitle>
+            <SectionTitle showIndicator={false}>{t("improvementsTitle")}</SectionTitle>
             <div className="space-y-3">
               {selectedRecord.issues?.map((issue, index) => (
                 <button
@@ -251,7 +281,7 @@ function CrawlerDetailPane({
                         {decodeHTMLText(issue.title)}
                       </p>
                       <p className="truncate text-[11px] text-muted-foreground md:text-xs">
-                        Opportunité #{index + 1}
+                        {t("opportunityNumber", { count: index + 1 })}
                       </p>
                     </div>
 
@@ -261,10 +291,10 @@ function CrawlerDetailPane({
                         severityTone(issue.severity),
                       )}
                     >
-                      {severityLabel(issue.severity)}
+                      {severityDisplayLabel(issue.severity, t)}
                     </Badge>
                     <Badge variant="outline" className="h-6 px-2 text-xs font-bold">
-                      {issueSourceLabel(issue)}
+                      {issueSourceDisplayLabel(issue, t)}
                     </Badge>
                   </div>
 
@@ -276,17 +306,17 @@ function CrawlerDetailPane({
             </div>
           </section>
         ) : (
-          <EmptyStateCard label="Aucune opportunité prioritaire détectée sur cette page." />
+          <EmptyStateCard label={t("noPriorityOpportunity")} />
         )}
 
         <section className="space-y-4">
           <div className="flex items-center justify-between gap-2">
-            <SectionTitle showIndicator={false}>Contenu extrait</SectionTitle>
+            <SectionTitle showIndicator={false}>{t("extractedContent")}</SectionTitle>
           </div>
 
           <pre className="max-h-[520px] overflow-auto whitespace-pre-wrap rounded-md border bg-background p-4 text-sm leading-6 text-foreground">
             {selectedRecord.markdown?.trim() ||
-              "Aucun contenu markdown extrait pour cette page."}
+              t("noMarkdownExtracted")}
           </pre>
         </section>
       </div>
@@ -311,6 +341,30 @@ export function CrawlerResultsView({
   onToggleSort,
   onSelectRecord,
 }: CrawlerResultsViewProps) {
+  const { t } = useScopedI18n("crawler-panel");
+  const statusFilterOptions = [
+    { value: "all", label: t("statusAll") },
+    { value: "completed", label: t("statusCompleted") },
+    { value: "running", label: t("statusRunning") },
+    { value: "errored", label: t("statusErrored") },
+    { value: "cancelled", label: t("statusCancelled") },
+  ] as const satisfies readonly PeriodFilterOption[];
+  const severityFilterOptions = [
+    { value: "all", label: t("severityAll") },
+    { value: "high", label: t("severityHigh") },
+    { value: "medium", label: t("severityMedium") },
+    { value: "low", label: t("severityLow") },
+    { value: "none", label: t("severityNone") },
+  ] as const satisfies readonly PeriodFilterOption[];
+  const columns = [
+    { id: "page", label: t("columnPage"), className: "min-w-[260px]" },
+    { id: "url", label: t("columnUrl"), className: "min-w-[260px]" },
+    { id: "http", label: t("columnHttp"), className: "w-[88px]" },
+    { id: "status", label: t("statusLabel"), className: "w-[120px]" },
+    { id: "priority", label: t("columnPriority"), className: "w-[120px]" },
+    { id: "findings", label: t("columnSignals"), className: "w-[120px]" },
+  ] as const;
+
   function renderSortIcon(columnKey: SortKey) {
     if (sortKey !== columnKey) return <ArrowUpDown className="h-4 w-4" />;
     return sortDirection === "asc" ? (
@@ -332,7 +386,7 @@ export function CrawlerResultsView({
               <Input
                 value={query}
                 onChange={(event) => onQueryChange(event.target.value)}
-                placeholder="Rechercher par titre ou URL"
+                placeholder={t("searchPlaceholder")}
                 className="pl-9"
               />
             </div>
@@ -341,9 +395,9 @@ export function CrawlerResultsView({
               className="w-full sm:w-[220px]"
               value={statusFilter}
               onValueChange={(value) => onStatusFilterChange(value as StatusFilter)}
-              options={STATUS_FILTER_OPTIONS}
-              label="Statut"
-              title="Statut"
+              options={statusFilterOptions}
+              label={t("statusLabel")}
+              title={t("statusLabel")}
             />
 
             <PeriodFilterPicker
@@ -352,9 +406,9 @@ export function CrawlerResultsView({
               onValueChange={(value) =>
                 onSeverityFilterChange(value as SeverityFilter)
               }
-              options={SEVERITY_FILTER_OPTIONS}
-              label="Sévérité"
-              title="Sévérité"
+              options={severityFilterOptions}
+              label={t("severityLabel")}
+              title={t("severityLabel")}
             />
           </div>
 
@@ -367,7 +421,7 @@ export function CrawlerResultsView({
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 {columns.map((column) => {
-                  const sortMap: Partial<Record<CrawlColumn["id"], SortKey>> = {
+                  const sortMap: Partial<Record<(typeof columns)[number]["id"], SortKey>> = {
                     page: "page",
                     http: "http",
                     status: "status",
@@ -415,8 +469,8 @@ export function CrawlerResultsView({
                       label={
                         errorLabel ||
                         (records.length === 0
-                          ? "Aucun résultat disponible."
-                          : "Aucun résultat ne correspond aux filtres actuels.")
+                          ? t("noResultAvailable")
+                          : t("noResultMatchesFilters"))
                       }
                       className="h-24"
                     />
@@ -452,7 +506,7 @@ export function CrawlerResultsView({
                             {recordTitle}
                           </div>
                           <div className="text-xs text-muted-foreground">
-                            {formatSignalCount(record.issues?.length ?? 0)}
+                            {signalCountLabel(record.issues?.length ?? 0, t)}
                           </div>
                         </div>
                       </TableCell>
@@ -472,19 +526,19 @@ export function CrawlerResultsView({
 
                       <TableCell>
                         <Badge variant={statusTone(record.status)}>
-                          {statusLabel(record.status)}
+                          {statusDisplayLabel(record.status, t)}
                         </Badge>
                       </TableCell>
 
                       <TableCell>
                         <Badge className={priority.className}>
-                          {priority.label}
+                          {priorityDisplayLabel(priority.rank, t)}
                         </Badge>
                       </TableCell>
 
                       <TableCell className="whitespace-normal">
                         <Badge variant="outline">
-                          {formatSignalCount(record.issues?.length ?? 0)}
+                          {signalCountLabel(record.issues?.length ?? 0, t)}
                         </Badge>
                       </TableCell>
                     </TableRow>

@@ -1,4 +1,5 @@
 import { KpiCard } from "@/components/shared/kpi-card";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { formatLabel } from "../../_lib/shared/formatters";
 import type { OrganizationResources, OrganizationSummary } from "../../_lib/shared/types";
 
@@ -9,35 +10,37 @@ export function OrganizationSummaryPanel({
   organization: OrganizationSummary;
   resources: OrganizationResources;
 }) {
+  const { t } = useScopedI18n("organizations");
+
   return (
     <div className="hidden md:grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard
-        title="Organisation"
+        title={t("summaryOrganizationTitle")}
         value={organization.name}
-        sub={`Role ${formatLabel(organization.role)}`}
-        trend="Active"
+        sub={t("summaryRole", { role: formatLabel(organization.role) })}
+        trend={t("summaryActive")}
         trendDir="stable"
         variant="active"
       />
       <KpiCard
-        title="Projets"
+        title={t("summaryProjectsTitle")}
         value={String(resources.projects.length)}
-        sub="Scopes actifs dans cette organisation."
-        trend={`${resources.members.length} membres`}
+        sub={t("summaryProjectsSub")}
+        trend={t("summaryMembersTrend", { count: resources.members.length })}
         trendDir="stable"
       />
       <KpiCard
-        title="Membres"
+        title={t("summaryMembersTitle")}
         value={String(resources.members.length)}
-        sub="Membres rattaches a cette organisation."
-        trend="Roles libres"
+        sub={t("summaryMembersSub")}
+        trend={t("summaryOpenRoles")}
         trendDir="stable"
       />
       <KpiCard
-        title="Invitations"
+        title={t("summaryInvitationsTitle")}
         value={String(resources.invitations.filter((item) => item.status === "pending").length)}
-        sub="Invitations en attente de reponse."
-        trend={`${resources.invitations.length} total`}
+        sub={t("summaryInvitationsSub")}
+        trend={t("summaryTotalInvitations", { count: resources.invitations.length })}
         trendDir="stable"
       />
     </div>

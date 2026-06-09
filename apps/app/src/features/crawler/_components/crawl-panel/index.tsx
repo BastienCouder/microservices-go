@@ -15,34 +15,12 @@ import {
   type SortKey,
   type StatusFilter,
 } from "./_lib/crawl-panel-utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type CrawlPanelProps = {
   apiBaseURL: string;
   routeSearch: string;
   variant?: "crawler" | "contentOptimizer";
-};
-
-const CONTENT_OPTIMIZER_COPY = {
-  header: {
-    title: "Optimisation de contenu",
-    baseline:
-      "Identifie les pages à améliorer pour la visibilité IA et priorise les corrections.",
-    discoverInitialLabel: "Découvrir les pages",
-    discoverRunningLabel: "Découverte en cours",
-    analyzeSelectionLabel: "Analyser la sélection",
-    analyzeRunningLabel: "Analyse en cours",
-    reviewAnalyzedPagesLabel: "Nouvelle sélection",
-    reviewAnalyzedPagesRunningLabel: "Découverte en cours",
-  },
-  initialSetup: {
-    title: "Optimisation de contenu",
-    titleWithProject: (projectName: string) =>
-      `Optimisation de contenu - ${projectName}`,
-    description:
-      "Découvre les pages du domaine, choisis celles à analyser, puis priorise les corrections GEO les plus actionnables.",
-    discoverLabel: "Découvrir les pages",
-    discoveringLabel: "Découverte en cours",
-  },
 };
 
 export function CrawlPanel({
@@ -51,7 +29,49 @@ export function CrawlPanel({
   variant = "crawler",
 }: CrawlPanelProps) {
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
-  const copy = variant === "contentOptimizer" ? CONTENT_OPTIMIZER_COPY : null;
+  const { t } = useScopedI18n("content-optimizer");
+  const { t: crawlerT } = useScopedI18n("crawler-panel");
+  const copy =
+    variant === "contentOptimizer"
+      ? {
+          header: {
+            title: t("headerTitle"),
+            baseline: t("headerBaseline"),
+            discoverInitialLabel: t("discoverPages"),
+            discoverRunningLabel: t("discoveringPages"),
+            analyzeSelectionLabel: t("analyzeSelection"),
+            analyzeRunningLabel: t("analyzingSelection"),
+            reviewAnalyzedPagesLabel: t("newSelection"),
+            reviewAnalyzedPagesRunningLabel: t("discoveringPages"),
+            analyzeConfirmTitle: t("analyzeConfirmTitle"),
+            discoverConfirmTitle: t("discoverConfirmTitle"),
+            reviewConfirmTitle: t("discoverConfirmTitle"),
+            confirmLoadingLabel: t("processing"),
+            cancelLabel: t("cancel"),
+            discoverAriaLabel: t("discoverAriaLabel"),
+            newSelectionAriaLabel: t("newSelectionAriaLabel"),
+            creditQuotaCurrentPlanFallback: t("currentPlan"),
+            creditQuotaLoadingLabel: t("quotaLoading"),
+            creditQuotaCheckingLabel: t("quotaChecking"),
+            creditConsumptionTemplate: t("creditConsumptionTemplate"),
+          },
+          initialSetup: {
+            title: t("setupTitle"),
+            titleWithProject: (projectName: string) =>
+              t("setupTitleWithProject", { projectName }),
+            description: t("setupDescription"),
+            discoverLabel: t("discoverPages"),
+            discoveringLabel: t("discoveringPages"),
+            confirmTitle: t("discoverConfirmTitle"),
+            confirmLoadingLabel: t("processing"),
+            cancelLabel: t("cancel"),
+            creditQuotaCurrentPlanFallback: t("currentPlan"),
+            creditQuotaLoadingLabel: t("quotaLoading"),
+            creditQuotaCheckingLabel: t("quotaChecking"),
+            creditConsumptionTemplate: t("discoverCreditConsumptionTemplate"),
+          },
+        }
+      : null;
   const reviewingDiscoveredPages =
     (viewModel.phase === "review" ||
       (viewModel.phase === "discovering" &&
@@ -191,11 +211,15 @@ export function CrawlPanel({
   useEffect(() => {
     if (viewModel.discovering) {
       pushInfoToast(
-        "Découverte des pages en cours.",
-        "Les pages détectées seront proposées à la sélection dès que la découverte est terminée.",
+        variant === "contentOptimizer"
+          ? t("discoveryToastTitle")
+          : crawlerT("discoveryToastTitle"),
+        variant === "contentOptimizer"
+          ? t("discoveryToastDescription")
+          : crawlerT("discoveryToastDescription"),
       );
     }
-  }, [viewModel.discovering]);
+  }, [crawlerT, t, variant, viewModel.discovering]);
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-3 p-2 md:p-4">

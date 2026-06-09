@@ -112,7 +112,7 @@ export function StepAnalysis({
             ? error.message
             : analysisRetryErrorMessage;
         setCreationError(nextMessage);
-        pushErrorToast(error, "Impossible de creer le projet.");
+        pushErrorToast(error, t("analysisCreateProjectError"));
       });
   }, [
     attempt,

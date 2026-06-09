@@ -1,0 +1,4 @@
+{
+  "missingConfigurationTitle": "Configuration manquante",
+  "missingApiBaseUrlDescription": "La variable `VITE_API_BASE_URL` est requise pour appeler l’API Gateway."
+}

@@ -1,4 +1,5 @@
 import { MultiSelectFilterPopover } from "@/components/shared/multi-select-filter-popover";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 export function ErrorHubCompetitorsFilter({
   allCompetitorsSelected,
@@ -15,9 +16,12 @@ export function ErrorHubCompetitorsFilter({
   selectedCompetitors: string[];
   toggleCompetitor: (competitor: string) => void;
 }) {
+  const { t } = useScopedI18n("error-hub");
   const summaryLabel = allCompetitorsSelected
-    ? "Tous les concurrents"
-    : `${selectedCompetitors.length} sélectionné${selectedCompetitors.length > 1 ? "s" : ""}`;
+    ? t("allCompetitors")
+    : selectedCompetitors.length > 1
+      ? t("selectedCountPlural", { count: selectedCompetitors.length })
+      : t("selectedCountSingular", { count: selectedCompetitors.length });
   const options = availableCompetitors.map((competitor) => ({
     id: competitor,
     label: competitor,
@@ -27,14 +31,14 @@ export function ErrorHubCompetitorsFilter({
     <MultiSelectFilterPopover
       open={open}
       onOpenChange={onOpenChange}
-      label="Concurrents"
+      label={t("competitorsLabel")}
       summaryLabel={summaryLabel}
-      title="Concurrents"
+      title={t("competitorsLabel")}
       options={options}
       selectedIds={selectedCompetitors}
       onToggle={toggleCompetitor}
       contentClassName="w-[360px]"
-      emptyLabel="Aucun concurrent disponible"
+      emptyLabel={t("noCompetitorAvailable")}
       gridClassName="sm:grid-cols-1"
     />
   );

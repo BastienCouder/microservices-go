@@ -1,6 +1,7 @@
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import {
   formatDateLabel,
@@ -17,6 +18,7 @@ type TrafficTrendProps = {
 };
 
 export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTrendProps) {
+  const { t } = useScopedI18n("traffic-report");
   const isMobile = useIsMobile();
   const presentation = getTrafficTrendPresentation(points, isMobile);
   const visiblePoints = presentation.points;
@@ -27,9 +29,9 @@ export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTre
     <section className="min-w-0 overflow-hidden rounded-md bg-card p-4 text-card-foreground">
       <div className="mb-4 flex flex-col gap-1">
         <SectionTitle>
-          Trafic dans le temps
+          {t("trafficTrendTitle")}
         </SectionTitle>
-        <p className="text-xs text-muted-foreground">Visites IA détectées agrégées par jour.</p>
+        <p className="text-xs text-muted-foreground">{t("trafficTrendDescription")}</p>
       </div>
 
       <div
@@ -51,7 +53,7 @@ export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTre
           </div>
         ) : visiblePoints.length === 0 ? (
           <div className="flex h-full min-w-0 items-center">
-            <EmptyStateCard label={errorLabel || "Aucune série disponible"} className="h-full min-h-0 w-full" />
+            <EmptyStateCard label={errorLabel || t("noSeriesAvailable")} className="h-full min-h-0 w-full" />
           </div>
         ) : (
           <div
@@ -76,11 +78,11 @@ export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTre
                   )}
                 >
                   <div className="flex h-full w-full items-end">
-                    <div
-                      className="w-full rounded-t-md bg-primary transition-[height]"
-                      style={{ height: `${height}%` }}
-                      title={`${formatInteger(point.sessions)} visites IA détectées`}
-                    />
+                  <div
+  className="w-full rounded-t-md bg-primary transition-[height]"
+  style={{ height: `${height}%` }}
+  title={t("trafficBarTitle", { count: point.sessions })}
+/>
                   </div>
                   <div className="flex min-h-[28px] w-full items-start justify-center pt-1">
                     <span

@@ -21,6 +21,7 @@ import {
   readSelectedOrganizationID,
   readSelectedProjectToken,
 } from "@/shared/selection";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type UseContentOptimizerViewModelInput = {
   apiBaseURL: string;
@@ -205,6 +206,7 @@ export function useContentOptimizerViewModel({
   apiBaseURL,
   routeSearch,
 }: UseContentOptimizerViewModelInput) {
+  const { t } = useScopedI18n("crawler-panel");
   const projectId = useMemo(
     () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectToken(),
     [routeSearch],
@@ -338,8 +340,12 @@ export function useContentOptimizerViewModel({
     quotaUsage.remainingCredits >= credits;
   const pushInsufficientCreditsToast = (credits: number) => {
     pushWarningToast(
-      "Crédits insuffisants",
-      `Cette analyse coûte ${credits} crédits. Il reste ${quotaUsage.remainingCredits}/${quotaUsage.monthlyCredits} crédits sur votre quota mensuel.`,
+      t("insufficientCreditsTitle"),
+      t("insufficientCreditsDescription", {
+        credits,
+        remaining: quotaUsage.remainingCredits,
+        total: quotaUsage.monthlyCredits,
+      }),
     );
   };
 
@@ -408,7 +414,7 @@ export function useContentOptimizerViewModel({
         setError(
           nextError instanceof Error
             ? nextError.message
-            : "Impossible de charger le projet.",
+            : t("loadProjectError"),
         );
         setProjectSummaryResolved(true);
         setHydratingProjectScope(false);
@@ -554,7 +560,7 @@ export function useContentOptimizerViewModel({
       setError(
         nextError instanceof Error
           ? nextError.message
-          : "Impossible d'analyser le site.",
+          : t("analyzeSiteError"),
       );
     },
   });
@@ -604,7 +610,7 @@ export function useContentOptimizerViewModel({
       setError(
         nextError instanceof Error
           ? nextError.message
-          : "Impossible de lancer le crawl.",
+          : t("launchCrawlError"),
       );
     },
   });
@@ -635,7 +641,7 @@ export function useContentOptimizerViewModel({
       setError(
         nextError instanceof Error
           ? nextError.message
-          : "Impossible d'analyser les pages sélectionnées.",
+          : t("analyzeSelectedPagesError"),
       );
     },
   });
@@ -730,7 +736,7 @@ export function useContentOptimizerViewModel({
         setError(
           nextError instanceof Error
             ? nextError.message
-            : "Impossible de lire le crawl.",
+            : t("readCrawlError"),
         );
         setActiveJobKind(null);
         setPhase(activeJobKind === "discover" ? "idle" : "review");

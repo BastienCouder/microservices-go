@@ -1,0 +1,22 @@
+{
+  "title": "Connect your sources.",
+  "subtitle": "In minutes.",
+  "description": "Combine AI visibility with traffic, pipeline and revenue using the tools already present in your stack.",
+  "items": {
+    "ga4": {
+      "category": "analytics"
+    },
+    "hubspot": {
+      "category": "crm"
+    },
+    "stripe": {
+      "category": "revenue"
+    },
+    "webflow": {
+      "category": "cms"
+    },
+    "markdown": {
+      "category": "content"
+    }
+  }
+}

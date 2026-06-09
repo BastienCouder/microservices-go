@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { PromptItem } from "../../_lib/types";
 
 export function PromptDeleteDialog({
@@ -13,6 +14,7 @@ export function PromptDeleteDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: (prompts: PromptItem[]) => void;
 }) {
+  const { t } = useScopedI18n("prompts-workspace");
   const promptCount = pendingDeletePrompts.length;
   const isBulkDelete = promptCount > 1;
 
@@ -20,17 +22,19 @@ export function PromptDeleteDialog({
     <ConfirmDialog
       open={promptCount > 0}
       onOpenChange={onOpenChange}
-      title={isBulkDelete ? "Supprimer ces prompts ?" : "Supprimer ce prompt ?"}
+      title={isBulkDelete ? t("deletePromptsTitle") : t("deletePromptTitle")}
       description={
         isBulkDelete
-          ? "Ces prompts seront supprimes definitivement."
-          : "Ce prompt sera supprime definitivement."
+          ? t("deletePromptsDescription")
+          : t("deletePromptDescription")
       }
-      confirmLabel="Supprimer"
+      confirmLabel={t("bulkDelete")}
       loading={promptsLoading}
       media={<Trash2 />}
       previewItems={pendingDeletePrompts.map((prompt) => prompt.prompt)}
-      previewOverflowLabel={(remainingCount) => `+${remainingCount} autres prompts`}
+      previewOverflowLabel={(remainingCount) =>
+        t("deletePromptsOverflow", { count: remainingCount })
+      }
       onConfirm={() => promptCount > 0 && onConfirm(pendingDeletePrompts)}
     />
   );

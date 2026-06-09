@@ -1,0 +1,45 @@
+{
+  "headline": {
+    "title": "API-first.",
+    "subtitle": "Ready for automation."
+  },
+  "description": "Pull raw visibility data, wire your own workflows and plug Visia into internal tooling without depending on the UI.",
+  "status": "Sandbox active",
+  "docsLink": "View documentation",
+  "features": {
+    "api": {
+      "title": "REST API",
+      "description": "List analyses, scores, citations and recommendations from your own dashboards."
+    },
+    "mcp": {
+      "title": "MCP server",
+      "description": "Expose visibility data directly to your internal agents and assistants."
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "description": "Trigger workflows on every new analysis, alert or score change."
+    },
+    "export": {
+      "title": "Clean exports",
+      "description": "Retrieve JSON or CSV data for reports, notebooks and pipelines."
+    },
+    "docs": {
+      "title": "Concise docs",
+      "description": "Simple endpoints, clear schemas and examples you can use right away."
+    }
+  },
+  "examples": {
+    "rest": {
+      "label": "REST",
+      "code": "curl -X GET \"https://api.visia.io/v1/analyses?brand=acme\" \\\n  -H \"Authorization: Bearer visia_test_key\" \\\n  -H \"Accept: application/json\""
+    },
+    "mcp": {
+      "label": "MCP",
+      "code": "{\n  \"server\": \"visia\",\n  \"tool\": \"brand.visibility\",\n  \"input\": {\n    \"brand\": \"acme\",\n    \"market\": \"en\",\n    \"question\": \"which billing platform should I choose?\"\n  }\n}"
+    },
+    "webhooks": {
+      "label": "Webhooks",
+      "code": "POST /webhooks/analysis.completed\n{\n  \"brand\": \"acme\",\n  \"score\": 71,\n  \"delta\": 8,\n  \"top_model\": \"ChatGPT\",\n  \"tracked_at\": \"2026-03-19T09:00:00Z\"\n}"
+    }
+  }
+}

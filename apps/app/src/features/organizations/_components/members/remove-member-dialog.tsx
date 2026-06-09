@@ -1,4 +1,5 @@
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { OrganizationMember } from "../../_lib/shared/types";
 
 export function RemoveMemberDialog({
@@ -12,13 +13,15 @@ export function RemoveMemberDialog({
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
 }) {
+  const { t } = useScopedI18n("organizations");
+
   return (
     <ConfirmDialog
       open={member !== null}
       onOpenChange={onOpenChange}
-      title="Retirer ce membre ?"
-      description="Le membre perdra l'acces a cette organisation. Ses roles seront retires."
-      confirmLabel="Retirer"
+      title={t("removeMemberTitle")}
+      description={t("removeMemberConfirmDescription")}
+      confirmLabel={t("remove")}
       loading={memberActionBusy}
       onConfirm={onConfirm}
     />

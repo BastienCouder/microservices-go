@@ -1,0 +1,20 @@
+{
+  "pageTitle": "Compte",
+  "pageBaseline": "Nom, prénom et email du compte connecté.",
+  "sessionTitle": "Session",
+  "noSession": "Aucune session utilisateur n’est chargée pour le moment.",
+  "profileTitle": "Profil",
+  "firstName": "Prénom",
+  "lastName": "Nom",
+  "email": "Email",
+  "save": "Enregistrer",
+  "profileUpdated": "Compte mis à jour.",
+  "updateProfileError": "Impossible de mettre à jour le compte.",
+  "logout": "Déconnexion",
+  "deleteAccount": "Supprimer le compte",
+  "deleteAccountTitle": "Supprimer votre compte ?",
+  "deleteAccountDescription": "Le compte sera désactivé et anonymisé. Les données utiles aux rapports restent conservées.",
+  "delete": "Supprimer",
+  "accountDeleted": "Compte supprimé.",
+  "deleteAccountError": "Impossible de supprimer le compte."
+}

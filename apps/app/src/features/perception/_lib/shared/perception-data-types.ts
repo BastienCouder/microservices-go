@@ -1,5 +1,5 @@
 import {
-  PERCEPTION_PERIOD_LABELS,
+  getPerceptionPeriodLabel,
 } from "@/lib/app-data";
 import type { ProjectModelMeta } from "@/lib/project-models";
 import type { RuntimeMode } from "@/lib/runtime-mode";
@@ -15,7 +15,7 @@ export type PerceptionAxisKey =
 
 export type PerceptionSeverity = "high" | "medium" | "low";
 export type OptimizePriority = "high" | "medium" | "low";
-export type PerceptionTrendPeriodKey = keyof typeof PERCEPTION_PERIOD_LABELS;
+export type PerceptionTrendPeriodKey = "all" | "7d" | "30d" | "90d" | "last-run";
 
 export type BrandCanon = {
   brandName: string;
@@ -204,23 +204,23 @@ export function createEmptyPerceptionViewData(
     },
     trend: {
       all: {
-        periodLabel: PERCEPTION_PERIOD_LABELS.all,
+        periodLabel: getPerceptionPeriodLabel("all"),
         data: [],
       },
       "7d": {
-        periodLabel: PERCEPTION_PERIOD_LABELS["7d"],
+        periodLabel: getPerceptionPeriodLabel("7d"),
         data: [],
       },
       "30d": {
-        periodLabel: PERCEPTION_PERIOD_LABELS["30d"],
+        periodLabel: getPerceptionPeriodLabel("30d"),
         data: [],
       },
       "90d": {
-        periodLabel: PERCEPTION_PERIOD_LABELS["90d"],
+        periodLabel: getPerceptionPeriodLabel("90d"),
         data: [],
       },
       "last-run": {
-        periodLabel: PERCEPTION_PERIOD_LABELS["last-run"],
+        periodLabel: getPerceptionPeriodLabel("last-run"),
         data: [],
       },
     },

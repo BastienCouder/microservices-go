@@ -1,0 +1,25 @@
+{
+  "headline": {
+    "title": "Une boucle simple.",
+    "subtitle": "Un signal actionnable."
+  },
+  "status": "Analyse synchronisée",
+  "steps": [
+    {
+      "title": "Connectez votre marque",
+      "description": "Ajoutez votre site, vos pages clés et vos concurrents pour définir le terrain de comparaison."
+    },
+    {
+      "title": "Lancez vos scénarios",
+      "description": "Testez les requêtes que vos prospects posent déjà dans ChatGPT, Perplexity, Claude, Gemini et les autres."
+    },
+    {
+      "title": "Recevez le diagnostic",
+      "description": "Visualisez qui est cité, quels messages ressortent et quels angles de contenu manquent pour prendre votre place."
+    },
+    {
+      "title": "Corrigez puis suivez",
+      "description": "Appliquez les recommandations, relancez les tests et mesurez si votre marque gagne enfin en présence."
+    }
+  ]
+}

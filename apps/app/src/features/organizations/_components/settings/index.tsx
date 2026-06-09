@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SectionTitle } from "@/components/shared/section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { OrganizationSummary } from "../../_lib/shared/types";
 
 type SettingsPanelProps = {
@@ -16,6 +17,7 @@ type SettingsPanelProps = {
 };
 
 export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDelete }: SettingsPanelProps) {
+  const { t } = useScopedI18n("organizations");
   const [name, setName] = useState(organization.name);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmationName, setConfirmationName] = useState("");
@@ -31,7 +33,7 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
     <div className="grid gap-4">
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-3">
-          <SectionTitle showIndicator={false}>Parametres</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("settingsTitle")}</SectionTitle>
         </div>
         <form
           className="grid gap-4 p-4 md:max-w-xl"
@@ -41,7 +43,7 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
           }}
         >
           <div className="grid gap-2">
-            <Label htmlFor="organization-name">Nom de l'organisation</Label>
+            <Label htmlFor="organization-name">{t("organizationName")}</Label>
             <Input
               id="organization-name"
               value={name}
@@ -52,7 +54,7 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
           <div>
             <Button type="submit" disabled={busy || deleteBusy || !canSave}>
               <Save data-icon="inline-start" />
-              Enregistrer
+              {t("save")}
             </Button>
           </div>
         </form>
@@ -60,13 +62,10 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
 
       <section className="rounded-lg border border-destructive/30 bg-card">
         <div className="border-b border-destructive/20 px-4 py-3">
-          <SectionTitle showIndicator={false}>Zone sensible</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("sensitiveZoneTitle")}</SectionTitle>
         </div>
         <div className="grid gap-3 p-4 md:max-w-xl">
-          <p className="text-sm text-muted-foreground">
-            La suppression desactive l'organisation, retire les acces, revoque les invitations et API keys,
-            puis anonymise les donnees sensibles rattachees a l'organisation.
-          </p>
+          <p className="text-sm text-muted-foreground">{t("deleteOrganizationDescription")}</p>
           <ConfirmDialog
             open={deleteOpen}
             onOpenChange={(open) => {
@@ -76,12 +75,12 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
             trigger={
               <Button type="button" variant="destructive" className="w-fit" disabled={busy || deleteBusy}>
                 <Trash2 data-icon="inline-start" />
-                Supprimer l'organisation
+                {t("deleteOrganization")}
               </Button>
             }
-            title="Supprimer cette organisation ?"
-            description="Cette action est irreversible. L'organisation sera soft-deletee et ses donnees sensibles seront anonymisees."
-            confirmLabel="Supprimer"
+            title={t("deleteOrganizationTitle")}
+            description={t("deleteOrganizationConfirmDescription")}
+            confirmLabel={t("delete")}
             loading={deleteBusy}
             confirmDisabled={confirmationName.trim() !== organization.name}
             media={<Trash2 />}
@@ -89,7 +88,7 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
           >
             <div className="mt-3 grid gap-2 text-left">
               <Label htmlFor="organization-delete-confirmation">
-                Tapez le nom de l'organisation pour confirmer
+                {t("deleteOrganizationTypeName")}
               </Label>
               <Input
                 id="organization-delete-confirmation"

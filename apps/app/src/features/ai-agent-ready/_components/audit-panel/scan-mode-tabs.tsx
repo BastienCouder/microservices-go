@@ -1,4 +1,5 @@
 import { cn } from "@/shared/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type { ScanMode } from "../../_lib/shared/types";
 
@@ -13,11 +14,12 @@ type ScanModeTabsProps = {
 };
 
 export function ScanModeTabs({ modes, value, onChange }: ScanModeTabsProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   return (
     <div
       className="flex gap-2 overflow-x-auto pb-1"
       role="tablist"
-      aria-label="Scan mode"
+      aria-label={t("scanModeAriaLabel")}
     >
       {modes.map((mode) => {
         const active = mode.id === value;

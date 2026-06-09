@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { EmptyBlock } from "../shared/empty-block";
 import {
   formatDateTime,
@@ -57,6 +58,7 @@ export function InvitationsPanel({
   busy,
   revokeBusy,
 }: InvitationsPanelProps) {
+  const { t } = useScopedI18n("organizations");
   const pendingInvitations = useMemo(
     () => invitations.filter((invitation) => invitation.status === "pending"),
     [invitations],
@@ -70,7 +72,7 @@ export function InvitationsPanel({
     <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
       <section className="rounded-lg border border-border/60 bg-card px-4 py-2">
         <h2>
-          <SectionTitle showIndicator={false}>Nouvelle invitation</SectionTitle>
+          <SectionTitle showIndicator={false}>{t("newInvitationTitle")}</SectionTitle>
         </h2>
         <div className="mt-4 space-y-3">
           <Input
@@ -96,10 +98,10 @@ export function InvitationsPanel({
             }}
           >
             <SelectTrigger className="bg-background w-full">
-              <SelectValue placeholder="Portee de l'invitation" />
+              <SelectValue placeholder={t("invitationScopePlaceholder")} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="organization">Toute l'organisation</SelectItem>
+              <SelectItem value="organization">{t("organizationWide")}</SelectItem>
               {projects.map((project) => (
                 <SelectItem key={project.id} value={project.id}>
                   {project.name}
@@ -109,7 +111,7 @@ export function InvitationsPanel({
           </Select>
           <Select value={draft.role} onValueChange={(role) => onDraftChange({ ...draft, role })}>
             <SelectTrigger className="bg-background w-full">
-              <SelectValue placeholder="Role" />
+              <SelectValue placeholder={t("rolePlaceholder")} />
             </SelectTrigger>
             <SelectContent>
               {(draft.projectId ? ASSIGNABLE_PROJECT_ROLES : INVITABLE_ORGANIZATION_ROLES).map((role) => (
@@ -122,10 +124,10 @@ export function InvitationsPanel({
           <Input
             value={draft.message}
             onChange={(event) => onDraftChange({ ...draft, message: event.target.value })}
-            placeholder="Message optionnel"
+            placeholder={t("optionalMessagePlaceholder")}
           />
           <Button className="w-full" onClick={onSubmit} disabled={busy}>
-            {busy ? "Envoi..." : "Inviter"}
+            {busy ? t("sending") : t("invite")}
           </Button>
         </div>
       </section>
@@ -133,25 +135,25 @@ export function InvitationsPanel({
       <section className="rounded-lg border border-border/60 bg-card">
         <div className="border-b border-border/60 px-4 py-2">
           <h2>
-            <SectionTitle showIndicator={false}>Invitations en cours</SectionTitle>
+            <SectionTitle showIndicator={false}>{t("pendingInvitationsTitle")}</SectionTitle>
           </h2>
         </div>
         <div className="p-4">
           {pendingInvitations.length === 0 ? (
             <EmptyBlock
-              title="Aucune invitation"
-              description="Les invitations en attente depuis cette organisation seront listees ici."
+              title={t("noInvitationTitle")}
+              description={t("noInvitationDescription")}
             />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Portee</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Envoyee le</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t("emailColumn")}</TableHead>
+                  <TableHead>{t("scopeColumn")}</TableHead>
+                  <TableHead>{t("roleColumn")}</TableHead>
+                  <TableHead>{t("statusColumn")}</TableHead>
+                  <TableHead>{t("sentAtColumn")}</TableHead>
+                  <TableHead className="text-right">{t("actionsColumn")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -160,8 +162,8 @@ export function InvitationsPanel({
                     <TableCell className="font-medium">{invitation.email}</TableCell>
                     <TableCell>
                       {invitation.projectId
-                        ? projectNameById.get(invitation.projectId) ?? `Projet ${invitation.projectId}`
-                        : "Organisation"}
+                        ? projectNameById.get(invitation.projectId) ?? t("projectFallback", { id: invitation.projectId })
+                        : t("organization")}
                     </TableCell>
                     <TableCell>{formatLabel(invitation.role)}</TableCell>
                     <TableCell>
@@ -178,16 +180,16 @@ export function InvitationsPanel({
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            title="Desactiver l'invitation"
+                            title={t("disableInvitation")}
                             disabled={revokeBusy}
                           >
                             <Trash2 />
-                            <span className="sr-only">Desactiver l'invitation</span>
+                            <span className="sr-only">{t("disableInvitation")}</span>
                           </Button>
                         }
-                        title="Desactiver cette invitation ?"
-                        description={`L'invitation envoyee a ${invitation.email} ne pourra plus etre acceptee.`}
-                        confirmLabel="Desactiver"
+                        title={t("disableInvitationTitle")}
+                        description={t("disableInvitationDescription", { email: invitation.email })}
+                        confirmLabel={t("disable")}
                         loading={revokeBusy}
                         media={<Trash2 />}
                         onConfirm={() => onRevokeInvitation(invitation.id)}

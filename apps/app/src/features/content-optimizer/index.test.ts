@@ -17,11 +17,11 @@ describe("content optimizer page", () => {
   });
 
   test("sets content optimization copy on the shared crawl panel", () => {
-    expect(crawlPanelSource.includes("CONTENT_OPTIMIZER_COPY")).toBe(true);
-    expect(crawlPanelSource.includes("Optimisation de contenu")).toBe(true);
-    expect(crawlPanelSource.includes("Découvrir les pages")).toBe(true);
-    expect(crawlPanelSource.includes("Analyser la sélection")).toBe(true);
-    expect(crawlPanelSource.includes("Nouvelle sélection")).toBe(true);
+    expect(crawlPanelSource.includes('useScopedI18n("content-optimizer")')).toBe(true);
+    expect(crawlPanelSource.includes('title: t("headerTitle")')).toBe(true);
+    expect(crawlPanelSource.includes('discoverLabel: t("discoverPages")')).toBe(true);
+    expect(crawlPanelSource.includes('analyzeSelectionLabel: t("analyzeSelection")')).toBe(true);
+    expect(crawlPanelSource.includes('reviewAnalyzedPagesLabel: t("newSelection")')).toBe(true);
     expect(crawlPanelSource.includes("Relancer la découverte")).toBe(false);
   });
 });

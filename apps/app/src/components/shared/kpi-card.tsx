@@ -6,6 +6,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 
 export type KpiCardProps = {
@@ -21,6 +22,7 @@ export type KpiCardProps = {
 };
 
 export const KpiCard = memo(function KpiCard({ className, mini = false, title, value, sub, description, trend, trendDir, variant = "default" }: KpiCardProps) {
+  const { t } = useScopedI18n("shared-ui");
   const isActive = variant === "active";
   const trendTone = isActive
     ? "border-transparent bg-white/20 text-white"
@@ -56,7 +58,7 @@ export const KpiCard = memo(function KpiCard({ className, mini = false, title, v
                         ? "text-primary-foreground/80 hover:bg-white/15 hover:text-primary-foreground"
                         : "text-muted-foreground hover:bg-muted hover:text-foreground",
                     )}
-                    aria-label={`Définition: ${title}`}
+                    aria-label={t("definitionAria", { title })}
                   >
                     <Info className="h-3.5 w-3.5" />
                   </button>

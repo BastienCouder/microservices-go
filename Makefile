@@ -9,6 +9,8 @@ COMPOSE_FILES := -f docker-compose.yml -f docker-compose.secrets.generated.yml
 COMPOSE_DEV := $(COMPOSE) -p microservices-go-dev $(COMPOSE_FILES) -f docker-compose.dev.yml
 COMPOSE_PROD := $(COMPOSE) -p microservices-go-prod $(COMPOSE_FILES)
 COMPOSE_PROD_SERIAL := COMPOSE_PARALLEL_LIMIT=1 $(COMPOSE_PROD)
+COMPOSE_PROD_LOCAL := $(COMPOSE_PROD) -f docker-compose.prod-local.yml
+COMPOSE_PROD_LOCAL_SERIAL := COMPOSE_PARALLEL_LIMIT=1 $(COMPOSE_PROD_LOCAL)
 
 ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
@@ -97,7 +99,8 @@ OPTIONAL_SECRETS := \
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
 	dev-doc dev-email dev-mcp dev-monitoring \
-	prod prod-build prod-down prod-logs prod-migrate prod-ping prod-check deploy-prod \
+	prod prod-build prod-down prod-restart prod-logs prod-migrate prod-ping prod-check deploy-prod \
+	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate prod-ping prod-check deploy-prod \
 	prod-doc prod-email prod-mcp prod-monitoring \
 	db-generate db-migrate \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
@@ -195,31 +198,37 @@ db-generate:
 db-migrate: dev-migrate
 
 prod: secrets-check
-	$(COMPOSE_PROD_SERIAL) $(PROFILES_PROD) up -d
+	$(COMPOSE_PROD_LOCAL_SERIAL) $(PROFILES_PROD) up -d
 
 prod-build: secrets-check
-	$(COMPOSE_PROD_SERIAL) $(PROFILES_PROD) up -d --build
+	$(COMPOSE_PROD_LOCAL_SERIAL) $(PROFILES_PROD) up -d --build
 
 prod-down:
-	$(COMPOSE_PROD) down --remove-orphans
+	$(COMPOSE_PROD_LOCAL) down --remove-orphans
+
+prod-restart:
+	$(COMPOSE_PROD_LOCAL) restart $(SERVICE)
+
+prod-rebuild:
+	$(COMPOSE_PROD_LOCAL_SERIAL) $(PROFILES_PROD) up -d --build $(SERVICE)
 
 prod-logs:
-	$(COMPOSE_PROD) logs -f $(SERVICE)
+	$(COMPOSE_PROD_LOCAL) logs -f $(SERVICE)
 
 prod-migrate: secrets-check
-	$(COMPOSE_PROD_SERIAL) --profile migrations up --build
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile migrations up --build
 
 prod-doc: secrets-check
-	$(COMPOSE_PROD_SERIAL) --profile doc up -d
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile doc up -d
 
 prod-email: secrets-check
-	$(COMPOSE_PROD_SERIAL) --profile email up -d
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile email up -d
 
 prod-mcp: secrets-check
-	$(COMPOSE_PROD_SERIAL) --profile mcp up -d
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile mcp up -d
 
 prod-monitoring: secrets-check
-	$(COMPOSE_PROD_SERIAL) --profile monitoring up -d
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile monitoring up -d
 
 prod-ping:
 	ansible -i $(ANSIBLE_INVENTORY) production -m ping --ask-become-pass
@@ -286,13 +295,21 @@ seed-nike:
 		-v /usr/bin/docker:/usr/local/bin/docker \
 		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e SEED_COMPOSE_PROJECT_NAME=$${SEED_COMPOSE_PROJECT_NAME:-microservices-go} \
-		-e SEED_COMPOSE_FILES=$${SEED_COMPOSE_FILES:-docker-compose.yml} \
-		-e SEED_ANALYSIS_MODE=$${SEED_ANALYSIS_MODE:-synthetic} \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
+		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_ANALYSIS_MODE=synthetic \
 		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 
 seed-nike-live:
-	SEED_ANALYSIS_MODE=live $(MAKE) seed-nike
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace \
+		-v /usr/bin/docker:/usr/local/bin/docker \
+		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
+		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_ANALYSIS_MODE=live \
+		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 
 # Backward-compatible aliases.
 up-dev-full: dev-build

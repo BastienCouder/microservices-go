@@ -416,8 +416,12 @@ export function usePerceptionViewModel(
     if (!projectId || analysisRunning) return;
     if (perceptionQuotaExceeded) {
       pushWarningToast(
-        "Crédits insuffisants",
-        `Cette analyse coûte ${estimatedPerceptionCredits} crédits. Il reste ${quotaQuery.data?.remainingCredits ?? 0}/${quotaQuery.data?.monthlyCredits ?? 0} crédits sur votre quota mensuel.`,
+        t("analysisInsufficientCreditsTitle"),
+        t("analysisInsufficientCreditsDescription", {
+          credits: estimatedPerceptionCredits,
+          remaining: quotaQuery.data?.remainingCredits ?? 0,
+          total: quotaQuery.data?.monthlyCredits ?? 0,
+        }),
       );
       return;
     }
@@ -442,7 +446,7 @@ export function usePerceptionViewModel(
       setLastAnalysisCredits(credits);
     } catch (err) {
       setAnalysisError(
-        err instanceof Error ? err.message : "Impossible de lancer l'analyse de perception.",
+        err instanceof Error ? err.message : t("analysisLaunchError"),
       );
     } finally {
       setAnalysisRunning(false);

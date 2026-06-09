@@ -1,0 +1,25 @@
+{
+  "description": "Mesurez, comprenez et améliorez la manière dont les IA parlent de votre marque.",
+  "copyright": "© 2026 Visia. Tous droits réservés.",
+  "status": "Tous les systèmes opérationnels",
+  "groups": {
+    "product": "Produit",
+    "company": "Entreprise",
+    "legal": "Légal"
+  },
+  "links": {
+    "features": "Fonctionnalités",
+    "howItWorks": "Comment ça marche",
+    "developers": "Développeurs",
+    "pricing": "Tarifs",
+    "faq": "FAQ",
+    "about": "À propos",
+    "blog": "Blog",
+    "careers": "Carrières",
+    "hiring": "On recrute",
+    "contact": "Contact",
+    "privacy": "Confidentialité",
+    "terms": "Conditions",
+    "security": "Sécurité"
+  }
+}

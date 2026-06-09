@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 
 import type { PageInsight } from "../../_lib/pages-panel/types";
@@ -30,13 +31,14 @@ export function TopPagesList({
   onSelectPage,
   loading = false,
 }: TopPagesListProps) {
+  const { t } = useScopedI18n("pages");
   return (
     <Card className="flex min-h-0 overflow-hidden rounded-md border-border/60 bg-card/95">
       <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <SectionTitle>Pages citées</SectionTitle>
+          <SectionTitle>{t("citedPagesTitle")}</SectionTitle>
           <p className="text-xs text-muted-foreground">
-            URLs de votre site détectées dans les réponses IA.
+            {t("citedPagesDescription")}
           </p>
         </div>
 
@@ -45,7 +47,7 @@ export function TopPagesList({
           <Input
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Rechercher"
+            placeholder={t("search")}
             disabled={loading}
             className="h-10 rounded-md border-border/70 bg-background pl-9 text-sm"
           />
@@ -84,8 +86,8 @@ export function TopPagesList({
                 label={
                   errorLabel ||
                   (search.trim()
-                    ? "Aucune page ne correspond à la recherche."
-                    : "Aucune page citée pour le moment.")
+                    ? t("noMatchingPage")
+                    : t("noCitedPageYet"))
                 }
                 className="h-40"
               />
@@ -102,7 +104,11 @@ export function TopPagesList({
                       ? "border border-border/50"
                       : "border border-border/50",
                   )}
-                  aria-label={`Page ${index + 1}: ${page.hostname}${page.path}`}
+                  aria-label={t("pageButtonAria", {
+                    index: index + 1,
+                    hostname: page.hostname,
+                    path: page.path,
+                  })}
                 >
                   <div className="mb-4 rounded-md">
                     <div className="flex min-w-0 items-center justify-between gap-2">
@@ -177,10 +183,10 @@ export function TopPagesList({
 
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
                       <span className="font-semibold text-foreground">{page.promptCount}</span>
-                      <span>réponses</span>
+                      <span>{t("responses")}</span>
                       <div className="h-[12px] w-px bg-border" />
                       <span className="font-semibold text-foreground">{page.citationCount}</span>
-                      <span>citations</span>
+                      <span>{t("citations")}</span>
                     </div>
                   </div>
                 </button>

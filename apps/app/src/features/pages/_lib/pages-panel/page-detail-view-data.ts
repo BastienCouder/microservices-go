@@ -1,3 +1,5 @@
+import i18n from "@/shared/i18n";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 import type { PageInsight, PageModelBadge, PagePromptHit } from "./types";
 
 export type PageModelBreakdownItem = PageModelBadge & {
@@ -16,6 +18,10 @@ export type PageGeoNeed = {
 export type PageCitationSample = PagePromptHit & {
   detailKey: string;
 };
+
+function currentLocale() {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
 
 export function buildPageCitationSamples(page: PageInsight): PageCitationSample[] {
   const seen = new Set<string>();
@@ -83,11 +89,11 @@ function normalizeText(value: string): string {
 }
 
 export function buildPageGeoNeed(page: PageInsight): PageGeoNeed | null {
+  const locale = currentLocale();
   if (page.modelCount <= 1 && page.promptCount > 0) {
     return {
-      title: "Diversifier la reprise LLM",
-      description:
-        "Cette page est encore reprise par un seul modèle. Renforcez les preuves, les comparatifs et les formulations explicites pour augmenter sa couverture multi-LLM.",
+      title: translateI18nText("pages", "diversifyLlmCoverageTitle", locale),
+      description: translateI18nText("pages", "diversifyLlmCoverageDescription", locale),
       metric: `${page.modelCount} LLM`,
       tone: "warning",
     };
@@ -95,10 +101,9 @@ export function buildPageGeoNeed(page: PageInsight): PageGeoNeed | null {
 
   if (page.citationShare >= 15 && page.modelCount >= 2 && page.promptCount >= 2) {
     return {
-      title: "Décliner le besoin couvert",
-      description:
-        "Cette page est déjà reprise par plusieurs modèles. Transformez les angles de prompts qui la citent en pages plus spécifiques pour capter la longue traîne GEO.",
-      metric: `${page.citationShare}% visibilité`,
+      title: translateI18nText("pages", "extendCoveredNeedTitle", locale),
+      description: translateI18nText("pages", "extendCoveredNeedDescription", locale),
+      metric: `${page.citationShare}% ${translateI18nText("pages", "visibilityMetricSuffix", locale)}`,
       tone: "primary",
     };
   }

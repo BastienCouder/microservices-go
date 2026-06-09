@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type ScoreGaugeProps = {
   score: number;
 };
 
 export function ScoreGauge({ score }: ScoreGaugeProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const [displayScore, setDisplayScore] = useState(0);
 
   useEffect(() => {
@@ -32,7 +34,7 @@ export function ScoreGauge({ score }: ScoreGaugeProps) {
   return (
     <div
       className="relative mx-auto h-[120px] w-[190px]"
-      aria-label={`Score ${score} out of 100`}
+      aria-label={t("scoreGaugeAria", { score })}
     >
       <svg viewBox="0 0 190 110" className="h-full w-full overflow-visible">
         <path

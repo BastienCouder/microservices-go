@@ -4,6 +4,8 @@ import {
   unwrapGatewayPayload,
   type GatewayResult,
 } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 export type ContentOptimizerCrawlJob = {
@@ -123,15 +125,16 @@ async function resolveProjectPathToken(
 }
 
 function normalizeContentOptimizerError(error: string): string {
+  const locale = i18n.resolvedLanguage || i18n.language || "fr";
   const normalized = error.trim();
   if (
     normalized.includes("cloudflare crawl authentication failed") ||
     normalized.includes('"code":10000') ||
     normalized.toLowerCase().includes("authentication error")
   ) {
-    return "Authentification Cloudflare invalide. Vérifie le token Browser Rendering dans deployments/secrets/cloudflare_api_token.txt, puis redémarre analysis-service.";
+    return translateI18nText("crawler-panel", "cloudflareAuthInvalid", locale);
   }
-  return normalized || "request failed";
+  return normalized || translateI18nText("crawler-panel", "requestFailed", locale);
 }
 
 function uniqueTrimmedValues(values: string[] | undefined): string[] {

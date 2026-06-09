@@ -16,6 +16,7 @@ import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-asset
 import type { TrafficPage } from "../../_lib/report/types";
 import { PaginationControls } from "./pagination-controls";
 import { SectionTitle } from "@/components/shared/section-title";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type TopPagesTableProps = {
   errorLabel?: string | null;
@@ -30,14 +31,16 @@ type TopPagesTableProps = {
 };
 
 export function TopPagesTable({ errorLabel, pages, pagination, loading = false }: TopPagesTableProps) {
+  const { t } = useScopedI18n("traffic-report");
+
   return (
     <section className="rounded-md bg-card p-4 text-card-foreground">
       <div className="mb-4 flex flex-col gap-1">
         <SectionTitle>
-          Top pages traffic
+          {t("topPagesTitle")}
         </SectionTitle>
         <p className="text-xs text-muted-foreground">
-          Pages publiques vues après une arrivée IA détectée. Les routes privées comme /admin sont masquées.
+          {t("topPagesDescription")}
         </p>
       </div>
 
@@ -52,7 +55,7 @@ export function TopPagesTable({ errorLabel, pages, pagination, loading = false }
           ))}
         </div>
       ) : pages.length === 0 ? (
-        <EmptyStateCard label={errorLabel || "Aucune page disponible"} className="h-28" />
+        <EmptyStateCard label={errorLabel || t("noPageAvailable")} className="h-28" />
       ) : (
         <>
           <div className="space-y-3 md:hidden">
@@ -85,15 +88,15 @@ export function TopPagesTable({ errorLabel, pages, pagination, loading = false }
 
                 <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <dt className="text-xs text-muted-foreground">Visites IA</dt>
+                    <dt className="text-xs text-muted-foreground">{t("aiVisits")}</dt>
                     <dd className="font-semibold">{formatInteger(page.sessions)}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground">Taux engagé</dt>
+                    <dt className="text-xs text-muted-foreground">{t("engagedRate")}</dt>
                     <dd>{formatPercent(page.engagementRate)}</dd>
                   </div>
                   <div>
-                    <dt className="text-xs text-muted-foreground">Conversions</dt>
+                    <dt className="text-xs text-muted-foreground">{t("conversions")}</dt>
                     <dd>{formatInteger(page.conversions)}</dd>
                   </div>
                 </dl>
@@ -105,11 +108,11 @@ export function TopPagesTable({ errorLabel, pages, pagination, loading = false }
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Page</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead className="text-right">Visites IA détectées</TableHead>
-                  <TableHead className="text-right">Taux engagé</TableHead>
-                  <TableHead className="text-right">Conversions</TableHead>
+                  <TableHead>{t("page")}</TableHead>
+                  <TableHead>{t("source")}</TableHead>
+                  <TableHead className="text-right">{t("detectedAiVisits")}</TableHead>
+                  <TableHead className="text-right">{t("engagedRate")}</TableHead>
+                  <TableHead className="text-right">{t("conversions")}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

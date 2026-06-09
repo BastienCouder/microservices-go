@@ -17,27 +17,23 @@ import {
   useTrafficReportPanelViewModel,
 } from "../../_lib/report/use-traffic-report-panel-view-model";
 import type { TrafficPeriod } from "../../_lib/report/types";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type TrafficReportPanelProps = {
   apiBaseURL: string;
   routeSearch: string;
 };
 
-const PERIOD_LABELS: Record<TrafficPeriod, string> = {
-  "7d": "7 jours",
-  "30d": "30 jours",
-  "90d": "90 jours",
-};
-
-const PERIOD_OPTIONS = Object.entries(PERIOD_LABELS).map(([value, label]) => ({
-  value,
-  label,
-}));
-
 export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPanelProps) {
   const vm = useTrafficReportPanelViewModel({ apiBaseURL, routeSearch });
+  const { t } = useScopedI18n("traffic-report");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const showReportShell = vm.loading || vm.isConnected || Boolean(vm.error);
+  const periodOptions: Array<{ value: TrafficPeriod; label: string }> = [
+    { value: "7d", label: t("period7d") },
+    { value: "30d", label: t("period30d") },
+    { value: "90d", label: t("period90d") },
+  ];
 
   const filtersContent = (
     <>
@@ -52,7 +48,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           value={vm.filters.search}
           onValueChange={vm.filters.setSearch}
           onSubmit={vm.filters.submitSearch}
-          placeholder="Rechercher source ou page"
+          placeholder={t("searchPlaceholder")}
         />
         <Button
           type="submit"
@@ -60,7 +56,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           disabled={vm.loading || vm.refreshing}
           className="w-full sm:w-auto"
         >
-          Rechercher
+          {t("searchButton")}
         </Button>
       </form>
 
@@ -76,9 +72,9 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
         <PeriodFilterPicker
           value={vm.period}
           onValueChange={vm.setPeriod}
-          options={PERIOD_OPTIONS}
-          label="Période"
-          title="Période"
+          options={periodOptions}
+          label={t("periodLabel")}
+          title={t("periodLabel")}
         />
       </div>
 
@@ -90,7 +86,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
         className="w-full sm:w-auto"
       >
         <RefreshCw data-icon="inline-start" />
-        Actualiser
+        {t("refresh")}
       </Button>
 
       {vm.canExport ? (
@@ -102,7 +98,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           className="w-full sm:w-auto xl:justify-self-end"
         >
           <Download data-icon="inline-start" />
-          Export Excel
+          {t("exportExcel")}
         </Button>
       ) : null}
     </>
@@ -111,8 +107,8 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]">
       <PageHeader
-        title="Trafic"
-        baseline="Visites provenant de moteurs IA lorsque Google Analytics 4 peut identifier la source."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         className="hidden md:block"
       />
 
@@ -150,7 +146,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
                 >
                   <span className="inline-flex items-center gap-2 text-sm font-medium">
                     <SlidersHorizontal className="h-4 w-4" />
-                    Filtres
+                    {t("filtersLabel")}
                   </span>
                   <ChevronDown
                     className={cn("h-4 w-4 transition-transform", filtersOpen && "rotate-180")}

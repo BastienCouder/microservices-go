@@ -1,7 +1,7 @@
 import {
-  PERCEPTION_AXIS_LABELS,
+  getPerceptionAxisLabel,
+  getPerceptionPeriodLabel,
   PERCEPTION_HEATMAP_AXIS_COLORS,
-  PERCEPTION_PERIOD_LABELS,
   PERCEPTION_VISIBLE_AXES,
 } from "@/lib/app-data";
 import type {
@@ -266,16 +266,16 @@ function deriveScoresFromParsedResponses(responses: ParsedResponse[]): Perceptio
 function deriveWindowLabel(responses: ParsedResponse[], referenceDate: Date): string {
   const dates = responses.map((response) => response.createdAt).filter((value): value is Date => value !== null);
   if (dates.length === 0) {
-    return PERCEPTION_PERIOD_LABELS["30d"];
+    return getPerceptionPeriodLabel("30d");
   }
 
   const earliest = dates.reduce((min, current) => (current.getTime() < min.getTime() ? current : min), dates[0]!);
   const diffDays = Math.max(0, Math.ceil((referenceDate.getTime() - earliest.getTime()) / (24 * 60 * 60 * 1000)));
 
-  if (diffDays <= 7) return PERCEPTION_PERIOD_LABELS["7d"];
-  if (diffDays <= 30) return PERCEPTION_PERIOD_LABELS["30d"];
-  if (diffDays <= 90) return PERCEPTION_PERIOD_LABELS["90d"];
-  return "Historique complet";
+  if (diffDays <= 7) return getPerceptionPeriodLabel("7d");
+  if (diffDays <= 30) return getPerceptionPeriodLabel("30d");
+  if (diffDays <= 90) return getPerceptionPeriodLabel("90d");
+  return getPerceptionPeriodLabel("all");
 }
 
 function deriveLatestRunIdFromResponses(
@@ -357,7 +357,7 @@ function deriveRadar(
     const incoming = payload.radar?.find((entry) => entry.axis === axis);
     return {
       axis,
-      label: incoming?.label || PERCEPTION_AXIS_LABELS[axis],
+      label: incoming?.label || getPerceptionAxisLabel(axis),
       score: averageByAxis[axis],
       target: clampScore(asNumber(incoming?.target ?? 100)),
     };
@@ -375,7 +375,7 @@ function deriveRadarFromParsedResponses(responses: ParsedResponse[]): Perception
 
   return PERCEPTION_VISIBLE_AXES.map((axis) => ({
     axis,
-    label: PERCEPTION_AXIS_LABELS[axis],
+    label: getPerceptionAxisLabel(axis),
     score: averageByAxis[axis],
     target: 100,
   }));
@@ -387,7 +387,7 @@ function deriveModelAxisHeatmap(
 ): PerceptionViewData["modelAxisHeatmap"] {
   const axes: PerceptionHeatmapAxis[] = PERCEPTION_VISIBLE_AXES.map((axis) => ({
     key: axis,
-    label: PERCEPTION_AXIS_LABELS[axis],
+    label: getPerceptionAxisLabel(axis),
     color: PERCEPTION_HEATMAP_AXIS_COLORS[axis] ?? "hsl(var(--primary))",
   }));
 
@@ -433,7 +433,7 @@ function deriveModelAxisHeatmapFromParsedResponses(
 ): PerceptionViewData["modelAxisHeatmap"] {
   const axes: PerceptionHeatmapAxis[] = PERCEPTION_VISIBLE_AXES.map((axis) => ({
     key: axis,
-    label: PERCEPTION_AXIS_LABELS[axis],
+    label: getPerceptionAxisLabel(axis),
     color: PERCEPTION_HEATMAP_AXIS_COLORS[axis] ?? "hsl(var(--primary))",
   }));
 
@@ -572,23 +572,23 @@ function buildTrendSeriesByPeriod(
 ): PerceptionViewData["trend"] {
   return {
     all: {
-      periodLabel: PERCEPTION_PERIOD_LABELS.all,
+      periodLabel: getPerceptionPeriodLabel("all"),
       data: buildAllTrendData(responses, referenceDate),
     },
     "7d": {
-      periodLabel: PERCEPTION_PERIOD_LABELS["7d"],
+      periodLabel: getPerceptionPeriodLabel("7d"),
       data: buildPeriodTrendData(responses, referenceDate, 7, "day"),
     },
     "30d": {
-      periodLabel: PERCEPTION_PERIOD_LABELS["30d"],
+      periodLabel: getPerceptionPeriodLabel("30d"),
       data: buildPeriodTrendData(responses, referenceDate, 30, "day"),
     },
     "90d": {
-      periodLabel: PERCEPTION_PERIOD_LABELS["90d"],
+      periodLabel: getPerceptionPeriodLabel("90d"),
       data: buildPeriodTrendData(responses, referenceDate, 90, "week"),
     },
     "last-run": {
-      periodLabel: PERCEPTION_PERIOD_LABELS["last-run"],
+      periodLabel: getPerceptionPeriodLabel("last-run"),
       data: buildLastRunTrendData(responses, latestRunId, referenceDate),
     },
   };

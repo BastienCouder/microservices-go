@@ -12,6 +12,7 @@ import { EmptyBlock } from "../shared/empty-block";
 import { MemberRow } from "./member-row";
 import { ProjectAccessDialog } from "./project-access-dialog";
 import { RemoveMemberDialog } from "./remove-member-dialog";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getMemberActionPolicy, getProjectIdsForMember, getProjectNamesForMember } from "../../_lib/shared/project-membership";
 import type {
   OrganizationInvitation,
@@ -45,6 +46,7 @@ export function MembersPanel({
   onRemoveMember,
   memberActionBusy,
 }: MembersPanelProps) {
+  const { t } = useScopedI18n("organizations");
   const [editingProjectsMember, setEditingProjectsMember] = useState<OrganizationMember | null>(null);
   const [projectIdsDraft, setProjectIdsDraft] = useState<string[]>([]);
   const [removeTarget, setRemoveTarget] = useState<OrganizationMember | null>(null);
@@ -129,10 +131,10 @@ export function MembersPanel({
         <div className="border-b border-border/60 px-4 py-2">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <h2>
-              <SectionTitle showIndicator={false}>Membres & roles</SectionTitle>
+              <SectionTitle showIndicator={false}>{t("membersTitle")}</SectionTitle>
             </h2>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{members.length} membres</Badge>
+              <Badge variant="outline">{t("membersCount", { count: members.length })}</Badge>
             </div>
           </div>
         </div>
@@ -140,18 +142,18 @@ export function MembersPanel({
         <div className="p-4">
           {members.length === 0 ? (
             <EmptyBlock
-              title="Aucun membre"
-              description="Invite un membre pour gerer ses roles dans cette organisation."
+              title={t("noMembersTitle")}
+              description={t("noMembersDescription")}
             />
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Membre</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Projets</TableHead>
-                  <TableHead>Roles actuels</TableHead>
-                  {canShowAnyActions ? <TableHead className="text-right">Actions</TableHead> : null}
+                  <TableHead>{t("memberColumn")}</TableHead>
+                  <TableHead>{t("emailColumn")}</TableHead>
+                  <TableHead>{t("projectsColumn")}</TableHead>
+                  <TableHead>{t("currentRolesColumn")}</TableHead>
+                  {canShowAnyActions ? <TableHead className="text-right">{t("actionsColumn")}</TableHead> : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
