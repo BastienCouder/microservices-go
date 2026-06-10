@@ -34,6 +34,13 @@ function getString(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeOrganizationRole(role: string): string {
+  const normalized = role.trim().toLowerCase();
+  if (normalized === "editor" || normalized === "admin" || normalized === "owner") return "editor";
+  if (normalized === "super_admin") return "super_admin";
+  return "viewer";
+}
+
 function normalizeMembership(value: unknown): { organizationId: string; role: string } | null {
   if (!isRecord(value)) return null;
   const organizationId = getIDString(
@@ -42,7 +49,7 @@ function normalizeMembership(value: unknown): { organizationId: string; role: st
   if (!organizationId) return null;
   return {
     organizationId,
-    role: getString(value.role ?? value.Role) || "member",
+    role: normalizeOrganizationRole(getString(value.role ?? value.Role)),
   };
 }
 

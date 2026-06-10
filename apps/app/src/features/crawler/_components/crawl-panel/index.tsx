@@ -15,6 +15,7 @@ import {
   type SortKey,
   type StatusFilter,
 } from "./_lib/crawl-panel-utils";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type CrawlPanelProps = {
   apiBaseURL: string;
@@ -51,6 +52,7 @@ export function CrawlPanel({
   variant = "crawler",
 }: CrawlPanelProps) {
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const copy = variant === "contentOptimizer" ? CONTENT_OPTIMIZER_COPY : null;
   const reviewingDiscoveredPages =
     (viewModel.phase === "review" ||
@@ -215,6 +217,7 @@ export function CrawlPanel({
           estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}
           creditConfirmation={creditConfirmation}
           copy={copy?.header}
+          canEdit={permissions.canEdit}
         />
       )}
 
@@ -229,6 +232,7 @@ export function CrawlPanel({
             estimatedDiscoverCredits={viewModel.estimatedDiscoverCredits}
             creditConfirmation={creditConfirmation}
             copy={copy?.initialSetup}
+            canEdit={permissions.canEdit}
           />
         ) : (
           <>

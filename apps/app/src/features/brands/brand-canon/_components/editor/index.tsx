@@ -34,10 +34,12 @@ export function BrandCanonEditorPanel({
   initialData,
   apiBaseURL,
   routeSearch,
+  canEdit,
 }: {
   initialData: PerceptionViewData;
   apiBaseURL: string;
   routeSearch: string;
+  canEdit: boolean;
 }) {
   const { locale, t } = useScopedI18n("perception-brand-canon");
   const navigate = useNavigate();
@@ -124,16 +126,17 @@ export function BrandCanonEditorPanel({
               <div className="space-y-4">
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Field label={t("fieldBrand")}>
-                    <Input value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
+                    <Input disabled={!canEdit} value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
                   </Field>
                   <Field label={t("fieldCategory")}>
-                    <Input value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
+                    <Input disabled={!canEdit} value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
                   </Field>
                 </div>
 
                 <Field label={t("fieldPositioning")}>
                   <Textarea
                     value={canonDraft.positioning}
+                    disabled={!canEdit}
                     onChange={(e) => update("positioning", e.target.value)}
                     className="min-h-[140px]"
                   />
@@ -147,6 +150,7 @@ export function BrandCanonEditorPanel({
                     placeholder={t("fieldUseCasesPlaceholder")}
                     addLabel={t("fieldUseCasesAdd")}
                     emptyLabel={t("fieldUseCasesEmpty")}
+                    disabled={!canEdit}
                   />
                   <EditableListField
                     label={t("fieldFeatures")}
@@ -155,10 +159,11 @@ export function BrandCanonEditorPanel({
                     placeholder={t("fieldFeaturesPlaceholder")}
                     addLabel={t("fieldFeaturesAdd")}
                     emptyLabel={t("fieldFeaturesEmpty")}
+                    disabled={!canEdit}
                   />
                 </div>
 
-                <CompetitorEditor value={competitorsDraft} onChange={setCompetitorsDraft} />
+                <CompetitorEditor value={competitorsDraft} onChange={setCompetitorsDraft} disabled={!canEdit} />
               </div>
             </CardContent>
           </Card>
@@ -176,9 +181,11 @@ export function BrandCanonEditorPanel({
             >
               {t("cancel")}
             </Button>
-            <Button type="button" onClick={() => saveMutation.mutate()} disabled={isSaving}>
-              {isSaving ? t("saving") : t("save")}
-            </Button>
+            {canEdit ? (
+              <Button type="button" onClick={() => saveMutation.mutate()} disabled={isSaving}>
+                {isSaving ? t("saving") : t("save")}
+              </Button>
+            ) : null}
           </div>
         </div>
       </div>

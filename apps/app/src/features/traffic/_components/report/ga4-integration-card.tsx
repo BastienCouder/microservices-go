@@ -38,6 +38,7 @@ type GA4IntegrationCardProps = {
   oauthPropertiesLoading: boolean;
   saving: boolean;
   loading?: boolean;
+  canEdit: boolean;
   onPropertyIdChange: (value: string) => void;
   onServiceAccountJSONChange: (value: string) => void;
   onSelectedOAuthPropertyIdChange: (value: string) => void;
@@ -60,6 +61,7 @@ export function GA4IntegrationCard({
   oauthPropertiesLoading,
   saving,
   loading = false,
+  canEdit,
   onPropertyIdChange,
   onServiceAccountJSONChange,
   onSelectedOAuthPropertyIdChange,
@@ -163,26 +165,28 @@ export function GA4IntegrationCard({
       </div>
 
       <div className="mt-auto flex flex-col gap-2">
-        <Button
-          type="button"
-          variant={connected || hasOAuthToken ? "outline" : "default"}
-          className="w-full"
-          disabled={saving || loading}
-          onClick={handlePrimaryAction}
-        >
-          {connected || hasOAuthToken ? (
-            <Settings2 data-icon="inline-start" />
-          ) : (
-         null
-          )}
-          {loading
-            ? "Chargement..."
-            : connected || hasOAuthToken
-              ? "Gérer"
-              : "Connecter Google Analytics"}
-        </Button>
+        {canEdit ? (
+          <Button
+            type="button"
+            variant={connected || hasOAuthToken ? "outline" : "default"}
+            className="w-full"
+            disabled={saving || loading}
+            onClick={handlePrimaryAction}
+          >
+            {connected || hasOAuthToken ? (
+              <Settings2 data-icon="inline-start" />
+            ) : (
+           null
+            )}
+            {loading
+              ? "Chargement..."
+              : connected || hasOAuthToken
+                ? "Gérer"
+                : "Connecter Google Analytics"}
+          </Button>
+        ) : null}
 
-        {showControls ? (
+        {showControls && canEdit ? (
           <div className="mt-3 rounded-xl border bg-background/70 p-3">
             <Tabs defaultValue="google" className="flex flex-col gap-4">
               <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-muted p-1">

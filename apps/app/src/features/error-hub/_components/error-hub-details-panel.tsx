@@ -33,8 +33,8 @@ type ErrorHubDetailsPanelProps = {
   modelLookup: ReturnType<
     typeof buildPerceptionModelLookup
   >;
-  onCreateAction: (error: OptimizationError) => void | Promise<void>;
-  onMarkDone: (error: OptimizationError) => void | Promise<void>;
+  onCreateAction?: (error: OptimizationError) => void | Promise<void>;
+  onMarkDone?: (error: OptimizationError) => void | Promise<void>;
   onOpenChange: (open: boolean) => void;
   savingErrorIds: ReadonlySet<string>;
   selectedError: OptimizationError | null;
@@ -71,8 +71,10 @@ export function ErrorHubDetailsPanel({
       actionSaving={savingErrorIds.has(selectedError.id)}
       actionStatus={actionStatusesByErrorId.get(selectedError.id)}
       markingActionDone={markingDoneErrorIds.has(selectedError.id)}
-      onCreateAction={() => void onCreateAction(selectedError)}
-      onMarkActionDone={() => void onMarkDone(selectedError)}
+      onCreateAction={
+        onCreateAction ? () => void onCreateAction(selectedError) : undefined
+      }
+      onMarkActionDone={onMarkDone ? () => void onMarkDone(selectedError) : undefined}
     />
   );
 

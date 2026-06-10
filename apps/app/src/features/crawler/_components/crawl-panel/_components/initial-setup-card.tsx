@@ -23,6 +23,7 @@ type InitialSetupCardProps = {
   onAnalyzeSite: () => void;
   estimatedDiscoverCredits: number;
   creditConfirmation: CreditConfirmation;
+  canEdit: boolean;
   copy?: {
     title?: string;
     titleWithProject?: (projectName: string) => string;
@@ -54,6 +55,7 @@ export function InitialSetupCard({
   onAnalyzeSite,
   estimatedDiscoverCredits,
   creditConfirmation,
+  canEdit,
   copy,
 }: InitialSetupCardProps) {
   const title = projectName
@@ -86,6 +88,7 @@ export function InitialSetupCard({
               </div>
             </div>
 
+            {canEdit ? (
             <div className="flex justify-end">
               <ConfirmDialog
                 title="Confirmer la découverte des pages"
@@ -116,6 +119,7 @@ export function InitialSetupCard({
                 }
               />
             </div>
+            ) : null}
           </OnboardingStep>
         </div>
       </div>

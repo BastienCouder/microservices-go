@@ -16,6 +16,7 @@ type PromptsPageHeaderProps = {
   onNewPrompt: () => void;
   onAutoGenerate: () => void;
   onImportCsv: () => void;
+  canEdit: boolean;
 };
 
 export function PromptsPageHeader({
@@ -26,7 +27,7 @@ export function PromptsPageHeader({
   generatingPrompts = false,
   onNewPrompt,
   onAutoGenerate,
-  onImportCsv,
+  canEdit,
 }: PromptsPageHeaderProps) {
   const content = useI18nScope("prompts-workspace");
   const { t } = useScopedI18n("prompts-workspace");
@@ -49,7 +50,7 @@ export function PromptsPageHeader({
           {isDemo ? <Badge className="bg-amber-100 text-amber-800">{content.demoMode}</Badge> : null}
         </>
       }
-      actions={
+      actions={canEdit ? (
         <>
           <Button
             aria-label={content.newPrompt}
@@ -76,7 +77,7 @@ export function PromptsPageHeader({
             </span>
           </Button>
         </>
-      }
+      ) : null}
     />
   );
 }

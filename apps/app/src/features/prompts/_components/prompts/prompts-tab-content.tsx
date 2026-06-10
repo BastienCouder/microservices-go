@@ -69,6 +69,7 @@ type PromptsTabContentProps = {
   canPreviousPromptPage: boolean;
   canNextPromptPage: boolean;
   setPromptPage: (page: number) => void;
+  canEdit: boolean;
 };
 
 function renderPromptLoadingRow(index: number) {
@@ -199,7 +200,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
     },
     { id: "actions", label: content.columnActions, className: "w-[56px] text-right" },
   ];
-  const canEditGlobalStatus = props.promptRowMode === "global";
+  const canEditGlobalStatus = props.canEdit && props.promptRowMode === "global";
   const isMobile = useIsMobile();
   return (
     <>
@@ -237,7 +238,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                 </div>
                 {hasSelectedPrompts || !isMobile ? (
                   <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-                    {hasSelectedPrompts && isMobile ? (
+                    {hasSelectedPrompts && isMobile && props.canEdit ? (
                       <>
                         <RunSelectedButton
                           disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts || props.runningAnyPrompts}
@@ -271,7 +272,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                         />
                       </>
                     ) : null}
-                    {!isMobile ? (
+                    {!isMobile && props.canEdit ? (
                       <>
                         <RunSelectedButton
                           disabled={
@@ -350,6 +351,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                       rankTone: props.rankTone,
                       statusBadgeClassName: props.statusBadgeClassName,
                       onRunSelect: props.onRunSelect,
+                      canEdit: props.canEdit,
                       locale,
                       content,
                     })
@@ -388,6 +390,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     rankTone={props.rankTone}
                     statusBadgeClassName={props.statusBadgeClassName}
                     onRunSelect={props.onRunSelect}
+                    canEdit={props.canEdit}
                     locale={locale}
                     content={content}
                   />

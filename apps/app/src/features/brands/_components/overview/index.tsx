@@ -14,6 +14,7 @@ import {
   deriveShortDescription,
 } from "../../_lib/overview/brand-overview-helpers";
 import { buildBrandCanonLocation } from "../../brand-canon/_lib/brand-canon-utils";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type BrandsOverviewPanelProps = {
   apiBaseURL: string;
@@ -22,6 +23,7 @@ type BrandsOverviewPanelProps = {
 
 export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewPanelProps) {
   const { data, error, loading } = usePerceptionData(apiBaseURL, routeSearch);
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
 
   if (loading && !data) {
     return <BrandPageLoadingState />;
@@ -38,13 +40,13 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
         baseline="Toutes les informations essentielles de la marque sont réunies sur un seul écran pour être relues rapidement."
         actionsVariant="classic"
         className="gap-3 md:gap-4"
-        actions={
+        actions={permissions.canEdit ? (
           <Button asChild variant="default" className="w-auto max-w-full whitespace-nowrap">
             <Link to={buildBrandCanonLocation(routeSearch)}>
               Modifier le profil de marque
             </Link>
           </Button>
-        }
+        ) : null}
       />
 
       <div className="space-y-3 sm:space-y-4">

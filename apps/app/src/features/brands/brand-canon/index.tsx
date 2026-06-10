@@ -1,6 +1,7 @@
 import { BrandCanonLoadingState } from "@/features/perception/_components";
 import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
 import { usePerceptionData } from "@/features/perception/_lib/shared/use-perception-data";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 import { BrandCanonEditorPanel } from "./_components";
 import { normalizeBrandCanonSearch } from "./_lib/brand-canon-utils";
@@ -16,6 +17,10 @@ export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps)
     apiBaseURL,
     normalizedRouteSearch,
   );
+  const permissions = useSelectedOrganizationPermissions({
+    apiBaseURL,
+    routeSearch: normalizedRouteSearch,
+  });
 
   if (loading && !data) {
     return <BrandCanonLoadingState />;
@@ -26,6 +31,7 @@ export function BrandCanonPage({ apiBaseURL, routeSearch }: BrandCanonPageProps)
       initialData={data ?? createEmptyPerceptionViewData(normalizedRouteSearch, error)}
       apiBaseURL={apiBaseURL}
       routeSearch={normalizedRouteSearch}
+      canEdit={permissions.canEdit}
     />
   );
 }

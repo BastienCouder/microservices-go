@@ -139,6 +139,7 @@ export function PromptActions({
   runPrompt,
   isPromptRunning,
   runningAnyPrompts,
+  canEdit,
 }: {
   item: PromptItem;
   setSelectedPromptId: (id: string) => void;
@@ -151,26 +152,32 @@ export function PromptActions({
   runPrompt: (item: PromptItem) => void;
   isPromptRunning: (item: PromptItem | null) => boolean;
   runningAnyPrompts: boolean;
+  canEdit: boolean;
 }) {
   const content = useI18nScope("prompts-workspace");
   const sourcePromptId = item.sourcePromptId || item.id;
   const promptRunnable = canRunPrompt(item);
   const promptRunning = isPromptRunning(item);
   const runLabel = getRunPromptActionLabel(item, promptRunning, content);
+  const editActions: ActionsPopoverItem[] = canEdit
+    ? [
+        {
+          icon: promptRunnable ? Play : Sparkles,
+          title: runLabel,
+          description: promptRunnable ? content.runNowDescription : content.saveBeforeRunDescription,
+          disabled: !promptRunnable || promptRunning || runningAnyPrompts,
+          onSelect: () => runPrompt(item),
+        },
+        {
+          icon: Pencil,
+          title: content.editPrompt,
+          description: content.editPromptDescription,
+          onSelect: () => onEditPrompt(sourcePromptId),
+        },
+      ]
+    : [];
   const actions: ActionsPopoverItem[] = [
-    {
-      icon: promptRunnable ? Play : Sparkles,
-      title: runLabel,
-      description: promptRunnable ? content.runNowDescription : content.saveBeforeRunDescription,
-      disabled: !promptRunnable || promptRunning || runningAnyPrompts,
-      onSelect: () => runPrompt(item),
-    },
-    {
-      icon: Pencil,
-      title: content.editPrompt,
-      description: content.editPromptDescription,
-      onSelect: () => onEditPrompt(sourcePromptId),
-    },
+    ...editActions,
     {
       icon: Copy,
       title: content.copyPrompt,
@@ -197,13 +204,17 @@ export function PromptActions({
         setTabResponses();
       },
     },
-    {
-      icon: Trash2,
-      title: content.deletePrompt,
-      description: content.deletePromptDescription,
-      tone: "destructive",
-      onSelect: () => requestDeletePrompt({ ...item, sourcePromptId }),
-    },
+    ...(canEdit
+      ? [
+          {
+            icon: Trash2,
+            title: content.deletePrompt,
+            description: content.deletePromptDescription,
+            tone: "destructive" as const,
+            onSelect: () => requestDeletePrompt({ ...item, sourcePromptId }),
+          },
+        ]
+      : []),
   ];
 
   return (

@@ -7,7 +7,7 @@ describe("perception client layout", () => {
     expect(source.includes("PerceptionOptimizeActions")).toBe(false);
     expect(source.includes("drafts={viewModel.visibleOptimizeDrafts}")).toBe(false);
     expect(source.includes("persistError={viewModel.persistError}")).toBe(false);
-    expect(source.includes("onCreateAction={viewModel.handleFix}")).toBe(true);
+    expect(source.includes("onCreateAction={permissions.canEdit ? viewModel.handleFix : undefined}")).toBe(true);
     expect(source.includes("generatedIds={viewModel.generatedIds}")).toBe(true);
     expect(source.includes("modelCatalog={viewModel.modelCatalog}")).toBe(true);
     expect(source.includes("savingErrorIds={viewModel.savingErrorIds}")).toBe(true);

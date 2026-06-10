@@ -17,7 +17,7 @@ describe("useOptimizationErrors", () => {
 
   test("error hub passes action status and done handler to error cards", () => {
     expect(errorHubColumnSource.includes("actionStatus={actionStatusesByErrorId.get(error.id)}")).toBe(true);
-    expect(errorHubColumnSource.includes("onMarkActionDone={() => void onMarkDone(error)}")).toBe(true);
+    expect(errorHubColumnSource.includes("onMarkDone ? () => void onMarkDone(error) : undefined")).toBe(true);
     expect(errorHubColumnSource.includes("markingActionDone={markingDoneErrorIds.has(error.id)}")).toBe(true);
   });
 

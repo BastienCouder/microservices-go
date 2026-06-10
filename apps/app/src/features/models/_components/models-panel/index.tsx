@@ -81,6 +81,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
                 drafts={viewModel.providerKeyDrafts}
                 pendingProvider={viewModel.pendingProvider}
                 disabled={viewModel.providerKeysDisabled}
+                canEdit={viewModel.canEdit}
                 onDraftChange={viewModel.updateProviderKeyDraft}
                 onSave={viewModel.saveProviderKey}
                 onDelete={viewModel.deleteProviderKey}
@@ -99,6 +100,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
           loading={viewModel.loading}
           onSearchChange={viewModel.setSearch}
           onSave={viewModel.saveSelectedModels}
+          canEdit={viewModel.canEdit}
         />
 
         <div className="px-4 py-4 md:px-6">
@@ -115,6 +117,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
               providerCredentialsReady={viewModel.providerCredentialsReady}
               providerCredentials={viewModel.providerCredentials}
               providerCredentialLookup={viewModel.providerCredentialLookup}
+              canEdit={viewModel.canEdit}
               onToggleModel={viewModel.toggleProjectModel}
             />
             </>

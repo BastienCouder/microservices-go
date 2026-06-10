@@ -42,7 +42,7 @@ describe("error hub", () => {
     expect(kanbanSource.includes("generatedContentByErrorId")).toBe(true);
     expect(source.includes("canGenerateAiBrief")).toBe(true);
     expect(kanbanSource.includes("canGenerateAiBrief")).toBe(true);
-    expect(contentBriefsSource.includes("canGenerateAiBrief ?")).toBe(true);
+    expect(contentBriefsSource.includes("canGenerateAiBrief && onCreateAction")).toBe(true);
     expect(
       kanbanSource.includes("onOpenDetails={setSelectedError}"),
     ).toBe(true);
@@ -59,7 +59,7 @@ describe("error hub", () => {
     ).toBe(true);
     expect(
       detailsSource.includes(
-        "onMarkActionDone={() => void onMarkDone(selectedError)}",
+        "onMarkDone ? () => void onMarkDone(selectedError) : undefined",
       ),
     ).toBe(true);
     expect(kanbanSource.includes("setActionStatusFilter")).toBe(true);

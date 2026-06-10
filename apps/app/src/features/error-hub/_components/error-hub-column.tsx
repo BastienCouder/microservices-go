@@ -23,8 +23,8 @@ type ErrorHubColumnProps = {
   modelLookup: ReturnType<
     typeof buildPerceptionModelLookup
   >;
-  onCreateAction: (error: OptimizationError) => void | Promise<void>;
-  onMarkDone: (error: OptimizationError) => void | Promise<void>;
+  onCreateAction?: (error: OptimizationError) => void | Promise<void>;
+  onMarkDone?: (error: OptimizationError) => void | Promise<void>;
   onOpenDetails: (error: OptimizationError) => void;
   savingErrorIds: ReadonlySet<string>;
   title: string;
@@ -94,8 +94,10 @@ export function ErrorHubColumn({
               actionSaving={savingErrorIds.has(error.id)}
               actionStatus={actionStatusesByErrorId.get(error.id)}
               markingActionDone={markingDoneErrorIds.has(error.id)}
-              onCreateAction={() => void onCreateAction(error)}
-              onMarkActionDone={() => void onMarkDone(error)}
+              onCreateAction={
+                onCreateAction ? () => void onCreateAction(error) : undefined
+              }
+              onMarkActionDone={onMarkDone ? () => void onMarkDone(error) : undefined}
             />
           ))
         ) : (

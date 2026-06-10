@@ -11,9 +11,11 @@ import { useScopedI18n } from "@/shared/hooks/use-i18n";
 export function CompetitorEditor({
   value,
   onChange,
+  disabled = false,
 }: {
   value: BrandCompetitor[];
   onChange: (next: BrandCompetitor[]) => void;
+  disabled?: boolean;
 }) {
   const { t } = useScopedI18n("perception-brand-canon");
   const [newName, setNewName] = useState("");
@@ -55,6 +57,7 @@ export function CompetitorEditor({
             >
               <Input
                 value={competitor.name}
+                disabled={disabled}
                 onChange={(event) =>
                   onChange(
                     value.map((item, itemIndex) =>
@@ -66,6 +69,7 @@ export function CompetitorEditor({
               />
               <Input
                 value={competitor.website}
+                disabled={disabled}
                 onChange={(event) =>
                   onChange(
                     value.map((item, itemIndex) =>
@@ -75,40 +79,44 @@ export function CompetitorEditor({
                 }
                 placeholder={t("competitorWebsitePlaceholder")}
               />
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
-                aria-label={t("deleteCompetitor", {
-                  name: competitor.name || t("deleteCompetitorFallback"),
-                })}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              {!disabled ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))}
+                  aria-label={t("deleteCompetitor", {
+                    name: competitor.name || t("deleteCompetitorFallback"),
+                  })}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              ) : null}
             </div>
           ))}
         </div>
       )}
 
-      <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
-        <Input
-          value={newName}
-          onChange={(event) => setNewName(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t("competitorAddPlaceholder")}
-        />
-        <Input
-          value={newWebsite}
-          onChange={(event) => setNewWebsite(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={t("competitorWebsitePlaceholder")}
-        />
-        <Button type="button" variant="outline" onClick={addCompetitor}>
-          <Plus className="mr-1 h-4 w-4" />
-          {t("competitorAdd")}
-        </Button>
-      </div>
+      {!disabled ? (
+        <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+          <Input
+            value={newName}
+            onChange={(event) => setNewName(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t("competitorAddPlaceholder")}
+          />
+          <Input
+            value={newWebsite}
+            onChange={(event) => setNewWebsite(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={t("competitorWebsitePlaceholder")}
+          />
+          <Button type="button" variant="outline" onClick={addCompetitor}>
+            <Plus className="mr-1 h-4 w-4" />
+            {t("competitorAdd")}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

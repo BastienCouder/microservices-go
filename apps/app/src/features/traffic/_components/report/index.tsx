@@ -17,6 +17,7 @@ import {
   useTrafficReportPanelViewModel,
 } from "../../_lib/report/use-traffic-report-panel-view-model";
 import type { TrafficPeriod } from "../../_lib/report/types";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type TrafficReportPanelProps = {
   apiBaseURL: string;
@@ -36,6 +37,7 @@ const PERIOD_OPTIONS = Object.entries(PERIOD_LABELS).map(([value, label]) => ({
 
 export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPanelProps) {
   const vm = useTrafficReportPanelViewModel({ apiBaseURL, routeSearch });
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const [filtersOpen, setFiltersOpen] = useState(false);
   const showReportShell = vm.loading || vm.isConnected || Boolean(vm.error);
 
@@ -129,6 +131,7 @@ export function TrafficReportPanel({ apiBaseURL, routeSearch }: TrafficReportPan
           oauthPropertiesLoading={vm.oauth.loadingProperties}
           saving={vm.saving}
           loading={vm.loading}
+          canEdit={permissions.canEdit}
           onPropertyIdChange={vm.form.setPropertyId}
           onServiceAccountJSONChange={vm.form.setServiceAccountJSON}
           onSelectedOAuthPropertyIdChange={vm.oauth.setSelectedPropertyId}

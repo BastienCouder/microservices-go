@@ -29,6 +29,7 @@ type ProviderApiKeysPanelProps = {
   texts: ProviderApiKeysPanelTexts;
   className?: string;
   disabled?: boolean;
+  canEdit?: boolean;
   onDraftChange: (provider: string, value: string) => void;
   onSave: (provider: string) => void;
   onDelete: (provider: string) => void;
@@ -59,6 +60,7 @@ type ProviderApiKeyCardProps = {
   isEditing: boolean;
   isProviderKeyVisible: boolean;
   disabled: boolean;
+  canEdit: boolean;
   texts: ProviderApiKeysPanelTexts;
   onToggleEditing: (provider: string) => void;
   onToggleVisibility: (provider: string) => void;
@@ -74,6 +76,7 @@ const ProviderApiKeyCard = memo(function ProviderApiKeyCard({
   isEditing,
   isProviderKeyVisible,
   disabled,
+  canEdit,
   texts,
   onToggleEditing,
   onToggleVisibility,
@@ -132,20 +135,22 @@ const ProviderApiKeyCard = memo(function ProviderApiKeyCard({
       </div>
 
       <div className="mt-auto flex flex-col gap-2">
-        <Button
-          type="button"
-          variant={requirement.hasApiKey ? "outline" : "default"}
-          className="w-full"
-          disabled={disabled}
-          onClick={() => onToggleEditing(requirement.provider)}
-        >
-          {requirement.hasApiKey ? (
-            <Settings2 data-icon="inline-start" />
-          ) : (
-            <Plus data-icon="inline-start" />
-          )}
-          {requirement.hasApiKey ? texts.manage : texts.connect}
-        </Button>
+        {canEdit ? (
+          <Button
+            type="button"
+            variant={requirement.hasApiKey ? "outline" : "default"}
+            className="w-full"
+            disabled={disabled}
+            onClick={() => onToggleEditing(requirement.provider)}
+          >
+            {requirement.hasApiKey ? (
+              <Settings2 data-icon="inline-start" />
+            ) : (
+              <Plus data-icon="inline-start" />
+            )}
+            {requirement.hasApiKey ? texts.manage : texts.connect}
+          </Button>
+        ) : null}
 
         {isEditing ? (
           <ProviderKeyForm
@@ -154,6 +159,7 @@ const ProviderApiKeyCard = memo(function ProviderApiKeyCard({
             isSaving={isSaving}
             isProviderKeyVisible={isProviderKeyVisible}
             disabled={disabled}
+            canEdit={canEdit}
             texts={texts}
             canSave={canSave}
             onToggleVisibility={onToggleVisibility}
@@ -257,6 +263,7 @@ export function ProviderApiKeysPanel({
   texts,
   className,
   disabled = false,
+  canEdit = true,
   onDraftChange,
   onSave,
   onDelete,
@@ -306,6 +313,7 @@ export function ProviderApiKeysPanel({
               isEditing={editingProvider === requirement.provider}
               isProviderKeyVisible={isProviderKeyVisible(requirement.provider)}
               disabled={disabled}
+              canEdit={canEdit}
               texts={texts}
               onToggleEditing={toggleEditingProvider}
               onToggleVisibility={toggleProviderKeyVisibility}

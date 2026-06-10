@@ -9,6 +9,7 @@ type ModelsToolbarProps = {
   saveDisabled: boolean;
   isSavingModels: boolean;
   loading?: boolean;
+  canEdit: boolean;
   onSearchChange: (value: string) => void;
   onSave: () => void;
 };
@@ -20,6 +21,7 @@ export function ModelsToolbar({
   saveDisabled,
   isSavingModels,
   loading = false,
+  canEdit,
   onSearchChange,
   onSave,
 }: ModelsToolbarProps) {
@@ -42,9 +44,11 @@ export function ModelsToolbar({
             className="w-full max-w-96"
           />
 
-          <Button type="button" onClick={onSave} disabled={saveDisabled}>
-            {isSavingModels ? "Enregistrement..." : "Enregistrer"}
-          </Button>
+          {canEdit ? (
+            <Button type="button" onClick={onSave} disabled={saveDisabled}>
+              {isSavingModels ? "Enregistrement..." : "Enregistrer"}
+            </Button>
+          ) : null}
         </div>
       </div>
     </div>

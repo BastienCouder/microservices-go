@@ -16,6 +16,7 @@ export function EditableListField({
   placeholder,
   addLabel,
   emptyLabel,
+  disabled = false,
 }: {
   label: string;
   value: string[];
@@ -23,6 +24,7 @@ export function EditableListField({
   placeholder: string;
   addLabel: string;
   emptyLabel: string;
+  disabled?: boolean;
 }) {
   const { t } = useScopedI18n("perception-brand-canon");
   const [draft, setDraft] = useState("");
@@ -56,31 +58,35 @@ export function EditableListField({
           {items.map((item) => (
             <Badge key={item} variant="secondary" className="gap-1.5 rounded-full px-3 py-1 font-normal">
               <span>{item}</span>
-              <button
-                type="button"
-                onClick={() => onChange(items.filter((entry) => entry !== item))}
-                className="rounded-full text-muted-foreground transition hover:text-foreground"
-                aria-label={t("removeItem", { item })}
-              >
-                <X className="h-3 w-3" />
-              </button>
+              {!disabled ? (
+                <button
+                  type="button"
+                  onClick={() => onChange(items.filter((entry) => entry !== item))}
+                  className="rounded-full text-muted-foreground transition hover:text-foreground"
+                  aria-label={t("removeItem", { item })}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              ) : null}
             </Badge>
           ))}
         </div>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Input
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
-        />
-        <Button type="button" variant="outline" onClick={addItem}>
-          <Plus className="mr-1 h-4 w-4" />
-          {addLabel}
-        </Button>
-      </div>
+      {!disabled ? (
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={placeholder}
+          />
+          <Button type="button" variant="outline" onClick={addItem}>
+            <Plus className="mr-1 h-4 w-4" />
+            {addLabel}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

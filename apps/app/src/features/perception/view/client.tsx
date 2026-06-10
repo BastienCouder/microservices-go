@@ -20,6 +20,7 @@ import {
 } from "../_lib";
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
 import { CheckCircle2, Download, Play, Sparkles, Target } from "lucide-react";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type PerceptionClientProps = {
   apiBaseURL: string;
@@ -36,6 +37,7 @@ const SCORE_CARD_ICONS = {
 export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: PerceptionClientProps) {
   const { locale } = useLocale();
   const viewModel = usePerceptionViewModel(initialData, { apiBaseURL, routeSearch });
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const emptyStateLabel = initialData.metadata.emptyStateLabel;
   const periodLabel = getPerceptionPeriodLabel(
     viewModel.selectedPeriod,
@@ -60,35 +62,37 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
             Export Excel
           </Button>
         ) : null}
-        <ConfirmDialog
-          title="Confirmer l'analyse de perception"
-          description={
-            viewModel.perceptionMonthlyCredits > 0
-              ? `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs. Solde actuel: ${viewModel.perceptionRemainingCredits}/${viewModel.perceptionMonthlyCredits} credits restants.`
-              : `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs.`
-          }
-          confirmLabel={
-            viewModel.analysisRunning ? "Analyse..." : "Lancer l'analyse"
-          }
-          cancelLabel="Annuler"
-          confirmVariant="default"
-          loading={viewModel.analysisRunning}
-          onConfirm={viewModel.handleRunPerceptionAnalysis}
-          confirmDisabled={viewModel.perceptionQuotaLoading}
-          trigger={
-            <Button
-              size="sm"
-              disabled={
-                viewModel.analysisRunning ||
-                viewModel.perceptionQuotaLoading ||
-                !initialData.metadata.projectId
-              }
-            >
-              <Play className="size-4" />
-              Analyser la perception
-            </Button>
-          }
-        />
+        {permissions.canEdit ? (
+          <ConfirmDialog
+            title="Confirmer l'analyse de perception"
+            description={
+              viewModel.perceptionMonthlyCredits > 0
+                ? `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs. Solde actuel: ${viewModel.perceptionRemainingCredits}/${viewModel.perceptionMonthlyCredits} credits restants.`
+                : `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs.`
+            }
+            confirmLabel={
+              viewModel.analysisRunning ? "Analyse..." : "Lancer l'analyse"
+            }
+            cancelLabel="Annuler"
+            confirmVariant="default"
+            loading={viewModel.analysisRunning}
+            onConfirm={viewModel.handleRunPerceptionAnalysis}
+            confirmDisabled={viewModel.perceptionQuotaLoading}
+            trigger={
+              <Button
+                size="sm"
+                disabled={
+                  viewModel.analysisRunning ||
+                  viewModel.perceptionQuotaLoading ||
+                  !initialData.metadata.projectId
+                }
+              >
+                <Play className="size-4" />
+                Analyser la perception
+              </Button>
+            }
+          />
+        ) : null}
       </div>
 
       {viewModel.lastAnalysisCredits !== null ? (
@@ -109,8 +113,8 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
         projectId={initialData.metadata.projectId}
         savingErrorIds={viewModel.savingErrorIds}
         totalErrorCount={initialData.topErrors.length}
-        onCreateAction={viewModel.handleFix}
-        onRemoveAction={viewModel.handleRemoveAction}
+        onCreateAction={permissions.canEdit ? viewModel.handleFix : undefined}
+        onRemoveAction={permissions.canEdit ? viewModel.handleRemoveAction : undefined}
       />
     </div>
   );

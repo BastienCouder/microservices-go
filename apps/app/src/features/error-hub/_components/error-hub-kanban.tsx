@@ -42,8 +42,8 @@ type ErrorHubKanbanProps = {
   loading: boolean;
   markingDoneErrorIds: ReadonlySet<string>;
   modelCatalog: Parameters<typeof buildPerceptionModelLookup>[0];
-  onCreateAction: (error: OptimizationError) => void | Promise<void>;
-  onMarkDone: (error: OptimizationError) => void | Promise<void>;
+  onCreateAction?: (error: OptimizationError) => void | Promise<void>;
+  onMarkDone?: (error: OptimizationError) => void | Promise<void>;
   persistError: string | null;
   savingErrorIds: ReadonlySet<string>;
 };

@@ -18,6 +18,7 @@ import {
 import { useModelsPanelData } from "./use-models-panel-data";
 import { useProviderCredentialMutations } from "./use-provider-credential-mutations";
 import { useSaveProjectModelsMutation } from "./use-save-project-models-mutation";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type UseModelsPanelViewModelOptions = {
   apiBaseURL: string;
@@ -68,6 +69,7 @@ export function useModelsPanelViewModel({
   const [storedProjectToken, setStoredProjectToken] = useState(() =>
     readCanonicalProjectToken(routeSearch),
   );
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const [search, setSearch] = useState("");
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<Record<string, string>>({});
   const hintedProjectToken = useMemo(
@@ -212,11 +214,13 @@ export function useModelsPanelViewModel({
     providerMutations.saveProviderCredentialMutation.isPending ||
     providerMutations.deleteProviderCredentialMutation.isPending ||
     data.providerCredentialsQuery.isFetching ||
-    data.selectedProjectId === "";
+    data.selectedProjectId === "" ||
+    !permissions.canEdit;
   const saveDisabled =
     saveModelsMutation.isPending ||
     data.loading ||
     !data.selectedProject ||
+    !permissions.canEdit ||
     data.selectedModelIds.length === 0 ||
     (data.isDeveloperPlan && !data.providerCredentialsReady) ||
     developerPlanMissingKeys;
@@ -226,6 +230,7 @@ export function useModelsPanelViewModel({
   }, []);
   const saveProviderKey = useCallback(
     (provider: string) => {
+      if (!permissions.canEdit) return;
       if (!data.selectedProjectId) {
         pushErrorToast(
           new Error(API_KEY_PROJECT_REQUIRED_SAVE),
@@ -237,10 +242,11 @@ export function useModelsPanelViewModel({
       const apiKey = providerKeyDrafts[provider]?.trim();
       if (apiKey) providerMutations.saveProviderCredential(provider, apiKey);
     },
-    [data.selectedProjectId, providerKeyDrafts, providerMutations],
+    [data.selectedProjectId, permissions.canEdit, providerKeyDrafts, providerMutations],
   );
   const deleteProviderKey = useCallback(
     (provider: string) => {
+      if (!permissions.canEdit) return;
       if (!data.selectedProjectId) {
         pushErrorToast(
           new Error(API_KEY_PROJECT_REQUIRED_DELETE),
@@ -251,10 +257,11 @@ export function useModelsPanelViewModel({
 
       providerMutations.deleteProviderCredential(provider);
     },
-    [data.selectedProjectId, providerMutations],
+    [data.selectedProjectId, permissions.canEdit, providerMutations],
   );
   const toggleProjectModel = useCallback(
     (modelId: string) => {
+      if (!permissions.canEdit) return;
       const isSelected = data.selectedModelIdSet.has(modelId);
 
       if (isSelected) {
@@ -297,11 +304,12 @@ export function useModelsPanelViewModel({
       }
       data.setSelectedModelIds((current) => [...current, modelId]);
     },
-    [data],
+    [data, permissions.canEdit],
   );
   const saveSelectedModels = useCallback(() => {
+    if (!permissions.canEdit) return;
     void saveModelsMutation.mutateAsync(data.selectedModelIds);
-  }, [data.selectedModelIds, saveModelsMutation]);
+  }, [data.selectedModelIds, permissions.canEdit, saveModelsMutation]);
 
   return {
     organizationId: data.effectiveOrganizationId || organizationId,
@@ -335,6 +343,7 @@ export function useModelsPanelViewModel({
     loadingPlan: data.loadingPlan,
     loadingProviderCredentials: data.loadingProviderCredentials,
     loadingProjectModels: data.loadingProjectModels,
+    canEdit: permissions.canEdit,
     saveDisabled,
     isSavingModels: saveModelsMutation.isPending,
     saveSelectedModels,

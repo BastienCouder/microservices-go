@@ -28,6 +28,7 @@ type SharedProps = {
   rankTone: (rank: number) => string;
   statusBadgeClassName: (status: PromptItem["status"]) => string;
   onRunSelect: (runId: string) => void;
+  canEdit: boolean;
   locale: string;
   content: Record<string, string>;
 };
@@ -130,6 +131,7 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
           runPrompt={props.runPrompt}
           isPromptRunning={props.isPromptRunning}
           runningAnyPrompts={props.runningAnyPrompts}
+          canEdit={props.canEdit}
         />
       </TableCell>
     </TableRow>
@@ -243,6 +245,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
                 runPrompt={props.runPrompt}
                 isPromptRunning={props.isPromptRunning}
                 runningAnyPrompts={props.runningAnyPrompts}
+                canEdit={props.canEdit}
               />
             </div>
           </div>

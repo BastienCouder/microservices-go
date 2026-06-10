@@ -11,6 +11,7 @@ import type { AuditCheckResult } from "../../_lib/shared/types";
 import { AuditCheckAccordion } from "./audit-check-accordion";
 import { ScanHero } from "./scan-hero";
 import { ScoreSummaryCard } from "./score-summary-card";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type AgentReadyAuditPanelProps = {
   apiBaseURL: string;
@@ -19,6 +20,7 @@ type AgentReadyAuditPanelProps = {
 
 export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAuditPanelProps) {
   const viewModel = useAgentReadyAuditViewModel({ apiBaseURL, routeSearch });
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const [openCheckIDs, setOpenCheckIDs] = useState<string[]>([]);
 
   const actionableChecks = useMemo(
@@ -57,6 +59,7 @@ export function AgentReadyAuditPanel({ apiBaseURL, routeSearch }: AgentReadyAudi
       loadingProject={viewModel.loadingProject}
       projectName={viewModel.projectName}
       onAnalyze={viewModel.runScan}
+      canEdit={permissions.canEdit}
     />
   );
 

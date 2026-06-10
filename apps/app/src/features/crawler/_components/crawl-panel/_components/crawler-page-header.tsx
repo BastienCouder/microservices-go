@@ -28,6 +28,7 @@ type CrawlerPageHeaderProps = {
   estimatedAnalyzeCredits: number;
   estimatedDiscoverCredits: number;
   creditConfirmation: CreditConfirmation;
+  canEdit: boolean;
   copy?: {
     title?: string;
     baseline?: string;
@@ -104,6 +105,7 @@ export function CrawlerPageHeader({
   estimatedAnalyzeCredits,
   estimatedDiscoverCredits,
   creditConfirmation,
+  canEdit,
   copy,
 }: CrawlerPageHeaderProps) {
   const labels = {
@@ -124,7 +126,7 @@ export function CrawlerPageHeader({
     <PageHeader
       title={labels.title}
       baseline={labels.baseline}
-      actions={
+      actions={canEdit ? (
         <div className="flex flex-wrap items-center gap-2">
           {reviewingDiscoveredPages ? (
             <CreditConfirmDialog
@@ -195,7 +197,7 @@ export function CrawlerPageHeader({
             </CreditConfirmDialog>
           )}
         </div>
-      }
+      ) : null}
       actionsVariant="classic"
     />
   );

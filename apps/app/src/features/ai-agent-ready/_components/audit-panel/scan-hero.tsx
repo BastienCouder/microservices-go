@@ -21,6 +21,7 @@ type ScanHeroProps = {
   isScanning: boolean;
   loadingProject?: boolean;
   projectName?: string;
+  canEdit: boolean;
   onAnalyze: () => void;
 };
 
@@ -31,6 +32,7 @@ export function ScanHero({
   isScanning,
   loadingProject = false,
   projectName = "",
+  canEdit,
   onAnalyze,
 }: ScanHeroProps) {
   const title = projectName
@@ -122,12 +124,14 @@ export function ScanHero({
               </p>
             ) : null}
           </div>
-          <Button type="submit" disabled={!canScan} className="min-w-44 self-end">
-            {isScanning ? (
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-            ) : null}
-            {isScanning ? "Analyse en cours" : "Analyser le site"}
-          </Button>
+          {canEdit ? (
+            <Button type="submit" disabled={!canScan} className="min-w-44 self-end">
+              {isScanning ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : null}
+              {isScanning ? "Analyse en cours" : "Analyser le site"}
+            </Button>
+          ) : null}
         </form>
       </CardContent>
     </Card>

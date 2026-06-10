@@ -32,7 +32,7 @@ function PromptDetailsContent({
   prompt: PromptItem;
   mobile: boolean;
   getModelVisual: GetModelVisual;
-  onEditPrompt: (prompt: PromptItem) => void;
+  onEditPrompt?: (prompt: PromptItem) => void;
   onSeeMoreResponses: (prompt: PromptItem) => void;
   onOpenResponse: (prompt: PromptItem, responseId: string) => void;
 }) {
@@ -94,14 +94,16 @@ function PromptDetailsContent({
             </h1>
           </div>
           <div className="flex w-full flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="default"
-              className="min-w-0 rounded-full"
-              onClick={() => onEditPrompt(prompt)}
-            >
-              <span className="truncate">Modifier</span>
-            </Button>
+            {onEditPrompt ? (
+              <Button
+                type="button"
+                variant="default"
+                className="min-w-0 rounded-full"
+                onClick={() => onEditPrompt(prompt)}
+              >
+                <span className="truncate">Modifier</span>
+              </Button>
+            ) : null}
             <Button
               type="button"
               variant="outline"
@@ -357,7 +359,7 @@ export function PromptDetailsSheet({
   onOpenChange: (open: boolean) => void;
   prompt: PromptItem | null;
   getModelVisual: GetModelVisual;
-  onEditPrompt: (prompt: PromptItem) => void;
+  onEditPrompt?: (prompt: PromptItem) => void;
   onSeeMoreResponses: (prompt: PromptItem) => void;
   onOpenResponse: (prompt: PromptItem, responseId: string) => void;
 }) {

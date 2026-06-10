@@ -23,6 +23,7 @@ type ModelCatalogGridProps = {
   providerCredentialsReady: boolean;
   providerCredentials: LLMProviderCredentialStatus[];
   providerCredentialLookup: ProviderCredentialLookup;
+  canEdit: boolean;
   onToggleModel: (modelId: string) => void;
 };
 
@@ -34,6 +35,7 @@ export function ModelCatalogGrid({
   providerCredentialsReady,
   providerCredentials,
   providerCredentialLookup,
+  canEdit,
   onToggleModel,
 }: ModelCatalogGridProps) {
   return (
@@ -50,7 +52,7 @@ export function ModelCatalogGrid({
             providerCredentials,
             providerCredentialLookup,
           );
-        const disabled = disabledByPlan || disabledByApiKey;
+        const disabled = !canEdit || disabledByPlan || disabledByApiKey;
 
         return (
           <div key={model.id} className={cn("h-full min-w-0", disabled && "opacity-70")}>
@@ -59,7 +61,7 @@ export function ModelCatalogGrid({
               description={model.description}
               icon={model.icon}
               selected={isSelected}
-              onClick={() => onToggleModel(model.id)}
+              onClick={canEdit ? () => onToggleModel(model.id) : () => undefined}
               modelGroup={model.modelGroup}
               size="large"
               variant="models"
@@ -68,6 +70,8 @@ export function ModelCatalogGrid({
               disabledLabel={
                 disabledByApiKey
                   ? "Cle API requise"
+                  : !canEdit
+                    ? "Lecture seule"
                   : undefined
               }
             />

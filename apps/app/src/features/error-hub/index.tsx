@@ -4,6 +4,7 @@ import { useOptimizationErrors } from "../perception/_lib/shared/use-optimizatio
 import type { OptimizationError } from "../perception/_lib/shared/optimization-errors-data";
 import { ErrorHubKanban } from "./_components/error-hub-kanban";
 import { readSourceFilterFromSearch } from "./_lib/error-hub-utils";
+import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type ErrorHubPageProps = {
   apiBaseURL: string;
@@ -15,6 +16,7 @@ function isErrorHubError(error: OptimizationError) {
 }
 
 export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
+  const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const {
     competitors,
     canGenerateAiBrief,
@@ -44,8 +46,8 @@ export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
       loading={loading && !data && !error}
       markingDoneErrorIds={markingDoneErrorIds}
       modelCatalog={modelCatalog}
-      onCreateAction={handleFix}
-      onMarkDone={handleMarkDone}
+      onCreateAction={permissions.canEdit ? handleFix : undefined}
+      onMarkDone={permissions.canEdit ? handleMarkDone : undefined}
       persistError={persistError || error}
       savingErrorIds={savingErrorIds}
     />

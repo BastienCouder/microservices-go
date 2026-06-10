@@ -27,7 +27,7 @@ type ErrorHubContentBriefsTabProps = {
   generatedContentByErrorId: ReadonlyMap<string, string>;
   generatedIds: ReadonlySet<string>;
   loading: boolean;
-  onCreateAction: (error: OptimizationError) => void | Promise<void>;
+  onCreateAction?: (error: OptimizationError) => void | Promise<void>;
   onOpenDetails: (error: OptimizationError) => void;
   savingErrorIds: ReadonlySet<string>;
 };
@@ -205,7 +205,7 @@ export function ErrorHubContentBriefsTab({
     ? splitGeneratedContent(selectedInitialSuggestion).slice(0, 6)
     : [];
   const handleSelectedCreateAction = () => {
-    if (!canGenerateAiBrief || !selectedError || selectedSaving) return;
+    if (!canGenerateAiBrief || !onCreateAction || !selectedError || selectedSaving) return;
     if (selectedGenerated) {
       pushInfoToast(
         "Action deja creee",
@@ -336,7 +336,7 @@ export function ErrorHubContentBriefsTab({
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto p-4">
-              {canGenerateAiBrief ? (
+              {canGenerateAiBrief && onCreateAction ? (
                 <div className="mb-4 rounded-md border bg-muted/20 p-4">
                   <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary">
                     <Sparkles className="h-4 w-4" />
@@ -432,7 +432,7 @@ export function ErrorHubContentBriefsTab({
                 />
               )}
 
-              {canGenerateAiBrief ? (
+              {canGenerateAiBrief && onCreateAction ? (
                 <Button
                   type="button"
                   className="w-full"
