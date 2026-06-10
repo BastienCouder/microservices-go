@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { Loader2, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import {
   Dialog,
@@ -27,18 +28,19 @@ type AcceptState =
   | { status: "error"; message: string };
 
 export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) {
+  const { t } = useScopedI18n("invitations");
   const { token = "" } = useParams();
   const invitationToken = useMemo(() => token.trim(), [token]);
   const queryClient = useQueryClient();
   const [state, setState] = useState<AcceptState>({
     status: "confirm",
-    message: "Confirmez l'invitation pour rejoindre le projet.",
+    message: t("confirmMessage"),
   });
 
   const acceptInvitationMutation = useMutation({
     mutationFn: async () => {
       if (!invitationToken) {
-        throw new Error("Invitation introuvable.");
+        throw new Error(t("notFound"));
       }
 
       const response = await gatewayJSON<unknown>(
@@ -46,10 +48,10 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
         apiRoutes.organizations.acceptInvitation(invitationToken),
         { method: "POST" },
       );
-      requireGatewayResult(response, "Impossible d'accepter cette invitation.");
+      requireGatewayResult(response, t("acceptError"));
     },
     onMutate: () => {
-      setState({ status: "loading", message: "Acceptation de l'invitation..." });
+      setState({ status: "loading", message: t("accepting") });
     },
     onSuccess: async () => {
       await invalidateQueryKeys(queryClient, [
@@ -58,7 +60,7 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
       ]);
       setState({
         status: "success",
-        message: "Invitation acceptee. Le projet est maintenant disponible.",
+        message: t("accepted"),
       });
     },
     onError: (error) => {
@@ -67,7 +69,7 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
         message:
           error instanceof Error
             ? error.message
-            : "Impossible d'accepter cette invitation.",
+            : t("acceptError"),
       });
     },
   });
@@ -88,21 +90,21 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
       <Dialog open>
         <DialogContent showCloseButton={false}>
           <DialogHeader>
-            <DialogTitle>Invitation au projet</DialogTitle>
+            <DialogTitle>{t("dialogTitle")}</DialogTitle>
             <DialogDescription>
-              Vous avez ete invite. En confirmant, votre compte sera ajoute au projet lie a cette invitation.
+              {t("dialogDescription")}
             </DialogDescription>
           </DialogHeader>
 
           <DialogFooter>
             {state.status === "success" ? (
               <Button asChild>
-                <Link to="/organizations">Continuer</Link>
+                <Link to="/organizations">{t("continue")}</Link>
               </Button>
             ) : (
               <>
                 <Button asChild variant="outline" disabled={isLoading}>
-                  <Link to="/organizations">Annuler</Link>
+                  <Link to="/organizations">{t("cancel")}</Link>
                 </Button>
                 <Button
                   type="button"
@@ -111,7 +113,7 @@ export function InvitationAcceptPage({ apiBaseURL }: InvitationAcceptPageProps) 
                 >
                   {state.status === "error" ? <RotateCw data-icon="inline-start" /> : null}
                   {isLoading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : null}
-                  {state.status === "error" ? "Reessayer" : "Confirmer"}
+                  {state.status === "error" ? t("retry") : t("confirm")}
                 </Button>
               </>
             )}

@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 import {
   formatLabel,
@@ -46,6 +47,7 @@ export function MemberRow({
   onEditProjects,
   onRemoveMember,
 }: MemberRowProps) {
+  const { t } = useScopedI18n("organizations");
   const selectedAssignableRole = ASSIGNABLE_ORGANIZATION_ROLES.find((role) =>
     member.roles.includes(role),
   );
@@ -54,8 +56,8 @@ export function MemberRow({
   if (actionPolicy.canEditProjects) {
     actions.push({
       icon: FolderKanban,
-      title: "Modifier l'acces au projet",
-      description: "Ajouter ou retirer ses acces projet.",
+      title: t("editProjectAccessAction"),
+      description: t("editProjectAccessDescription"),
       disabled: false,
       onSelect: () => onEditProjects(member),
     });
@@ -63,8 +65,8 @@ export function MemberRow({
   if (actionPolicy.canRemoveMember) {
     actions.push({
       icon: Trash2,
-      title: "Retirer le membre",
-      description: "Supprimer son acces a cette organisation et retirer ses roles.",
+      title: t("removeMemberAction"),
+      description: t("removeMemberDescription"),
       tone: "destructive",
       disabled: false,
       onSelect: () => onRemoveMember(member),
@@ -76,14 +78,14 @@ export function MemberRow({
       <TableCell className="font-medium">
         <div className="flex flex-wrap items-center gap-2">
           <span>{memberLabel(member)}</span>
-          {isCurrentUser ? <Badge variant="secondary">Vous</Badge> : null}
+          {isCurrentUser ? <Badge variant="secondary">{t("you")}</Badge> : null}
         </div>
       </TableCell>
       <TableCell className="text-sm text-muted-foreground">{email || "-"}</TableCell>
       <TableCell className="max-w-[280px] whitespace-normal">
         <div className="flex flex-wrap gap-1">
           {projectNames.length === 0 ? (
-            <Badge variant="outline">Aucun projet</Badge>
+            <Badge variant="outline">{t("noProject")}</Badge>
           ) : (
             projectNames.map((projectName) => (
               <Badge key={projectName} variant="secondary" className="max-w-full truncate">
@@ -129,9 +131,9 @@ export function MemberRow({
         <TableCell className="text-right">
           {actionPolicy.showActions && actions.length > 0 ? (
             <ActionsPopover
-              title="Actions membre"
+              title={t("memberActionsTitle")}
               description={memberLabel(member)}
-              triggerLabel="Actions du membre"
+              triggerLabel={t("memberActionsTrigger")}
               items={actions}
               disabled={memberActionBusy}
             />

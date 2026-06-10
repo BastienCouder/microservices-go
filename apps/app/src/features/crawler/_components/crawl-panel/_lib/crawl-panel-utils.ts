@@ -2,6 +2,8 @@ import type {
   ContentOptimizerCrawlRecord,
   ContentOptimizerIssue,
 } from "../../../_lib/content-optimizer-api";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 
 export type CrawlColumn = {
   id: string;
@@ -22,10 +24,14 @@ export const columns: CrawlColumn[] = [
   { id: "page", label: "Page", className: "min-w-[260px]" },
   { id: "url", label: "URL", className: "min-w-[260px]" },
   { id: "http", label: "HTTP", className: "w-[88px]" },
-  { id: "status", label: "Statut", className: "w-[120px]" },
-  { id: "priority", label: "Priorité", className: "w-[120px]" },
-  { id: "findings", label: "Signaux", className: "w-[120px]" },
+  { id: "status", label: "Status", className: "w-[120px]" },
+  { id: "priority", label: "Priority", className: "w-[120px]" },
+  { id: "findings", label: "Signals", className: "w-[120px]" },
 ];
+
+function currentLocale(): string {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
 
 export function statusTone(
   status: string,
@@ -39,22 +45,31 @@ export function statusTone(
 }
 
 export function statusLabel(status: string): string {
-  if (status === "completed") return "Terminé";
-  if (status === "running") return "En cours";
-  if (status === "errored") return "En erreur";
-  if (status.includes("cancelled")) return "Annulé";
+  const locale = currentLocale();
+  if (status === "completed") {
+    return translateI18nText("crawler-panel", "statusCompleted", locale);
+  }
+  if (status === "running") {
+    return translateI18nText("crawler-panel", "statusRunning", locale);
+  }
+  if (status === "errored") {
+    return translateI18nText("crawler-panel", "statusErrored", locale);
+  }
+  if (status.includes("cancelled")) {
+    return translateI18nText("crawler-panel", "statusCancelled", locale);
+  }
   return status;
 }
 
 export function formatSignalCount(count: number): string {
-  return `${count} ${count > 1 ? "signaux" : "signal"}`;
+  return translateI18nText("crawler-panel", "signalCount", currentLocale(), { count });
 }
 
 export function pageContent(record: ContentOptimizerCrawlRecord): string {
   if (record.markdown?.trim()) return record.markdown.trim();
   if (record.html?.trim()) return record.html.trim();
   if (record.json != null) return JSON.stringify(record.json, null, 2);
-  return "Aucun contenu extrait pour cette page.";
+  return translateI18nText("crawler-panel", "noExtractedContentForPage", currentLocale());
 }
 
 const htmlEntityMap: Record<string, string> = {
@@ -97,9 +112,10 @@ export function severityTone(severity: string): string {
 }
 
 export function severityLabel(severity: string): string {
-  if (severity === "high") return "Haute";
-  if (severity === "medium") return "Moyenne";
-  if (severity === "low") return "Faible";
+  const locale = currentLocale();
+  if (severity === "high") return translateI18nText("crawler-panel", "severityHigh", locale);
+  if (severity === "medium") return translateI18nText("crawler-panel", "severityMedium", locale);
+  if (severity === "low") return translateI18nText("crawler-panel", "severityLow", locale);
   return "-";
 }
 
@@ -129,14 +145,14 @@ export type GeoInsightGroup = {
 export const geoInsightGroups: GeoInsightGroup[] = [
   {
     id: "qualitative",
-    label: "Lecture IA",
-    description: "Intentions, citabilité et nuances éditoriales.",
+    label: translateI18nText("crawler-panel", "geoGroupQualitativeLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupQualitativeDescription", currentLocale()),
     fixTypes: [],
   },
   {
     id: "understanding",
-    label: "Compréhension IA",
-    description: "Entité, offre, audience et cas d'usage.",
+    label: translateI18nText("crawler-panel", "geoGroupUnderstandingLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupUnderstandingDescription", currentLocale()),
     fixTypes: [
       "add_entity_context",
       "clarify_offer",
@@ -145,20 +161,20 @@ export const geoInsightGroups: GeoInsightGroup[] = [
   },
   {
     id: "answer",
-    label: "Réponse générative",
-    description: "Réponse courte et questions directement réutilisables.",
+    label: translateI18nText("crawler-panel", "geoGroupAnswerLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupAnswerDescription", currentLocale()),
     fixTypes: ["add_direct_answer", "add_faq"],
   },
   {
     id: "credibility",
-    label: "Crédibilité",
-    description: "Preuves, sources, chiffres et fraîcheur.",
+    label: translateI18nText("crawler-panel", "geoGroupCredibilityLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupCredibilityDescription", currentLocale()),
     fixTypes: ["add_evidence", "add_freshness_signal"],
   },
   {
     id: "structure",
-    label: "Structure contenu",
-    description: "Titres, profondeur, schema et lisibilité.",
+    label: translateI18nText("crawler-panel", "geoGroupStructureLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupStructureDescription", currentLocale()),
     fixTypes: [
       "add_title",
       "improve_title",
@@ -172,8 +188,8 @@ export const geoInsightGroups: GeoInsightGroup[] = [
   },
   {
     id: "conversion",
-    label: "Maillage & choix",
-    description: "Liens internes, comparaison et parcours suivant.",
+    label: translateI18nText("crawler-panel", "geoGroupConversionLabel", currentLocale()),
+    description: translateI18nText("crawler-panel", "geoGroupConversionDescription", currentLocale()),
     fixTypes: [
       "add_internal_links",
       "add_comparison_context",
@@ -197,9 +213,9 @@ export function issuesForGeoInsightGroup(
 
 export function issueSourceLabel(issue: ContentOptimizerIssue): string {
   if (issue.source === "ai" || issue.fixType.startsWith("ai_")) {
-    return "IA";
+    return translateI18nText("crawler-panel", "issueSourceAi", currentLocale());
   }
-  return "Règle";
+  return translateI18nText("crawler-panel", "issueSourceRule", currentLocale());
 }
 
 export type GeoKpiSummary = {
@@ -258,6 +274,7 @@ function groupReadyCount(
 export function computeGeoKpiSummaries(
   records: ContentOptimizerCrawlRecord[],
 ): GeoKpiSummary[] {
+  const locale = currentLocale();
   const analyzedRecords = records.filter(
     (record) => record.status === "completed",
   );
@@ -281,12 +298,14 @@ export function computeGeoKpiSummaries(
   return [
     {
       id: "geo-score",
-      label: "Score GEO moyen",
+      label: translateI18nText("crawler-panel", "geoKpiScoreLabel", locale),
       value: `${averageScore}%`,
       caption:
         analyzedCount === 0
-          ? "Aucune page analysée"
-          : `${analyzedCount} page(s) analysée(s)`,
+          ? translateI18nText("crawler-panel", "geoKpiNoPageAnalyzed", locale)
+          : translateI18nText("crawler-panel", "geoKpiAnalyzedPages", locale, {
+              count: analyzedCount,
+            }),
       tone:
         averageScore >= 80
           ? "success"
@@ -296,19 +315,18 @@ export function computeGeoKpiSummaries(
     },
     {
       id: "risk-pages",
-      label: "Pages à risque",
+      label: translateI18nText("crawler-panel", "geoKpiRiskPagesLabel", locale),
       value: String(riskyCount),
-      caption: "Priorité haute ou critique",
+      caption: translateI18nText("crawler-panel", "geoKpiRiskPagesCaption", locale),
       tone: riskyCount === 0 ? "success" : "warning",
     },
     {
       id: "understanding-ready",
-      label: "Compréhension OK",
+      label: translateI18nText("crawler-panel", "geoKpiUnderstandingLabel", locale),
       value: formatRatio(understandingReady, analyzedCount),
-      caption: `${formatPercent(
-        understandingReady,
-        analyzedCount,
-      )} sans flou entité/offre`,
+      caption: translateI18nText("crawler-panel", "geoKpiUnderstandingCaption", locale, {
+        percent: formatPercent(understandingReady, analyzedCount),
+      }),
       tone:
         understandingReady === analyzedCount && analyzedCount > 0
           ? "success"
@@ -316,9 +334,11 @@ export function computeGeoKpiSummaries(
     },
     {
       id: "answer-ready",
-      label: "Réponses prêtes",
+      label: translateI18nText("crawler-panel", "geoKpiAnswerLabel", locale),
       value: formatRatio(answerReady, analyzedCount),
-      caption: `${formatPercent(answerReady, analyzedCount)} avec réponse/FAQ`,
+      caption: translateI18nText("crawler-panel", "geoKpiAnswerCaption", locale, {
+        percent: formatPercent(answerReady, analyzedCount),
+      }),
       tone:
         answerReady === analyzedCount && analyzedCount > 0
           ? "success"
@@ -326,12 +346,11 @@ export function computeGeoKpiSummaries(
     },
     {
       id: "credibility-ready",
-      label: "Crédibilité OK",
+      label: translateI18nText("crawler-panel", "geoKpiCredibilityLabel", locale),
       value: formatRatio(credibilityReady, analyzedCount),
-      caption: `${formatPercent(
-        credibilityReady,
-        analyzedCount,
-      )} avec preuves fraîches`,
+      caption: translateI18nText("crawler-panel", "geoKpiCredibilityCaption", locale, {
+        percent: formatPercent(credibilityReady, analyzedCount),
+      }),
       tone:
         credibilityReady === analyzedCount && analyzedCount > 0
           ? "success"

@@ -4,6 +4,7 @@ import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { UserProfile } from "@/shared/models";
 import { buildAccountProfileViewData } from "./account-profile-view-data";
 
@@ -45,27 +46,28 @@ export function useAccountProfileViewModel({
   onLogout,
   onRefresh,
 }: UseAccountProfileViewModelInput) {
+  const { t } = useScopedI18n("account");
   const queryClient = useQueryClient();
   const profile = useMemo(() => (user ? buildAccountProfileViewData(user) : null), [user]);
   const updateProfileMutation = useMutation({
     mutationFn: (input: AccountProfileUpdateInput) => updateAccountProfile(apiBaseURL, input),
     onSuccess: (updatedUser) => {
       queryClient.setQueryData(appQueryKeys.session(apiBaseURL), updatedUser);
-      pushSuccessToast("Compte mis a jour.");
+      pushSuccessToast(t("profileUpdated"));
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre a jour le compte.");
+      pushErrorToast(error, t("updateProfileError"));
     },
   });
   const deleteAccountMutation = useMutation({
     mutationFn: () => deleteAccount(apiBaseURL),
     onSuccess: async () => {
       queryClient.setQueryData(appQueryKeys.session(apiBaseURL), null);
-      pushSuccessToast("Compte supprime.");
+      pushSuccessToast(t("accountDeleted"));
       await onLogout?.();
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de supprimer le compte.");
+      pushErrorToast(error, t("deleteAccountError"));
     },
   });
 

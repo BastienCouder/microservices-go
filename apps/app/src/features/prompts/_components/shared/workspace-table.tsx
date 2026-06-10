@@ -1,6 +1,7 @@
 import { Fragment, ReactNode } from "react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 
 export type WorkspaceTableColumn = {
@@ -29,9 +30,11 @@ export function WorkspaceTable<T>({
   loading = false,
   loadingRowCount = 6,
   renderLoadingRow,
-  emptyLabel = "No data found.",
+  emptyLabel,
   tableClassName,
 }: WorkspaceTableProps<T>) {
+  const { t } = useScopedI18n("shared-ui");
+
   return (
     <Table className={tableClassName}>
       <TableHeader className="sticky top-0 z-10 bg-background">
@@ -54,7 +57,7 @@ export function WorkspaceTable<T>({
         ) : rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={columns.length} className="py-4">
-              <EmptyStateCard label={emptyLabel} className="h-20" />
+              <EmptyStateCard label={emptyLabel ?? t("noDataFound")} className="h-20" />
             </TableCell>
           </TableRow>
         ) : (

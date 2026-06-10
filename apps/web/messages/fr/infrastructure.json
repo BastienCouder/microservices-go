@@ -1,0 +1,16 @@
+{
+  "headline": {
+    "line1": "Une couverture large.",
+    "line2": "Un signal fiable."
+  },
+  "description": "VISIA monitore 10 LLMs en continu — ChatGPT, Perplexity, Gemini, Claude, Mistral, Llama, et plus. Chaque prompt est rejoué en conditions réelles, sans cache, avec rotation d'agents. Résultats disponibles en moins de 50ms.",
+  "stats": {
+    "covered": "LLMs couverts",
+    "uptime": "disponibilité",
+    "responseTime": "temps de réponse"
+  },
+  "panel": {
+    "allLlms": "Tous les LLMs",
+    "liveMonitoring": "monitoring en direct"
+  }
+}

@@ -4,6 +4,7 @@ import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/lib/utils";
 
 import type { PagesOpportunity } from "../../_lib/pages-panel/types";
@@ -17,15 +18,14 @@ export function OpportunitiesPanel({
   opportunities: PagesOpportunity[];
   loading?: boolean;
 }) {
+  const { t } = useScopedI18n("pages");
   return (
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
-          <SectionTitle>Besoins GEO détectés</SectionTitle>
+          <SectionTitle>{t("geoNeedsTitle")}</SectionTitle>
         </CardTitle>
-        <CardDescription>
-          Actions à fort levier à partir des citations observées.
-        </CardDescription>
+        <CardDescription>{t("geoNeedsDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -51,7 +51,7 @@ export function OpportunitiesPanel({
           </div>
         ) : opportunities.length === 0 ? (
           <EmptyStateCard
-            label={errorLabel || "Les opportunités apparaîtront dès que des citations seront disponibles."}
+            label={errorLabel || t("geoOpportunitiesEmpty")}
             className="h-[150px]"
           />
         ) : (

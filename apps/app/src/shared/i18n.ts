@@ -3,25 +3,20 @@ import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
 import Backend, { type HttpBackendOptions } from "i18next-http-backend";
 
-import en from "@/public/locales/en/translations.json";
-import fr from "@/public/locales/fr/translations.json";
 import { isProduction } from "@/lib/utils";
+import { enMessages, frMessages, translationNamespaces, type TranslationKeys } from "@/shared/i18n-messages";
 
-export type TranslationKeys = typeof en;
+const defaultNamespace = "shared-api";
 
-export const translations: Record<string, { translations: TranslationKeys }> = {
-  en: {
-    translations: en,
-  },
-  fr: {
-    translations: fr,
-  },
+export const translations: Record<string, TranslationKeys> = {
+  en: enMessages,
+  fr: frMessages,
 };
 
 const config: InitOptions<HttpBackendOptions> = {
   supportedLngs: ["en", "fr"],
-  ns: ["translations"],
-  defaultNS: "translations",
+  ns: translationNamespaces,
+  defaultNS: defaultNamespace,
   fallbackLng: "en",
   debug: !isProduction,
   interpolation: {
@@ -29,7 +24,7 @@ const config: InitOptions<HttpBackendOptions> = {
   },
   resources: translations,
   backend: {
-    loadPath: "/locales/{{lng}}/translations.json",
+    loadPath: "/locales/{{lng}}/{{ns}}.json",
   },
 };
 

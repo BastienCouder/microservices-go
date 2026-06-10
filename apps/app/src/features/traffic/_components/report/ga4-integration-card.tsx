@@ -25,6 +25,7 @@ import {
 } from "../../_lib/report/ga4-property-labels";
 import type { TrafficGA4OAuthProperty } from "../../_lib/report/types";
 import type { TrafficGA4LLMSetupResult } from "../../_lib/report/types";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 type GA4IntegrationCardProps = {
   connected: boolean;
@@ -71,21 +72,20 @@ export function GA4IntegrationCard({
   onConnect,
   onDisconnect,
 }: GA4IntegrationCardProps) {
+  const { t } = useScopedI18n("traffic-report");
   const [isManaging, setIsManaging] = useState(false);
   const statusLabel = connected
-    ? authMode === "oauth"
-      ? "Connecté"
-      : "Connecté"
+    ? t("ga4StatusConnected")
     : hasOAuthToken
-      ? "Propriété à choisir"
-      : "Non connecté";
+      ? t("ga4StatusPropertyToChoose")
+      : t("ga4StatusDisconnected");
   const showControls = isManaging || (hasOAuthToken && !connected);
   const propertySummary = getGA4PropertySummary(propertyId, oauthProperties);
   const selectedOAuthPropertySummary = getGA4PropertySummary(
     selectedOAuthPropertyId,
     oauthProperties,
   );
-  const llmSetupStatus = getLLMSetupStatus(llmSetup, { loading, saving });
+  const llmSetupStatus = getLLMSetupStatus(llmSetup, t, { loading, saving });
 
   useEffect(() => {
     if (!llmSetupStatus) {
@@ -166,36 +166,37 @@ export function GA4IntegrationCard({
 
       <div className="mt-auto flex flex-col gap-2">
         {canEdit ? (
-          <Button
-            type="button"
-            variant={connected || hasOAuthToken ? "outline" : "default"}
-            className="w-full"
-            disabled={saving || loading}
-            onClick={handlePrimaryAction}
-          >
-            {connected || hasOAuthToken ? (
-              <Settings2 data-icon="inline-start" />
-            ) : (
-           null
-            )}
-            {loading
-              ? "Chargement..."
-              : connected || hasOAuthToken
-                ? "Gérer"
-                : "Connecter Google Analytics"}
-          </Button>
-        ) : null}
+      <Button
+          type="button"
+          variant={connected || hasOAuthToken ? "outline" : "default"}
+          className="w-full"
+          disabled={saving || loading}
+          onClick={handlePrimaryAction}
+        >
+          {connected || hasOAuthToken ? (
+            <Settings2 data-icon="inline-start" />
+          ) : (
+         null
+          )}
+          {loading
+            ? t("loading")
+            : connected || hasOAuthToken
+              ? t("manage")
+              : t("connectGoogleAnalytics")}
+        </Button>
 
+        ) : null}
+       
         {showControls && canEdit ? (
           <div className="mt-3 rounded-xl border bg-background/70 p-3">
             <Tabs defaultValue="google" className="flex flex-col gap-4">
               <TabsList className="grid h-auto w-full grid-cols-2 rounded-xl bg-muted p-1">
                 <TabsTrigger value="google" className="gap-2 rounded-lg py-2">
-                  Google
+                  {t("googleTab")}
                 </TabsTrigger>
 
                 <TabsTrigger value="manual" className="gap-2 rounded-lg py-2">
-                  Manuel
+                  {t("manualTab")}
                 </TabsTrigger>
               </TabsList>
 
@@ -203,10 +204,10 @@ export function GA4IntegrationCard({
                 <div className="rounded-xl border bg-card p-4">
                   <div className="mb-4 space-y-1">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Connexion via Google
+                      {t("googleConnectionTitle")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Connecte ton compte Google, puis sélectionne la propriété GA4 à utiliser.
+                      {t("googleConnectionDescription")}
                     </p>
                   </div>
 
@@ -218,13 +219,13 @@ export function GA4IntegrationCard({
                       disabled={saving || oauthPropertiesLoading}
                       className="w-full justify-center"
                     >
-                      {hasOAuthToken ? "Reconnecter Google" : "Connecter Google"}
+                      {hasOAuthToken ? t("reconnectGoogle") : t("connectGoogle")}
                     </Button>
 
                     {hasOAuthToken ? (
                       <div className="space-y-3 rounded-lg bg-muted/40 p-3">
                         <label className="grid gap-1.5 text-sm font-medium">
-                          Propriété GA4
+                          {t("ga4PropertyLabel")}
                           <Select
                             value={selectedOAuthPropertyId}
                             onValueChange={onSelectedOAuthPropertyIdChange}
@@ -234,8 +235,8 @@ export function GA4IntegrationCard({
                               <SelectValue
                                 placeholder={
                                   oauthPropertiesLoading
-                                    ? "Chargement des propriétés..."
-                                    : "Choisir une propriété GA4"
+                                    ? t("loadingProperties")
+                                    : t("chooseProperty")
                                 }
                               />
                             </SelectTrigger>
@@ -257,15 +258,15 @@ export function GA4IntegrationCard({
 
                         {selectedOAuthPropertySummary ? (
                           <p className="break-words text-xs text-muted-foreground">
-                            Sélection actuelle : {selectedOAuthPropertySummary}
+                            {t("currentSelection", { value: selectedOAuthPropertySummary })}
                           </p>
                         ) : oauthPropertiesLoading ? (
                           <p className="text-xs text-muted-foreground">
-                            Chargement des propriétés disponibles dans ton compte Google...
+                            {t("loadingAvailableProperties")}
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground">
-                            Aucune propriété chargée. Actualise la liste après la connexion Google.
+                            {t("noPropertyLoaded")}
                           </p>
                         )}
 
@@ -276,7 +277,7 @@ export function GA4IntegrationCard({
                             onClick={onRefreshOAuthProperties}
                             disabled={saving || oauthPropertiesLoading}
                           >
-                            {oauthPropertiesLoading ? "Chargement" : "Actualiser"}
+                            {oauthPropertiesLoading ? t("loading") : t("refresh")}
                           </Button>
 
                           <Button
@@ -284,7 +285,7 @@ export function GA4IntegrationCard({
                             onClick={onSelectOAuthProperty}
                             disabled={saving || oauthPropertiesLoading || !selectedOAuthPropertyId}
                           >
-                            Utiliser cette propriété
+                            {t("useThisProperty")}
                           </Button>
                         </div>
                       </div>
@@ -300,7 +301,7 @@ export function GA4IntegrationCard({
                     disabled={saving || oauthPropertiesLoading}
                     className="w-full justify-center text-muted-foreground hover:text-destructive"
                   >
-                    Déconnecter Google Analytics
+                    {t("disconnectGoogleAnalytics")}
                   </Button>
                 ) : null}
               </TabsContent>
@@ -309,33 +310,33 @@ export function GA4IntegrationCard({
                 <div className="rounded-xl border bg-card p-4">
                   <div className="mb-4 space-y-1">
                     <h3 className="text-sm font-semibold text-foreground">
-                      Connexion manuelle
+                      {t("manualConnectionTitle")}
                     </h3>
                     <p className="text-sm text-muted-foreground">
-                      Utilise cette option si tu veux connecter GA4 avec un Service Account JSON.
+                      {t("manualConnectionDescription")}
                     </p>
                   </div>
 
                   <ol className="mb-4 list-decimal space-y-2 pl-5 text-sm text-muted-foreground">
-                    <li>Dans Google Cloud, crée ou ouvre un projet et active Google Analytics Data API.</li>
-                    <li>Crée un Service Account, puis génère une clé JSON.</li>
-                    <li>Dans GA4, ouvre Admin, Property access management, puis ajoute l’email du Service Account avec le rôle Editor.</li>
-                    <li>Copie l’ID numérique de la propriété GA4 depuis Property details.</li>
-                    <li>Colle cet ID et le JSON complet ci-dessous, puis connecte.</li>
+                    <li>{t("manualStep1")}</li>
+                    <li>{t("manualStep2")}</li>
+                    <li>{t("manualStep3")}</li>
+                    <li>{t("manualStep4")}</li>
+                    <li>{t("manualStep5")}</li>
                   </ol>
 
                   <div className="space-y-3">
                     <label className="grid gap-1.5 text-sm font-medium">
-                      Property ID GA4
+                      {t("propertyIdLabel")}
                       <Input
                         value={propertyId}
                         onChange={(event) => onPropertyIdChange(event.target.value)}
-                        placeholder="Ex : 123456789"
+                        placeholder={t("propertyIdPlaceholder")}
                       />
                     </label>
 
                     <label className="grid gap-1.5 text-sm font-medium">
-                      Service Account JSON
+                      {t("serviceAccountJsonLabel")}
                       <Textarea
                         value={serviceAccountJSON}
                         onChange={(event) =>
@@ -347,18 +348,20 @@ export function GA4IntegrationCard({
                     </label>
 
                     <p className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                      Service Account JSON introuvable ? Dans Google Cloud, ouvre
+                      {t("serviceAccountHelpIntro")}
                       {" "}
                       <span className="font-medium text-foreground">
-                        IAM & Admin &gt; Service Accounts
+                        {t("serviceAccountHelpSection")}
                       </span>
-                      , choisis le service account, puis va dans
                       {" "}
-                      <span className="font-medium text-foreground">Keys</span>
-                      . Crée une nouvelle clé
+                      {t("serviceAccountHelpMiddle")}
                       {" "}
-                      <span className="font-medium text-foreground">JSON</span>
-                      , puis reconnecte GA4 avec ce fichier.
+                      <span className="font-medium text-foreground">{t("serviceAccountHelpKeys")}</span>
+                      {" "}
+                      {t("serviceAccountHelpAfterKeys")}
+                      {" "}
+                      <span className="font-medium text-foreground">{t("serviceAccountHelpJson")}</span>
+                      {t("serviceAccountHelpEnd")}
                     </p>
 
                     <Button
@@ -368,8 +371,8 @@ export function GA4IntegrationCard({
                       className="w-full"
                     >
                       {connected && authMode === "service_account"
-                        ? "Mettre à jour la connexion"
-                        : "Connecter manuellement"}
+                        ? t("updateConnection")
+                        : t("connectManually")}
                     </Button>
                   </div>
                 </div>
@@ -382,7 +385,7 @@ export function GA4IntegrationCard({
                     disabled={saving}
                     className="w-full justify-center text-muted-foreground hover:text-destructive"
                   >
-                    Déconnecter Google Analytics
+                    {t("disconnectGoogleAnalytics")}
                   </Button>
                 ) : null}
               </TabsContent>
@@ -396,6 +399,7 @@ export function GA4IntegrationCard({
 
 function getLLMSetupStatus(
   setup: TrafficGA4LLMSetupResult | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
   options?: { loading?: boolean; saving?: boolean },
 ): {
   title: string;
@@ -410,30 +414,33 @@ function getLLMSetupStatus(
   }
   if (setup.setupStatus === "success") {
     return {
-      title: "Tracking AI Traffic GA4 activé",
-      description: "Channel group Default + AI et canal AI prêts.",
+      title: t("ga4SetupSuccessTitle"),
+      description: t("ga4SetupSuccessDescription"),
       tone: "success",
     };
   }
   if (setup.setupStatus === "partial_success") {
     return {
-      title: "Tracking AI Traffic GA4 partiel",
+      title: t("ga4SetupPartialTitle"),
       description:
-        formatLLMSetupGuidance(setup.errors[0]?.message) ||
-        "Une ressource GA4 reste à vérifier.",
+        formatLLMSetupGuidance(setup.errors[0]?.message, t) ||
+        t("ga4SetupPartialDescription"),
       tone: "warning",
     };
   }
   return {
-    title: "Tracking AI Traffic GA4 non configuré",
+    title: t("ga4SetupErrorTitle"),
     description:
-      formatLLMSetupGuidance(setup.errors[0]?.message) ||
-      "Google Analytics a refusé la configuration automatique.",
+      formatLLMSetupGuidance(setup.errors[0]?.message, t) ||
+      t("ga4SetupErrorDescription"),
     tone: "error",
   };
 }
 
-function formatLLMSetupGuidance(message?: string): string {
+function formatLLMSetupGuidance(
+  message: string | undefined,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
   const normalized = message?.trim() ?? "";
   if (normalized === "") {
     return "";
@@ -443,7 +450,7 @@ function formatLLMSetupGuidance(message?: string): string {
     normalized.includes("unsupported-channel-grouping-field") ||
     normalized.includes("provided channel grouping contained a 'field_name' that is not supported")
   ) {
-    return `GA4 a refusé la création automatique du channel group Default + AI. On tente plusieurs noms de champ via l'Admin API; si le refus persiste, créez le channel group manuellement dans Admin > Channel groups avec le canal AI avant Referral. Détail technique: ${normalized}`;
+    return t("ga4SetupGuidanceChannelGroup", { message: normalized });
   }
 
   return normalized;

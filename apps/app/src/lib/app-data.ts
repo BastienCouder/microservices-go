@@ -1,3 +1,6 @@
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
+
 export const VISIBILITY_ANALYTICS_COLORS = {
   series: [
     "hsl(var(--chart-series-1))",
@@ -64,6 +67,7 @@ export const PERCEPTION_VISIBLE_AXES = [
 
 export const PERCEPTION_AXIS_LABELS = {
   positioning: "Positionnement",
+  pricing: "Tarification",
   use_cases: "Cas d'usage",
   features: "Fonctionnalités",
   sentiment: "Sentiment",
@@ -77,6 +81,38 @@ export const PERCEPTION_PERIOD_LABELS = {
   "90d": "90 derniers jours",
   "last-run": "Dernière exécution",
 } as const;
+
+type PerceptionPeriodKey = keyof typeof PERCEPTION_PERIOD_LABELS;
+type PerceptionAxisLabelKey = keyof typeof PERCEPTION_AXIS_LABELS;
+
+function currentI18nLocale(): string {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
+
+export function getPerceptionPeriodLabel(period: PerceptionPeriodKey): string {
+  const keyByPeriod: Record<PerceptionPeriodKey, string> = {
+    all: "periodAll",
+    "7d": "period7d",
+    "30d": "period30d",
+    "90d": "period90d",
+    "last-run": "periodLastRun",
+  };
+
+  return translateI18nText("perception", keyByPeriod[period], currentI18nLocale());
+}
+
+export function getPerceptionAxisLabel(axis: PerceptionAxisLabelKey): string {
+  const keyByAxis: Record<PerceptionAxisLabelKey, string> = {
+    positioning: "axisPositioning",
+    pricing: "axisPricing",
+    use_cases: "axisUseCases",
+    features: "axisFeatures",
+    sentiment: "axisSentiment",
+    competitors: "axisCompetitors",
+  };
+
+  return translateI18nText("perception", keyByAxis[axis], currentI18nLocale());
+}
 
 export const PERCEPTION_PERIOD_BADGE_LABELS = {
   all: "All",
@@ -171,7 +207,7 @@ export const PERCEPTION_TEXT = {
       useCases: "Cas d'usage prioritaires",
       features: "Fonctionnalités que l'IA doit citer",
     },
-    empty: "Non renseigné",
+    empty: translateI18nText("perception-brand-canon", "summaryEmpty", currentI18nLocale()),
     demoHint: "Mode démo : vous pouvez modifier le référentiel sur la page dédiée, sans sauvegarde serveur.",
     projectHint: "Conseil : utilisez ici des formulations simples et factuelles pour réduire les erreurs des IA.",
   },

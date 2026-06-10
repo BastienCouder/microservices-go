@@ -15,7 +15,7 @@ type StepCompetitorsProps = {
   nextLabel?: string;
 };
 
-export function StepCompetitors({ hideBack = false, nextLabel = "Next" }: StepCompetitorsProps) {
+export function StepCompetitors({ hideBack = false, nextLabel }: StepCompetitorsProps) {
   const { competitors, setCompetitors, nextStep, prevStep } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
   const [newName, setNewName] = useState("");
@@ -71,7 +71,7 @@ export function StepCompetitors({ hideBack = false, nextLabel = "Next" }: StepCo
           onBack={prevStep}
           onNext={nextStep}
           // nextDisabled={competitors.length < 1}
-          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+          nextLabel={nextLabel}
         />
       }
     >

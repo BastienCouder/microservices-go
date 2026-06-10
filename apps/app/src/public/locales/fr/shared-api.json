@@ -1,0 +1,15 @@
+{
+  "validationError": "Vérifie les informations saisies.",
+  "unauthorizedError": "Reconnecte-toi pour continuer.",
+  "forbiddenError": "Tu n'as pas les droits pour cette action.",
+  "notFoundError": "La ressource demandée est introuvable.",
+  "conflictError": "Cette action entre en conflit avec l'état actuel.",
+  "rateLimitedError": "Trop de requêtes. Réessaie dans un instant.",
+  "quotaExceededError": "Tu n'as plus de crédits disponibles.",
+  "dependencyUnavailableError": "Le service est temporairement indisponible.",
+  "internalError": "Une erreur interne est survenue.",
+  "timeoutError": "La requête a expiré. Réessaie.",
+  "cancelledError": "La requête a été annulée.",
+  "networkError": "Impossible de joindre le service. Réessaie.",
+  "unknownError": "La requête a échoué."
+}

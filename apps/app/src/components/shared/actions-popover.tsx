@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { MoreHorizontal } from "lucide-react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -90,11 +91,13 @@ function ActionsPopoverItemView({
 export function ActionsPopover({
   title,
   items,
-  triggerLabel = "Actions",
+  triggerLabel,
   disabled = false,
   contentClassName,
   stopPropagation = true,
 }: ActionsPopoverProps) {
+  const { t } = useScopedI18n("shared-ui");
+  const resolvedTriggerLabel = triggerLabel ?? t("actions");
   const propagationProps = stopPropagation
     ? {
         onClick: stopEventPropagation,
@@ -112,10 +115,10 @@ export function ActionsPopover({
             variant="ghost"
             className="rounded-full border border-transparent hover:border-border/70 hover:bg-muted/50"
             disabled={disabled}
-            title={triggerLabel}
+            title={resolvedTriggerLabel}
           >
             <MoreHorizontal className="h-4 w-4" />
-            <span className="sr-only">{triggerLabel}</span>
+            <span className="sr-only">{resolvedTriggerLabel}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className={cn("w-[340px] max-w-[92vw] p-0", contentClassName)}>

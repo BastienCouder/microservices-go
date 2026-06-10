@@ -1,6 +1,7 @@
 import { ChevronDown, ExternalLink } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 import type { AuditCheckResult } from "../../_lib/shared/types";
@@ -18,6 +19,7 @@ export function AuditCheckAccordion({
   open,
   onToggle,
 }: AuditCheckAccordionProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const contentID = `audit-check-${check.id}`;
 
   return (
@@ -60,14 +62,14 @@ export function AuditCheckAccordion({
       {open ? (
         <div id={contentID} className="border-t border-border/60 px-4 pb-4 pt-4">
           <div className="grid gap-4 md:grid-cols-3">
-            <DetailBlock title="Objectif" value={check.goal} />
-            <DetailBlock title="Problème détecté" value={check.issue} />
-            <DetailBlock title="Implémentation" value={check.how_to_implement} />
+            <DetailBlock title={t("detailGoal")} value={check.goal} />
+            <DetailBlock title={t("detailIssue")} value={check.issue} />
+            <DetailBlock title={t("detailImplementation")} value={check.how_to_implement} />
           </div>
 
           {check.evidence?.length ? (
             <div className="mt-4 rounded-xl border border-border/60 bg-background/80 p-4">
-              <h4 className="text-sm font-semibold text-foreground">Preuves détectées</h4>
+              <h4 className="text-sm font-semibold text-foreground">{t("evidenceDetected")}</h4>
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-muted-foreground">
                 {check.evidence.slice(0, 4).map((item) => (
                   <li key={item} className="break-words">

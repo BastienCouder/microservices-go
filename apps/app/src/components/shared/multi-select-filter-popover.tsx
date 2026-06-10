@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { Button } from "@/components/ui/button";
 import { FloatingPanelHeader } from "@/components/ui/floating-panel-header";
@@ -160,7 +161,7 @@ export function MultiSelectFilterPopover({
   allOption,
   className,
   contentClassName,
-  emptyLabel = "Aucune option disponible",
+  emptyLabel,
   gridClassName,
   label,
   loading = false,
@@ -174,6 +175,9 @@ export function MultiSelectFilterPopover({
   summaryLabel,
   title,
 }: MultiSelectFilterPopoverProps) {
+  const { t } = useScopedI18n("shared-ui");
+  const resolvedEmptyLabel = emptyLabel ?? t("noOptionAvailable");
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
@@ -230,7 +234,7 @@ export function MultiSelectFilterPopover({
             />
           ) : options.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border/70 p-3 text-sm text-muted-foreground">
-              {emptyLabel}
+              {resolvedEmptyLabel}
             </div>
           ) : (
             options.map((option) => (

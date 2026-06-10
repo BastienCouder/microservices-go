@@ -66,6 +66,7 @@ export function ErrorHubKanban({
 }: ErrorHubKanbanProps) {
   const { locale } = useLocale();
   const { t } = useScopedI18n("perception");
+  const { t: tErrorHub } = useScopedI18n("error-hub");
   const isMobile = useIsMobile();
 
   const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
@@ -121,11 +122,29 @@ export function ErrorHubKanban({
   );
 
   const columns = useMemo(
-    () =>
-      boardView === "status"
-        ? groupErrorsByActionStatus(filteredErrors, actionStatusesByErrorId)
-        : groupErrorsBySeverity(filteredErrors, actionStatusesByErrorId),
-    [actionStatusesByErrorId, boardView, filteredErrors],
+    () => {
+      const grouped =
+        boardView === "status"
+          ? groupErrorsByActionStatus(filteredErrors, actionStatusesByErrorId)
+          : groupErrorsBySeverity(filteredErrors, actionStatusesByErrorId);
+
+      return grouped.map((column) => ({
+        ...column,
+        title:
+          boardView === "status"
+            ? column.id === "todo"
+              ? tErrorHub("statusColumnTodo")
+              : column.id === "processing"
+                ? tErrorHub("statusColumnProcessing")
+                : tErrorHub("statusColumnDone")
+            : column.id === "high"
+              ? tErrorHub("severityColumnHigh")
+              : column.id === "medium"
+                ? tErrorHub("severityColumnMedium")
+                : tErrorHub("severityColumnLow"),
+      }));
+    },
+    [actionStatusesByErrorId, boardView, filteredErrors, tErrorHub],
   );
 
   const allCompetitorsSelected = selectedCompetitors.length === 0;
@@ -187,8 +206,8 @@ export function ErrorHubKanban({
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
-        title="Problèmes détectés"
-        baseline="Centre de triage des erreurs de l'application"
+        title={tErrorHub("pageTitle")}
+        baseline={tErrorHub("pageBaseline")}
         actionsVariant="classic"
       />
 
@@ -230,13 +249,13 @@ export function ErrorHubKanban({
               >
                 <TabsList className="h-10 w-full md:w-auto">
                   <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
-                    Par sévérité
+                    {tErrorHub("boardBySeverity")}
                   </TabsTrigger>
                   <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
-                    Par statut
+                    {tErrorHub("boardByStatus")}
                   </TabsTrigger>
                   <TabsTrigger value="content" className="px-3 text-xs md:text-sm">
-                    Briefs contenu
+                    {tErrorHub("boardByContent")}
                   </TabsTrigger>
                 </TabsList>
               </Tabs>

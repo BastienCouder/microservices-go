@@ -5,6 +5,7 @@ import { SectionTitle } from "@/components/shared/section-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type { ModelLeader } from "../../_lib/pages-panel/types";
 
@@ -15,15 +16,14 @@ type ModelLeaderboardProps = {
 };
 
 export function ModelLeaderboard({ errorLabel, models, loading = false }: ModelLeaderboardProps) {
+  const { t } = useScopedI18n("pages");
   return (
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
-          <SectionTitle>LLMs qui citent le plus</SectionTitle>
+          <SectionTitle>{t("modelLeaderboardTitle")}</SectionTitle>
         </CardTitle>
-        <CardDescription>
-          Modèles qui réutilisent le plus souvent vos pages comme sources.
-        </CardDescription>
+        <CardDescription>{t("modelLeaderboardDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -46,7 +46,7 @@ export function ModelLeaderboard({ errorLabel, models, loading = false }: ModelL
           </div>
         ) : models.length === 0 ? (
           <EmptyStateCard
-            label={errorLabel || "Aucun LLM ne cite encore une page du site."}
+            label={errorLabel || t("noLlmYet")}
             className="h-[150px]"
           />
         ) : (
@@ -77,7 +77,7 @@ export function ModelLeaderboard({ errorLabel, models, loading = false }: ModelL
                       </span>
                     </div>
                     <div className="mt-1 text-xs text-muted-foreground">
-                      {model.citedPageCount} pages • {model.sourcedPromptCount} réponses
+                      {model.citedPageCount} {t("pagesWord")} • {model.sourcedPromptCount} {t("responses")}
                     </div>
                   </div>
                 </div>

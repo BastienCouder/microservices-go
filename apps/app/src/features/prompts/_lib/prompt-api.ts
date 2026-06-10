@@ -4,8 +4,14 @@ import {
   requireGatewayResult,
   unwrapGatewayPayload,
 } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import { normalizePromptPage, normalizeProjectPromptRecord, PROMPTS_CATALOG_PAGE_SIZE } from "./prompt-normalizers";
 import type { PromptItem, PromptPageResult, PromptSchedule, ProjectPromptRecord } from "./types";
+
+function currentLocale(): string {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
 
 export async function loadPromptPage(
   apiBaseURL: string,
@@ -27,7 +33,10 @@ export async function loadPromptPage(
   );
 
   return normalizePromptPage(
-    requireGatewayResult(response, "Impossible de charger les prompts."),
+    requireGatewayResult(
+      response,
+      translateI18nText("prompts-workspace", "loadPromptsError", currentLocale()),
+    ),
   );
 }
 
@@ -81,7 +90,10 @@ export async function patchPromptModels(
     body: JSON.stringify({ modelIds }),
   });
 
-  requireGatewayResult(response, "Impossible de mettre a jour la couverture IA du prompt.");
+  requireGatewayResult(
+    response,
+    translateI18nText("prompts-workspace", "updatePromptCoverageError", currentLocale()),
+  );
 }
 
 export async function patchPromptSchedule(
@@ -96,7 +108,10 @@ export async function patchPromptSchedule(
     body: JSON.stringify({ schedule }),
   });
 
-  requireGatewayResult(response, "Impossible de mettre a jour la cadence d'analyse du prompt.");
+  requireGatewayResult(
+    response,
+    translateI18nText("prompts-workspace", "updatePromptScheduleError", currentLocale()),
+  );
 }
 
 export async function createProjectPrompt(
@@ -112,7 +127,10 @@ export async function createProjectPrompt(
   });
 
   const payload = unwrapGatewayPayload(
-    requireGatewayResult(response, "Impossible de creer le prompt."),
+    requireGatewayResult(
+      response,
+      translateI18nText("prompts-workspace", "createPromptError", currentLocale()),
+    ),
   );
   const rawItems = Array.isArray(payload)
     ? payload
@@ -126,7 +144,9 @@ export async function createProjectPrompt(
   );
 
   if (!firstItem) {
-    throw new Error("Le backend n'a pas retourne le prompt cree.");
+    throw new Error(
+      translateI18nText("prompts-workspace", "missingCreatedPromptError", currentLocale()),
+    );
   }
 
   return normalizeProjectPromptRecord(firstItem);
@@ -147,7 +167,10 @@ export async function generateProjectPrompts(
   );
 
   const payload = unwrapGatewayPayload(
-    requireGatewayResult(response, "Impossible de generer les prompts."),
+    requireGatewayResult(
+      response,
+      translateI18nText("prompts-workspace", "generatePromptsApiError", currentLocale()),
+    ),
   );
   const rawItems = Array.isArray(payload)
     ? payload
@@ -178,7 +201,10 @@ export async function patchPrompt(
     body: JSON.stringify(input),
   });
 
-  requireGatewayResult(response, "Impossible d'enregistrer le prompt.");
+  requireGatewayResult(
+    response,
+    translateI18nText("prompts-workspace", "savePromptApiError", currentLocale()),
+  );
 }
 
 export async function deleteProjectPrompt(
@@ -191,5 +217,8 @@ export async function deleteProjectPrompt(
     organizationId,
   });
 
-  requireGatewayResult(response, "Impossible de supprimer le prompt.");
+  requireGatewayResult(
+    response,
+    translateI18nText("prompts-workspace", "deletePromptError", currentLocale()),
+  );
 }

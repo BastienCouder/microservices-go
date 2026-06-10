@@ -13,6 +13,7 @@ import { buildPromptPageItems } from "./prompt-data-factory";
 import { loadAllPromptPages } from "./prompt-api";
 import { dedupeModels } from "./prompt-normalizers";
 import { normalizeModelName, STAGES } from "./utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type {
   ModelVisual,
   ProjectPromptRecord,
@@ -147,6 +148,7 @@ export function usePromptsSourceData({
   promptSort,
   promptSortDirection,
 }: UsePromptsSourceDataParams) {
+  const { t } = useScopedI18n("shared-ui");
   const activeProjectId = projectId || monitoringData.project.id || "";
   const projectModels = monitoringData.models;
   const liveModels = useMemo(
@@ -189,12 +191,12 @@ export function usePromptsSourceData({
     }
 
     const providerVisual = findProviderVisual(model);
-    const provider = providerVisual?.provider ?? "AI provider";
-    const name = getProviderModelName(model) || model || "Modele IA";
+    const provider = providerVisual?.provider ?? t("aiProvider");
+    const name = getProviderModelName(model) || model || t("aiModel");
 
     return {
       icon: providerVisual?.icon ?? "/models/openai.svg",
-      description: model || "Modele IA",
+      description: model || t("aiModel"),
       label: name,
       provider: providerVisual?.provider ?? buildProviderLabel(provider),
       name,

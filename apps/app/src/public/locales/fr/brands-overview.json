@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Profil de marque",
+  "pageBaseline": "Toutes les informations essentielles de la marque sont réunies sur un seul écran pour être relues rapidement.",
+  "editBrandProfile": "Modifier le profil de marque",
+  "quickSummaryTitle": "Résumé rapide",
+  "quickSummaryDescription": "Les informations les plus utiles pour comprendre la marque immédiatement.",
+  "brandNameLabel": "Nom de la marque",
+  "sectorLabel": "Secteur",
+  "shortSummaryLabel": "Résumé court",
+  "referenceDescriptionTitle": "Description de référence",
+  "referenceDescriptionDescription": "La formulation qui décrit précisément la marque et son positionnement.",
+  "descriptionLabel": "Description",
+  "priorityUseCasesTitle": "Cas d’usage prioritaires",
+  "keyFeaturesTitle": "Fonctionnalités clés",
+  "competitorsTitle": "Concurrents",
+  "emptyLabel": "Non renseigné"
+}

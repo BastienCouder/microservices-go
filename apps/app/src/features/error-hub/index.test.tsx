@@ -68,9 +68,9 @@ describe("error hub", () => {
     expect(utilsSource.includes("sortErrorsByActionStatus")).toBe(true);
     expect(utilsSource.includes("groupErrorsByActionStatus")).toBe(true);
     expect(typesSource.includes("STATUS_COLUMNS")).toBe(true);
-    expect(typesSource.includes('title: "À faire"')).toBe(true);
-    expect(typesSource.includes('title: "En cours"')).toBe(true);
-    expect(typesSource.includes('title: "Terminé"')).toBe(true);
+    expect(typesSource.includes('translateI18nText("error-hub", "statusColumnTodo"')).toBe(true);
+    expect(typesSource.includes('translateI18nText("error-hub", "statusColumnProcessing"')).toBe(true);
+    expect(typesSource.includes('translateI18nText("error-hub", "statusColumnDone"')).toBe(true);
     expect(utilsSource.includes('if (status === "processing") return 0;')).toBe(
       true,
     );

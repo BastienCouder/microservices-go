@@ -47,6 +47,8 @@ Services exposés:
 - Doc: `http://localhost:30001`
 - Email preview: `http://localhost:30002`
 
+Les cibles `make prod*` publient par défaut la stack "prod locale" sur `http://localhost:30005` pour `web` et `http://localhost:30006` pour `app`, afin d'éviter un conflit avec la stack locale principale.
+
 ## Endpoints principaux (via Gateway)
 
 - `GET /health`

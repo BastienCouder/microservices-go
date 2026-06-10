@@ -34,6 +34,7 @@ import {
 } from "@/components/ui/select";
 import { appQueryKeys } from "@/lib/query-keys";
 import { apiRoutes } from "@/lib/api-config";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   loadOrganizationSummaries,
   type OrganizationMember,
@@ -154,6 +155,7 @@ async function loadAdminOrganizationRow(
 export function AdminOrganizationsPage({
   apiBaseURL,
 }: AdminOrganizationsPageProps) {
+  const { t } = useScopedI18n("admin-organizations");
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [search, setSearch] = useState("");
@@ -300,13 +302,13 @@ export function AdminOrganizationsPage({
         appQueryKeys.billingQuota(apiBaseURL, variables.organizationId),
         ["prompt-quota", apiBaseURL, variables.organizationId],
       ]);
-      pushSuccessToast("Quota de crédits mis a jour.");
+      pushSuccessToast(t("quotaUpdated"));
     },
     onError: (error, _variables, context) => {
       if (context?.previousRows) {
         queryClient.setQueryData(quotaQueryKey, context.previousRows);
       }
-      pushErrorToast(error, "Impossible de mettre a jour ce quota.");
+      pushErrorToast(error, t("quotaUpdateError"));
     },
     onSettled: async () => {
       await queryClient.invalidateQueries({ queryKey: quotaQueryKey });
@@ -343,16 +345,16 @@ export function AdminOrganizationsPage({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
-        title="Admin organisations"
-        baseline="Gerez les plans et le nombre de crédits mensuels autorises par organisation."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="mb-3 md:mb-4"
         meta={
           <>
             <Badge variant="default">
-              {manageableOrganizations.length} organisations
+              {t("organizationsCount", { count: manageableOrganizations.length })}
             </Badge>
-            <Badge variant="outline">Quotas crédits</Badge>
+            <Badge variant="outline">{t("creditQuotas")}</Badge>
           </>
         }
         actions={
@@ -364,7 +366,7 @@ export function AdminOrganizationsPage({
             className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
           >
             <RefreshCw data-icon="inline-start" />
-            {isFetching ? "Actualisation..." : "Actualiser"}
+            {isFetching ? t("refreshing") : t("refresh")}
           </Button>
         }
       />
@@ -382,16 +384,16 @@ export function AdminOrganizationsPage({
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Rechercher une organisation"
+                    placeholder={t("searchPlaceholder")}
                     className="h-10 pl-9"
                   />
                 </div>
                 <Select value={planFilter} onValueChange={setPlanFilter}>
                   <SelectTrigger className="h-10 w-full">
-                    <SelectValue placeholder="Plan" />
+                    <SelectValue placeholder={t("planPlaceholder")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={PLAN_FILTER_ALL}>Tous les plans</SelectItem>
+                    <SelectItem value={PLAN_FILTER_ALL}>{t("allPlans")}</SelectItem>
                     {availablePlans.map((plan) => (
                       <SelectItem key={plan} value={plan}>
                         {getBillingPlanLabel(plan)}
@@ -414,16 +416,16 @@ export function AdminOrganizationsPage({
                   variant="outline"
                   className="hidden h-9 w-fit shrink-0 justify-center px-3 text-sm md:inline-flex"
                 >
-                  {filteredRows.length} orgs affichees
+                  {t("displayedOrganizations", { count: filteredRows.length })}
                 </Badge>
               )}
             </div>
             <div className="flex min-w-0 flex-col gap-1 px-3 text-xs text-muted-foreground md:px-0 lg:text-right">
               <span className="inline-flex items-center gap-1 font-medium text-foreground">
                 <ShieldCheck className="size-3.5 text-primary" />
-                Quotas crédits
+                {t("changesApplyHintTitle")}
               </span>
-              <span>Les changements se repercutent sur l'usage de crédits sans refresh.</span>
+              <span>{t("changesApplyHintDescription")}</span>
             </div>
           </div>
         </div>
@@ -432,23 +434,23 @@ export function AdminOrganizationsPage({
           {isLoading ? (
             <AdminOrganizationsLoading />
           ) : manageableOrganizations.length === 0 ? (
-            <EmptyState label="Aucune organisation administrable trouvee pour ce compte." />
+            <EmptyState label={t("noManageableOrganization")} />
           ) : rows.length === 0 ? (
-            <EmptyState label="Aucun quota charge pour le moment." />
+            <EmptyState label={t("noQuotaLoaded")} />
           ) : filteredRows.length === 0 ? (
-            <EmptyState label="Aucune organisation ne correspond a ces filtres." />
+            <EmptyState label={t("noFilteredOrganization")} />
           ) : (
             <>
               <div className="hidden overflow-hidden rounded-xl border border-border/70 md:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Organisation</TableHead>
-                      <TableHead className="min-w-[220px]">Projets</TableHead>
-                      <TableHead className="min-w-[240px]">Utilisateurs</TableHead>
-                      <TableHead className="w-[180px]">Plan</TableHead>
-                      <TableHead className="w-[260px]">Quota crédits</TableHead>
-                      <TableHead className="w-[140px] text-right">Action</TableHead>
+                      <TableHead>{t("columnOrganization")}</TableHead>
+                      <TableHead className="min-w-[220px]">{t("columnProjects")}</TableHead>
+                      <TableHead className="min-w-[240px]">{t("columnUsers")}</TableHead>
+                      <TableHead className="w-[180px]">{t("columnPlan")}</TableHead>
+                      <TableHead className="w-[260px]">{t("columnCreditQuota")}</TableHead>
+                      <TableHead className="w-[140px] text-right">{t("columnAction")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -522,6 +524,8 @@ function AdminOrganizationTableRow({
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
   planOptions: BillingPlanCode[];
 }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   return (
     <TableRow>
       <TableCell>
@@ -533,8 +537,10 @@ function AdminOrganizationTableRow({
             <Badge variant="outline">{row.organization.role}</Badge>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
-            ID org {row.organization.id} ·{" "}
-            {row.entitlements.subscriptionStatus || "defaut"}
+            {t("organizationIdStatus", {
+              id: row.organization.id,
+              status: row.entitlements.subscriptionStatus || t("defaultSubscriptionStatus"),
+            })}
           </div>
         </div>
       </TableCell>
@@ -586,6 +592,8 @@ function AdminOrganizationMobileCard({
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
   planOptions: BillingPlanCode[];
 }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   return (
     <form
       onSubmit={(event) => onSave(event, row)}
@@ -595,17 +603,17 @@ function AdminOrganizationMobileCard({
         <div className="min-w-0">
           <div className="font-medium text-foreground">{row.organization.name}</div>
           <div className="mt-1 text-xs text-muted-foreground">
-            ID org {row.organization.id}
+            {t("organizationId", { id: row.organization.id })}
           </div>
         </div>
         <Badge variant="outline">{row.organization.role}</Badge>
       </div>
       <div className="space-y-3">
         <div className="grid gap-3">
-          <MobileSummaryBlock title="Projets">
+          <MobileSummaryBlock title={t("projectsTitle")}>
             <ProjectsSummary projects={row.projects} />
           </MobileSummaryBlock>
-          <MobileSummaryBlock title="Utilisateurs">
+          <MobileSummaryBlock title={t("usersTitle")}>
             <MembersSummary members={row.members} />
           </MobileSummaryBlock>
         </div>
@@ -628,8 +636,10 @@ function AdminOrganizationMobileCard({
 }
 
 function ProjectsSummary({ projects }: { projects: OrganizationProject[] }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   if (projects.length === 0) {
-    return <span className="text-sm text-muted-foreground">Aucun projet</span>;
+    return <span className="text-sm text-muted-foreground">{t("noProject")}</span>;
   }
 
   const visibleProjects = projects.slice(0, 3);
@@ -650,8 +660,10 @@ function ProjectsSummary({ projects }: { projects: OrganizationProject[] }) {
 }
 
 function MembersSummary({ members }: { members: OrganizationMember[] }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   if (members.length === 0) {
-    return <span className="text-sm text-muted-foreground">Aucun utilisateur</span>;
+    return <span className="text-sm text-muted-foreground">{t("noUser")}</span>;
   }
 
   const visibleMembers = members.slice(0, 3);
@@ -672,7 +684,7 @@ function MembersSummary({ members }: { members: OrganizationMember[] }) {
         {remaining > 0 ? <Badge variant="outline">+{remaining}</Badge> : null}
       </div>
       <div className="text-xs text-muted-foreground">
-        {members.length} utilisateur{members.length > 1 ? "s" : ""}
+        {t("membersCount", { count: members.length })}
       </div>
     </div>
   );
@@ -704,10 +716,12 @@ function PlanSelect({
   planOptions: BillingPlanCode[];
   onValueChange: (plan: BillingPlanCode) => void;
 }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   return (
     <Select value={value} onValueChange={onValueChange}>
       <SelectTrigger className="h-10 w-full">
-        <SelectValue placeholder="Plan" />
+        <SelectValue placeholder={t("planPlaceholder")} />
       </SelectTrigger>
       <SelectContent>
         {planOptions.map((plan) => (
@@ -729,6 +743,7 @@ function QuotaInput({
   entitlements: BillingEntitlements;
   onChange: (value: string) => void;
 }) {
+  const { t } = useScopedI18n("admin-organizations");
   const normalizedValue = toPositiveInteger(value, entitlements.monthlyQuota || 1);
   const isDirty = normalizedValue !== entitlements.monthlyQuota;
 
@@ -748,7 +763,9 @@ function QuotaInput({
           className="h-1.5 flex-1 bg-muted"
         />
         <span className="shrink-0 text-xs text-muted-foreground">
-          {isDirty ? `nouveau ${normalizedValue}` : `enregistre ${entitlements.monthlyQuota}`}
+          {isDirty
+            ? t("newQuota", { value: normalizedValue })
+            : t("savedQuota", { value: entitlements.monthlyQuota })}
         </span>
       </div>
     </div>
@@ -762,10 +779,12 @@ function SaveButton({
   pending: boolean;
   className?: string;
 }) {
+  const { t } = useScopedI18n("admin-organizations");
+
   return (
     <Button type="submit" disabled={pending} className={className}>
       <Save data-icon="inline-start" />
-      {pending ? "Sauvegarde..." : "Sauvegarder"}
+      {pending ? t("saving") : t("save")}
     </Button>
   );
 }

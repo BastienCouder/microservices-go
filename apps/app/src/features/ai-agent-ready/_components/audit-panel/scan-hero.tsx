@@ -11,6 +11,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { CHECK_GROUPS } from "../../_lib/audit/audit-config";
 
@@ -35,9 +36,10 @@ export function ScanHero({
   canEdit,
   onAnalyze,
 }: ScanHeroProps) {
+  const { t } = useScopedI18n("ai-agent-ready");
   const title = projectName
-    ? `Analyser le site ${projectName}`
-    : "Analyser le site du projet";
+    ? t("heroTitleProject", { projectName })
+    : t("heroTitleFallback");
 
   return (
     <Card className="border-border/60">
@@ -45,7 +47,7 @@ export function ScanHero({
         <div className="space-y-1">
           <h1 className="text-lg font-semibold text-foreground">{title}</h1>
           <p className="text-sm text-muted-foreground">
-            Audit rapide du site public pour vérifier ce qu&apos;un agent peut trouver et exploiter.
+            {t("heroDescription")}
           </p>
         </div>
 
@@ -58,20 +60,20 @@ export function ScanHero({
               className="h-auto justify-start p-0 text-muted-foreground"
             >
               <CircleHelp className="size-4" aria-hidden="true" />
-              Voir ce qui sera analysé
+              {t("heroSeeChecks")}
             </Button>
           </DialogTrigger>
           <DialogContent className="sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle>Ce que l&apos;audit vérifie</DialogTitle>
-              <DialogDescription>
-                Les contrôles lancés sont en lecture seule et se concentrent sur les points qui comptent pour les agents.
-              </DialogDescription>
+              <DialogTitle>{t("heroChecksTitle")}</DialogTitle>
+              <DialogDescription>{t("heroChecksDescription")}</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               {CHECK_GROUPS.map((group) => (
                 <div key={group.id} className="space-y-2">
-                  <div className="text-sm font-semibold text-foreground">{group.label}</div>
+                  <div className="text-sm font-semibold text-foreground">
+                    {t(`checkGroup_${group.id}_label`)}
+                  </div>
                   <ul className="space-y-1 text-sm text-muted-foreground">
                     {group.checks
                       .filter((check) => !check.disabled)
@@ -79,9 +81,11 @@ export function ScanHero({
                         <li key={check.id} className="flex gap-2">
                           <span className="mt-[9px] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                           <span>
-                            <span className="font-medium text-foreground">{check.label}</span>
+                            <span className="font-medium text-foreground">
+                              {t(`check_${check.id}_label`)}
+                            </span>
                             {" - "}
-                            {check.description}
+                            {t(`check_${check.id}_description`)}
                           </span>
                         </li>
                       ))}
@@ -113,25 +117,25 @@ export function ScanHero({
               />
             </div>
             {loadingProject ? (
-              <p className="text-sm text-muted-foreground">Chargement de l&apos;URL du projet...</p>
+              <p className="text-sm text-muted-foreground">{t("heroLoadingUrl")}</p>
             ) : null}
             {!loadingProject && urlError ? (
               <p className="text-sm font-medium text-destructive">{urlError}</p>
             ) : null}
             {!loadingProject && !url && !urlError ? (
               <p className="text-sm text-muted-foreground">
-                Aucune URL de projet disponible pour lancer l&apos;audit.
+                {t("heroNoUrl")}
               </p>
             ) : null}
           </div>
-          {canEdit ? (
-            <Button type="submit" disabled={!canScan} className="min-w-44 self-end">
-              {isScanning ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : null}
-              {isScanning ? "Analyse en cours" : "Analyser le site"}
-            </Button>
-          ) : null}
+             {canEdit ? (
+          <Button type="submit" disabled={!canScan} className="min-w-44 self-end">
+            {isScanning ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : null}
+            {isScanning ? t("heroScanning") : t("heroAnalyze")}
+          </Button>
+             ) : null}
         </form>
       </CardContent>
     </Card>

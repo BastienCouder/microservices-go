@@ -21,7 +21,7 @@ type StepBrandProps = {
 export function StepBrand({
   apiBaseURL,
   hideBack = false,
-  nextLabel = "Next",
+  nextLabel,
 }: StepBrandProps) {
   const {
     brandName,
@@ -194,7 +194,7 @@ export function StepBrand({
           hideBack={hideBack}
           onBack={prevStep}
           onNext={nextStep}
-          nextLabel={nextLabel === "Next" ? undefined : nextLabel}
+          nextLabel={nextLabel}
         />
       }
     >

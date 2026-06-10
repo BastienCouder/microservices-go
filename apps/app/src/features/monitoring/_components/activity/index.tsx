@@ -7,6 +7,7 @@ import { ActivityAlertDetailSheet } from "./activity-alert-detail-sheet";
 import { ActivityPromptDetailSheet } from "./activity-prompt-detail-sheet";
 import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 function openPromptResponse(prompt: MonitoringData["recent_prompts"][number]) {
   const params = new URLSearchParams(window.location.search);
@@ -21,6 +22,7 @@ const PROMPTS_PREVIEW_COUNT = 5;
 
 export function ActivityPanel() {
   const viewModel = useActivityPanelViewModel();
+  const { t } = useScopedI18n("monitoring-activity-panel");
 
   if (viewModel.loading) {
     return <Template />;
@@ -39,7 +41,7 @@ export function ActivityPanel() {
                 onClick={viewModel.handleExportMonitoringData}
               >
                 <Download className="size-4" />
-                Export Excel
+                {t("exportExcel")}
               </Button>
             </div>
           ) : null}

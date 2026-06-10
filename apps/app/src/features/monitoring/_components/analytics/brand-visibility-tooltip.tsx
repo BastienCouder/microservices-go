@@ -1,3 +1,4 @@
+import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { BrandVisibilityRow } from "../../_lib/analytics/use-brand-visibility-view-model";
 
 const LEGEND_FALLBACK_COLOR = "hsl(var(--chart-legend-fallback))";
@@ -27,6 +28,7 @@ export function BrandVisibilityTooltip({
   payload,
   totalScopedPrompts,
 }: BrandVisibilityTooltipProps) {
+  const content = useI18nScope("monitoring-analytics-panel");
   const item = payload?.[0];
   const row = item?.payload;
   if (!active || !item || !row) return null;
@@ -49,13 +51,13 @@ export function BrandVisibilityTooltip({
       </div>
       <div className="grid gap-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">Mentions</span>
+          <span className="text-muted-foreground">{content.mentions}</span>
           <span className="font-mono tabular-nums">
             {mentions} / {Math.max(totalScopedPrompts, 0)}
           </span>
         </div>
-        <TooltipMetricBar label="Mention rate" value={mentionRate} color={color} />
-        <TooltipMetricBar label="SOV" value={sov} color={color} />
+        <TooltipMetricBar label={content.mentionRateLabel} value={mentionRate} color={color} />
+        <TooltipMetricBar label={content.sovLabel} value={sov} color={color} />
       </div>
     </div>
   );

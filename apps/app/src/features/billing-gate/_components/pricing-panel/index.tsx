@@ -8,6 +8,7 @@ import {
   pushSuccessToast,
   pushWarningToast,
 } from "@/components/ui/toast-actions";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 import type { CheckoutPlan } from "../../_lib/pricing/billing-gate-api";
 import { useBillingGateViewModel } from "../../_lib/pricing/use-billing-gate-view-model";
@@ -19,6 +20,7 @@ type PricingPanelProps = {
 };
 
 export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPanelProps) {
+  const { t } = useScopedI18n("billing-gate");
   const viewModel = useBillingGateViewModel({ apiBaseURL, routeSearch, userEmail });
 
   useEffect(() => {
@@ -52,10 +54,10 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-              Activation du compte
+              {t("eyebrow")}
             </p>
             <h1 className="mt-1 text-2xl font-semibold text-foreground">
-              Choisis ton accès avant d'entrer dans l'app
+              {t("title")}
             </h1>
           </div>
 
@@ -65,14 +67,14 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
               variant={viewModel.billingCycle === "monthly" ? "default" : "ghost"}
               onClick={() => viewModel.setBillingCycle("monthly")}
             >
-              Mensuel
+              {t("monthly")}
             </Button>
             <Button
               size="sm"
               variant={viewModel.billingCycle === "yearly" ? "default" : "ghost"}
               onClick={() => viewModel.setBillingCycle("yearly")}
             >
-              Annuel
+              {t("yearly")}
             </Button>
           </div>
         </div>
@@ -83,19 +85,19 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
           {!viewModel.hasOrganizations ? (
             <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
               <label className="text-sm font-medium text-foreground" htmlFor="organization-name">
-                Nom de l'organisation
+                {t("organizationName")}
               </label>
               <input
                 className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/20 transition focus:ring-4"
                 id="organization-name"
                 value={viewModel.organizationName}
                 onChange={(event) => viewModel.setOrganizationName(event.target.value)}
-                placeholder="Ex: Acme SEO"
+                placeholder={t("organizationNamePlaceholder")}
               />
             </div>
           ) : (
             <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-              <p className="text-sm font-medium text-foreground">Organisation active</p>
+              <p className="text-sm font-medium text-foreground">{t("activeOrganization")}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {viewModel.organizations.map((organization) => (
                   <Button
@@ -110,7 +112,7 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
               </div>
               {viewModel.billingStatus ? (
                 <p className="mt-3 text-xs text-muted-foreground">
-                  Statut billing actuel : {viewModel.billingStatus}
+                  {t("billingStatus", { status: viewModel.billingStatus })}
                 </p>
               ) : null}
             </div>
@@ -130,13 +132,13 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
                     <h2 className="text-xl font-semibold">{plan.name}</h2>
                     <p className="mt-2 text-sm leading-6 text-muted-foreground">{plan.description}</p>
                   </div>
-                  {plan.highlighted ? <Badge>Populaire</Badge> : null}
+                  {plan.highlighted ? <Badge>{t("popular")}</Badge> : null}
                 </div>
 
                 <div className="mt-6">
                   <p className="text-2xl font-semibold">
                     {viewModel.billingCycle === "yearly" ? plan.yearlyPrice : plan.price}
-                    <span className="text-sm font-medium text-muted-foreground"> / mois</span>
+                    <span className="text-sm font-medium text-muted-foreground"> {t("perMonth")}</span>
                   </p>
                   <p className="mt-1 text-sm text-muted-foreground">{plan.quota}</p>
                 </div>
@@ -160,7 +162,7 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
                   ) : (
                     <ArrowRight className="h-4 w-4" />
                   )}
-                  Continuer
+                  {t("continue")}
                 </Button>
               </article>
             ))}
@@ -171,29 +173,29 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
           <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <Handshake className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Programme affiliation</h2>
+              <h2 className="text-lg font-semibold">{t("affiliateProgram")}</h2>
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Recommande la plateforme a une equipe marketing ou une agence et suis les introductions qualifiees.
+              {t("affiliateDescription")}
             </p>
             <div className="mt-5 space-y-3">
               <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-sm font-medium">Commission recurrente</p>
+                <p className="text-sm font-medium">{t("recurringCommission")}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Jusqu'a 20% sur les comptes apportes et actives.
+                  {t("recurringCommissionDescription")}
                 </p>
               </div>
               <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-sm font-medium">Intro assistee</p>
+                <p className="text-sm font-medium">{t("assistedIntro")}</p>
                 <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  Partage une opportunite, l'equipe prend le relais sur la demo.
+                  {t("assistedIntroDescription")}
                 </p>
               </div>
             </div>
             <Button asChild className="mt-5 w-full" variant="outline">
               <a href="mailto:partners@riligar.com?subject=Programme%20affiliation">
                 <Gift className="h-4 w-4" />
-                Devenir partenaire
+                {t("becomePartner")}
               </a>
             </Button>
           </section>
@@ -201,10 +203,10 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
           <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <RefreshCw className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">Apres paiement</h2>
+              <h2 className="text-lg font-semibold">{t("afterPayment")}</h2>
             </div>
             <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              Une fois Stripe confirme, les comptes avec organisation payee sont rediriges vers l'app.
+              {t("afterPaymentDescription")}
             </p>
           </section>
         </aside>

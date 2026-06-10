@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-assets";
 import { formatInteger, formatPercent } from "../../_lib/report/traffic-report-formatters";
 import type { TrafficSource } from "../../_lib/report/types";
@@ -21,15 +22,16 @@ type SourceBreakdownProps = {
 };
 
 export function SourceBreakdown({ errorLabel, sources, pagination, loading = false }: SourceBreakdownProps) {
+  const { t } = useScopedI18n("traffic-report");
   const maxSessions = Math.max(1, ...sources.map((source) => source.sessions));
 
   return (
     <section className="rounded-md bg-card p-4 text-card-foreground">
       <div className="mb-4 flex flex-col gap-1">
         <SectionTitle>
-          Sources IA détectées
+          {t("sourceBreakdownTitle")}
         </SectionTitle>
-        <p className="text-xs text-muted-foreground">Moteurs génératifs identifiés par la source, le référent ou les UTM GA4.</p>
+        <p className="text-xs text-muted-foreground">{t("sourceBreakdownDescription")}</p>
       </div>
 
       <div className="space-y-3">
@@ -44,7 +46,7 @@ export function SourceBreakdown({ errorLabel, sources, pagination, loading = fal
             </div>
           ))
         ) : sources.length === 0 ? (
-          <EmptyStateCard label={errorLabel || "Aucune source disponible"} className="h-28" />
+          <EmptyStateCard label={errorLabel || t("noSourceAvailable")} className="h-28" />
         ) : (
           sources.map((source) => {
             const width = Math.max(6, (source.sessions / maxSessions) * 100);

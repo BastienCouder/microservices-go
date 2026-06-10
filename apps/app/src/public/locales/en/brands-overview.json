@@ -1,0 +1,17 @@
+{
+  "pageTitle": "Brand profile",
+  "pageBaseline": "All essential brand information is gathered on one screen for quick review.",
+  "editBrandProfile": "Edit brand profile",
+  "quickSummaryTitle": "Quick summary",
+  "quickSummaryDescription": "The most useful information to understand the brand immediately.",
+  "brandNameLabel": "Brand name",
+  "sectorLabel": "Category",
+  "shortSummaryLabel": "Short summary",
+  "referenceDescriptionTitle": "Reference description",
+  "referenceDescriptionDescription": "The wording that precisely describes the brand and its positioning.",
+  "descriptionLabel": "Description",
+  "priorityUseCasesTitle": "Priority use cases",
+  "keyFeaturesTitle": "Key features",
+  "competitorsTitle": "Competitors",
+  "emptyLabel": "Not filled in"
+}

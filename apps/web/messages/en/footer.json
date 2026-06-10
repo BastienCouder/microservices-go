@@ -1,0 +1,25 @@
+{
+  "description": "Measure, understand and improve how AI systems talk about your brand.",
+  "copyright": "© 2026 Visia. All rights reserved.",
+  "status": "All systems operational",
+  "groups": {
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal"
+  },
+  "links": {
+    "features": "Features",
+    "howItWorks": "How it works",
+    "developers": "Developers",
+    "pricing": "Pricing",
+    "faq": "FAQ",
+    "about": "About",
+    "blog": "Blog",
+    "careers": "Careers",
+    "hiring": "Hiring",
+    "contact": "Contact",
+    "privacy": "Privacy",
+    "terms": "Terms",
+    "security": "Security"
+  }
+}

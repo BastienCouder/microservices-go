@@ -2,6 +2,8 @@ import {
   buildModelDescription,
   normalizeModelPayload,
 } from "@/lib/project-models";
+import i18n from "@/shared/i18n";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
 import { attachStableSlugs } from "@/shared/public-slugs";
 
 import type {
@@ -52,11 +54,12 @@ export function normalizeProjects(value: unknown): ModelsProjectSummary[] {
 export function normalizeCatalogItem(value: unknown): ModelCatalogItem | null {
   const model = normalizeModelPayload(value);
   if (!model) return null;
+  const fallbackModelLabel = translateI18nText("shared-ui", "aiModel", i18n.language);
 
   return {
     id: model.id,
-    modelGroup: model.groupName || model.displayName || "Modele IA",
-    name: model.displayName || "Modele IA",
+    modelGroup: model.groupName || model.displayName || fallbackModelLabel,
+    name: model.displayName || fallbackModelLabel,
     provider: model.provider,
     providerModelId: model.providerModelId,
     iconKey: model.iconKey,

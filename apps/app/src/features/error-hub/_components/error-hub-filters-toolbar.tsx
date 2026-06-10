@@ -4,6 +4,7 @@ import {
 import { ResponsiveFiltersToolbar } from "@/components/shared/responsive-filters-toolbar";
 import { Button } from "@/components/ui/button";
 import type { ProjectModelMeta } from "@/lib/project-models";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { ErrorHubCompetitorsFilter } from "./filters/error-hub-competitors-filter";
 import { ErrorHubModelsFilter } from "./filters/error-hub-models-filter";
@@ -44,6 +45,32 @@ type ErrorHubFiltersToolbarProps = {
 };
 
 export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
+  const { t } = useScopedI18n("error-hub");
+  const periodOptions = PERIOD_OPTIONS.map((option) => ({
+    ...option,
+    label: t(`periodOption${option.value === "all" ? "All" : option.value.toUpperCase()}`),
+  }));
+  const actionStatusOptions = ACTION_STATUS_OPTIONS.map((option) => ({
+    ...option,
+    label:
+      option.value === "all"
+        ? t("actionStatusAll")
+        : option.value === "processing"
+          ? t("actionStatusProcessing")
+          : t("actionStatusDone"),
+  }));
+  const sourceOptions = SOURCE_OPTIONS.map((option) => ({
+    ...option,
+    label:
+      option.value === "all"
+        ? t("sourceAll")
+        : option.value === "crawler"
+          ? t("sourceCrawler")
+          : option.value === "perception"
+            ? t("sourcePerception")
+            : t("sourceMonitoring"),
+  }));
+
   const renderFilters = () => (
     <>
       <ErrorHubSearchFilter
@@ -55,9 +82,9 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         className="w-full sm:w-[220px]"
         value={props.period}
         onValueChange={(value) => props.setPeriod(value as PeriodFilter)}
-        options={PERIOD_OPTIONS}
-        label="Période"
-        title="Période"
+        options={periodOptions}
+        label={t("periodLabel")}
+        title={t("periodLabel")}
       />
 
       <PeriodFilterPicker
@@ -66,18 +93,18 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         onValueChange={(value) =>
           props.setActionStatusFilter(value as ActionStatusFilter)
         }
-        options={ACTION_STATUS_OPTIONS}
-        label="Statut"
-        title="Statut"
+        options={actionStatusOptions}
+        label={t("statusLabel")}
+        title={t("statusLabel")}
       />
 
       <PeriodFilterPicker
         className="w-full sm:w-[220px]"
         value={props.sourceFilter}
         onValueChange={(value) => props.setSourceFilter(value as SourceFilter)}
-        options={SOURCE_OPTIONS}
-        label="Source"
-        title="Source"
+        options={sourceOptions}
+        label={t("sourceLabel")}
+        title={t("sourceLabel")}
       />
 
       <ErrorHubModelsFilter
@@ -106,14 +133,14 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
           className="h-10 justify-center rounded-lg px-4 text-xs"
           onClick={props.clearFilters}
         >
-          Réinitialiser
+          {t("resetFilters")}
         </Button>
       ) : null}
     </>
   );
 
   return (
-    <ResponsiveFiltersToolbar label="Filtres">
+    <ResponsiveFiltersToolbar label={t("filtersLabel")}>
       {renderFilters}
     </ResponsiveFiltersToolbar>
   );

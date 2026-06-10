@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getTrafficEngineIconPath } from "../../_lib/report/traffic-engine-assets";
 
 type TrafficEngineFilterProps = {
@@ -21,8 +22,9 @@ export function TrafficEngineFilter({
   engines,
   onValueChange,
 }: TrafficEngineFilterProps) {
+  const { t } = useScopedI18n("traffic-report");
   const options = ["all", ...engines.filter((engine) => engine !== "all")];
-  const currentLabel = value === "all" ? "Tous les moteurs" : value;
+  const currentLabel = value === "all" ? t("allEngines") : value;
 
   return (
     <Popover>
@@ -37,14 +39,14 @@ export function TrafficEngineFilter({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-[min(92vw,32rem)] p-0">
-        <FloatingPanelHeader title="Moteurs" />
+        <FloatingPanelHeader title={t("enginesTitle")} />
         <div className="grid max-h-[360px] grid-cols-1 gap-3 overflow-y-auto p-4 sm:grid-cols-2">
           {options.map((engine) => {
-            const label = engine === "all" ? "Tous les moteurs" : engine;
+            const label = engine === "all" ? t("allEngines") : engine;
             return (
               <ModelCard
                 key={engine}
-                name={engine === "all" ? "Toutes les sources" : "Moteur IA"}
+                name={engine === "all" ? t("allSources") : t("aiEngine")}
                 modelGroup={label}
                 icon={getTrafficEngineIconPath(engine)}
                 selected={value === engine}

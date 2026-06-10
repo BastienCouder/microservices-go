@@ -1,5 +1,6 @@
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type { PageModelBadge } from "../../_lib/pages-panel/types";
 
@@ -26,8 +27,9 @@ export function ModelBadgeItem({ badge }: { badge: PageModelBadge }) {
 }
 
 export function ModelIconStack({ models }: { models: PageModelBadge[] }) {
+  const { t } = useScopedI18n("pages");
   if (models.length === 0) {
-    return <span className="text-xs text-muted-foreground">Aucun modèle identifié.</span>;
+    return <span className="text-xs text-muted-foreground">{t("identifiedModel")}</span>;
   }
 
   return (

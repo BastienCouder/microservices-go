@@ -1,0 +1,21 @@
+{
+  "eyebrow": "Segment use cases",
+  "title": "B2B AI systems",
+  "subtitle": "already filter by role and company size.",
+  "description": "If your positioning is not explicit for each audience, you disappear from recommendations. Visia helps align your brand signals, pages and messaging with the segments that matter most.",
+  "cardLabel": "Profile",
+  "items": [
+    {
+      "title": "For Head of Growth",
+      "description": "See how AI systems compare you on acquisition, activation and performance, then fix the positioning gaps that keep you out of shortlists."
+    },
+    {
+      "title": "For scale-up CMOs",
+      "description": "Measure whether your brand shows up as a credible choice for fast-growing teams, with the right category, maturity and proof signals."
+    },
+    {
+      "title": "For B2B SaaS vendors",
+      "description": "Clarify your value proposition, use cases and market position so AI answers rank you higher against alternatives that are already well understood."
+    }
+  ]
+}

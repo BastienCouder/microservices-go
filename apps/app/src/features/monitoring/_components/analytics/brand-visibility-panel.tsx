@@ -57,7 +57,7 @@ export function BrandVisibilityPanel() {
                   value="mention_rate"
                   className="px-2 text-[11px] md:px-3 md:text-xs"
                 >
-                  Mention rate %
+                  {content.mentionRateLabel} %
                 </TabsTrigger>
               </TabsList>
             </Tabs>

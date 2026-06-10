@@ -15,6 +15,7 @@ import {
   getOrphanedProjectsAfterMemberProjectsChange,
   memberHasOrganizationWideProjectAccess,
 } from "../../_lib/shared/project-membership";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type {
   OrganizationMember,
   OrganizationProject,
@@ -46,17 +47,18 @@ export function ProjectAccessDialog({
   onToggleProject,
   onSubmit,
 }: ProjectAccessDialogProps) {
+  const { t } = useScopedI18n("organizations");
   return (
     <Dialog open={member !== null} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Modifier l'acces au projet</DialogTitle>
+          <DialogTitle>{t("projectAccessTitle")}</DialogTitle>
           <DialogDescription>{member ? memberLabel(member) : ""}</DialogDescription>
         </DialogHeader>
         <div className="max-h-[360px] space-y-2 overflow-auto rounded-lg border border-border/60 p-2">
           {projects.length === 0 ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              Aucun projet disponible.
+              {t("noProjectAvailable")}
             </p>
           ) : (
             projects.map((project) => {
@@ -81,11 +83,11 @@ export function ProjectAccessDialog({
                 roles: editingMemberRoles,
               });
               const disabledReason = hasOrganizationWideAccess
-                ? "Ce role donne acces a tous les projets."
+                ? t("roleGivesAllProjects")
                 : removalWouldOrphan
-                  ? "Impossible de laisser ce projet sans utilisateur."
+                  ? t("cannotOrphanProject")
                   : checked && currentUserGuardMessage
-                    ? "Votre compte doit rester rattache a au moins un projet."
+                    ? t("currentUserMustKeepProject")
                     : undefined;
 
               return (
@@ -115,10 +117,10 @@ export function ProjectAccessDialog({
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Annuler
+            {t("cancel")}
           </Button>
           <Button onClick={onSubmit} disabled={memberActionBusy}>
-            Enregistrer
+            {t("save")}
           </Button>
         </DialogFooter>
       </DialogContent>

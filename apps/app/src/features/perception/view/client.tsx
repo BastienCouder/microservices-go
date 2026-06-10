@@ -3,7 +3,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
-import { useLocale } from "@/shared/hooks/use-i18n";
+import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PerceptionDonutVisual,
   PerceptionLeftPanel,
@@ -36,6 +36,7 @@ const SCORE_CARD_ICONS = {
 
 export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: PerceptionClientProps) {
   const { locale } = useLocale();
+  const { t } = useScopedI18n("perception");
   const viewModel = usePerceptionViewModel(initialData, { apiBaseURL, routeSearch });
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const emptyStateLabel = initialData.metadata.emptyStateLabel;
@@ -59,45 +60,54 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
             onClick={() => viewModel.handleExportPerceptionData(periodLabel)}
           >
             <Download className="size-4" />
-            Export Excel
+            {t("exportExcel")}
           </Button>
         ) : null}
         {permissions.canEdit ? (
-          <ConfirmDialog
-            title="Confirmer l'analyse de perception"
-            description={
-              viewModel.perceptionMonthlyCredits > 0
-                ? `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs. Solde actuel: ${viewModel.perceptionRemainingCredits}/${viewModel.perceptionMonthlyCredits} credits restants.`
-                : `Cette analyse consommera environ ${viewModel.estimatedPerceptionCredits} credits selon les modeles actifs.`
-            }
-            confirmLabel={
-              viewModel.analysisRunning ? "Analyse..." : "Lancer l'analyse"
-            }
-            cancelLabel="Annuler"
-            confirmVariant="default"
-            loading={viewModel.analysisRunning}
-            onConfirm={viewModel.handleRunPerceptionAnalysis}
-            confirmDisabled={viewModel.perceptionQuotaLoading}
-            trigger={
-              <Button
-                size="sm"
-                disabled={
-                  viewModel.analysisRunning ||
-                  viewModel.perceptionQuotaLoading ||
-                  !initialData.metadata.projectId
-                }
-              >
-                <Play className="size-4" />
-                Analyser la perception
-              </Button>
-            }
-          />
+            <ConfirmDialog
+          title={t("confirmAnalysisTitle")}
+          description={
+            viewModel.perceptionMonthlyCredits > 0
+              ? t("confirmAnalysisDescriptionWithQuota", {
+                  credits: viewModel.estimatedPerceptionCredits,
+                  remaining: viewModel.perceptionRemainingCredits,
+                  total: viewModel.perceptionMonthlyCredits,
+                })
+              : t("confirmAnalysisDescriptionWithoutQuota", {
+                  credits: viewModel.estimatedPerceptionCredits,
+                })
+          }
+          confirmLabel={
+            viewModel.analysisRunning ? t("analysisRunning") : t("launchAnalysis")
+          }
+          cancelLabel={t("cancel")}
+          confirmVariant="default"
+          loading={viewModel.analysisRunning}
+          onConfirm={viewModel.handleRunPerceptionAnalysis}
+          confirmDisabled={viewModel.perceptionQuotaLoading}
+          trigger={
+            <Button
+              size="sm"
+              disabled={
+                viewModel.analysisRunning ||
+                viewModel.perceptionQuotaLoading ||
+                !initialData.metadata.projectId
+              }
+            >
+              <Play className="size-4" />
+              {t("analyzePerception")}
+            </Button>
+          }
+        />
         ) : null}
+     
       </div>
 
       {viewModel.lastAnalysisCredits !== null ? (
         <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
-          Analyse lancee. Credits utilises: {viewModel.lastAnalysisCredits}.
+          {t("analysisStartedWithCredits", {
+            credits: viewModel.lastAnalysisCredits,
+          })}
         </p>
       ) : null}
       {viewModel.analysisError ? (

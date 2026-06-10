@@ -139,7 +139,7 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 		t.Fatalf("expected accept URL to include token %q, got %q", invitation.Token, notification.AcceptURL)
 	}
 	if !strings.HasPrefix(notification.AcceptURL, "http://localhost:30000/auth?") {
-		t.Fatalf("expected accept URL to start on marketing auth, got %q", notification.AcceptURL)
+		t.Fatalf("expected accept URL to start on web auth, got %q", notification.AcceptURL)
 	}
 }
 

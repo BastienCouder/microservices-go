@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn, formatDateTime } from "@/shared/utils";
 
 import {
@@ -29,29 +30,30 @@ type PageDetailPanelProps = {
 };
 
 function PageKpiGrid({ page }: { page: PageInsight }) {
+  const { t } = useScopedI18n("pages");
   const metrics: Array<
     Pick<KpiCardProps, "title" | "value" | "sub" | "variant">
   > = [
     {
-      title: "Visibilité",
+      title: t("visibility"),
       value: `${page.citationShare}%`,
-      sub: "Part des réponses qui citent cette URL",
+      sub: t("visibilityDescription"),
       variant: "active" as const,
     },
     {
-      title: "Citations",
+      title: t("citationsColumn"),
       value: String(page.citationCount),
-      sub: "Occurrences détectées",
+      sub: t("occurrencesDetected"),
     },
     {
-      title: "Réponses",
+      title: t("responsesColumn"),
       value: String(page.promptCount),
-      sub: "Réponses avec cette page",
+      sub: t("responsesWithPage"),
     },
     {
-      title: "LLMs",
+      title: t("llmsColumn"),
       value: String(page.modelCount),
-      sub: "Modèles qui la reprennent",
+      sub: t("modelsUsingPage"),
     },
   ];
 
@@ -73,13 +75,14 @@ function PageKpiGrid({ page }: { page: PageInsight }) {
 }
 
 function ModelBreakdown({ models }: { models: PageModelBreakdownItem[] }) {
+  const { t } = useScopedI18n("pages");
   if (models.length === 0) {
     return null;
   }
 
   return (
     <section className="space-y-3">
-      <SectionTitle>Répartition LLM</SectionTitle>
+      <SectionTitle>{t("llmsColumn")}</SectionTitle>
       <div className="overflow-hidden rounded-md border border-border/60 bg-background">
         {models.map((model, index) => (
           <div key={model.id}>
@@ -100,12 +103,12 @@ function ModelBreakdown({ models }: { models: PageModelBreakdownItem[] }) {
               <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
                 <span>
                   <strong className="font-semibold text-foreground">{model.responseCount}</strong>{" "}
-                  réponses
+                  {t("responses")}
                 </span>
                 <span className="h-3 w-px bg-border" />
                 <span>
                   <strong className="font-semibold text-foreground">{model.citationCount}</strong>{" "}
-                  citations
+                  {t("citations")}
                 </span>
               </div>
             </div>
@@ -117,11 +120,12 @@ function ModelBreakdown({ models }: { models: PageModelBreakdownItem[] }) {
 }
 
 function CitationSamplesList({ samples }: { samples: PageCitationSample[] }) {
+  const { t } = useScopedI18n("pages");
   const navigate = useNavigate();
 
   return (
     <section className="min-h-0 flex-1 space-y-3 overflow-hidden">
-      <SectionTitle>Réponses qui citent cette page</SectionTitle>
+      <SectionTitle>{t("responseCitingPageTitle")}</SectionTitle>
       <div className="h-[300px] overflow-y-auto rounded-md border border-border/60 bg-background">
         {samples.map((sample, index) => (
           <div key={sample.detailKey}>
@@ -150,7 +154,7 @@ function CitationSamplesList({ samples }: { samples: PageCitationSample[] }) {
                     <ModelBadgeItem badge={sample.model} />
                   ) : (
                     <Badge variant="outline" className="font-normal">
-                      Modèle inconnu
+                      {t("unknownModel")}
                     </Badge>
                   )}
                   {sample.persona ? (
@@ -185,25 +189,27 @@ function DetailSeparator() {
 }
 
 function LastSeenMeta({ value }: { value?: string }) {
+  const { t } = useScopedI18n("pages");
   if (!value) {
     return null;
   }
 
   return (
     <div className="text-xs text-muted-foreground">
-      Dernière citation <span className="font-medium text-foreground">{formatDateTime(value)}</span>
+      {t("lastCitation")} <span className="font-medium text-foreground">{formatDateTime(value)}</span>
     </div>
   );
 }
 
 function GeoNeedBlock({ need }: { need: PageGeoNeed | null }) {
+  const { t } = useScopedI18n("pages");
   if (!need) {
     return null;
   }
 
   return (
     <section className="space-y-3">
-      <SectionTitle>Besoin GEO détecté</SectionTitle>
+      <SectionTitle>{t("geoNeedDetected")}</SectionTitle>
       <div className="rounded-md border border-border/60 bg-background p-4">
         <div className="flex items-start gap-3">
           <div
@@ -234,6 +240,7 @@ function GeoNeedBlock({ need }: { need: PageGeoNeed | null }) {
 }
 
 export function PageDetailPanel({ errorLabel, page, loading = false }: PageDetailPanelProps) {
+  const { t } = useScopedI18n("pages");
   if (loading) {
     return <PageDetailSkeleton />;
   }
@@ -244,17 +251,17 @@ export function PageDetailPanel({ errorLabel, page, loading = false }: PageDetai
         <CardHeader className="border-b border-border/60 bg-muted/10">
           <div className="space-y-1">
             <CardTitle className="text-base font-semibold">
-              <SectionTitle>Détail de la page</SectionTitle>
+              <SectionTitle>{t("detailTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription className="flex min-w-0 items-center gap-2">
               <Link2 className="h-3.5 w-3.5 shrink-0" />
-              <span>Aucune URL sélectionnée</span>
+              <span>{t("noSelectedUrl")}</span>
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent>
           <EmptyStateCard
-            label={errorLabel || "Aucune page citée pour le moment."}
+            label={errorLabel || t("noCitedPageYet")}
             className="h-[300px]"
           />
         </CardContent>
@@ -273,7 +280,7 @@ export function PageDetailPanel({ errorLabel, page, loading = false }: PageDetai
           <div className="w-full min-w-0 flex-1 space-y-3">
             <div className="space-y-1">
               <CardTitle className="text-base font-semibold">
-                <SectionTitle>Détail de la page</SectionTitle>
+                <SectionTitle>{t("detailTitle")}</SectionTitle>
               </CardTitle>
               <CardDescription className="flex min-w-0 items-center gap-2">
                 <Link2 className="h-3.5 w-3.5 shrink-0" />
@@ -287,7 +294,7 @@ export function PageDetailPanel({ errorLabel, page, loading = false }: PageDetai
             <Button asChild className="rounded-md">
               <a href={page.url} target="_blank" rel="noreferrer">
                 <ExternalLink className="mr-2 h-4 w-4" />
-                Ouvrir
+                {t("open")}
               </a>
             </Button>
           </div>
@@ -317,6 +324,7 @@ export function PageDetailPanel({ errorLabel, page, loading = false }: PageDetai
 }
 
 function PageDetailSkeleton() {
+  const { t } = useScopedI18n("pages");
   return (
     <Card className="flex min-h-0 overflow-hidden rounded-md border-border/60 bg-card/95 shadow-sm">
       <CardHeader className="border-b border-border/60 bg-muted/10">
@@ -324,7 +332,7 @@ function PageDetailSkeleton() {
           <div className="min-w-0 space-y-3">
             <div className="space-y-1">
               <CardTitle className="text-base font-semibold">
-                <SectionTitle>Détail de la page</SectionTitle>
+                <SectionTitle>{t("detailTitle")}</SectionTitle>
               </CardTitle>
               <CardDescription className="flex min-w-0 items-center gap-2">
                 <Link2 className="h-3.5 w-3.5 shrink-0" />
@@ -352,7 +360,7 @@ function PageDetailSkeleton() {
         <div className="min-h-0 flex-1 overflow-hidden">
           <div className="px-1 py-1">
             <div className="text-sm font-semibold text-foreground">
-              <SectionTitle>Réponses qui citent cette page</SectionTitle>
+              <SectionTitle>{t("responseCitingPageTitle")}</SectionTitle>
             </div>
           </div>
           <div className="space-y-3 px-1 py-3 pr-5 pb-8">

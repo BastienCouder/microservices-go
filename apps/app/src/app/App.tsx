@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AppToaster } from "@/components/ui/toaster";
 import { ACCOUNT_SETUP_SEARCH } from "@/features/onboarding/onboarding-mode";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
@@ -60,6 +61,7 @@ async function loadProjectCount(
 }
 
 export default function App() {
+  const { t } = useScopedI18n("app-shell");
   const location = useLocation();
   const navigate = useNavigate();
   const [selectionVersion, setSelectionVersion] = useState(0);
@@ -247,9 +249,9 @@ export default function App() {
       <>
         <main className="app-root">
           <section className="card">
-            <h1>Configuration manquante</h1>
+            <h1>{t("missingConfigurationTitle")}</h1>
             <p>
-              La variable <code>VITE_API_BASE_URL</code> est requise pour appeler l&apos;API Gateway.
+              {t("missingApiBaseUrlDescription")}
             </p>
           </section>
         </main>

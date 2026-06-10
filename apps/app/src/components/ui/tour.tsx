@@ -11,6 +11,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 import { Torus } from "lucide-react";
@@ -106,6 +107,7 @@ export function TourProvider({
   className,
   isTourCompleted = false,
 }: TourProviderProps) {
+  const { t } = useScopedI18n("shared-ui");
   const [steps, setSteps] = useState<TourStep[]>([]);
   const [currentStep, setCurrentStep] = useState(-1);
   const [elementPosition, setElementPosition] = useState<{
@@ -300,14 +302,14 @@ export function TourProvider({
                         disabled={currentStep === 0}
                         className="text-sm text-muted-foreground hover:text-foreground"
                       >
-                        Previous
+                        {t("previous")}
                       </button>
                     )}
                     <button
                       onClick={nextStep}
                       className="ml-auto text-sm font-medium text-primary hover:text-primary/90"
                     >
-                      {currentStep === steps.length - 1 ? "Finish" : "Next"}
+                      {currentStep === steps.length - 1 ? t("finish") : t("next")}
                     </button>
                   </div>
                 </div>
@@ -330,6 +332,7 @@ export function useTour() {
 
 export function TourAlertDialog({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (isOpen: boolean) => void }) {
   const { startTour, steps, isTourCompleted, currentStep } = useTour();
+  const { t } = useScopedI18n("shared-ui");
 
   if (isTourCompleted || steps.length === 0 || currentStep > -1) {
     return null;
@@ -370,18 +373,18 @@ export function TourAlertDialog({ isOpen, setIsOpen }: { isOpen: boolean, setIsO
             </motion.div>
           </div>
           <AlertDialogTitle className="text-center text-xl font-medium">
-            Welcome to the Tour
+            {t("tourWelcomeTitle")}
           </AlertDialogTitle>
           <AlertDialogDescription className="text-muted-foreground mt-2 text-center text-sm">
-            Take a quick tour to learn about the key features and functionality of this application.
+            {t("tourWelcomeDescription")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="mt-6 space-y-3">
           <Button onClick={startTour} className="w-full">
-            Start Tour
+            {t("startTour")}
           </Button>
           <Button onClick={handleSkip} variant="ghost" className="w-full">
-            Skip Tour
+            {t("skipTour")}
           </Button>
         </div>
       </AlertDialogContent>

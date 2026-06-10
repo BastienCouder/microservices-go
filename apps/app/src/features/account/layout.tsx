@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shared/page-header";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { AccountProfilePanel } from "./_components/profile";
 import type { AccountProfileViewData } from "./_lib/profile/account-profile-view-data";
 import type { AccountProfileUpdateInput } from "./_lib/profile/use-account-profile-view-model";
@@ -20,11 +21,13 @@ export function AccountLayout({
   onDeleteAccount,
   onUpdateProfile,
 }: AccountLayoutProps) {
+  const { t } = useScopedI18n("account");
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
-        title="Compte"
-        baseline="Nom, prenom et email du compte connecte."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="hidden md:block"
       />

@@ -1,3 +1,5 @@
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import type { MonitoringPrompt } from "../shared/monitoring-data";
 
 export function getAlertTypeLabel(
@@ -25,9 +27,12 @@ export function getSentimentMeta(
   value: MonitoringPrompt["sentiment"],
   content: Record<string, string>,
 ) {
+  const locale = i18n.resolvedLanguage || i18n.language || "fr";
   if (value === "positive") {
     return {
-      label: content.sentimentPositive || "Positif",
+      label:
+        content.sentimentPositive ||
+        translateI18nText("monitoring-activity-panel", "sentimentPositive", locale),
       toneClass: "text-emerald-700",
       badgeClass: "bg-emerald-50 text-emerald-700",
     };
@@ -35,14 +40,18 @@ export function getSentimentMeta(
 
   if (value === "negative") {
     return {
-      label: content.sentimentNegative || "Négatif",
+      label:
+        content.sentimentNegative ||
+        translateI18nText("monitoring-activity-panel", "sentimentNegative", locale),
       toneClass: "text-rose-700",
       badgeClass: "bg-rose-50 text-rose-700",
     };
   }
 
   return {
-    label: content.sentimentNeutral || "Neutre",
+    label:
+      content.sentimentNeutral ||
+      translateI18nText("monitoring-activity-panel", "sentimentNeutral", locale),
     toneClass: "text-amber-700",
     badgeClass: "bg-amber-50 text-amber-700",
   };

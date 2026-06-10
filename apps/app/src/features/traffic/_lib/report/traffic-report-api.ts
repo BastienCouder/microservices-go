@@ -1,5 +1,7 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import {
   attachStableSlugs,
   findBySlugOrId,
@@ -160,14 +162,15 @@ function normalizeProjectIdentity(value: unknown): ProjectIdentity {
 }
 
 function trafficReportErrorMessage(error: string): string {
+  const locale = i18n.resolvedLanguage || i18n.language || "fr";
   const normalized = error.trim();
   if (normalized === "") {
-    return "Connexion GA4 enregistrée. Le rapport est momentanément indisponible.";
+    return translateI18nText("traffic-report", "reportUnavailableAfterConnection", locale);
   }
   if (normalized.toLowerCase().includes("google analytics")) {
     return normalized;
   }
-  return "Connexion GA4 enregistrée. Le rapport est momentanément indisponible. Réessaie avec Actualiser.";
+  return translateI18nText("traffic-report", "reportUnavailableRetryRefresh", locale);
 }
 
 function isGA4NotConfiguredError(status: number, error: string): boolean {
@@ -564,6 +567,7 @@ export async function loadTrafficPageData(
 
   const report = normalizeTrafficReport(unwrapRequiredEnvelope(trafficRes, "traffic"));
   if (report.dataSource === "fake") {
+    const locale = i18n.resolvedLanguage || i18n.language || "fr";
     return {
       report: emptyReport,
       integration,
@@ -571,7 +575,7 @@ export async function loadTrafficPageData(
       projectName: project.name,
       organizationId: project.organizationId,
       period,
-      reportError: "Aucune donnée GA4 réelle disponible pour cette période.",
+      reportError: translateI18nText("traffic-report", "noRealGa4DataForPeriod", locale),
     };
   }
 

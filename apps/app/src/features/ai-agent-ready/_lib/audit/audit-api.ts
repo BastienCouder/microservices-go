@@ -4,6 +4,8 @@ import {
   requireGatewayResult,
   unwrapGatewayPayload,
 } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 import type {
@@ -20,6 +22,10 @@ type PollOptions = {
 
 const DEFAULT_POLL_DELAY_MS = 800;
 const DEFAULT_MAX_ATTEMPTS = 20;
+
+function currentLocale(): string {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
 
 type ProjectSummary = {
   name: string;
@@ -106,7 +112,10 @@ export async function getAgentReadyProjectSummary(
   }
 
   const payload = unwrapGatewayPayload(
-    requireGatewayResult(response, "Impossible de charger le projet de scan."),
+    requireGatewayResult(
+      response,
+      translateI18nText("ai-agent-ready", "loadScanProjectError", currentLocale()),
+    ),
   );
 
   return {
@@ -125,7 +134,10 @@ export async function startAgentReadyScan(
     retry: { attempts: 0 },
   });
 
-  return requireGatewayResult(response, "Impossible de lancer le scan.");
+  return requireGatewayResult(
+    response,
+    translateI18nText("ai-agent-ready", "startScanError", currentLocale()),
+  );
 }
 
 export async function getAgentReadyScan(
@@ -139,7 +151,10 @@ export async function getAgentReadyScan(
     { method: "GET", retry: { delayMs: 200 }, signal },
   );
 
-  return requireGatewayResult(response, "Impossible de charger le scan.");
+  return requireGatewayResult(
+    response,
+    translateI18nText("ai-agent-ready", "loadScanError", currentLocale()),
+  );
 }
 
 export async function pollAgentReadyScan(

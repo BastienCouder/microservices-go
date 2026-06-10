@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 import type { PageInsight, PageModelBadge } from "../../_lib/pages-panel/types";
@@ -49,14 +50,6 @@ type PagesColumn = {
   className?: string;
   sortKey?: PagesSortKey;
 };
-
-const columns: PagesColumn[] = [
-  { id: "page", label: "Page", sortKey: "page" },
-  { id: "visibility", label: "Visibilité", sortKey: "visibility" },
-  { id: "citations", label: "Citations", sortKey: "citations" },
-  { id: "responses", label: "Réponses", sortKey: "responses" },
-  { id: "models", label: "LLMs", sortKey: "models" },
-];
 
 function loadingRows() {
   return Array.from({ length: 6 }).map((_, index) => (
@@ -114,8 +107,10 @@ function sortPages(
 }
 
 function PageModelsPreview({ page }: { page: PageInsight }) {
+  const { t } = useScopedI18n("pages");
+
   if (page.models.length === 0) {
-    return <span className="text-sm text-muted-foreground">Aucun modèle</span>;
+    return <span className="text-sm text-muted-foreground">{t("noModel")}</span>;
   }
 
   const visibleModels = page.models.slice(0, 3);
@@ -165,15 +160,14 @@ function PagesModelsFilter({
   selectedModelIds,
   toggleModel,
 }: PagesModelsFilterProps) {
+  const { t } = useScopedI18n("pages");
   const summaryLabel = allModelsSelected
-    ? "Tous les LLMs"
-    : `${selectedModelIds.length} LLM${
-        selectedModelIds.length > 1 ? "s" : ""
-      }`;
+    ? t("allLlms")
+    : t("llmCount", { count: selectedModelIds.length });
   const options = models.map((model) => ({
     id: model.id,
     label: model.label,
-    description: "Pages citées par ce modèle",
+    description: t("modelCoverageDescription"),
     iconSrc: toSafeImageAssetPath(model.iconPath),
     imageAlt: model.label,
   }));
@@ -181,9 +175,9 @@ function PagesModelsFilter({
   return (
     <MultiSelectFilterPopover
       align="end"
-      label="Models"
+      label={t("modelsFilterLabel")}
       summaryLabel={summaryLabel}
-      title="Couverture IA"
+      title={t("modelsCoverageTitle")}
       options={options}
       selectedIds={selectedModelIds}
       onToggle={toggleModel}
@@ -194,6 +188,7 @@ function PagesModelsFilter({
   );
 }
 export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
+  const { t } = useScopedI18n("pages");
   const viewModel = usePagesPanelViewModel({ apiBaseURL, routeSearch });
   const [sortKey, setSortKey] = useState<PagesSortKey>("visibility");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
@@ -206,12 +201,19 @@ export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
     sortedPages.find((page) => page.url === viewModel.selectedPageUrl) ??
     sortedPages[0] ??
     null;
+  const columns: PagesColumn[] = [
+    { id: "page", label: t("pageColumn"), sortKey: "page" },
+    { id: "visibility", label: t("visibilityColumn"), sortKey: "visibility" },
+    { id: "citations", label: t("citationsColumn"), sortKey: "citations" },
+    { id: "responses", label: t("responsesColumn"), sortKey: "responses" },
+    { id: "models", label: t("llmsColumn"), sortKey: "models" },
+  ];
   const hasActiveFilters = !viewModel.allModelsSelected;
   const emptyLabel =
     viewModel.error ||
     (viewModel.search.trim() || hasActiveFilters
-      ? "Aucune page ne correspond à la recherche."
-      : "Aucune page citée pour le moment.");
+      ? t("noMatchingPage")
+      : t("noCitedPageYet"));
 
   function toggleSort(nextKey: PagesSortKey) {
     if (sortKey === nextKey) {
@@ -235,8 +237,8 @@ export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
       <PageHeader
-        title="Pages citées"
-        baseline="Pilotez les URLs citées par les LLMs, les modèles qui les reprennent et les sites externes qui renforcent votre visibilité."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
       />
 
@@ -246,7 +248,7 @@ export function PagesPanel({ apiBaseURL, routeSearch }: PagesPanelProps) {
             <SearchFilterInput
               value={viewModel.search}
               onValueChange={viewModel.setSearch}
-              placeholder="Rechercher par URL, domaine ou modèle"
+              placeholder={t("searchPlaceholder")}
               disabled={viewModel.loading}
               className="flex-1"
             />

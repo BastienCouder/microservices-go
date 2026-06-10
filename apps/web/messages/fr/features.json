@@ -1,0 +1,23 @@
+{
+  "eyebrow": "Capacités",
+  "title": "Tout ce qu'il faut.",
+  "subtitle": "Rien d'inutile.",
+  "items": [
+    {
+      "title": "Mesurez votre visibilité IA",
+      "description": "Lancez des prompts ciblés sur plusieurs LLMs et voyez enfin si votre marque apparaît, comment elle est décrite et face à quels concurrents."
+    },
+    {
+      "title": "Identifiez ce qui vous bloque",
+      "description": "Repérez les pages, signaux de marque et contenus qui empêchent les IA de vous comprendre, vous citer ou vous recommander."
+    },
+    {
+      "title": "Priorisez les bonnes actions",
+      "description": "Transformez les observations en plan d'action concret pour le SEO, le contenu, la preuve sociale et la structure de vos pages."
+    },
+    {
+      "title": "Prouvez l'impact dans le temps",
+      "description": "Suivez l'évolution de votre présence, comparez les résultats par modèle et montrez les gains à votre équipe."
+    }
+  ]
+}

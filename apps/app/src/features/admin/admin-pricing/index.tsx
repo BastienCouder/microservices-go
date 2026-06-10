@@ -31,6 +31,7 @@ import {
   type BillingPlanSettings,
 } from "@/shared/billing";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 type AdminPricingPageProps = {
@@ -112,10 +113,6 @@ function toNonNegativeInteger(value: string) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
 }
 
-function formatCredits(value: number) {
-  return new Intl.NumberFormat("fr-FR").format(value);
-}
-
 function formatPrice(cents: number) {
   return `${Math.round(cents / 100)}€`;
 }
@@ -184,6 +181,7 @@ function normalizePlanDraft(
 }
 
 export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
+  const { t } = useScopedI18n("admin-pricing");
   const queryClient = useQueryClient();
   const [planDrafts, setPlanDrafts] = useState<Record<string, PlanDraft>>({});
   const [newPlanDraft, setNewPlanDraft] = useState<NewPlanDraft>(blankNewPlanDraft);
@@ -251,10 +249,10 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
         ["billing", "quota", apiBaseURL],
         ["prompt-quota", apiBaseURL],
       ]);
-      pushSuccessToast("Plan mis à jour.");
+      pushSuccessToast(t("planUpdated"));
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre à jour ce plan.");
+      pushErrorToast(error, t("planUpdateError"));
     },
   });
 
@@ -265,11 +263,17 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     },
     onSuccess: (result, plan) => {
       pushSuccessToast(
-        `${getBillingPlanLabel(plan)} poussé vers Stripe : ${result.productsCreated} produit créé, ${result.productsUpdated} mis à jour, ${result.pricesCreated} prix créés, ${result.pricesReused} réutilisés.`,
+        t("stripeSyncSuccess", {
+          plan: getBillingPlanLabel(plan),
+          productsCreated: result.productsCreated,
+          productsUpdated: result.productsUpdated,
+          pricesCreated: result.pricesCreated,
+          pricesReused: result.pricesReused,
+        }),
       );
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de pousser le pricing vers Stripe.");
+      pushErrorToast(error, t("stripeSyncError"));
     },
   });
 
@@ -284,10 +288,10 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: plansQueryKey });
-      pushSuccessToast("Badge Le plus choisi mis à jour.");
+      pushSuccessToast(t("mostChosenUpdated"));
     },
     onError: (error) => {
-      pushErrorToast(error, "Impossible de mettre à jour le badge.");
+      pushErrorToast(error, t("mostChosenUpdateError"));
     },
   });
 
@@ -326,20 +330,20 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
     event.preventDefault();
     const plan = normalizePlanCode(newPlanDraft.plan);
     if (!plan) {
-      pushErrorToast(new Error("Plan invalide."), "Le code du plan est requis.");
+      pushErrorToast(new Error(t("invalidPlanErrorTitle")), t("invalidPlanErrorDescription"));
       return;
     }
     if (HIDDEN_ADMIN_PLANS.has(plan)) {
       pushErrorToast(
-        new Error("Plan réservé."),
-        "Ce code plan est réservé et ne doit pas être exposé dans l'admin pricing.",
+        new Error(t("reservedPlanErrorTitle")),
+        t("reservedPlanErrorDescription"),
       );
       return;
     }
     if (plansByID.has(plan)) {
       pushErrorToast(
-        new Error("Plan déjà existant."),
-        "Ce code plan existe déjà. Modifie sa carte existante.",
+        new Error(t("existingPlanErrorTitle")),
+        t("existingPlanErrorDescription"),
       );
       return;
     }
@@ -376,11 +380,11 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       <PageHeader
-        title="Tarification admin"
-        baseline="Gérez les prix, crédits et limites des plans fixes."
+        title={t("pageTitle")}
+        baseline={t("pageBaseline")}
         actionsVariant="classic"
         className="mb-2 md:mb-3"
-        meta={<Badge variant="outline">{visiblePlanIds.length} plans</Badge>}
+        meta={<Badge variant="outline">{t("plansCount", { count: visiblePlanIds.length })}</Badge>}
         actions={
           <Button
             type="button"
@@ -389,7 +393,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
             disabled={isFetching || !organizationId}
             className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
           >
-            {isFetching ? "Actualisation..." : "Actualiser"}
+            {isFetching ? t("refreshing") : t("refresh")}
           </Button>
         }
       />
@@ -399,7 +403,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
           {isLoading ? (
             <AdminPricingLoading />
           ) : !organizationId ? (
-            <EmptyState label="Aucune organisation administrable trouvee pour ce compte." />
+            <EmptyState label={t("noManageableOrganization")} />
           ) : (
             <div className="grid h-full min-h-0 gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
               <NewPlanCard
@@ -458,24 +462,26 @@ function NewPlanCard({
   onUpdate: (patch: Partial<NewPlanDraft>) => void;
   onSave: (event: FormEvent<HTMLFormElement>) => void;
 }) {
+  const { t } = useScopedI18n("admin-pricing");
+
   return (
     <form
       onSubmit={onSave}
       className="relative rounded-lg border border-dashed border-border/70 bg-card/60 p-3"
     >
       <div className="mb-3">
-        <p className="font-mono text-xs text-muted-foreground">NEW</p>
+        <p className="font-mono text-xs text-muted-foreground">{t("newLabel")}</p>
         <h3 className="truncate text-lg font-semibold text-primary">
-          Nouveau plan
+          {t("newPlanTitle")}
         </h3>
       </div>
 
       <div className="mb-3 border-b border-foreground/10 pb-3">
         <Field
           id="new-plan-code"
-          label="Code plan"
+          label={t("planCodeLabel")}
           value={draft.plan}
-          helper="Exemple: agency-plus"
+          helper={t("planCodeExample")}
           onChange={(plan) => onUpdate({ plan })}
         />
       </div>
@@ -483,7 +489,7 @@ function NewPlanCard({
       <div className="grid gap-2 sm:grid-cols-2">
         <Field
           id="new-plan-monthly-price"
-          label="Prix mensuel (€)"
+          label={t("monthlyPriceLabel")}
           value={draft.monthlyPrice}
           type="number"
           min={0}
@@ -492,7 +498,7 @@ function NewPlanCard({
         />
         <Field
           id="new-plan-yearly-price"
-          label="Prix annuel / mois (€)"
+          label={t("yearlyMonthlyPriceLabel")}
           value={draft.yearlyPrice}
           type="number"
           min={0}
@@ -501,7 +507,7 @@ function NewPlanCard({
         />
         <Field
           id="new-plan-monthly-quota"
-          label="Crédits inclus / mois"
+          label={t("monthlyCreditsLabel")}
           value={draft.monthlyQuota}
           type="number"
           min={1}
@@ -510,34 +516,34 @@ function NewPlanCard({
         />
         <Field
           id="new-plan-model-selection-limit"
-          label="Modèles simultanés"
+          label={t("simultaneousModelsLabel")}
           value={draft.modelSelectionLimit}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(modelSelectionLimit) => onUpdate({ modelSelectionLimit })}
         />
         <Field
           id="new-plan-monthly-model-change-limit"
-          label="Changements / mois"
+          label={t("monthlyChangesLabel")}
           value={draft.monthlyModelChangeLimit}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(monthlyModelChangeLimit) =>
             onUpdate({ monthlyModelChangeLimit })
           }
         />
         <Field
           id="new-plan-max-projects"
-          label="Projets maximum"
+          label={t("maxProjectsLabel")}
           value={draft.maxProjects}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(maxProjects) => onUpdate({ maxProjects })}
         />
       </div>
@@ -545,7 +551,7 @@ function NewPlanCard({
       <div className="mt-3">
         <PlanFeatureToggle
           id="new-plan-allow-ai-briefs"
-          label="Brief IA"
+          label={t("aiBriefLabel")}
           checked={draft.allowAiBriefs}
           onCheckedChange={(allowAiBriefs) => onUpdate({ allowAiBriefs })}
         />
@@ -553,7 +559,7 @@ function NewPlanCard({
 
       <div className="mt-3">
         <Button type="submit" disabled={pending} size="sm" className="w-full">
-          {pending ? "Création..." : "Créer ce plan"}
+          {pending ? t("creating") : t("createPlan")}
         </Button>
       </div>
     </form>
@@ -591,6 +597,8 @@ function PlanCard({
   onSyncStripe: (plan: BillingPlanCode) => void;
   onMarkMostChosen: (plan: BillingPlanCode, settings: BillingPlanSettings) => void;
 }) {
+  const { t } = useScopedI18n("admin-pricing");
+
   return (
     <form
       onSubmit={(event) => onSave(event, plan, settings)}
@@ -609,7 +617,7 @@ function PlanCard({
           </h3>
         </div>
         {settings.isMostChosen ? (
-          <Badge className="shrink-0">Le plus choisi</Badge>
+          <Badge className="shrink-0">{t("mostChosen")}</Badge>
         ) : null}
       </div>
 
@@ -618,14 +626,14 @@ function PlanCard({
           {formatPrice(settings.monthlyPriceCents)}
         </span>
         <span className="text-xs text-muted-foreground">
-          {formatCredits(settings.monthlyQuota)} crédits/mois
+          {t("creditsPerMonth", { count: settings.monthlyQuota })}
         </span>
       </div>
 
       <div className="grid gap-2 sm:grid-cols-2">
         <Field
           id={`${plan}-monthly-price`}
-          label="Prix mensuel (€)"
+          label={t("monthlyPriceLabel")}
           value={planDraft.monthlyPrice}
           type="number"
           min={0}
@@ -634,7 +642,7 @@ function PlanCard({
         />
         <Field
           id={`${plan}-yearly-price`}
-          label="Prix annuel / mois (€)"
+          label={t("yearlyMonthlyPriceLabel")}
           value={planDraft.yearlyPrice}
           type="number"
           min={0}
@@ -643,7 +651,7 @@ function PlanCard({
         />
         <Field
           id={`${plan}-monthly-quota`}
-          label="Crédits inclus / mois"
+          label={t("monthlyCreditsLabel")}
           value={planDraft.monthlyQuota}
           type="number"
           min={1}
@@ -652,36 +660,36 @@ function PlanCard({
         />
         <Field
           id={`${plan}-model-selection-limit`}
-          label="Modèles simultanés"
+          label={t("simultaneousModelsLabel")}
           value={planDraft.modelSelectionLimit}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(modelSelectionLimit) =>
             onUpdatePlanDraft(plan, { modelSelectionLimit })
           }
         />
         <Field
           id={`${plan}-monthly-model-change-limit`}
-          label="Changements / mois"
+          label={t("monthlyChangesLabel")}
           value={planDraft.monthlyModelChangeLimit}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(monthlyModelChangeLimit) =>
             onUpdatePlanDraft(plan, { monthlyModelChangeLimit })
           }
         />
         <Field
           id={`${plan}-max-projects`}
-          label="Projets maximum"
+          label={t("maxProjectsLabel")}
           value={planDraft.maxProjects}
           type="number"
           min={0}
           step="1"
-          helper="0 = illimité"
+          helper={t("unlimitedHint")}
           onChange={(maxProjects) => onUpdatePlanDraft(plan, { maxProjects })}
         />
       </div>
@@ -689,7 +697,7 @@ function PlanCard({
       <div className="mt-3">
         <PlanFeatureToggle
           id={`${plan}-allow-ai-briefs`}
-          label="Brief IA"
+          label={t("aiBriefLabel")}
           checked={planDraft.allowAiBriefs}
           onCheckedChange={(allowAiBriefs) =>
             onUpdatePlanDraft(plan, { allowAiBriefs })
@@ -699,7 +707,7 @@ function PlanCard({
 
       <div className="mt-3 grid gap-2">
         <Button type="submit" disabled={pending} size="sm" className="w-full">
-          {pending ? "Sauvegarde..." : "Sauvegarder ce plan"}
+          {pending ? t("saving") : t("savePlan")}
         </Button>
         <Button
           type="button"
@@ -710,10 +718,10 @@ function PlanCard({
           onClick={() => onMarkMostChosen(plan, settings)}
         >
           {settings.isMostChosen
-            ? "Badge actif"
+            ? t("badgeActive")
             : mostChosenPending
-              ? "Mise à jour..."
-              : "Mettre le badge"}
+              ? t("badgeUpdating")
+              : t("setBadge")}
         </Button>
         <Button
           type="button"
@@ -723,7 +731,7 @@ function PlanCard({
           className="w-full"
           onClick={() => onSyncStripe(plan)}
         >
-          {stripePending ? "Envoi Stripe..." : "Pousser ce plan"}
+          {stripePending ? t("stripeSending") : t("pushPlan")}
         </Button>
       </div>
     </form>

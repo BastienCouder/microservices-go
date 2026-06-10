@@ -5,6 +5,7 @@ import { SectionTitle } from "@/components/shared/section-title";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import type { CitationSource } from "../../_lib/pages-panel/types";
 import { ModelIconStack } from "./model-badge";
@@ -20,15 +21,14 @@ export function CitationSourcesPanel({
   sources,
   loading = false,
 }: CitationSourcesPanelProps) {
+  const { t } = useScopedI18n("pages");
   return (
     <Card className="rounded-md border-border/60">
       <CardHeader className="pb-3">
         <CardTitle className="text-base font-semibold">
-          <SectionTitle>Sites qui nous citent</SectionTitle>
+          <SectionTitle>{t("citationSourcesTitle")}</SectionTitle>
         </CardTitle>
-        <CardDescription>
-          Domaines externes qui apparaissent comme sources à côté de votre marque.
-        </CardDescription>
+        <CardDescription>{t("citationSourcesDescription")}</CardDescription>
       </CardHeader>
       <CardContent>
         {loading ? (
@@ -58,7 +58,7 @@ export function CitationSourcesPanel({
           </div>
         ) : sources.length === 0 ? (
           <EmptyStateCard
-            label={errorLabel || "Aucun site tiers détecté pour le moment."}
+            label={errorLabel || t("noThirdPartySource")}
             className="h-[190px]"
           />
         ) : (
@@ -83,7 +83,7 @@ export function CitationSourcesPanel({
                         </span>
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {source.citationCount} citations • {source.promptCount} réponses
+                        {source.citationCount} {t("citations")} • {source.promptCount} {t("responses")}
                       </div>
                       <div className="mt-3">
                         <ModelIconStack models={source.models} />

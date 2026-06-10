@@ -1,0 +1,15 @@
+{
+  "validationError": "Check the information you entered.",
+  "unauthorizedError": "Sign in again to continue.",
+  "forbiddenError": "You do not have permission for this action.",
+  "notFoundError": "The requested resource could not be found.",
+  "conflictError": "This action conflicts with the current state.",
+  "rateLimitedError": "Too many requests. Please try again in a moment.",
+  "quotaExceededError": "You do not have any credits left.",
+  "dependencyUnavailableError": "The service is temporarily unavailable.",
+  "internalError": "An internal error occurred.",
+  "timeoutError": "The request timed out. Please try again.",
+  "cancelledError": "The request was cancelled.",
+  "networkError": "Unable to reach the service. Please try again.",
+  "unknownError": "The request failed."
+}

@@ -1,22 +1,25 @@
-import { MONITORING_TEXT } from "@/lib/app-data";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 import type { MonitoringPrompt } from "../shared/monitoring-data";
 import { type ChartConfig } from "@/components/ui/chart";
 
+const locale = i18n.resolvedLanguage || i18n.language || "fr";
+
 export const chartConfig = {
-  chatgpt: { label: MONITORING_TEXT.chartConfig.models.chatgpt, color: "hsl(var(--chart-brand-primary))" },
-  perplexity: { label: MONITORING_TEXT.chartConfig.models.perplexity, color: "hsl(var(--chart-series-2))" },
-  claude: { label: MONITORING_TEXT.chartConfig.models.claude, color: "hsl(var(--chart-series-3))" },
-  gemini: { label: MONITORING_TEXT.chartConfig.models.gemini, color: "hsl(var(--chart-series-4))" },
-  mistral: { label: MONITORING_TEXT.chartConfig.models.mistral, color: "hsl(var(--chart-series-5))" },
-  copilot: { label: MONITORING_TEXT.chartConfig.models.copilot, color: "hsl(var(--chart-series-6))" },
-  brand: { label: MONITORING_TEXT.chartConfig.brands.brand, color: "hsl(var(--chart-brand-primary))" },
-  comp1: { label: MONITORING_TEXT.chartConfig.brands.comp1, color: "hsl(var(--chart-series-2))" },
-  comp2: { label: MONITORING_TEXT.chartConfig.brands.comp2, color: "hsl(var(--chart-series-3))" },
-  other: { label: MONITORING_TEXT.chartConfig.brands.other, color: "hsl(var(--muted))" },
-  sentiment: { label: MONITORING_TEXT.chartConfig.sentiment.sentiment, color: "hsl(var(--chart-brand-primary))" },
-  positive: { label: MONITORING_TEXT.chartConfig.sentiment.positive, color: "hsl(var(--chart-sentiment-positive))" },
-  neutral: { label: MONITORING_TEXT.chartConfig.sentiment.neutral, color: "hsl(var(--chart-sentiment-neutral))" },
-  negative: { label: MONITORING_TEXT.chartConfig.sentiment.negative, color: "hsl(var(--chart-sentiment-negative))" },
+  chatgpt: { label: "ChatGPT", color: "hsl(var(--chart-brand-primary))" },
+  perplexity: { label: "Perplexity", color: "hsl(var(--chart-series-2))" },
+  claude: { label: "Claude", color: "hsl(var(--chart-series-3))" },
+  gemini: { label: "Gemini", color: "hsl(var(--chart-series-4))" },
+  mistral: { label: "Mistral", color: "hsl(var(--chart-series-5))" },
+  copilot: { label: "Copilot", color: "hsl(var(--chart-series-6))" },
+  brand: { label: translateI18nText("monitoring-analytics-panel", "chartBrandLabel", locale), color: "hsl(var(--chart-brand-primary))" },
+  comp1: { label: translateI18nText("monitoring-analytics-panel", "chartCompetitor1Label", locale), color: "hsl(var(--chart-series-2))" },
+  comp2: { label: translateI18nText("monitoring-analytics-panel", "chartCompetitor2Label", locale), color: "hsl(var(--chart-series-3))" },
+  other: { label: translateI18nText("monitoring-analytics-panel", "chartOtherLabel", locale), color: "hsl(var(--muted))" },
+  sentiment: { label: translateI18nText("monitoring-analytics-panel", "chartSentimentLabel", locale), color: "hsl(var(--chart-brand-primary))" },
+  positive: { label: translateI18nText("monitoring-analytics-panel", "sentimentPositive", locale), color: "hsl(var(--chart-sentiment-positive))" },
+  neutral: { label: translateI18nText("monitoring-analytics-panel", "sentimentNeutral", locale), color: "hsl(var(--chart-sentiment-neutral))" },
+  negative: { label: translateI18nText("monitoring-analytics-panel", "sentimentNegative", locale), color: "hsl(var(--chart-sentiment-negative))" },
 } satisfies ChartConfig;
 
 export type RecentPrompt = MonitoringPrompt;

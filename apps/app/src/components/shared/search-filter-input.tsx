@@ -1,6 +1,7 @@
 import { Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { cn } from "@/shared/utils";
 
 type SearchFilterInputProps = {
@@ -17,11 +18,13 @@ export function SearchFilterInput({
   value,
   onValueChange,
   onSubmit,
-  placeholder = "Rechercher",
+  placeholder,
   className,
   disabled = false,
   inputClassName,
 }: SearchFilterInputProps) {
+  const { t } = useScopedI18n("shared-ui");
+
   return (
     <label className={cn("relative block min-w-0", className)}>
       <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -34,7 +37,7 @@ export function SearchFilterInput({
             onSubmit?.();
           }
         }}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t("search")}
         className={cn("pl-9", inputClassName)}
       />
     </label>
