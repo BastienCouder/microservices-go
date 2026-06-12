@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { isDeveloperBillingPlan } from "@/shared/billing-plan";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { resolveProjectTokenToContext } from "@/shared/project-token-resolution";
 
 import {
@@ -68,6 +69,7 @@ export function useModelsPanelData({
   organizationId,
   hintedProjectToken,
 }: UseModelsPanelDataOptions) {
+  const { t } = useScopedI18n("models");
   const normalizedHintedProjectToken = hintedProjectToken.trim();
   const resolvedProjectContextQuery = useQuery({
     queryKey: [
@@ -231,7 +233,7 @@ export function useModelsPanelData({
         resolvedProjectContextQuery.isFetched &&
         !resolvedProjectContextQuery.data
       ) {
-        return "Le projet demande est introuvable.";
+        return t("requestedProjectNotFound");
       }
       if (normalizedHintedProjectToken === "" && !organizationId) {
         return null;
@@ -243,7 +245,7 @@ export function useModelsPanelData({
       !projectsCatalogQuery.isLoading &&
       !projectsCatalogQuery.isFetching
     ) {
-      return "Le projet demande est introuvable dans cette organisation.";
+      return t("requestedProjectNotFoundInOrganization");
     }
     if (projectsCatalogQuery.error instanceof Error && !projectsCatalogQuery.data) {
       return projectsCatalogQuery.error.message;
@@ -270,6 +272,7 @@ export function useModelsPanelData({
     resolvedProjectContextQuery.data,
     resolvedProjectContextQuery.isFetched,
     selectedProjectId,
+    t,
   ]);
 
   const loadingCatalog =

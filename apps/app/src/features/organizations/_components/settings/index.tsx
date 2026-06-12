@@ -4,19 +4,38 @@ import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { OrganizationSummary } from "../../_lib/shared/types";
 
 type SettingsPanelProps = {
   organization: OrganizationSummary;
+  organizations: OrganizationSummary[];
   busy: boolean;
   deleteBusy: boolean;
+  switchBusy?: boolean;
+  onSelectOrganization: (organizationId: string) => void;
   onSubmit: (name: string) => void;
   onDelete: () => void;
 };
 
-export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDelete }: SettingsPanelProps) {
+export function SettingsPanel({
+  organization,
+  organizations,
+  busy,
+  deleteBusy,
+  switchBusy = false,
+  onSelectOrganization,
+  onSubmit,
+  onDelete,
+}: SettingsPanelProps) {
   const { t } = useScopedI18n("organizations");
   const [name, setName] = useState(organization.name);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -42,6 +61,31 @@ export function SettingsPanel({ organization, busy, deleteBusy, onSubmit, onDele
             if (canSave) onSubmit(trimmedName);
           }}
         >
+          {organizations.length > 1 ? (
+            <div className="grid gap-2">
+              <Label htmlFor="organization-switcher">{t("organizationSwitcherLabel")}</Label>
+              <Select
+                value={organization.id}
+                onValueChange={onSelectOrganization}
+                disabled={busy || deleteBusy || switchBusy}
+              >
+                <SelectTrigger id="organization-switcher" className="w-full bg-background">
+                  <SelectValue placeholder={t("organizationSwitcherPlaceholder")} />
+                </SelectTrigger>
+                <SelectContent>
+                  {organizations.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-sm text-muted-foreground">
+                {t("organizationSwitcherDescription")}
+              </p>
+            </div>
+          ) : null}
+
           <div className="grid gap-2">
             <Label htmlFor="organization-name">{t("organizationName")}</Label>
             <Input

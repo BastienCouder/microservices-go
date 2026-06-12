@@ -70,7 +70,10 @@ export async function resolveProjectTokenToContext(
   if (!response.ok) return null;
 
   const project = normalizeProjectTokenCandidates(response.data)
-    .find((candidate) => candidate.id === projectToken);
+    .find(
+      (candidate) =>
+        candidate.id === projectToken || candidate.slug === projectToken,
+    );
   if (!project) return null;
 
   return {

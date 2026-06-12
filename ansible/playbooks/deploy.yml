@@ -1,7 +1,19 @@
 ---
-- name: Deploy fury-defendu
+- name: Deploy visia
   hosts: production
   become: true
+  vars:
+    compose_files:
+      - "{{ deploy_path }}/docker-compose.yml"
+      - "{{ deploy_path }}/docker-compose.secrets.generated.yml"
+    compose_profiles_default:
+      - frontend
+      - backend
+      - infra
+    deploy_services: []
+    deploy_profiles: "{{ [] if (deploy_services | length > 0) else compose_profiles_default }}"
+    deploy_build: true
+    deploy_detached: true
   vars_files:
     - ../group_vars/production.yml
     - ../group_vars/generated_secrets.yml
@@ -103,35 +115,29 @@
       ansible.builtin.command: nginx -t
       changed_when: false
 
-    - name: Check Docker Compose file exists
+    - name: Check Docker Compose files exist
       ansible.builtin.stat:
-        path: "{{ deploy_path }}/docker-compose.yml"
-      register: compose_file
+        path: "{{ item }}"
+      register: compose_files_stats
+      loop: "{{ compose_files }}"
 
-    - name: Stop deploy if Docker Compose file is missing
+    - name: Stop deploy if a Docker Compose file is missing
       ansible.builtin.fail:
-        msg: "Missing compose file: {{ deploy_path }}/docker-compose.yml. Check that repo_version={{ repo_version }} is pushed to GitHub and contains docker-compose.yml."
-      when: not compose_file.stat.exists
+        msg: "Missing compose file: {{ item.item }}. Check that repo_version={{ repo_version }} is pushed to GitHub and contains this file."
+      when: not item.stat.exists
+      loop: "{{ compose_files_stats.results }}"
 
-    - name: Start application
-      ansible.builtin.command:
-        argv:
-          - sudo
-          - -u
-          - "{{ deploy_user }}"
-          - docker
-          - compose
-          - -f
-          - "{{ deploy_path }}/docker-compose.yml"
-          - --profile
-          - frontend
-          - --profile
-          - backend
-          - --profile
-          - infra
-          - up
-          - -d
-          - --build
+    - name: Start requested application stack
+      ansible.builtin.shell: >
+        sudo -u {{ deploy_user }} docker compose
+        {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
+        {% for profile in deploy_profiles %}--profile {{ profile | quote }} {% endfor %}
+        up
+        {% if deploy_detached %}-d {% endif %}
+        {% if deploy_build %}--build {% endif %}
+        {% for service in deploy_services %}{{ service | quote }} {% endfor %}
+      args:
+        chdir: "{{ deploy_path }}"
 
     - name: Check Certbot is installed
       ansible.builtin.command: certbot --version

@@ -7,7 +7,10 @@ describe("step analysis", () => {
     expect(source.includes("analysisRetry")).toBe(true);
     expect(source.includes("creationError")).toBe(true);
     expect(source.includes("setProgress(10)")).toBe(true);
-    expect(source.includes("navigate(buildScopedHref")).toBe(true);
+    expect(source.includes('buildScopedHref("/monitoring"')).toBe(true);
+    expect(source.includes("queryClient.removeQueries")).toBe(true);
+    expect(source.includes('queryKey: ["route-project-guard", apiBaseURL]')).toBe(true);
+    expect(source.includes("organizationId: projectOrganizationId")).toBe(true);
     expect(source.includes("setTimeout")).toBe(true);
     expect(source.includes("<OnboardingStepFooter")).toBe(false);
     expect(source.includes('t("goToMonitoring")')).toBe(false);

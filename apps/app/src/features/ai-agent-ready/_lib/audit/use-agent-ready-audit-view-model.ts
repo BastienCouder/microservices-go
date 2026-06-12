@@ -3,8 +3,8 @@ import { useEffect, useMemo, useState } from "react";
 import {
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
-  readSelectedOrganizationID,
-  readSelectedProjectToken,
+  readSelectedOrganizationPublicID,
+  readSelectedProjectID,
 } from "@/shared/selection";
 
 import {
@@ -32,11 +32,11 @@ export function useAgentReadyAuditViewModel({
   routeSearch,
 }: UseAgentReadyAuditViewModelInput) {
   const projectId = useMemo(
-    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectToken(),
+    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectID(),
     [routeSearch],
   );
   const organizationId = useMemo(
-    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
+    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID(),
     [routeSearch],
   );
 

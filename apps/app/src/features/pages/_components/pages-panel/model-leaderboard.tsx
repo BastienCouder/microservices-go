@@ -55,7 +55,7 @@ export function ModelLeaderboard({ errorLabel, models, loading = false }: ModelL
               <div key={model.id} className="space-y-2">
                 <div className="flex items-center gap-3">
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-md border bg-background">
-                    {model.iconPath ? (
+                    {toSafeImageAssetPath(model.iconPath) ? (
                       <img
                         src={toSafeImageAssetPath(model.iconPath)}
                         alt=""

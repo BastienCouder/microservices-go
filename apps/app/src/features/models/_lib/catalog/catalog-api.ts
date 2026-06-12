@@ -1,5 +1,7 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
+import { translateI18nText } from "@/shared/hooks/use-i18n";
+import i18n from "@/shared/i18n";
 
 import type {
   CatalogModelPayload,
@@ -23,6 +25,10 @@ import {
 } from "./provider-credentials";
 import { normalizeProviderId } from "./catalog-utils";
 
+function currentLocale(): string {
+  return i18n.resolvedLanguage || i18n.language || "fr";
+}
+
 export async function loadModelCatalog(
   apiBaseURL: string,
   organizationId: string,
@@ -35,7 +41,10 @@ export async function loadModelCatalog(
   );
 
   return normalizeCatalog(
-    requireGatewayResult(response, "Impossible de charger le catalogue des modeles."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "loadModelCatalogError", currentLocale()),
+    ),
   );
 }
 
@@ -50,7 +59,10 @@ export async function loadOnboardingModelCatalog(
   );
 
   return normalizeCatalog(
-    requireGatewayResult(response, "Impossible de charger le catalogue des modeles."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "loadModelCatalogError", currentLocale()),
+    ),
   );
 }
 
@@ -72,7 +84,7 @@ export async function loadProjectsAndCatalog(
     projects: normalizeProjects(
       requireGatewayResult(
         projectsResponse,
-        "Impossible de charger les projets pour cette organisation.",
+        translateI18nText("models", "loadProjectsError", currentLocale()),
       ),
     ),
     catalog,
@@ -92,7 +104,10 @@ export async function loadProjectModels(
   );
 
   return normalizeSelectedModelIds(
-    requireGatewayResult(response, "Impossible de charger les modeles actifs du projet."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "loadProjectModelsError", currentLocale()),
+    ),
   );
 }
 
@@ -109,7 +124,10 @@ export async function loadLLMProviderCredentials(
   );
 
   return normalizeLLMProviderCredentials(
-    requireGatewayResult(response, "Impossible de charger les cles API LLM."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "loadProviderCredentialsError", currentLocale()),
+    ),
   );
 }
 
@@ -127,9 +145,16 @@ export async function saveLLMProviderCredential(
   );
 
   const [credential] = normalizeLLMProviderCredentials(
-    requireGatewayResult(response, "Impossible d'enregistrer la cle API LLM."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "saveProviderCredentialError", currentLocale()),
+    ),
   );
-  if (!credential) throw new Error("Reponse de cle API LLM invalide.");
+  if (!credential) {
+    throw new Error(
+      translateI18nText("models", "invalidProviderCredentialResponse", currentLocale()),
+    );
+  }
   return credential;
 }
 
@@ -146,7 +171,10 @@ export async function deleteLLMProviderCredential(
   );
 
   const [credential] = normalizeLLMProviderCredentials(
-    requireGatewayResult(response, "Impossible de supprimer la cle API LLM."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "deleteProviderCredentialError", currentLocale()),
+    ),
   );
   return (
     credential ?? {
@@ -170,9 +198,16 @@ export async function createCatalogModel(
   );
 
   const model = normalizeCatalogMutationItem(
-    requireGatewayResult(response, "Impossible de creer le modele."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "createModelError", currentLocale()),
+    ),
   );
-  if (!model) throw new Error("Reponse catalogue invalide.");
+  if (!model) {
+    throw new Error(
+      translateI18nText("models", "invalidCatalogResponse", currentLocale()),
+    );
+  }
   return model;
 }
 
@@ -189,9 +224,16 @@ export async function updateCatalogModel(
   );
 
   const model = normalizeCatalogMutationItem(
-    requireGatewayResult(response, "Impossible de mettre a jour le modele."),
+    requireGatewayResult(
+      response,
+      translateI18nText("models", "updateModelError", currentLocale()),
+    ),
   );
-  if (!model) throw new Error("Reponse catalogue invalide.");
+  if (!model) {
+    throw new Error(
+      translateI18nText("models", "invalidCatalogResponse", currentLocale()),
+    );
+  }
   return model;
 }
 
@@ -208,11 +250,15 @@ export async function syncOpenRouterModelCatalog(
 
   const data = requireGatewayResult(
     response,
-    "Impossible de synchroniser les modeles OpenRouter.",
+    translateI18nText("models", "syncOpenRouterModelsError", currentLocale()),
   );
 
   const payload = unwrapSuccessEnvelope(data);
-  if (!isRecord(payload)) throw new Error("Reponse OpenRouter invalide.");
+  if (!isRecord(payload)) {
+    throw new Error(
+      translateI18nText("models", "invalidOpenRouterResponse", currentLocale()),
+    );
+  }
 
   return {
     imported: Number.isFinite(payload.imported) ? Number(payload.imported) : 0,

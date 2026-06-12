@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AdminSidebar } from "@/components/admin/admin-sidebar";
 import { Sidebar } from "@/components/sidebar/sidebar";
 import { MobileFloatingNav } from "@/components/sidebar/mobile-floating-nav";
 
@@ -30,5 +31,23 @@ export function AppLayout({ apiBaseURL, busy, children, feedback, onLogout, onRe
                 </div> */}
             </div>
         </div>
+  );
+}
+
+export function AdminLayout({
+  busy,
+  children,
+  onLogout,
+}: Pick<AppLayoutProps, "busy" | "children" | "onLogout">) {
+  return (
+    <div className="flex h-screen w-full bg-slate-100">
+      <AdminSidebar busy={busy} onLogout={onLogout} />
+
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <main className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-slate-100">
+          {children}
+        </main>
+      </div>
+    </div>
   );
 }

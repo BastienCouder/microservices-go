@@ -9,7 +9,7 @@ import { useI18nScope } from "@/shared/hooks/use-i18n";
 import {
   buildScopedHref,
   readProjectTokenFromSearch,
-  readSelectedProjectToken,
+  readSelectedProjectID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
 import {
@@ -46,7 +46,7 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const activeProjectToken =
-    readProjectTokenFromSearch(location.search) || readSelectedProjectToken();
+    readProjectTokenFromSearch(location.search) || readSelectedProjectID();
 
   const navigationItems = useMemo(
     () => [

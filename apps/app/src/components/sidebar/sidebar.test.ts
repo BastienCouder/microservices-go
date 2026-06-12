@@ -12,6 +12,8 @@ describe("sidebar navigation", () => {
     expect(source.includes('item(links.brands, content.brands)')).toBe(true);
     expect(source.includes('item(links.models, content.models)')).toBe(true);
     expect(source.includes('"/ai-agent-ready"')).toBe(false);
+    expect(source.includes("content.adminOrganizations")).toBe(false);
+    expect(source.includes('"/admin/organizations"')).toBe(false);
   });
 
   test("keeps the mobile navigation aligned with the sidebar items", async () => {

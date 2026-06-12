@@ -10,9 +10,7 @@ import { usePerceptionData } from "@/features/perception/_lib/shared/use-percept
 import { PageHeader } from "@/components/shared/page-header";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
-import {
-  deriveShortDescription,
-} from "../../_lib/overview/brand-overview-helpers";
+import { deriveShortDescription } from "../../_lib/overview/brand-overview-helpers";
 import { buildBrandCanonLocation } from "../../brand-canon/_lib/brand-canon-utils";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
@@ -62,7 +60,7 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
           </CardHeader>
           <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
             <BrandField label={t("brandNameLabel")} value={viewData.brandCanon.brandName} emptyLabel={emptyLabel} />
-            <BrandField label={t("sectorLabel")} value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
+            <BrandField label={t("industryLabel")} value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
             <BrandField label={t("shortSummaryLabel")} value={shortDescription} emptyLabel={emptyLabel} />
           </CardContent>
         </Card>
@@ -70,15 +68,15 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
         <Card className="border-border/60">
           <CardHeader>
             <CardTitle className="text-base">
-              <SectionTitle showIndicator={false}>{t("referenceDescriptionTitle")}</SectionTitle>
+              <SectionTitle showIndicator={false}>{t("fullDescriptionTitle")}</SectionTitle>
             </CardTitle>
             <CardDescription>
-              {t("referenceDescriptionDescription")}
+              {t("fullDescriptionDescription")}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <BrandField
-              label={t("descriptionLabel")}
+              label={t("fullDescriptionLabel")}
               value={viewData.brandCanon.positioning}
               emptyLabel={emptyLabel}
               multiline
@@ -95,7 +93,7 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
             variant="numbered"
           />
           <BrandListSection
-            label={t("keyFeaturesTitle")}
+            label={t("keyStrengthsTitle")}
             items={viewData.brandCanon.features}
             emptyLabel={emptyLabel}
             variant="stack"

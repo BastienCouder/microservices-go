@@ -1,32 +1,45 @@
 export const SELECTED_ORG_KEY = "selected-organization-id";
 export const SELECTED_PROJECT_KEY = "selected-project-id";
-export const LAST_SELECTED_PROJECT_TOKEN_KEY = "last-selected-project-token";
 export const SELECTED_CONTEXT_CHANGE_EVENT = "app:selected-context-change";
+const LEGACY_SELECTED_ORG_INTERNAL_KEY = "selected-organization-internal-id";
+const LEGACY_LAST_SELECTED_PROJECT_TOKEN_KEY = "last-selected-project-token";
+
+function getStorage(): Storage | null {
+  if (typeof window !== "undefined") {
+    return window.localStorage;
+  }
+  if (typeof globalThis !== "undefined" && "localStorage" in globalThis) {
+    return globalThis.localStorage ?? null;
+  }
+  return null;
+}
 
 function readStoredValue(key: string): string {
-  if (typeof window === "undefined") return "";
+  const storage = getStorage();
+  if (!storage) return "";
   try {
-    return window.localStorage.getItem(key)?.trim() ?? "";
+    return storage.getItem(key)?.trim() ?? "";
   } catch {
     return "";
   }
 }
 
 function writeStoredValue(key: string, value: string): boolean {
-  if (typeof window === "undefined") return false;
+  const storage = getStorage();
+  if (!storage) return false;
   try {
     const normalized = value.trim();
     if (normalized === "") {
-      if (window.localStorage.getItem(key) === null) {
+      if (storage.getItem(key) === null) {
         return false;
       }
-      window.localStorage.removeItem(key);
+      storage.removeItem(key);
       return true;
     }
-    if (window.localStorage.getItem(key)?.trim() === normalized) {
+    if (storage.getItem(key)?.trim() === normalized) {
       return false;
     }
-    window.localStorage.setItem(key, normalized);
+    storage.setItem(key, normalized);
     return true;
   } catch {
     return false;
@@ -60,11 +73,37 @@ export function readRouteQueryParam(routeSearch: string, key: string): string {
 }
 
 export function readSelectedOrganizationID(): string {
-  return readStoredValue(SELECTED_ORG_KEY);
+  return readStoredValue(SELECTED_ORG_KEY) || readStoredValue(LEGACY_SELECTED_ORG_INTERNAL_KEY);
+}
+
+export function readSelectedOrganizationPublicID(): string {
+  return readSelectedOrganizationID();
 }
 
 export function storeSelectedOrganizationID(value: string): void {
-  storeValue(SELECTED_ORG_KEY, value);
+  let changed = false;
+  changed = writeStoredValue(SELECTED_ORG_KEY, value) || changed;
+  changed = writeStoredValue(LEGACY_SELECTED_ORG_INTERNAL_KEY, "") || changed;
+
+  if (changed) {
+    dispatchSelectedContextChange("selected-organization-context", value.trim());
+  }
+}
+
+export function storeSelectedOrganizationContext({
+  organizationId,
+  publicId: _publicId,
+}: {
+  organizationId: string;
+  publicId?: string;
+}): void {
+  let changed = false;
+  changed = writeStoredValue(SELECTED_ORG_KEY, organizationId) || changed;
+  changed = writeStoredValue(LEGACY_SELECTED_ORG_INTERNAL_KEY, "") || changed;
+
+  if (changed) {
+    dispatchSelectedContextChange("selected-organization-context", organizationId.trim());
+  }
 }
 
 export function readSelectedProjectID(): string {
@@ -72,27 +111,21 @@ export function readSelectedProjectID(): string {
 }
 
 export function storeSelectedProjectID(value: string): void {
-  storeValue(SELECTED_PROJECT_KEY, value);
-}
+  let changed = false;
+  changed = writeStoredValue(SELECTED_PROJECT_KEY, value) || changed;
+  changed = writeStoredValue(LEGACY_LAST_SELECTED_PROJECT_TOKEN_KEY, "") || changed;
 
-export function readLastSelectedProjectToken(): string {
-  return readStoredValue(LAST_SELECTED_PROJECT_TOKEN_KEY);
-}
-
-export function storeLastSelectedProjectToken(value: string): void {
-  storeValue(LAST_SELECTED_PROJECT_TOKEN_KEY, value);
-}
-
-export function readSelectedProjectToken(): string {
-  return readLastSelectedProjectToken() || readSelectedProjectID();
+  if (changed) {
+    dispatchSelectedContextChange("selected-project-context", value.trim());
+  }
 }
 
 export function readProjectTokenFromSearch(routeSearch: string): string {
-  const projectAlias = readRouteQueryParam(routeSearch, "project");
+  const projectToken = readRouteQueryParam(routeSearch, "project");
   return (
     readRouteQueryParam(routeSearch, "projectId") ||
     readRouteQueryParam(routeSearch, "project_id") ||
-    (projectAlias.startsWith("prj_") ? projectAlias : "")
+    projectToken
   ).trim();
 }
 
@@ -106,31 +139,53 @@ export function readOptionalProjectTokenFromSearch(
 export function storeSelectedProjectContext({
   organizationId,
   projectId,
-  projectToken,
 }: {
   organizationId?: string;
   projectId: string;
-  projectToken?: string;
 }): void {
   let changed = false;
   if (organizationId !== undefined) {
     changed = writeStoredValue(SELECTED_ORG_KEY, organizationId) || changed;
+    changed = writeStoredValue(LEGACY_SELECTED_ORG_INTERNAL_KEY, "") || changed;
   }
-  const token = projectToken || projectId;
-  changed = writeStoredValue(LAST_SELECTED_PROJECT_TOKEN_KEY, token) || changed;
   changed = writeStoredValue(SELECTED_PROJECT_KEY, projectId) || changed;
+  changed = writeStoredValue(LEGACY_LAST_SELECTED_PROJECT_TOKEN_KEY, "") || changed;
 
   if (changed) {
-    dispatchSelectedContextChange("selected-project-context", token.trim());
+    dispatchSelectedContextChange("selected-project-context", projectId.trim());
+  }
+}
+
+export function clearSelectedProjectContext(): void {
+  let changed = false;
+  changed = writeStoredValue(SELECTED_PROJECT_KEY, "") || changed;
+  changed = writeStoredValue(LEGACY_LAST_SELECTED_PROJECT_TOKEN_KEY, "") || changed;
+
+  if (changed) {
+    dispatchSelectedContextChange("selected-project-context", "");
+  }
+}
+
+export function clearSelectedContext(): void {
+  let changed = false;
+  changed = writeStoredValue(SELECTED_ORG_KEY, "") || changed;
+  changed = writeStoredValue(LEGACY_SELECTED_ORG_INTERNAL_KEY, "") || changed;
+  changed = writeStoredValue(SELECTED_PROJECT_KEY, "") || changed;
+  changed = writeStoredValue(LEGACY_LAST_SELECTED_PROJECT_TOKEN_KEY, "") || changed;
+
+  if (changed) {
+    dispatchSelectedContextChange("selected-project-context", "");
   }
 }
 
 export function readProjectIdFromSearch(routeSearch: string): string {
-  const projectAlias = readRouteQueryParam(routeSearch, "project");
+  const projectToken = readRouteQueryParam(routeSearch, "project");
   return (
     readRouteQueryParam(routeSearch, "projectId") ||
     readRouteQueryParam(routeSearch, "project_id") ||
-    (projectAlias.startsWith("prj_") ? projectAlias : "")
+    (projectToken.startsWith("prj_") || projectToken.startsWith("prj-")
+      ? projectToken
+      : "")
   ).trim();
 }
 
@@ -146,13 +201,11 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
   const routeProjectId = readProjectIdFromSearch(routeSearch);
   const routeProjectAlias = readRouteQueryParam(routeSearch, "project");
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
-  const selectedProjectToken = readSelectedProjectToken();
   const selectedStoredProjectId = readSelectedProjectID();
-  const selectedOrganizationId = readSelectedOrganizationID();
+  const selectedOrganizationId = readSelectedOrganizationPublicID();
 
   if (
     !routeProjectId &&
-    !selectedProjectToken &&
     !selectedStoredProjectId &&
     !selectedOrganizationId
   ) {
@@ -163,8 +216,8 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
     routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
   );
 
-  if (!routeProjectAlias && !routeProjectId && selectedProjectToken) {
-    params.set("project", selectedProjectToken);
+  if (!routeProjectAlias && !routeProjectId && selectedStoredProjectId) {
+    params.set("projectId", selectedStoredProjectId);
   }
 
   if (
@@ -173,7 +226,6 @@ export function resolveSelectedContextSearch(routeSearch: string): string {
     !routeProjectAlias &&
     (
       !routeProjectId ||
-      routeProjectId === selectedProjectToken ||
       routeProjectId === selectedStoredProjectId
     )
   ) {
@@ -188,6 +240,21 @@ export function keepProjectOnlyContextSearch(routeSearch: string): string {
   const params = new URLSearchParams(
     routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
   );
+  params.delete("projectId");
+  params.delete("project_id");
+  params.delete("org");
+  params.delete("organizationId");
+  params.delete("organization_id");
+
+  const search = params.toString();
+  return search ? `?${search}` : "";
+}
+
+export function clearProjectContextSearch(routeSearch: string): string {
+  const params = new URLSearchParams(
+    routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
+  );
+  params.delete("project");
   params.delete("projectId");
   params.delete("project_id");
   params.delete("org");

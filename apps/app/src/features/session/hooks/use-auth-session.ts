@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
@@ -8,6 +8,7 @@ import i18n from "@/shared/i18n";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { navigateToWebAuth } from "@/shared/auth/web-auth";
 import type { UserProfile } from "@/shared/models";
+import { clearSelectedContext } from "@/shared/selection";
 
 type UseAuthSessionResult = {
   busy: boolean;
@@ -39,6 +40,7 @@ async function loadAuthSession(apiBaseURL: string, signal?: AbortSignal): Promis
 export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
   const [feedback, setFeedback] = useState("");
   const queryClient = useQueryClient();
+  const previousUserIdRef = useRef("");
 
   const sessionQuery = useQuery({
     queryKey: appQueryKeys.session(apiBaseURL),
@@ -59,6 +61,7 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
       return translateI18nText("shared-ui", "loggedOut", i18n.resolvedLanguage || i18n.language || "fr");
     },
     onSuccess: (nextFeedback) => {
+      clearSelectedContext();
       queryClient.setQueryData(appQueryKeys.session(apiBaseURL), null);
       setFeedback(nextFeedback);
     },
@@ -82,6 +85,22 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
       setFeedback("");
     }
   }, [logoutMutation.isPending, sessionQuery.error, sessionQuery.isSuccess]);
+
+  useEffect(() => {
+    const nextUserId =
+      sessionQuery.data?.ID != null ? String(sessionQuery.data.ID).trim() : "";
+    const previousUserId = previousUserIdRef.current;
+
+    if (nextUserId === "") {
+      return;
+    }
+
+    if (previousUserId !== "" && previousUserId !== nextUserId) {
+      clearSelectedContext();
+    }
+
+    previousUserIdRef.current = nextUserId;
+  }, [sessionQuery.data?.ID]);
 
   const logout = useCallback(async () => {
     if (!apiBaseURL) {

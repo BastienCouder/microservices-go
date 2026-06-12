@@ -1,18 +1,27 @@
 import type { Metadata } from "next";
-import { getTranslations } from "next-intl/server";
 import { AuthPageClient } from "@/app/[locale]/_components/auth-page-client";
+import { Navigation } from "@/app/[locale]/_components/navigation";
 import { defaultLocale, isLocale, type Locale } from "@/src/i18n/config";
-import { buildLocalizedMetadata } from "@/src/site/config";
+import { createPageMetadata } from "@/src/site/seo";
 
 type AuthRuntimeConfig = {
   gatewayURL: string;
   appURL: string;
 };
 
+function readRuntimeURL(value: string | undefined, fallback: string): string {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const trimmed = value.trim();
+  return trimmed !== "" ? trimmed : fallback;
+}
+
 function loadRuntimeConfig(): AuthRuntimeConfig {
   return {
-    gatewayURL: process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000",
-    appURL: process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004",
+    gatewayURL: readRuntimeURL(process.env.NEXT_PUBLIC_API_GATEWAY_URL, "http://localhost:50000"),
+    appURL: readRuntimeURL(process.env.NEXT_PUBLIC_APP_URL, "http://localhost:30004"),
   };
 }
 
@@ -23,22 +32,25 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   const { locale } = await params;
   const resolvedLocale: Locale = isLocale(locale) ? locale : defaultLocale;
-  const t = await getTranslations({ locale: resolvedLocale, namespace: "metadata" });
 
-  return {
-    ...buildLocalizedMetadata({
-      locale: resolvedLocale,
-      pathname: "/login",
-      title: t("loginTitle"),
-      description: t("loginDescription"),
-    }),
-    robots: {
-      index: false,
-      follow: false,
-    },
-  };
+  return createPageMetadata({
+    locale: resolvedLocale,
+    pathname: "/login",
+    noIndex: true,
+    noFollow: true,
+  });
 }
 
 export default function LoginPage() {
-  return <AuthPageClient config={loadRuntimeConfig()} mode="login" />;
+  return (
+    <main className="h-screen w-full overflow-hidden bg-background">
+      <header className="h-20 w-full shrink-0">
+        <Navigation />
+      </header>
+
+      <section className="h-[calc(100vh-5rem)] w-full overflow-hidden">
+        <AuthPageClient config={loadRuntimeConfig()} mode="login" />
+      </section>
+    </main>
+  );
 }

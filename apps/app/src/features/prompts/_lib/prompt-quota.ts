@@ -78,7 +78,12 @@ export async function loadPromptQuotaUsage(
   organizationId: string,
   options?: { signal?: AbortSignal },
 ): Promise<PromptQuotaUsageData> {
-  const result = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.quota(projectId), {
+  const normalizedProjectId = projectId.trim();
+  if (normalizedProjectId === "") {
+    throw new PromptQuotaRequestError(400, "missing project id");
+  }
+
+  const result = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.quota(normalizedProjectId), {
     method: "GET",
     signal: options?.signal,
     organizationId,

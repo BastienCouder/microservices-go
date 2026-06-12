@@ -8,6 +8,7 @@ import {
   deleteOrganizationProject,
   removeOrganizationMember,
   removeOrganizationProjectMember,
+  resendOrganizationInvitation,
   revokeOrganizationAPIKey,
   revokeOrganizationInvitation,
   updateOrganizationProject,
@@ -420,6 +421,25 @@ export function useOrganizationMutations({
     },
   });
 
+  const resendInvitationMutation = useMutation({
+    mutationFn: async (invitationId: string) => {
+      if (!selectedOrganizationId) throw new Error("Selectionne une organisation.");
+      if (!invitationId) throw new Error("Selectionne une invitation.");
+      const invitation = resources.invitations.find((item) => item.id === invitationId);
+      if (!invitation) throw new Error("Invitation introuvable.");
+      await resendOrganizationInvitation(apiBaseURL, selectedOrganizationId, invitation);
+    },
+    onSuccess: async () => {
+      setNotice("Invitation renvoyee.");
+      setLocalError(null);
+      await invalidateOrganizationData();
+    },
+    onError: (error) => {
+      setNotice(null);
+      setLocalError(buildOrganizationError(error, "Impossible de renvoyer l'invitation."));
+    },
+  });
+
   return {
     updateProjectSettingsMutation,
     deleteProjectMutation,
@@ -434,5 +454,6 @@ export function useOrganizationMutations({
     createAPIKeyMutation,
     revokeAPIKeyMutation,
     revokeInvitationMutation,
+    resendInvitationMutation,
   };
 }

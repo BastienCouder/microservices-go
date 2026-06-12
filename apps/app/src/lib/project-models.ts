@@ -1,4 +1,4 @@
-import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { resolveAIIconPath } from "@/lib/ai-provider-assets";
 import i18n from "@/shared/i18n";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 
@@ -130,6 +130,22 @@ export function buildModelDescription(input: {
   );
 }
 
+export function resolveProjectModelIconPath(
+  model: Pick<
+    ProjectModelMeta,
+    "iconPath" | "provider" | "groupName" | "displayName" | "providerModelId" | "id"
+  >,
+): string {
+  return resolveAIIconPath(
+    model.iconPath,
+    model.providerModelId,
+    model.displayName,
+    model.groupName,
+    model.provider,
+    model.id,
+  );
+}
+
 export function normalizeModelPayload(value: unknown): NormalizedModelPayload | null {
   if (!isRecord(value)) return null;
 
@@ -161,8 +177,13 @@ export function normalizeModelPayload(value: unknown): NormalizedModelPayload | 
         providerModelId,
         supportsLiveSearch,
       }),
-    iconPath: toSafeImageAssetPath(
+    iconPath: resolveAIIconPath(
       getString(getField(value, ["iconPath", "IconPath"])),
+      providerModelId,
+      displayName,
+      groupName,
+      provider,
+      id,
     ),
     iconKey: getString(getField(value, ["iconKey", "IconKey"])),
     isActive: getBool(getField(value, ["isActive", "IsActive"])),
@@ -245,7 +266,7 @@ export function toProjectModelVisual(
   model: Pick<ProjectModelMeta, "iconPath" | "description" | "groupName" | "displayName" | "providerModelId" | "provider" | "id">,
 ): ProjectModelVisual {
   return {
-    icon: toSafeImageAssetPath(model.iconPath),
+    icon: resolveProjectModelIconPath(model),
     description: model.description || model.displayName || model.providerModelId,
     label: model.groupName || model.displayName || model.providerModelId || model.id,
     provider: buildProviderLabel(model.provider),
@@ -271,7 +292,7 @@ export function buildProjectModelFilterItems(
         displayName: model.displayName,
         groupName: model.groupName || model.displayName || model.id,
         description: model.description,
-        iconPath: model.iconPath,
+        iconPath: resolveProjectModelIconPath(model),
         live: model.live,
         memberIds: [model.id],
       }))
@@ -294,7 +315,7 @@ export function buildProjectModelFilterItems(
         displayName: model.displayName,
         groupName: groupKey,
         description: "",
-        iconPath: model.iconPath,
+        iconPath: resolveProjectModelIconPath(model),
         live: true,
         memberIds: [model.id],
       });

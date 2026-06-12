@@ -38,24 +38,26 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 	defer tx.Rollback(ctx)
 
 	qtx := r.queries.WithTx(tx)
-	created, err := qtx.CreateOrganization(ctx, sqlc.CreateOrganizationParams{
-		Name:        organization.Name,
-		OwnerUserID: organization.OwnerIdentityID,
-		CreatedAt:   toPgTimestamptz(organization.CreatedAt),
-	})
-	if err != nil {
+	var createdID int64
+	if err := tx.QueryRow(ctx, `
+		INSERT INTO organizations (public_id, name, owner_user_id, created_at, deleted_at)
+		VALUES ($1, $2, $3, $4, NULL)
+		RETURNING id
+	`, organization.PublicID, organization.Name, organization.OwnerIdentityID, toPgTimestamptz(organization.CreatedAt)).Scan(
+		&createdID,
+	); err != nil {
 		return fmt.Errorf("insert organization: %w", err)
 	}
 
 	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
-		ID:      created.ID,
+		ID:      createdID,
 		UserID:  organization.OwnerIdentityID,
 		AddedAt: toPgTimestamptz(organization.CreatedAt),
 	}); err != nil {
 		return fmt.Errorf("insert organization creator membership: %w", err)
 	}
 	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
-		OrganizationID: created.ID,
+		OrganizationID: createdID,
 		UserID:         organization.OwnerIdentityID,
 		Role:           domain.RoleEditor,
 	}); err != nil {
@@ -66,26 +68,64 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 		return fmt.Errorf("commit create organization transaction: %w", err)
 	}
 
-	organization.ID = created.ID
+	organization.ID = createdID
 	return nil
 }
 
 func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Organization, error) {
-	org, err := r.queries.GetOrganizationByID(ctx, id)
-	if err != nil {
+	var org domain.Organization
+	var createdAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		SELECT id, public_id, name, owner_user_id, created_at, deleted_at
+		FROM organizations
+		WHERE id = $1
+		  AND deleted_at IS NULL
+	`, id).Scan(
+		&org.ID,
+		&org.PublicID,
+		&org.Name,
+		&org.OwnerIdentityID,
+		&createdAt,
+		&deletedAt,
+	); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, domain.ErrOrganizationNotFound
 		}
 		return nil, fmt.Errorf("get organization: %w", err)
 	}
 
-	return &domain.Organization{
-		ID:              org.ID,
-		Name:            org.Name,
-		OwnerIdentityID: org.OwnerUserID,
-		CreatedAt:       fromPgTimestamptz(org.CreatedAt),
-		DeletedAt:       fromPgNullableTimestamptz(org.DeletedAt),
-	}, nil
+	org.CreatedAt = fromPgTimestamptz(createdAt)
+	org.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &org, nil
+}
+
+func (r *Repository) GetByPublicID(ctx context.Context, publicID string) (*domain.Organization, error) {
+	var org domain.Organization
+	var createdAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	if err := r.db.QueryRow(ctx, `
+		SELECT id, public_id, name, owner_user_id, created_at, deleted_at
+		FROM organizations
+		WHERE public_id = $1
+		  AND deleted_at IS NULL
+	`, publicID).Scan(
+		&org.ID,
+		&org.PublicID,
+		&org.Name,
+		&org.OwnerIdentityID,
+		&createdAt,
+		&deletedAt,
+	); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrOrganizationNotFound
+		}
+		return nil, fmt.Errorf("get organization by public id: %w", err)
+	}
+
+	org.CreatedAt = fromPgTimestamptz(createdAt)
+	org.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &org, nil
 }
 
 func (r *Repository) UpdateName(ctx context.Context, id int64, name string) (*domain.Organization, error) {
@@ -97,9 +137,10 @@ func (r *Repository) UpdateName(ctx context.Context, id int64, name string) (*do
 		SET name = $2
 		WHERE id = $1
 		  AND deleted_at IS NULL
-		RETURNING id, name, owner_user_id, created_at, deleted_at
+		RETURNING id, public_id, name, owner_user_id, created_at, deleted_at
 	`, id, name).Scan(
 		&org.ID,
+		&org.PublicID,
 		&org.Name,
 		&org.OwnerIdentityID,
 		&createdAt,

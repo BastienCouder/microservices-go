@@ -1,4 +1,5 @@
 import type { UserProfile } from "@/shared/models";
+import type { OnboardingSetupMode } from "@/features/onboarding/onboarding-mode";
 
 type ShouldRedirectUnauthenticatedInput = {
   apiBaseURL: string;
@@ -14,6 +15,15 @@ type ShouldRedirectToOnboardingInput = {
   isBillingRoute?: boolean;
   isInvitationRoute?: boolean;
   billingAccess?: BillingAccessState;
+  projectCount: number | null;
+};
+
+type ShouldRedirectAwayFromAccountOnboardingInput = {
+  apiBaseURL: string;
+  busy: boolean;
+  user: UserProfile | null;
+  isOnboardingRoute: boolean;
+  onboardingSetupMode: OnboardingSetupMode;
   projectCount: number | null;
 };
 
@@ -76,6 +86,29 @@ export function shouldRedirectToOnboarding({
     return false;
   }
   return projectCount === 0;
+}
+
+export function shouldRedirectAwayFromAccountOnboarding({
+  apiBaseURL,
+  busy,
+  user,
+  isOnboardingRoute,
+  onboardingSetupMode,
+  projectCount,
+}: ShouldRedirectAwayFromAccountOnboardingInput): boolean {
+  if (apiBaseURL.trim() === "") {
+    return false;
+  }
+  if (busy || user === null || !isOnboardingRoute) {
+    return false;
+  }
+  if (onboardingSetupMode !== "account") {
+    return false;
+  }
+  if (projectCount === null) {
+    return false;
+  }
+  return projectCount > 0;
 }
 
 export function shouldRedirectToBillingGate({

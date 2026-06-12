@@ -7,7 +7,7 @@ import { loadBillingEntitlements } from "@/shared/billing";
 import { normalizeBillingPlan } from "@/shared/billing-plan";
 import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 
 const EXPORT_PLAN_CODES = new Set(["growth", "pro", "agency", "agency-enterprise"]);
@@ -21,7 +21,7 @@ function resolveExportOrganizationId(routeSearch?: string, organizationId?: stri
   return (
     organizationId?.trim() ||
     (routeSearch ? readOrganizationIdFromSearch(routeSearch) : "") ||
-    readSelectedOrganizationID()
+    readSelectedOrganizationPublicID()
   );
 }
 

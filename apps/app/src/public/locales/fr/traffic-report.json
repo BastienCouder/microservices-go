@@ -76,7 +76,7 @@
   "searchPlaceholder": "Rechercher source ou page",
   "searchButton": "Rechercher",
   "periodLabel": "Période",
-  "exportExcel": "Exporter Excel",
+  "exportExcel": "Exporter",
   "pageTitle": "Trafic",
   "pageBaseline": "Visites provenant de moteurs IA lorsque Google Analytics 4 peut identifier la source.",
   "filtersLabel": "Filtres",

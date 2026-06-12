@@ -23,6 +23,37 @@ function mockFetchSequence(responses: Response[]) {
   }) as typeof fetch;
 }
 
+function mockFetchSequenceWithHeaders(responses: Response[]) {
+  const requests: Array<{ url: string; organizationId: string | null }> = [];
+  let index = 0;
+
+  globalThis.fetch = (async (input, init) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+    const headers = new Headers(
+      init?.headers ??
+      (typeof input === "string" || input instanceof URL ? undefined : input.headers),
+    );
+    requests.push({
+      url,
+      organizationId: headers.get("X-Organization-ID"),
+    });
+
+    const response = responses[index];
+    index += 1;
+    if (!response) {
+      throw new Error(`unexpected fetch call #${index}`);
+    }
+    return response;
+  }) as typeof fetch;
+
+  return requests;
+}
+
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
@@ -189,6 +220,26 @@ describe("loadMonitoringData", () => {
 
     expect(result.projectId).toBe("prj_1");
     expect(result.data.project.name).toBe("Acme");
+  });
+
+  test("sends the selected organization header for project-scoped monitoring requests", async () => {
+    const requests = mockFetchSequenceWithHeaders([
+      jsonResponse(200, { success: true, data: { id: "project-1", brandName: "Acme" } }),
+      jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
+      jsonResponse(200, { success: true, data: [] }),
+    ]);
+
+    await loadMonitoringData("http://api.test", "?projectId=project-1&organizationId=org-9");
+
+    expect(requests.map((request) => request.organizationId)).toEqual([
+      "org-9",
+      "org-9",
+      "org-9",
+      "org-9",
+    ]);
+    expect(requests[0]?.url.includes("/projects/project-1")).toBe(true);
   });
 
   test("maps provider model ids back to the enabled project model id for prompts responses", async () => {

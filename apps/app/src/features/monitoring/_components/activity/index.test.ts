@@ -6,13 +6,20 @@ const viewModelSource = await Bun.file(
 ).text();
 
 describe("monitoring activity panel", () => {
-  test("adds the monitoring export above monitoring alerts", () => {
+  test("keeps the monitoring export available in the activity panel on mobile", () => {
     expect(source.indexOf("Export monitoring") < source.indexOf("<ActivityAlerts")).toBe(true);
-    expect(source.includes("Export Excel")).toBe(true);
+    expect(source.includes('t("exportExcel")')).toBe(true);
     expect(source.includes("Download")).toBe(true);
     expect(source.includes("viewModel.canExport")).toBe(true);
     expect(source.includes("viewModel.handleExportMonitoringData")).toBe(true);
     expect(source.includes("viewModel.exportDisabled")).toBe(true);
+    expect(source.includes("lg:hidden")).toBe(true);
+  });
+
+  test("navigates to prompts responses through the SPA router", () => {
+    expect(source.includes("useNavigate")).toBe(true);
+    expect(source.includes("navigate(`/prompts?${params.toString()}`)")).toBe(true);
+    expect(source.includes("window.location.assign(`/prompts?${params.toString()}`)")).toBe(false);
   });
 
   test("shows calculated monitoring alerts instead of raw monitoring errors", () => {

@@ -15,6 +15,7 @@ type ProjectContextProject = {
 type ProjectContextHierarchy = {
   organization: {
     id: string;
+    publicId: string;
     slug: string;
     name: string;
   };
@@ -23,6 +24,7 @@ type ProjectContextHierarchy = {
 
 export type ResolvedProjectContext = {
   organizationId: string;
+  organizationPublicId: string;
   organizationSlug: string;
   projectId: string;
   projectSlug: string;
@@ -38,6 +40,7 @@ function matchesOrganizationScope(
 
   return (
     hierarchy.organization.id === normalized ||
+    hierarchy.organization.publicId === normalized ||
     hierarchy.organization.slug === normalized
   );
 }
@@ -78,7 +81,7 @@ function normalizeProject(value: unknown): Omit<ProjectContextProject, "slug"> |
 
 export function normalizeProjectContextHierarchy(
   value: unknown,
-  fallbackOrganization: Pick<UserOrganizationSummary, "id" | "name" | "slug">,
+  fallbackOrganization: Pick<UserOrganizationSummary, "id" | "publicId" | "name" | "slug">,
 ): ProjectContextHierarchy | null {
   const payload = unwrapGatewayPayload(value);
   if (!isRecord(payload)) return null;
@@ -91,6 +94,10 @@ export function normalizeProjectContextHierarchy(
     getString(getField(organizationRecord, ["name", "Name"])) ||
     fallbackOrganization.name ||
     `Organisation ${organizationId}`;
+  const organizationPublicId =
+    getString(getField(organizationRecord, ["publicId", "PublicID"])) ||
+    fallbackOrganization.publicId ||
+    organizationId;
   const organizationSlug = fallbackOrganization.slug || slugifyPublicName(organizationName, "organization");
 
   const projectsValue = getField(payload, ["projects", "Projects"]);
@@ -112,6 +119,7 @@ export function normalizeProjectContextHierarchy(
   return {
     organization: {
       id: organizationId,
+      publicId: organizationPublicId,
       slug: organizationSlug,
       name: organizationName,
     },
@@ -128,10 +136,10 @@ export async function loadProjectContextHierarchies(
     organizations.map(async (organization) => {
       const response = await gatewayJSON<unknown>(
         apiBaseURL,
-        apiRoutes.organizations.hierarchy(organization.id),
+        apiRoutes.organizations.hierarchy(organization.publicId || organization.id),
         {
           method: "GET",
-          organizationId: organization.id,
+          organizationId: organization.publicId || organization.id,
           signal,
         },
       );
@@ -159,23 +167,31 @@ export function findResolvedProjectContext(
         matchesOrganizationScope(hierarchy, organizationToken),
       )
     : hierarchies;
-  const searchableHierarchies = scopedHierarchies.length > 0
-    ? scopedHierarchies
-    : organizationToken.trim()
-      ? []
-      : hierarchies;
 
-  for (const hierarchy of searchableHierarchies) {
-    const project = hierarchy.projects.find((candidate) => candidate.id === token);
-    if (!project) continue;
+  const candidateScopes = [
+    scopedHierarchies,
+    ...(organizationToken.trim() ? [hierarchies] : []),
+  ];
 
-    return {
-      organizationId: hierarchy.organization.id || project.organizationId,
-      organizationSlug: hierarchy.organization.slug,
-      projectId: project.id,
-      projectSlug: project.slug,
-      projectName: project.name,
-    };
+  for (const searchableHierarchies of candidateScopes) {
+    for (const hierarchy of searchableHierarchies) {
+      const project = hierarchy.projects.find(
+        (candidate) => candidate.id === token || candidate.slug === token,
+      );
+      if (!project) continue;
+
+      return {
+        organizationId: hierarchy.organization.id || project.organizationId,
+        organizationPublicId:
+          hierarchy.organization.publicId ||
+          hierarchy.organization.id ||
+          project.organizationId,
+        organizationSlug: hierarchy.organization.slug,
+        projectId: project.id,
+        projectSlug: project.slug,
+        projectName: project.name,
+      };
+    }
   }
 
   return null;
@@ -193,7 +209,7 @@ export function applyResolvedProjectContextSearch(
   params.set("project", context.projectSlug || context.projectId);
   params.set("projectId", context.projectId);
   params.delete("project_id");
-  params.set("organizationId", context.organizationId);
+  params.set("organizationId", context.organizationPublicId || context.organizationId);
   params.delete("organization_id");
 
   const search = params.toString();

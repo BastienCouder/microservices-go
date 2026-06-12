@@ -18,8 +18,8 @@ import { loadBillingEntitlements } from "@/shared/billing";
 import {
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
-  readSelectedOrganizationID,
-  readSelectedProjectToken,
+  readSelectedOrganizationPublicID,
+  readSelectedProjectID,
 } from "@/shared/selection";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
@@ -208,12 +208,12 @@ export function useContentOptimizerViewModel({
 }: UseContentOptimizerViewModelInput) {
   const { t } = useScopedI18n("crawler-panel");
   const projectId = useMemo(
-    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectToken(),
+    () => readProjectTokenFromSearch(routeSearch) || readSelectedProjectID(),
     [routeSearch],
   );
   const organizationId = useMemo(
     () =>
-      readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID(),
+      readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID(),
     [routeSearch],
   );
   const projectScopeKey = useMemo(

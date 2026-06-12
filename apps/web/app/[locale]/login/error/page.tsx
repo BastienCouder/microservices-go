@@ -8,7 +8,10 @@ type LocalizedAuthErrorPageProps = {
   searchParams?: Promise<PageSearchParams> | PageSearchParams;
 };
 
-export default async function LocalizedAuthErrorPage({ params, searchParams }: LocalizedAuthErrorPageProps) {
+export default async function LocalizedAuthErrorPage({
+  params,
+  searchParams,
+}: LocalizedAuthErrorPageProps) {
   const { locale } = await params;
   const resolvedLocale: Locale = isLocale(locale) ? locale : defaultLocale;
   const resolvedSearchParams = searchParams instanceof Promise ? await searchParams : searchParams;

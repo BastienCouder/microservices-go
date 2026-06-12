@@ -1,6 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { useMonitoringData } from "../shared/use-monitoring-data";
+import { exportMonitoringWorkbook } from "../shared/monitoring-export";
+import { filterPromptsByScope } from "../shared/prompt-filters";
+import { useClientExportAccess } from "@/shared/export-entitlements";
 import { buildSelectedProjectModelFilterIds } from "@/lib/project-models";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
@@ -16,6 +19,29 @@ import {
   useMonitoringFilterActions,
   useMonitoringFilters,
 } from "../shared/use-monitoring-filters";
+import type { MonitoringPrompt } from "../shared/monitoring-data";
+
+function getPromptSortValue(prompt: MonitoringPrompt): number {
+  if (prompt.createdAt) {
+    const createdAt = new Date(prompt.createdAt);
+    if (!Number.isNaN(createdAt.getTime())) {
+      return createdAt.getTime();
+    }
+  }
+
+  const normalizedTime = prompt.time.trim().toLowerCase();
+  const match = normalizedTime.match(/^(\d+)\s*(m|h|d)$/);
+  if (!match) {
+    return 0;
+  }
+
+  const amount = Number(match[1]);
+  const unit = match[2];
+  const multiplier =
+    unit === "m" ? 60 * 1000 : unit === "h" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+
+  return Date.now() - amount * multiplier;
+}
 
 type FiltersPanelViewModel = {
   loading: boolean;
@@ -46,6 +72,9 @@ type FiltersPanelViewModel = {
   showUniqueModelFilters: boolean;
   onModelFilterModeChange: (value: boolean) => void;
   heroInsight: FilterHeroInsight;
+  canExport: boolean;
+  exportDisabled: boolean;
+  handleExportMonitoringData: () => void;
 };
 
 export function useFiltersPanelViewModel(): FiltersPanelViewModel {
@@ -53,6 +82,7 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
   const { data: monitoringData, loading } = useMonitoringData();
   const filters = useMonitoringFilters();
   const actions = useMonitoringFilterActions();
+  const exportAccess = useClientExportAccess();
   const { project, models, recent_prompts } = monitoringData;
   const [showAllModels, setShowAllModels] = useState(false);
   const [showAllPersonas, setShowAllPersonas] = useState(false);
@@ -107,6 +137,13 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
       }),
     [filters, locale, projectWithDynamicCompetitors, recent_prompts],
   );
+  const filteredPrompts = useMemo(
+    () =>
+      [...filterPromptsByScope(recent_prompts, filters)].sort(
+        (left, right) => getPromptSortValue(right) - getPromptSortValue(left),
+      ),
+    [filters, recent_prompts],
+  );
 
   const toggleModelFilter = useCallback(
     (filterId: string) => {
@@ -134,6 +171,13 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
   const clearModels = useCallback(() => {
     filters.selectedModels.forEach((id) => actions.toggleModel(id));
   }, [actions, filters.selectedModels]);
+  const handleExportMonitoringData = useCallback(() => {
+    exportMonitoringWorkbook({
+      data: monitoringData,
+      filteredPrompts,
+      filters,
+    });
+  }, [filteredPrompts, filters, monitoringData]);
 
   return {
     loading,
@@ -171,5 +215,8 @@ export function useFiltersPanelViewModel(): FiltersPanelViewModel {
     showUniqueModelFilters: filters.showUniqueModelFilters,
     onModelFilterModeChange: actions.setShowUniqueModelFilters,
     heroInsight,
+    canExport: exportAccess.canExport,
+    exportDisabled: filteredPrompts.length === 0,
+    handleExportMonitoringData,
   };
 }

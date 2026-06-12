@@ -143,6 +143,61 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 	}
 }
 
+func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewService(repo)
+	notifier := &fakeInvitationNotifier{}
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+
+	invitation, err := svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"invitee@acme.io",
+		"viewer",
+		"Welcome to the team",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create invitation: %v", err)
+	}
+
+	updated, err := svc.UpdateInvitation(
+		context.Background(),
+		org.ID,
+		invitation.ID,
+		"invitee+again@acme.io",
+		"editor",
+		"Second reminder",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("update invitation: %v", err)
+	}
+
+	if len(notifier.notifications) != 2 {
+		t.Fatalf("expected 2 notifications, got %d", len(notifier.notifications))
+	}
+	notification := notifier.notifications[1]
+	if notification.Email != "invitee+again@acme.io" {
+		t.Fatalf("expected resent invitee email, got %q", notification.Email)
+	}
+	if notification.Role != "editor" {
+		t.Fatalf("expected resent invitee role editor, got %q", notification.Role)
+	}
+	if notification.Message != "Second reminder" {
+		t.Fatalf("expected resent invitee message, got %q", notification.Message)
+	}
+	if !strings.Contains(notification.AcceptURL, updated.Token) {
+		t.Fatalf("expected accept URL to include token %q, got %q", updated.Token, notification.AcceptURL)
+	}
+}
+
 func TestAcceptInvitationRejectsAuthenticatedUserEmailMismatch(t *testing.T) {
 	repo := newFakeRepo()
 	svc := NewService(repo)

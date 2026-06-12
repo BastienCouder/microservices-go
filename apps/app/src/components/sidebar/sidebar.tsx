@@ -26,7 +26,7 @@ import type { OrganizationHierarchy } from "@/shared/models";
 import {
   loadProjectContextHierarchies,
 } from "@/shared/project-context";
-import { findBySlugOrId } from "@/shared/public-slugs";
+import { findBySlugIdOrPublicId, findBySlugOrId } from "@/shared/public-slugs";
 import {
   SELECTED_CONTEXT_CHANGE_EVENT,
   buildScopedHref,
@@ -34,8 +34,9 @@ import {
   readProjectTokenFromSearch,
   readRouteQueryParam,
   readSelectedOrganizationID,
-  readSelectedProjectToken,
+  readSelectedProjectID,
   storeSelectedProjectContext,
+  storeSelectedOrganizationContext,
   storeSelectedOrganizationID,
 } from "@/shared/selection";
 import { cn } from "@/shared/utils";
@@ -54,13 +55,7 @@ import {
 import { Button } from "../ui/button";
 
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
-const SETTINGS_PATHS = [
-  "/organizations",
-  "/account",
-  "/admin/organizations",
-  "/admin/pricing",
-  "/admin/models",
-];
+const SETTINGS_PATHS = ["/organizations", "/account"];
 
 type SidebarProps = {
   apiBaseURL?: string;
@@ -110,20 +105,20 @@ const normalizeProjects = (
 
 async function loadHierarchy(
   apiBaseURL: string,
-  organizationId: string,
+  organizationRef: string,
   signal?: AbortSignal,
 ) {
   const response = await gatewayJSON<unknown>(
     apiBaseURL,
-    apiRoutes.organizations.hierarchy(organizationId),
-    { method: "GET", organizationId, signal },
+    apiRoutes.organizations.hierarchy(organizationRef),
+    { method: "GET", organizationId: organizationRef, signal },
   );
 
   if (!response.ok) {
     throw new Error("Impossible de charger les projets de cette organisation.");
   }
 
-  return normalizeOrganizationHierarchy(response.data, organizationId);
+  return normalizeOrganizationHierarchy(response.data, organizationRef);
 }
 
 function NavSection({ title, items, collapsed, indent }: NavSectionProps) {
@@ -174,7 +169,7 @@ function SidebarComponent({
   );
   const [stored, setStored] = useState(() => ({
     organizationId: readSelectedOrganizationID(),
-    projectToken: readSelectedProjectToken(),
+    projectId: readSelectedProjectID(),
   }));
 
   const apiEnabled = !!apiBaseURL.trim();
@@ -184,13 +179,13 @@ function SidebarComponent({
 
   const routeOrgToken = readOrganizationIdFromSearch(location.search);
   const routeProjectToken = readProjectTokenFromSearch(location.search);
-  const preferredProjectToken = routeProjectToken || stored.projectToken;
+  const preferredProjectToken = routeProjectToken || stored.projectId;
 
   useEffect(() => {
     const sync = () =>
       setStored({
         organizationId: readSelectedOrganizationID(),
-        projectToken: readSelectedProjectToken(),
+        projectId: readSelectedProjectID(),
       });
 
     window.addEventListener(SELECTED_CONTEXT_CHANGE_EVENT, sync);
@@ -208,7 +203,8 @@ function SidebarComponent({
     queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
   });
 
-  const routeOrg = findBySlugOrId(organizations, routeOrgToken);
+  const routeOrg = findBySlugIdOrPublicId(organizations, routeOrgToken);
+  const storedOrg = findBySlugIdOrPublicId(organizations, stored.organizationId);
   const organizationIds = useMemo(
     () => organizations.map(({ id }) => id),
     [organizations],
@@ -241,21 +237,24 @@ function SidebarComponent({
     candidates: [
       routeOrg?.id,
       projectOrgId,
-      stored.organizationId,
+      storedOrg?.id,
       organizations[0]?.id,
     ],
     availableIds: organizationIds,
   });
+  const activeOrg =
+    organizations.find(({ id }) => id === selectedOrgId) ?? null;
+  const selectedOrgRef = activeOrg?.publicId || selectedOrgId;
 
   const { data: hierarchy = null } = useQuery({
-    queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrgId),
-    enabled: apiEnabled && !!selectedOrgId,
-    queryFn: ({ signal }) => loadHierarchy(apiBaseURL, selectedOrgId, signal),
+    queryKey: appQueryKeys.organizationHierarchy(apiBaseURL, selectedOrgRef),
+    enabled: apiEnabled && !!selectedOrgRef,
+    queryFn: ({ signal }) => loadHierarchy(apiBaseURL, selectedOrgRef, signal),
   });
 
   const projects = useMemo(() => normalizeProjects(hierarchy), [hierarchy]);
   const routeProject = findBySlugOrId(projects, routeProjectToken);
-  const storedProjectId = findProjectIdForToken(projects, stored.projectToken);
+  const storedProjectId = findProjectIdForToken(projects, stored.projectId);
 
   const selectedProjectId = selectPreferredID({
     candidates: [
@@ -270,18 +269,22 @@ function SidebarComponent({
     projects.find(({ id }) => id === selectedProjectId) ??
     (!preferredProjectToken ? projects[0] ?? null : null);
 
-  const activeOrg =
-    organizations.find(({ id }) => id === selectedOrgId) ?? null;
-
   useEffect(() => {
     if ((!shouldResolveOrg || projectContextQuery.data) && selectedOrgId) {
-      storeSelectedOrganizationID(selectedOrgId);
+      const selectedOrganization = organizations.find(({ id }) => id === selectedOrgId);
+      if (selectedOrganization) {
+        storeSelectedOrganizationContext({
+          organizationId: selectedOrganization.id,
+          publicId: selectedOrganization.publicId,
+        });
+      } else {
+        storeSelectedOrganizationID(selectedOrgId);
+      }
     }
-  }, [shouldResolveOrg, projectContextQuery.data, selectedOrgId]);
+  }, [organizations, shouldResolveOrg, projectContextQuery.data, selectedOrgId]);
 
   const links = useMemo(() => {
     const project = activeProject?.slug;
-    const org = activeOrg?.slug ?? activeProject?.organizationSlug;
 
     return {
       dashboard: buildScopedHref("/monitoring", { project }),
@@ -295,9 +298,6 @@ function SidebarComponent({
       contentOptimizer: buildScopedHref("/content-optimizer", { project }),
       errorHub: buildScopedHref("/error-hub", { project }),
       organizations: buildScopedHref("/organizations", { project }),
-      adminOrganizations: "/admin/organizations",
-      adminPricing: buildScopedHref("/admin/pricing", { org }),
-      adminModels: buildScopedHref("/admin/models", { org }),
       account: buildScopedHref("/account", { project }),
       addProject: buildCreateProjectOnboardingHref(),
     };
@@ -330,13 +330,12 @@ function SidebarComponent({
 
     setStored({
       organizationId: project?.organizationId ?? selectedOrgId,
-      projectToken: projectId,
+      projectId,
     });
 
     storeSelectedProjectContext({
       organizationId: project?.organizationId,
       projectId,
-      projectToken: projectId,
     });
 
     navigate(
@@ -419,29 +418,6 @@ function SidebarComponent({
 
   const settingsSections = [
     {
-      title: content.admin,
-      items: [
-        item(
-          links.adminOrganizations,
-          content.adminOrganizations,
-          undefined,
-          currentPath === "/admin/organizations",
-        ),
-        item(
-          links.adminPricing,
-          content.adminPricing,
-          undefined,
-          currentPath === "/admin/pricing",
-        ),
-        item(
-          links.adminModels,
-          content.adminModels,
-          undefined,
-          currentPath === "/admin/models",
-        ),
-      ],
-    },
-    {
       title: content.organizations,
       items: orgTabs.map(({ value, label }) =>
         item(
@@ -521,12 +497,7 @@ function SidebarComponent({
                 </button>
 
                 {settingsSections.map((section) => (
-                  <NavSection
-                    key={section.title}
-                    {...section}
-                    collapsed={collapsed}
-                    indent
-                  />
+                  <NavSection key={section.title} {...section} collapsed={collapsed} indent />
                 ))}
               </div>
             ) : (
@@ -548,7 +519,7 @@ function SidebarComponent({
         <div className="shrink-0 border-t border-background/40 p-2">
           <SidebarPromptPlanProgress
             apiBaseURL={apiBaseURL}
-            organizationId={selectedOrgId}
+            organizationId={selectedOrgRef}
             projectId={selectedProjectId}
             collapsed={collapsed}
           />

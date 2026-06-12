@@ -3,6 +3,10 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
+  findAIProviderAsset,
+  getAIProviderIconPath,
+} from "@/lib/ai-provider-assets";
+import {
   buildProviderLabel,
   buildProjectModelLookup,
   toProjectModelVisual,
@@ -21,74 +25,6 @@ import type {
   PromptSortDirection,
 } from "./types";
 
-const PROVIDER_VISUALS = [
-  {
-    keys: ["openai", "chatgpt", "gpt", "o1", "o3", "o4"],
-    provider: "OpenAI",
-    icon: "/models/openai.svg",
-  },
-  {
-    keys: ["google", "gemini", "gemma"],
-    provider: "Google",
-    icon: "/models/google.svg",
-  },
-  {
-    keys: ["anthropic", "claude"],
-    provider: "Anthropic",
-    icon: "/models/anthropic.svg",
-  },
-  {
-    keys: ["perplexity"],
-    provider: "Perplexity",
-    icon: "/models/perplexity.svg",
-  },
-  {
-    keys: ["mistral"],
-    provider: "Mistral",
-    icon: "/models/mistral.svg",
-  },
-  {
-    keys: ["microsoft", "copilot"],
-    provider: "Microsoft",
-    icon: "/models/copilot.svg",
-  },
-  {
-    keys: ["xai", "grok"],
-    provider: "xAI",
-    icon: "/models/xai.svg",
-  },
-  {
-    keys: ["deepseek"],
-    provider: "DeepSeek",
-    icon: "/models/deepseek.svg",
-  },
-  {
-    keys: ["qwen"],
-    provider: "Qwen",
-    icon: "/models/qwen.svg",
-  },
-  {
-    keys: ["meta", "llama"],
-    provider: "Meta",
-    icon: "/models/meta.svg",
-  },
-  {
-    keys: ["groq"],
-    provider: "Groq",
-    icon: "/models/groq.svg",
-  },
-  {
-    keys: ["openrouter"],
-    provider: "OpenRouter",
-    icon: "/models/openrouter.svg",
-  },
-  {
-    keys: ["z.ai", "zai"],
-    provider: "Z.ai",
-    icon: "/models/zai.svg",
-  },
-] as const;
-
 function getProviderModelName(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return "";
@@ -97,21 +33,6 @@ function getProviderModelName(value: string) {
   const lastPathPart = pathParts.at(-1) ?? trimmed;
 
   return lastPathPart.trim();
-}
-
-function findProviderVisual(...values: string[]) {
-  const haystack = values
-    .map((value) => normalizeModelName(value))
-    .filter(Boolean)
-    .join(" ");
-
-  if (!haystack) return null;
-
-  return (
-    PROVIDER_VISUALS.find(({ keys }) =>
-      keys.some((key) => haystack.includes(key)),
-    ) ?? null
-  );
 }
 
 type MonitoringDataShape = {
@@ -190,12 +111,12 @@ export function usePromptsSourceData({
       return toProjectModelVisual(partialMatch);
     }
 
-    const providerVisual = findProviderVisual(model);
+    const providerVisual = findAIProviderAsset(model);
     const provider = providerVisual?.provider ?? t("aiProvider");
     const name = getProviderModelName(model) || model || t("aiModel");
 
     return {
-      icon: providerVisual?.icon ?? "/models/openai.svg",
+      icon: getAIProviderIconPath(model),
       description: model || t("aiModel"),
       label: name,
       provider: providerVisual?.provider ?? buildProviderLabel(provider),

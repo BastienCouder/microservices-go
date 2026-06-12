@@ -1,5 +1,6 @@
 import { ModelCard } from "@/components/shared/model-card";
 import { cn } from "@/lib/utils";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {
   isProviderUsableWithCredentials,
@@ -10,9 +11,12 @@ import type {
   ModelCatalogItem,
 } from "../../_lib/model-access";
 
-function formatCreditCost(creditCost: number) {
+function formatCreditCost(
+  creditCost: number,
+  t: (key: string, options?: any) => string,
+) {
   const normalized = Math.max(1, Math.floor(creditCost));
-  return `${normalized} credit${normalized > 1 ? "s" : ""}`;
+  return t("creditCost", { count: normalized });
 }
 
 type ModelCatalogGridProps = {
@@ -38,6 +42,8 @@ export function ModelCatalogGrid({
   canEdit,
   onToggleModel,
 }: ModelCatalogGridProps) {
+  const { t } = useScopedI18n("models");
+
   return (
     <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(220px,1fr))] items-stretch gap-4">
       {models.map((model) => {
@@ -66,12 +72,12 @@ export function ModelCatalogGrid({
               size="large"
               variant="models"
               disabled={disabled}
-              metaLabel={formatCreditCost(model.creditCost)}
+              metaLabel={formatCreditCost(model.creditCost, t)}
               disabledLabel={
                 disabledByApiKey
-                  ? "Cle API requise"
+                  ? t("apiKeyRequired")
                   : !canEdit
-                    ? "Lecture seule"
+                    ? t("readOnly")
                   : undefined
               }
             />

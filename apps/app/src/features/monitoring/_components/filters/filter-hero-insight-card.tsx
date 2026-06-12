@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -13,6 +14,7 @@ import type { FilterHeroInsight } from "../../_lib/filters/filter-hero-insight";
 
 type FilterHeroInsightCardProps = {
   insight: FilterHeroInsight;
+  actions?: ReactNode;
 };
 
 function getMomentumIcon(tone: FilterHeroInsight["momentumTone"]) {
@@ -29,6 +31,7 @@ function getTrendArrow(tone: FilterHeroInsight["momentumTone"]) {
 
 export function FilterHeroInsightCard({
   insight,
+  actions,
 }: FilterHeroInsightCardProps) {
   const MomentumIcon = getMomentumIcon(insight.momentumTone);
   const TrendArrow = getTrendArrow(insight.momentumTone);
@@ -116,6 +119,12 @@ export function FilterHeroInsightCard({
       <p className="relative z-10 mt-2 text-xs leading-relaxed text-primary-foreground/72">
         {insight.microCopy}
       </p>
+
+      {actions ? (
+        <div className="relative z-10 mt-4 border-t border-white/12 pt-4">
+          {actions}
+        </div>
+      ) : null}
     </section>
   );
 }

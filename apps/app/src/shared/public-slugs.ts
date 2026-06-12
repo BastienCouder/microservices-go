@@ -64,3 +64,22 @@ export function findBySlugOrId<T extends { id: string; slug: string }>(
     items.find((item) => item.id === normalized || item.slug === normalized) ?? null
   );
 }
+
+export function findBySlugIdOrPublicId<
+  T extends { id: string; slug: string; publicId?: string | null },
+>(
+  items: T[],
+  value: string,
+): T | null {
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  return (
+    items.find(
+      (item) =>
+        item.id === normalized ||
+        item.slug === normalized ||
+        (item.publicId?.trim() ?? "") === normalized,
+    ) ?? null
+  );
+}

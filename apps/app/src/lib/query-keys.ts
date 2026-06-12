@@ -14,12 +14,14 @@ export const appQueryKeys = {
   monitoring: (
     apiBaseURL: string,
     projectId: string | null,
+    organizationId: string | null,
     mode: string,
     historyScope = "active_only",
   ) =>
     [
       "monitoring",
       apiBaseURL,
+      organizationIdOrDefault(organizationId),
       projectIdOrDefault(projectId),
       mode,
       historyScope,
@@ -40,11 +42,13 @@ export const appQueryKeys = {
   perception: (
     apiBaseURL: string,
     projectId: string | null,
+    organizationId: string | null,
     mode: string,
   ) =>
     [
       "perception",
       apiBaseURL,
+      organizationIdOrDefault(organizationId),
       projectIdOrDefault(projectId),
       mode,
     ] as const,
@@ -52,10 +56,12 @@ export const appQueryKeys = {
   optimizationErrors: (
     apiBaseURL: string,
     projectId: string | null,
+    organizationId: string | null,
   ) =>
     [
       "optimization-errors",
       apiBaseURL,
+      organizationIdOrDefault(organizationId),
       projectIdOrDefault(projectId),
     ] as const,
 

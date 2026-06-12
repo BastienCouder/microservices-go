@@ -24,11 +24,24 @@ function mockFetchSequence(responses: Response[]) {
 }
 
 function mockFetchSequenceWithRequests(responses: Response[]) {
-  const requests: string[] = [];
+  const requests: Array<{ url: string; organizationId: string | null }> = [];
   let index = 0;
 
-  globalThis.fetch = (async (input) => {
-    requests.push(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
+  globalThis.fetch = (async (input, init) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+    const headers = new Headers(
+      init?.headers ??
+      (typeof input === "string" || input instanceof URL ? undefined : input.headers),
+    );
+    requests.push({
+      url,
+      organizationId: headers.get("X-Organization-ID"),
+    });
     const response = responses[index];
     index += 1;
     if (!response) {
@@ -243,9 +256,59 @@ describe("loadPerceptionData", () => {
     const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
 
     expect(result.data.metadata.analyzedResponses).toBe(1);
-    expect(requests.some((request) => request.includes("/dashboard"))).toBe(false);
-    expect(requests.some((request) => request.includes("/perception?includeDashboard=1"))).toBe(true);
+    expect(requests.some((request) => request.url.includes("/dashboard"))).toBe(false);
+    expect(requests.some((request) => request.url.includes("/perception?includeDashboard=1"))).toBe(true);
     expect(requests).toHaveLength(4);
+  });
+
+  test("sends the selected organization header for project-scoped perception requests", async () => {
+    const requests = mockFetchSequenceWithRequests([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+        ],
+      }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          dashboard: {
+            promptRuns: [],
+            aiResponses: [],
+          },
+          metadata: {
+            generatedAt: "2026-03-10T09:30:00Z",
+          },
+        },
+      }),
+    ]);
+
+    await loadPerceptionData("http://api.test", "?projectId=project-1&organizationId=org-9");
+
+    expect(requests.map((request) => request.organizationId)).toEqual([
+      "org-9",
+      "org-9",
+      "org-9",
+      "org-9",
+    ]);
+    expect(requests[0]?.url.includes("/projects/project-1")).toBe(true);
   });
 
   test("filters perception responses to the currently enabled project models when backend provides them", async () => {

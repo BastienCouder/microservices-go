@@ -1,6 +1,6 @@
 import { memo } from "react";
+import { resolveAIIconPath } from "@/lib/ai-provider-assets";
 import { cn } from "@/lib/utils";
-import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 
 type ModelCardProps = {
   name: string;
@@ -26,10 +26,10 @@ export const ModelCard = memo(function ModelCard({
   size = "small",
   disabled = false,
   disabledLabel,
-  metaLabel,
-  variant = "default",
+    metaLabel,
+    variant = "default",
 }: ModelCardProps) {
-  const safeIcon = toSafeImageAssetPath(icon);
+  const resolvedIcon = resolveAIIconPath(icon, modelGroup, name, description ?? "");
   const isModelsVariant = variant === "models";
   const isMonitoringVariant = variant === "monitoring";
   
@@ -113,15 +113,17 @@ export const ModelCard = memo(function ModelCard({
           isMonitoringVariant && "mt-1"
         )}
       >
-        <img
-          src={safeIcon}
-          alt={name}
-          width={config.iconSize.image}
-          height={config.iconSize.image}
-          loading="lazy"
-          decoding="async"
-          className="h-full w-full object-contain opacity-85"
-        />
+        {resolvedIcon ? (
+          <img
+            src={resolvedIcon}
+            alt={name}
+            width={config.iconSize.image}
+            height={config.iconSize.image}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-contain opacity-85"
+          />
+        ) : null}
       </div>
 
       <div className={cn("w-full min-w-0", config.position.content, config.position.spacing)}>

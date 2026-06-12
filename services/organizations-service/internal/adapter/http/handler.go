@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"log"
 	"net/http"
@@ -120,7 +121,34 @@ type createOrganizationRequest struct {
 type membershipResponse struct {
 	ID             string `json:"id"`
 	OrganizationID string `json:"organizationId"`
+	InternalID     string `json:"internalId"`
+	PublicID       string `json:"publicId"`
 	Role           string `json:"role"`
+}
+
+type organizationResponse struct {
+	ID              int64      `json:"id"`
+	PublicID        string     `json:"publicId"`
+	Name            string     `json:"name"`
+	OwnerIdentityID int64      `json:"ownerIdentityId"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	DeletedAt       *time.Time `json:"deletedAt,omitempty"`
+}
+
+type organizationHierarchyResponse struct {
+	Organization organizationResponse     `json:"organization"`
+	Projects     []usecase.ProjectSummary `json:"projects"`
+}
+
+func toOrganizationResponse(organization *domain.Organization) organizationResponse {
+	return organizationResponse{
+		ID:              organization.ID,
+		PublicID:        strings.TrimSpace(organization.PublicID),
+		Name:            organization.Name,
+		OwnerIdentityID: organization.OwnerIdentityID,
+		CreatedAt:       organization.CreatedAt,
+		DeletedAt:       organization.DeletedAt,
+	}
 }
 
 func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +175,7 @@ func (h *Handler) createOrganization(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusCreated, organization)
+	writeJSON(w, http.StatusCreated, toOrganizationResponse(organization))
 }
 
 func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
@@ -171,10 +199,20 @@ func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 				role = candidate
 			}
 		}
-		organizationID := strconv.FormatInt(membership.OrganizationID, 10)
+		organization, getErr := h.svc.GetOrganization(r.Context(), membership.OrganizationID)
+		if getErr != nil {
+			h.writeDomainError(w, getErr)
+			return
+		}
+		organizationID := strings.TrimSpace(organization.PublicID)
+		if organizationID == "" {
+			organizationID = strconv.FormatInt(membership.OrganizationID, 10)
+		}
 		response = append(response, membershipResponse{
 			ID:             organizationID,
 			OrganizationID: organizationID,
+			InternalID:     strconv.FormatInt(membership.OrganizationID, 10),
+			PublicID:       organizationID,
 			Role:           role,
 		})
 	}
@@ -189,11 +227,12 @@ func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	organizationID, err := strconv.ParseInt(parts[0], 10, 64)
-	if err != nil || organizationID <= 0 {
-		httpjson.WriteError(w, http.StatusBadRequest, "invalid organization id")
+	organization, err := h.resolveOrganization(parts[0], r.Context())
+	if err != nil {
+		h.writeDomainError(w, err)
 		return
 	}
+	organizationID := organization.ID
 	if err := enforceScopedOrganization(r, organizationID); err != nil {
 		httpjson.WriteForbiddenError(w)
 		return
@@ -329,7 +368,7 @@ func (h *Handler) getOrganizationByID(w http.ResponseWriter, r *http.Request, or
 		h.writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, organization)
+	writeJSON(w, http.StatusOK, toOrganizationResponse(organization))
 }
 
 type updateOrganizationRequest struct {
@@ -364,7 +403,7 @@ func (h *Handler) updateOrganization(w http.ResponseWriter, r *http.Request, org
 		"user_id":         authUserID,
 		"result":          "success",
 	})
-	writeJSON(w, http.StatusOK, organization)
+	writeJSON(w, http.StatusOK, toOrganizationResponse(organization))
 }
 
 func (h *Handler) deleteOrganization(w http.ResponseWriter, r *http.Request, organizationID int64) {
@@ -521,7 +560,10 @@ func (h *Handler) getOrganizationHierarchy(w http.ResponseWriter, r *http.Reques
 		h.writeDomainError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, hierarchy)
+	writeJSON(w, http.StatusOK, organizationHierarchyResponse{
+		Organization: toOrganizationResponse(&hierarchy.Organization),
+		Projects:     hierarchy.Projects,
+	})
 }
 
 type addMemberRequest struct {
@@ -926,6 +968,17 @@ func authenticatedOrganizationID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func (h *Handler) resolveOrganization(raw string, ctx context.Context) (*domain.Organization, error) {
+	identifier := strings.TrimSpace(raw)
+	if identifier == "" {
+		return nil, fmt.Errorf("%w: organization id is required", domain.ErrInvalidOrganization)
+	}
+	if organizationID, err := strconv.ParseInt(identifier, 10, 64); err == nil && organizationID > 0 {
+		return h.svc.GetOrganization(ctx, organizationID)
+	}
+	return h.svc.GetOrganizationByPublicID(ctx, identifier)
 }
 
 func publicAPIKeyID(r *http.Request) (int64, bool) {

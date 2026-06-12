@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Trash2 } from "lucide-react";
+import { Mail, Trash2 } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
@@ -43,8 +43,10 @@ type InvitationsPanelProps = {
   draft: InvitationDraft;
   onDraftChange: (draft: InvitationDraft) => void;
   onSubmit: () => void;
+  onResendInvitation: (invitationId: string) => void;
   onRevokeInvitation: (invitationId: string) => void;
   busy: boolean;
+  resendBusy: boolean;
   revokeBusy: boolean;
 };
 
@@ -54,8 +56,10 @@ export function InvitationsPanel({
   draft,
   onDraftChange,
   onSubmit,
+  onResendInvitation,
   onRevokeInvitation,
   busy,
+  resendBusy,
   revokeBusy,
 }: InvitationsPanelProps) {
   const { t } = useScopedI18n("organizations");
@@ -173,27 +177,39 @@ export function InvitationsPanel({
                     </TableCell>
                     <TableCell>{formatDateTime(invitation.createdAt)}</TableCell>
                     <TableCell className="text-right">
-                      <ConfirmDialog
-                        trigger={
-                          <Button
-                            type="button"
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                            title={t("disableInvitation")}
-                            disabled={revokeBusy}
-                          >
-                            <Trash2 />
-                            <span className="sr-only">{t("disableInvitation")}</span>
-                          </Button>
-                        }
-                        title={t("disableInvitationTitle")}
-                        description={t("disableInvitationDescription", { email: invitation.email })}
-                        confirmLabel={t("disable")}
-                        loading={revokeBusy}
-                        media={<Trash2 />}
-                        onConfirm={() => onRevokeInvitation(invitation.id)}
-                      />
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => onResendInvitation(invitation.id)}
+                          disabled={resendBusy}
+                        >
+                          <Mail data-icon="inline-start" />
+                          {resendBusy ? t("resendingInvitation") : t("resendInvitation")}
+                        </Button>
+                        <ConfirmDialog
+                          trigger={
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                              title={t("disableInvitation")}
+                              disabled={revokeBusy}
+                            >
+                              <Trash2 />
+                              <span className="sr-only">{t("disableInvitation")}</span>
+                            </Button>
+                          }
+                          title={t("disableInvitationTitle")}
+                          description={t("disableInvitationDescription", { email: invitation.email })}
+                          confirmLabel={t("disable")}
+                          loading={revokeBusy}
+                          media={<Trash2 />}
+                          onConfirm={() => onRevokeInvitation(invitation.id)}
+                        />
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

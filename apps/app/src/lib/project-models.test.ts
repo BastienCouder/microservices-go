@@ -3,6 +3,8 @@ import { describe, expect, test } from "bun:test";
 import {
   buildProjectModelFilterItems,
   normalizeModelPayload,
+  resolveProjectModelIconPath,
+  toProjectModelVisual,
   type ProjectModelMeta,
 } from "./project-models";
 
@@ -67,6 +69,28 @@ describe("project model filters", () => {
       "Alpha 10",
       "Aardvark 2",
     ]);
+  });
+
+  test("infers provider icons for filter items and visuals when iconPath is empty", () => {
+    const visual = toProjectModelVisual({
+      id: "claude-3-7-sonnet",
+      displayName: "Claude 3.7 Sonnet",
+      provider: "anthropic",
+      groupName: "Claude",
+      providerModelId: "anthropic/claude-3.7-sonnet",
+      description: "",
+      iconPath: "",
+    });
+
+    expect(visual.icon).toBe("/models/anthropic.svg");
+    expect(resolveProjectModelIconPath({
+      id: "gemini-2-5-pro",
+      displayName: "Gemini 2.5 Pro",
+      provider: "google",
+      groupName: "Gemini",
+      providerModelId: "google/gemini-2.5-pro",
+      iconPath: "",
+    })).toBe("/models/google.svg");
   });
 });
 

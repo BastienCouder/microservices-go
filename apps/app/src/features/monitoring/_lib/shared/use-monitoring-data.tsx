@@ -18,6 +18,10 @@ import {
 } from "./monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
 import type { RuntimeMode } from "@/lib/runtime-mode";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 
 type MonitoringDataContextValue = {
   data: MonitoringData;
@@ -61,10 +65,15 @@ export function MonitoringDataProvider({
     () => getMonitoringQueryContext(routeSearch),
     [routeSearch],
   );
+  const organizationId = useMemo(
+    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID() || null,
+    [routeSearch],
+  );
   const monitoringQuery = useQuery({
     queryKey: appQueryKeys.monitoring(
       apiBaseURL,
       queryProjectId,
+      organizationId,
       queryMode,
       includeHistoricalModels ? "include_historical_models" : "active_only",
     ),

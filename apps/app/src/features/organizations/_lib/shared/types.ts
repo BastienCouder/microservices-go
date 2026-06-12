@@ -5,6 +5,7 @@ export type OrganizationRole =
 
 export type OrganizationSummary = {
   id: string;
+  publicId: string;
   slug: string;
   name: string;
   role: OrganizationRole;

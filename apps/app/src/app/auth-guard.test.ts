@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { UserProfile } from "@/shared/models";
 import {
+  shouldRedirectAwayFromAccountOnboarding,
   shouldRedirectToBillingGate,
   shouldRedirectToOnboarding,
   shouldRedirectUnauthenticated,
@@ -75,5 +76,29 @@ describe("auth route guards", () => {
         projectCount: 0,
       }),
     ).toBe(true);
+  });
+
+  test("blocks account onboarding once a project already exists", () => {
+    expect(
+      shouldRedirectAwayFromAccountOnboarding({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "account",
+        projectCount: 1,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRedirectAwayFromAccountOnboarding({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "project",
+        projectCount: 1,
+      }),
+    ).toBe(false);
   });
 });

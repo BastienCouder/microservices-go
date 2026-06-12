@@ -20,6 +20,7 @@ export function OrganizationsLayout({
   actionError,
   notice,
   isInitialLoading,
+  organizations,
   selectedOrganization,
   resources,
   currentUserId,
@@ -37,6 +38,7 @@ export function OrganizationsLayout({
   removeProjectMemberBusy,
   memberActionBusy,
   createInvitationBusy,
+  resendInvitationBusy,
   revokeInvitationBusy,
   updateOrganizationBusy,
   deleteOrganizationBusy,
@@ -55,12 +57,14 @@ export function OrganizationsLayout({
   onUpdateRoles,
   onRemoveMember,
   onCreateInvitation,
+  onResendInvitation,
   onRevokeInvitation,
   onUpdateOrganizationName,
   onDeleteOrganization,
   onCreateAPIKey,
   onRevokeAPIKey,
   onClearCreatedAPIKey,
+  onSelectOrganization,
   onRefetchOrganizations,
 }: OrganizationsPageViewModel) {
   const { t } = useScopedI18n("organizations");
@@ -139,8 +143,10 @@ export function OrganizationsLayout({
                   draft={invitationDraft}
                   onDraftChange={setInvitationDraft}
                   onSubmit={onCreateInvitation}
+                  onResendInvitation={onResendInvitation}
                   onRevokeInvitation={onRevokeInvitation}
                   busy={createInvitationBusy}
+                  resendBusy={resendInvitationBusy}
                   revokeBusy={revokeInvitationBusy}
                 />
               ) : null}
@@ -148,8 +154,11 @@ export function OrganizationsLayout({
             {activeTab === "settings" ? (
                 <SettingsPanel
                   organization={selectedOrganization}
+                  organizations={organizations}
                   busy={updateOrganizationBusy}
                   deleteBusy={deleteOrganizationBusy}
+                  switchBusy={isInitialLoading}
+                  onSelectOrganization={onSelectOrganization}
                   onSubmit={onUpdateOrganizationName}
                   onDelete={onDeleteOrganization}
                 />

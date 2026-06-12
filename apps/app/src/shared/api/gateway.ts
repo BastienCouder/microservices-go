@@ -355,6 +355,10 @@ function createRequestSignal(
   };
 }
 
+function resolveGatewayOrganizationId(rawOrganizationId: string): string {
+  return rawOrganizationId.trim();
+}
+
 export async function gatewayJSON<T>(
   baseURL: string,
   path: string,
@@ -371,7 +375,7 @@ export async function gatewayJSON<T>(
     timeoutMs,
     ...fetchInit
   } = init ?? {};
-  const organizationId = rawOrganizationId?.trim() ?? "";
+  const organizationId = resolveGatewayOrganizationId(rawOrganizationId?.trim() ?? "");
   const method = getRequestMethod(fetchInit.method);
   const retryAttempts = Math.max(0, retry?.attempts ?? DEFAULT_RETRY_ATTEMPTS);
   const retryDelayMs = Math.max(0, retry?.delayMs ?? DEFAULT_RETRY_DELAY_MS);

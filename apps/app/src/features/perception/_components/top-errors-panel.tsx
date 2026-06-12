@@ -33,6 +33,7 @@ import {
 } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import i18n from "@/shared/i18n";
+import { findAIProviderAsset } from "@/lib/ai-provider-assets";
 import {
   formatPerceptionErrorTypeLabel as formatPerceptionErrorTypeLabelI18n,
   formatPerceptionPriorityLabel as formatPerceptionPriorityLabelI18n,
@@ -463,50 +464,6 @@ type PerceptionModelBadgeMeta = {
   title: string;
 };
 
-const PROVIDER_VISUALS = [
-  {
-    keys: ["openai", "chatgpt", "gpt", "o1", "o3", "o4"],
-    provider: "OpenAI",
-    iconPath: "/models/openai.svg",
-  },
-  {
-    keys: ["google", "gemini"],
-    provider: "Google",
-    iconPath: "/models/google.svg",
-  },
-  {
-    keys: ["anthropic", "claude"],
-    provider: "Anthropic",
-    iconPath: "/models/anthropic.svg",
-  },
-  {
-    keys: ["perplexity"],
-    provider: "Perplexity",
-    iconPath: "/models/perplexity.svg",
-  },
-  { keys: ["mistral"], provider: "Mistral", iconPath: "/models/mistral.svg" },
-  {
-    keys: ["microsoft", "copilot"],
-    provider: "Microsoft",
-    iconPath: "/models/copilot.svg",
-  },
-  { keys: ["xai", "grok"], provider: "xAI", iconPath: "/models/xai.svg" },
-  {
-    keys: ["deepseek"],
-    provider: "DeepSeek",
-    iconPath: "/models/deepseek.svg",
-  },
-  { keys: ["qwen"], provider: "Qwen", iconPath: "/models/qwen.svg" },
-  { keys: ["meta", "llama"], provider: "Meta", iconPath: "/models/meta.svg" },
-  { keys: ["groq"], provider: "Groq", iconPath: "/models/groq.svg" },
-  {
-    keys: ["openrouter"],
-    provider: "OpenRouter",
-    iconPath: "/models/openrouter.svg",
-  },
-  { keys: ["zai"], provider: "Z.ai", iconPath: "/models/zai.svg" },
-] as const;
-
 function normalizeModelLookupKey(value: string): string {
   return value.trim().toLowerCase();
 }
@@ -532,16 +489,7 @@ export function buildPerceptionModelLookup(
 }
 
 function findProviderVisual(provider: string, modelName: string) {
-  const providerValue = normalizeModelLookupKey(provider);
-  const modelValue = normalizeModelLookupKey(modelName);
-  const providerMatch = PROVIDER_VISUALS.find(({ keys }) =>
-    keys.some((key) => providerValue.includes(key)),
-  );
-  if (providerMatch) return providerMatch;
-
-  return PROVIDER_VISUALS.find(({ keys }) =>
-    keys.some((key) => modelValue.includes(key)),
-  );
+  return findAIProviderAsset(provider, modelName);
 }
 
 function getProviderModelName(providerModelId: string): string {

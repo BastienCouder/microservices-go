@@ -20,5 +20,5 @@ export function normalizeAppReturnTo(raw: string | null | undefined, appURL: str
 }
 
 export function buildBrowserCallbackURL(origin: string, returnTo: string): string {
-  return `${origin}/auth/callback?return_to=${encodeURIComponent(returnTo)}`;
+  return `${origin}/login/callback?return_to=${encodeURIComponent(returnTo)}`;
 }

@@ -3,7 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
-import { readOptionalProjectTokenFromSearch } from "@/shared/selection";
+import {
+  readOptionalProjectTokenFromSearch,
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 import {
   loadPerceptionData,
   type PerceptionViewData,
@@ -18,9 +22,11 @@ type UsePerceptionDataResult = {
 
 export function usePerceptionData(apiBaseURL: string, routeSearch: string): UsePerceptionDataResult {
   const projectId = readOptionalProjectTokenFromSearch(routeSearch);
+  const organizationId =
+    readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID() || null;
   const runtimeMode = resolveRuntimeMode(routeSearch);
   const perceptionQuery = useQuery({
-    queryKey: appQueryKeys.perception(apiBaseURL, projectId, runtimeMode),
+    queryKey: appQueryKeys.perception(apiBaseURL, projectId, organizationId, runtimeMode),
     enabled: apiBaseURL.trim() !== "",
     queryFn: ({ signal }) => loadPerceptionData(apiBaseURL, routeSearch, { signal }),
   });

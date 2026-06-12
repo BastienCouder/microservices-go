@@ -9,7 +9,7 @@ import { IntegrationsSection } from "@/app/[locale]/_components/integrations-sec
 import { SecuritySection } from "@/app/[locale]/_components/security-section";
 import { DevelopersSection } from "@/app/[locale]/_components/developers-section";
 import { TestimonialsSection } from "@/app/[locale]/_components/testimonials-section";
-import { PricingSection } from "@/app/[locale]/_components/pricing-section";
+
 import { FaqSection } from "@/app/[locale]/_components/faq-section";
 import { CtaSection } from "@/app/[locale]/_components/cta-section";
 import { FooterSection } from "@/app/[locale]/_components/footer-section";
@@ -19,6 +19,7 @@ import { getTranslations } from "next-intl/server";
 import LinearHeroCard, { LinearMonitoringPreview } from "./_components/linear-card";
 import { Separator } from "@/components/ui/separator";
 import { SegmentsSection } from "./_components/segments-section";
+import { PricingSection } from "@/components/pricing/pricing-section";
 
 export async function generateMetadata({
   params,

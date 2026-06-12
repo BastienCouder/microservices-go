@@ -5,7 +5,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import { loadUserOrganizationSummaries } from "@/shared/organizations";
 import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 
 export type NormalizedOrganizationRole = "editor" | "viewer" | "super_admin";
@@ -23,7 +23,7 @@ export function canEditWithOrganizationRole(role: string | null | undefined): bo
 
 export function readEffectiveOrganizationId(routeSearch: string): string {
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
-  return routeOrganizationId || readSelectedOrganizationID();
+  return routeOrganizationId || readSelectedOrganizationPublicID();
 }
 
 export function useSelectedOrganizationPermissions({
@@ -44,7 +44,12 @@ export function useSelectedOrganizationPermissions({
   });
   const selectedOrganization = useMemo(() => {
     const organizations = organizationsQuery.data ?? [];
-    return organizations.find((organization) => organization.id === organizationId) ?? null;
+    return (
+      organizations.find(
+        (organization) =>
+          organization.id === organizationId || organization.publicId === organizationId,
+      ) ?? null
+    );
   }, [organizationId, organizationsQuery.data]);
   const role = normalizeOrganizationRole(selectedOrganization?.role);
 

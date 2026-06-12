@@ -13,6 +13,8 @@ import type {
 
 type Membership = {
   organizationId: string;
+  internalId?: string;
+  publicId?: string;
   role: OrganizationRole;
 };
 
@@ -73,6 +75,8 @@ export function normalizeMembership(value: unknown): Membership | null {
 
   return {
     organizationId,
+    internalId: getIDString(getField(value, ["internalId", "InternalID"])),
+    publicId: getString(getField(value, ["publicId", "PublicID"])) || organizationId,
     role: getRole(getField(value, ["role", "Role"])),
   };
 }
@@ -82,7 +86,14 @@ export function normalizeOrganization(value: unknown, fallback: Membership): Org
   const record = isRecord(payload) ? payload : {};
 
   return {
-    id: getIDString(getField(record, ["id", "ID"])) || fallback.organizationId,
+    id:
+      getIDString(getField(record, ["id", "ID"])) ||
+      fallback.internalId ||
+      fallback.organizationId,
+    publicId:
+      getString(getField(record, ["publicId", "PublicID"])) ||
+      fallback.publicId ||
+      fallback.organizationId,
     slug: "",
     name: getString(getField(record, ["name", "Name"])) || `Organisation ${fallback.organizationId}`,
     role: fallback.role,

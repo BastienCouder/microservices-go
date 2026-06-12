@@ -8,9 +8,8 @@ COMPOSE := docker compose
 COMPOSE_FILES := -f docker-compose.yml -f docker-compose.secrets.generated.yml
 COMPOSE_DEV := $(COMPOSE) -p microservices-go-dev $(COMPOSE_FILES) -f docker-compose.dev.yml
 COMPOSE_PROD := $(COMPOSE) -p microservices-go-prod $(COMPOSE_FILES)
-COMPOSE_PROD_SERIAL := COMPOSE_PARALLEL_LIMIT=1 $(COMPOSE_PROD)
-COMPOSE_PROD_LOCAL := $(COMPOSE_PROD) -f docker-compose.prod-local.yml
-COMPOSE_PROD_LOCAL_SERIAL := COMPOSE_PARALLEL_LIMIT=1 $(COMPOSE_PROD_LOCAL)
+COMPOSE_PROD_LOCAL := $(COMPOSE_PROD)
+COMPOSE_PROD_LOCAL_SERIAL := $(COMPOSE_PROD_LOCAL)
 
 ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
@@ -99,8 +98,9 @@ OPTIONAL_SECRETS := \
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
 	dev-doc dev-email dev-mcp dev-monitoring \
-	prod prod-build prod-down prod-restart prod-logs prod-migrate prod-ping prod-check deploy-prod \
-	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate prod-ping prod-check deploy-prod \
+	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate \
+	prod-front prod-app prod-web prod-services prod-service \
+	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service \
 	prod-doc prod-email prod-mcp prod-monitoring \
 	db-generate db-migrate \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
@@ -130,10 +130,17 @@ help:
 	@echo "    make db-migrate       Alias for dev migrations"
 	@echo ""
 	@echo "  Production"
-	@echo "    make prod             Start production stack (one service at a time)"
-	@echo "    make prod-build       Rebuild and start production stack (one service at a time)"
+	@echo "    make prod             Start web + app + backend + infra in production"
+	@echo "    make prod-build       Rebuild and start web + app + backend + infra"
 	@echo "    make prod-down        Stop production stack"
 	@echo "    make prod-logs        Follow prod logs (SERVICE=name optional)"
+	@echo "    make prod-restart     Restart one running service (SERVICE=name)"
+	@echo "    make prod-rebuild     Rebuild and restart one service (SERVICE=name)"
+	@echo "    make prod-front       Rebuild and start only web + app"
+	@echo "    make prod-app         Rebuild and start only app"
+	@echo "    make prod-web         Rebuild and start only web"
+	@echo "    make prod-services    Run migrations, then rebuild and start backend services"
+	@echo "    make prod-service     Rebuild and start only one service (SERVICE=name)"
 	@echo "    make prod-migrate     Run all production migrations"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
@@ -141,7 +148,12 @@ help:
 	@echo "    make prod-monitoring  Start monitoring only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
 	@echo "    make prod-check       Ansible syntax check"
-	@echo "    make deploy-prod      Run production deploy playbook"
+	@echo "    make deploy-prod      Deploy full production stack with Ansible"
+	@echo "    make deploy-prod-front Deploy only web + app with Ansible"
+	@echo "    make deploy-prod-app  Deploy only app with Ansible"
+	@echo "    make deploy-prod-web  Deploy only web with Ansible"
+	@echo "    make deploy-prod-services Deploy backend services with Ansible"
+	@echo "    make deploy-prod-service SERVICE=name  Deploy one service with Ansible"
 	@echo ""
 	@echo "  Secrets"
 	@echo "    make secrets-generate Regenerate Makefile/Compose/Ansible secrets files"
@@ -215,6 +227,22 @@ prod-rebuild:
 prod-logs:
 	$(COMPOSE_PROD_LOCAL) logs -f $(SERVICE)
 
+prod-front: secrets-check
+	$(COMPOSE_PROD_LOCAL) up -d --build web app
+
+prod-app: secrets-check
+	$(COMPOSE_PROD_LOCAL) up -d --build app
+
+prod-web: secrets-check
+	$(COMPOSE_PROD_LOCAL) up -d --build web
+
+prod-services: prod-migrate
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend up -d --build
+
+prod-services: prod-migrate
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend build --no-cache
+	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend up -d --force-recreate
+
 prod-migrate: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile migrations up --build
 
@@ -238,6 +266,22 @@ prod-check:
 
 deploy-prod:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass
+
+deploy-prod-front:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web","app"]}'
+
+deploy-prod-app:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["app"]}'
+
+deploy-prod-web:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web"]}'
+
+deploy-prod-services:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_profiles":["backend"]}'
+
+deploy-prod-service:
+	@test -n "$(SERVICE)" || (echo "Usage: make deploy-prod-service SERVICE=api-gateway"; exit 1)
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["$(SERVICE)"]}'
 
 secrets-generate:
 	python3 scripts/generate_secrets_config.py

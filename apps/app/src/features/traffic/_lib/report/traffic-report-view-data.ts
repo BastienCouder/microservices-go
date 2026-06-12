@@ -3,6 +3,7 @@ import type {
   TrafficPage,
   TrafficSource,
 } from "./types";
+import { getAdminPrivatePathPrefixes } from "@/shared/admin-routing";
 
 export type TrafficReportFilters = {
   sourcePage: number;
@@ -26,7 +27,7 @@ export type TrafficReportViewData = {
 
 const defaultPageSize = 10;
 const maxTrendPoints = 60;
-const privatePagePathPrefixes = ["/admin"];
+const privatePagePathPrefixes = getAdminPrivatePathPrefixes();
 
 function clampPage(page: number, totalPages: number): number {
   if (!Number.isFinite(page) || page < 1) {

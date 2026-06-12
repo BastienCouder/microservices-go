@@ -98,15 +98,15 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
         title={t("statusLabel")}
       />
 
-      <PeriodFilterPicker
+     {/* } <PeriodFilterPicker
         className="w-full sm:w-[220px]"
         value={props.sourceFilter}
         onValueChange={(value) => props.setSourceFilter(value as SourceFilter)}
         options={sourceOptions}
         label={t("sourceLabel")}
-        title={t("sourceLabel")}
+        title={t("sourceLabel")} 
       />
-
+*/}
       <ErrorHubModelsFilter
         open={props.modelsPopoverOpen}
         onOpenChange={props.setModelsPopoverOpen}

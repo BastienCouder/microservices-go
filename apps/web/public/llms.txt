@@ -1,0 +1,2 @@
+- [Version française](https://visia.app/llms-fr.txt)
+- [English version](https://visia.app/llms-en.txt)

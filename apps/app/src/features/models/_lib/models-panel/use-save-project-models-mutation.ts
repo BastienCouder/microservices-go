@@ -4,15 +4,16 @@ import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { invalidateProjectScope } from "@/shared/api/query-refresh";
 
-const DEFAULT_UPDATE_ERROR = "Impossible de mettre a jour les modeles du projet.";
-
-function sanitizeLegacyModelUpdateError(rawError?: string): string {
+function sanitizeLegacyModelUpdateError(
+  rawError: string | undefined,
+  defaultErrorMessage: string,
+): string {
   const normalized = rawError?.trim();
   if (
     !normalized ||
     normalized.toLowerCase().includes("monthly model change limit reached")
   ) {
-    return DEFAULT_UPDATE_ERROR;
+    return defaultErrorMessage;
   }
   return normalized;
 }
@@ -21,6 +22,8 @@ type UseSaveProjectModelsMutationOptions = {
   apiBaseURL: string;
   organizationId: string;
   selectedProjectId: string;
+  successMessage: string;
+  defaultErrorMessage: string;
   onSuccessMessage: (message: string) => void;
   onErrorMessage: (message: string) => void;
 };
@@ -29,6 +32,8 @@ export function useSaveProjectModelsMutation({
   apiBaseURL,
   organizationId,
   selectedProjectId,
+  successMessage,
+  defaultErrorMessage,
   onSuccessMessage,
   onErrorMessage,
 }: UseSaveProjectModelsMutationOptions) {
@@ -45,7 +50,11 @@ export function useSaveProjectModelsMutation({
         body: JSON.stringify({ modelIds }),
       });
 
-      if (!response.ok) throw new Error(sanitizeLegacyModelUpdateError(response.error));
+      if (!response.ok) {
+        throw new Error(
+          sanitizeLegacyModelUpdateError(response.error, defaultErrorMessage),
+        );
+      }
       return modelIds;
     },
     onSuccess: async () => {
@@ -55,13 +64,13 @@ export function useSaveProjectModelsMutation({
         organizationId,
         selectedProjectId,
       );
-      onSuccessMessage("Modeles du projet mis a jour.");
+      onSuccessMessage(successMessage);
     },
     onError: (mutationError) => {
       onErrorMessage(
         mutationError instanceof Error
           ? mutationError.message
-          : DEFAULT_UPDATE_ERROR,
+          : defaultErrorMessage,
       );
     },
   });

@@ -54,6 +54,7 @@ import {
 } from "@/shared/billing";
 import { gatewayJSON } from "@/shared/api/gateway";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
+import { canAccessAdminRole } from "@/shared/admin-routing";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 
 type AdminOrganizationsPageProps = {
@@ -89,9 +90,7 @@ function sortBillingPlans(plans: BillingPlanCode[]) {
 }
 
 function canManageUsage(organization: OrganizationSummary) {
-  return (
-    organization.role === "editor" || organization.role === "super_admin"
-  );
+  return canAccessAdminRole(organization.role);
 }
 
 function draftFromEntitlements(entitlements: BillingEntitlements): Draft {

@@ -396,6 +396,26 @@ export async function revokeOrganizationInvitation(
   );
 }
 
+export async function resendOrganizationInvitation(
+  apiBaseURL: string,
+  organizationId: string,
+  invitation: OrganizationInvitation,
+): Promise<void> {
+  await requireGatewayData(
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.invitation(organizationId, invitation.id), {
+      method: "PUT",
+      organizationId,
+      body: JSON.stringify({
+        email: invitation.email,
+        role: invitation.role,
+        message: invitation.message,
+        expires_at: invitation.expiresAt || "",
+      }),
+    }),
+    "Impossible de renvoyer l'invitation.",
+  );
+}
+
 export async function assignOrganizationProjectMember(
   apiBaseURL: string,
   organizationId: string,

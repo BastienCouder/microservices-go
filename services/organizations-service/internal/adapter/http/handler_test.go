@@ -19,6 +19,9 @@ type stubRepo struct{}
 
 func (stubRepo) Create(_ context.Context, organization *domain.Organization) error {
 	organization.ID = 1
+	if organization.PublicID == "" {
+		organization.PublicID = "org_000000000001"
+	}
 	return nil
 }
 
@@ -26,14 +29,39 @@ func (stubRepo) GetByID(_ context.Context, id int64) (*domain.Organization, erro
 	if id <= 0 {
 		return nil, domain.ErrOrganizationNotFound
 	}
-	return &domain.Organization{ID: id, Name: "Acme", OwnerIdentityID: 7, CreatedAt: time.Now().UTC()}, nil
+	return &domain.Organization{
+		ID:              id,
+		PublicID:        "org_acme00000001",
+		Name:            "Acme",
+		OwnerIdentityID: 7,
+		CreatedAt:       time.Now().UTC(),
+	}, nil
+}
+
+func (stubRepo) GetByPublicID(_ context.Context, publicID string) (*domain.Organization, error) {
+	if publicID == "" {
+		return nil, domain.ErrOrganizationNotFound
+	}
+	return &domain.Organization{
+		ID:              1,
+		PublicID:        publicID,
+		Name:            "Acme",
+		OwnerIdentityID: 7,
+		CreatedAt:       time.Now().UTC(),
+	}, nil
 }
 
 func (stubRepo) UpdateName(_ context.Context, id int64, name string) (*domain.Organization, error) {
 	if id <= 0 {
 		return nil, domain.ErrOrganizationNotFound
 	}
-	return &domain.Organization{ID: id, Name: name, OwnerIdentityID: 7, CreatedAt: time.Now().UTC()}, nil
+	return &domain.Organization{
+		ID:              id,
+		PublicID:        "org_acme00000001",
+		Name:            name,
+		OwnerIdentityID: 7,
+		CreatedAt:       time.Now().UTC(),
+	}, nil
 }
 
 func (stubRepo) DeleteOrganization(_ context.Context, organizationID int64, _ time.Time) error {

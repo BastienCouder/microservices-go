@@ -5,7 +5,7 @@ import {
   unwrapGatewayPayload,
   type GatewayResult,
 } from "@/shared/api/gateway";
-import { readSelectedOrganizationID } from "@/shared/selection";
+import { readSelectedOrganizationPublicID } from "@/shared/selection";
 
 function readData<T>(result: GatewayResult<unknown>): T {
   return unwrapGatewayPayload(
@@ -14,7 +14,7 @@ function readData<T>(result: GatewayResult<unknown>): T {
 }
 
 function readOrganizationId(): string | undefined {
-  const organizationId = readSelectedOrganizationID();
+  const organizationId = readSelectedOrganizationPublicID();
   return organizationId || undefined;
 }
 

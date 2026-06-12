@@ -1,21 +1,12 @@
 import { redirect } from "next/navigation";
 import { normalizeAppReturnTo } from "@/src/auth/routing";
+import { pickFirst, type PageSearchParams } from "@/src/auth/search-params";
 
 export const dynamic = "force-dynamic";
 
 type AuthCallbackPageProps = {
-  searchParams?:
-    | Promise<Record<string, string | string[] | undefined>>
-    | Record<string, string | string[] | undefined>;
+  searchParams?: Promise<PageSearchParams> | PageSearchParams;
 };
-
-function pickFirst(value: string | string[] | undefined): string {
-  if (Array.isArray(value)) {
-    return value[0]?.trim() ?? "";
-  }
-
-  return typeof value === "string" ? value.trim() : "";
-}
 
 function getAppURL(): string {
   const appURL = process.env.NEXT_PUBLIC_APP_URL;

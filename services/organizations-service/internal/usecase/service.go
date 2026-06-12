@@ -47,7 +47,13 @@ func (s *Service) EnableInvitationUserEmailValidation(resolver UserEmailResolver
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIdentityID int64) (*domain.Organization, error) {
+	publicID, err := generateOrganizationPublicID()
+	if err != nil {
+		return nil, fmt.Errorf("generate organization public id: %w", err)
+	}
+
 	org := &domain.Organization{
+		PublicID:        publicID,
 		Name:            strings.TrimSpace(name),
 		OwnerIdentityID: ownerIdentityID,
 		CreatedAt:       s.now().UTC(),
@@ -67,6 +73,18 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 	org, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("get organization %d: %w", id, err)
+	}
+	return org, nil
+}
+
+func (s *Service) GetOrganizationByPublicID(ctx context.Context, publicID string) (*domain.Organization, error) {
+	normalizedPublicID := strings.TrimSpace(publicID)
+	if normalizedPublicID == "" {
+		return nil, fmt.Errorf("%w: organization public id is required", domain.ErrInvalidOrganization)
+	}
+	org, err := s.repo.GetByPublicID(ctx, normalizedPublicID)
+	if err != nil {
+		return nil, fmt.Errorf("get organization %s: %w", normalizedPublicID, err)
 	}
 	return org, nil
 }
@@ -516,6 +534,9 @@ func (s *Service) UpdateInvitation(
 	if err != nil {
 		return nil, fmt.Errorf("update invitation: %w", err)
 	}
+	if err := s.sendInvitationNotification(ctx, updated); err != nil {
+		return nil, err
+	}
 	return updated, nil
 }
 
@@ -615,6 +636,14 @@ func generateOrganizationAPIKey() (string, error) {
 	token, err := generateSecureTokenHex(32)
 	if err != nil {
 		return "", fmt.Errorf("generate organization api key: %w", err)
+	}
+	return "org_" + token, nil
+}
+
+func generateOrganizationPublicID() (string, error) {
+	token, err := generateSecureTokenHex(12)
+	if err != nil {
+		return "", err
 	}
 	return "org_" + token, nil
 }

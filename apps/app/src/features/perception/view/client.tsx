@@ -48,23 +48,10 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
     viewModel.selectedPeriod,
     locale,
   );
-
-  const rightColumn = (
-    <div className="space-y-3 px-1 pb-4">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {viewModel.canExport ? (
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={viewModel.exportDisabled}
-            onClick={() => viewModel.handleExportPerceptionData(periodLabel)}
-          >
-            <Download className="size-4" />
-            {t("exportExcel")}
-          </Button>
-        ) : null}
-        {permissions.canEdit ? (
-            <ConfirmDialog
+  const heroActions = (
+    <div className="flex flex-col md:flex-row items-center gap-2">
+      {permissions.canEdit ? (
+        <ConfirmDialog
           title={t("confirmAnalysisTitle")}
           description={
             viewModel.perceptionMonthlyCredits > 0
@@ -88,21 +75,36 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           trigger={
             <Button
               size="sm"
+              variant={"secondary"}
+            className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
               disabled={
                 viewModel.analysisRunning ||
                 viewModel.perceptionQuotaLoading ||
                 !initialData.metadata.projectId
               }
             >
-              <Play className="size-4" />
               {t("analyzePerception")}
             </Button>
           }
         />
-        ) : null}
-     
-      </div>
+      ) : null}
+      {viewModel.canExport ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+          disabled={viewModel.exportDisabled}
+          onClick={() => viewModel.handleExportPerceptionData(periodLabel)}
+        >
+          <Download className="size-4" />
+          {t("exportExcel")}
+        </Button>
+      ) : null}
+    </div>
+  );
 
+  const rightColumn = (
+    <div className="space-y-3 px-1 pb-4">
       {viewModel.lastAnalysisCredits !== null ? (
         <p className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-300">
           {t("analysisStartedWithCredits", {
@@ -162,6 +164,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
                 viewModel.setShowAllModels(false);
               }}
               isDemo={!initialData.metadata.projectId}
+              heroActions={heroActions}
             />
           </div>
         </div>

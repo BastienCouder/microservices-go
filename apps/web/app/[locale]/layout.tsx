@@ -6,6 +6,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { getMessages, setRequestLocale } from "next-intl/server";
 import { isLocale, locales } from "@/src/i18n/config";
 import { getSiteURL } from "@/src/site/config";
+import { createVisiaJsonLd } from "@/src/site/seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,25 +23,37 @@ export function generateStaticParams() {
 
 export default async function RootLayout({
   children,
-  params
+  params,
 }: {
   children: React.ReactNode;
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
+
   if (!isLocale(locale)) {
     notFound();
   }
 
   setRequestLocale(locale);
+
   const messages = await getMessages();
+  const jsonLd = createVisiaJsonLd(locale);
 
   return (
     <html lang={locale}>
       <body className="font-sans antialiased">
+        <script
+          type="application/ld+json"
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(jsonLd),
+          }}
+        />
+
         <NextIntlClientProvider messages={messages} locale={locale}>
           {children}
         </NextIntlClientProvider>
+
         <Analytics />
       </body>
     </html>

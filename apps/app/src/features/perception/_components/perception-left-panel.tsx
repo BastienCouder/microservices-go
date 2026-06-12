@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
@@ -48,6 +49,7 @@ export function PerceptionLeftPanel({
   showUniqueModelFilters,
   onToggleModelFilterMode,
   isDemo,
+  heroActions,
 }: {
   canon: BrandCanon;
   radar: PerceptionViewData["radar"];
@@ -65,6 +67,7 @@ export function PerceptionLeftPanel({
   showUniqueModelFilters: boolean;
   onToggleModelFilterMode: (value: boolean) => void;
   isDemo: boolean;
+  heroActions?: ReactNode;
 }) {
   const { locale, t } = useScopedI18n("perception");
   const location = useLocation();
@@ -91,7 +94,7 @@ export function PerceptionLeftPanel({
   return (
     <div className="flex h-auto flex-col xl:h-full">
       <div className="m-2 mb-4 shrink-0">
-        <PerceptionHeroInsightCard insight={heroInsight} />
+        <PerceptionHeroInsightCard insight={heroInsight} actions={heroActions} />
       </div>
 
       <Tabs defaultValue="brand" className="min-h-0 flex-1 flex-col">

@@ -20,8 +20,13 @@ import type {
 } from "@/features/perception/_lib/shared/perception-data";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 import { CompetitorEditor } from "./competitor-editor";
 import { EditableListField } from "./editable-list-field";
+import { deriveShortDescription } from "@/features/brands/_lib/overview/brand-overview-helpers";
 import {
   buildBrandsLocation,
   saveBrandCanonProject,
@@ -49,6 +54,9 @@ export function BrandCanonEditorPanel({
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
   const brandsLocation = buildBrandsLocation(location.search);
   const loadError = initialData.metadata.emptyStateLabel;
+  const shortDescription = deriveShortDescription(canonDraft);
+  const organizationId =
+    readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID() || null;
 
   const update = <K extends keyof BrandCanon>(key: K, value: BrandCanon[K]) => {
     setCanonDraft((current) => ({ ...current, [key]: value }));
@@ -84,6 +92,7 @@ export function BrandCanonEditorPanel({
         appQueryKeys.perception(
           apiBaseURL,
           initialData.metadata.projectId ?? null,
+          organizationId,
           resolveRuntimeMode(routeSearch),
         ),
       ]);
@@ -128,12 +137,23 @@ export function BrandCanonEditorPanel({
                   <Field label={t("fieldBrand")}>
                     <Input disabled={!canEdit} value={canonDraft.brandName} onChange={(e) => update("brandName", e.target.value)} />
                   </Field>
-                  <Field label={t("fieldCategory")}>
+                  <Field label={t("fieldIndustry")}>
                     <Input disabled={!canEdit} value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
                   </Field>
                 </div>
 
-                <Field label={t("fieldPositioning")}>
+                <Field
+                  label={t("fieldShortDescription")}
+                  description={t("fieldShortDescriptionHint")}
+                >
+                  <Textarea
+                    value={shortDescription}
+                    disabled
+                    className="min-h-[96px] text-sm"
+                  />
+                </Field>
+
+                <Field label={t("fieldLongDescription")}>
                   <Textarea
                     value={canonDraft.positioning}
                     disabled={!canEdit}
@@ -153,7 +173,7 @@ export function BrandCanonEditorPanel({
                     disabled={!canEdit}
                   />
                   <EditableListField
-                    label={t("fieldFeatures")}
+                    label={t("fieldKeyStrengths")}
                     value={canonDraft.features}
                     onChange={(next) => update("features", next)}
                     placeholder={t("fieldFeaturesPlaceholder")}
@@ -193,15 +213,38 @@ export function BrandCanonEditorPanel({
   );
 }
 
-function FieldShell({ label, children }: { label: string; children: ReactNode }) {
+function FieldShell({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: ReactNode;
+}) {
   return (
     <div className="rounded-xl border border-border/60 bg-muted/10 p-4">
       <label className="mb-2 block text-sm font-medium text-primary">{label}</label>
+      {description ? (
+        <p className="mb-3 text-sm text-muted-foreground">{description}</p>
+      ) : null}
       {children}
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <FieldShell label={label}>{children}</FieldShell>;
+function Field({
+  label,
+  description,
+  children,
+}: {
+  label: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <FieldShell label={label} description={description}>
+      {children}
+    </FieldShell>
+  );
 }

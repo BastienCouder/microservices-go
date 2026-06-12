@@ -9,10 +9,7 @@ import { pushWarningToast } from "@/components/ui/toast-actions";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { ProviderApiKeysPanel } from "../provider-keys/provider-api-keys-panel";
-import {
-  PROVIDER_API_KEY_TEXTS,
-  useModelsPanelViewModel,
-} from "../../_lib/models-panel/use-models-panel-view-model";
+import { useModelsPanelViewModel } from "../../_lib/models-panel/use-models-panel-view-model";
 import { ModelCatalogGrid } from "./model-catalog-grid";
 import { ModelsToolbar } from "./models-toolbar";
 import {
@@ -87,7 +84,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
                 onDraftChange={viewModel.updateProviderKeyDraft}
                 onSave={viewModel.saveProviderKey}
                 onDelete={viewModel.deleteProviderKey}
-                texts={PROVIDER_API_KEY_TEXTS}
+                texts={viewModel.providerApiKeyTexts}
               />
             )}
           </div>

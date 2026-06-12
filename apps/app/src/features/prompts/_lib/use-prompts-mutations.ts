@@ -336,6 +336,19 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         return [...retained, ...nextEntries];
       });
       params.setRunningPromptRowIds(nextEntries.map((prompt) => prompt.rowId));
+      return { rowIds: nextEntries.map((prompt) => prompt.rowId) };
+    },
+    onError: (error, promptsToRun, context) => {
+      const failedRowIds = new Set(
+        context?.rowIds ?? promptsToRun.map((prompt) => prompt.id),
+      );
+      params.setPendingPromptRuns((current) =>
+        current.filter((entry) => !failedRowIds.has(entry.rowId)),
+      );
+      params.setRunningPromptRowIds((current) =>
+        current.filter((rowId) => !failedRowIds.has(rowId)),
+      );
+      pushErrorToast(error, t("runPromptApiError"));
     },
     onSuccess: async () => {
       await params.queryClient.invalidateQueries({

@@ -45,12 +45,18 @@ import type {
   OpenRouterModelSyncInput,
 } from "@/features/models/_lib/model-access";
 import { PageHeader } from "@/components/shared/page-header";
+import {
+  loadOrganizationSummaries,
+} from "@/features/organizations/_lib/shared/organization-page-api";
 import { appQueryKeys } from "@/lib/query-keys";
 import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { cn } from "@/lib/utils";
 import {
+  resolvePreferredAdminOrganization,
+} from "@/shared/admin-routing";
+import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -92,12 +98,28 @@ export function AdminModelsTemplate({
     useState(false);
   const [purgeMissingModels, setPurgeMissingModels] = useState(false);
   const [minContext, setMinContext] = useState("");
+  const organizationsQuery = useQuery({
+    queryKey: appQueryKeys.organizations(apiBaseURL, "admin-models"),
+    enabled: apiBaseURL.trim() !== "",
+    queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
+  });
+
+  const requestedOrganizationId = useMemo(
+    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID(),
+    [routeSearch],
+  );
+  const adminOrganization = useMemo(
+    () =>
+      resolvePreferredAdminOrganization(
+        organizationsQuery.data ?? [],
+        requestedOrganizationId,
+      ),
+    [organizationsQuery.data, requestedOrganizationId],
+  );
 
   useEffect(() => {
-    setOrganizationId(
-      readSelectedOrganizationID() || readOrganizationIdFromSearch(routeSearch),
-    );
-  }, [routeSearch]);
+    setOrganizationId(adminOrganization?.publicId || adminOrganization?.id || requestedOrganizationId);
+  }, [adminOrganization?.id, adminOrganization?.publicId, requestedOrganizationId]);
 
   const catalogQuery = useQuery({
     queryKey: appQueryKeys.modelsCatalog(apiBaseURL, organizationId, "all"),
@@ -379,15 +401,16 @@ export function AdminModelsTemplate({
                     const pending =
                       toggleModelMutation.isPending &&
                       toggleModelMutation.variables?.model.id === model.id;
+                    const safeIconPath = toSafeImageAssetPath(model.icon);
 
                     return (
                       <TableRow key={model.id}>
                         <TableCell>
                           <div className="flex min-w-[220px] items-center gap-3">
                             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background p-2">
-                              {model.icon ? (
+                              {safeIconPath ? (
                                 <img
-                                  src={toSafeImageAssetPath(model.icon)}
+                                  src={safeIconPath}
                                   alt=""
                                   className="size-full object-contain"
                                   loading="lazy"

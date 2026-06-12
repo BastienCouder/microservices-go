@@ -4,6 +4,7 @@ import { Eye, EyeOff, KeyRound, Plus, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { findAIProviderAsset } from "@/lib/ai-provider-assets";
 import { cn } from "@/lib/utils";
 
 import type { LLMProviderCredentialStatus } from "../../_lib/model-access";
@@ -20,6 +21,8 @@ export type ProviderApiKeysPanelTexts = {
   placeholder: string;
   save: string;
   saving: string;
+  showKey: string;
+  hideKey: string;
 };
 
 type ProviderApiKeysPanelProps = {
@@ -33,24 +36,6 @@ type ProviderApiKeysPanelProps = {
   onDraftChange: (provider: string, value: string) => void;
   onSave: (provider: string) => void;
   onDelete: (provider: string) => void;
-};
-
-const PROVIDER_ICON_PATHS: Record<string, string> = {
-  anthropic: "/models/anthropic.svg",
-  copilot: "/models/copilot.svg",
-  deepseek: "/models/deepseek.svg",
-  google: "/models/google.svg",
-  groq: "/models/groq.svg",
-  mistral: "/models/mistral.svg",
-  meta: "/models/meta.svg",
-  openai: "/models/openai.svg",
-  openrouter: "/models/openrouter.svg",
-  perplexity: "/models/perplexity.svg",
-  qwen: "/models/qwen.svg",
-  "qwen-color": "/models/qwen.svg",
-  grok: "/models/xai.svg",
-  xai: "/models/xai.svg",
-  zai: "/models/zai.svg",
 };
 
 type ProviderApiKeyCardProps = {
@@ -85,7 +70,7 @@ const ProviderApiKeyCard = memo(function ProviderApiKeyCard({
   onDelete,
 }: ProviderApiKeyCardProps) {
   const canSave = draft.trim() !== "" && !disabled && !isSaving;
-  const iconPath = PROVIDER_ICON_PATHS[requirement.provider];
+  const iconPath = findAIProviderAsset(requirement.provider)?.iconPath;
 
   return (
     <div
@@ -218,9 +203,7 @@ function ProviderKeyForm({
           size="icon"
           className="absolute right-1 top-1 size-8"
           disabled={disabled || isSaving}
-          aria-label={
-            isProviderKeyVisible ? "Masquer la cle API" : "Afficher la cle API"
-          }
+          aria-label={isProviderKeyVisible ? texts.hideKey : texts.showKey}
           onClick={() => onToggleVisibility(requirement.provider)}
         >
           {isProviderKeyVisible ? (

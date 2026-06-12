@@ -8,7 +8,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import {
   readOrganizationIdFromSearch,
   readRouteQueryParam,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
   SELECTED_CONTEXT_CHANGE_EVENT,
 } from "@/shared/selection";
 import {
@@ -48,7 +48,7 @@ function readOrganizationId(routeSearch: string): string {
     return routeOrganizationId;
   }
 
-  return readSelectedOrganizationID();
+  return readSelectedOrganizationPublicID();
 }
 
 type PromptsWorkspaceLoadingStateInput = {
@@ -152,6 +152,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     promptSort,
     promptSortDirection,
   });
+  const hasActiveProjectId = source.activeProjectId.trim() !== "";
 
   useEffect(() => {
     if (source.promptAvailableModels.length === 0) return;
@@ -203,9 +204,9 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     enabled:
       apiBaseURL.trim() !== "" &&
       organizationId.trim() !== "" &&
-      source.activeProjectId !== null,
+      hasActiveProjectId,
     queryFn: ({ signal }) =>
-      loadPromptQuotaUsage(apiBaseURL, source.activeProjectId!, organizationId, { signal }),
+      loadPromptQuotaUsage(apiBaseURL, source.activeProjectId, organizationId, { signal }),
   });
 
   const derived = usePromptsDerivedState({

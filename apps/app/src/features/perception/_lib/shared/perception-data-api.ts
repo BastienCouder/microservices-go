@@ -7,7 +7,11 @@ import {
 import { resolveRuntimeMode, type RuntimeMode } from "@/lib/runtime-mode";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
-import { readOptionalProjectTokenFromSearch } from "@/shared/selection";
+import {
+  readOptionalProjectTokenFromSearch,
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 import { buildPerceptionDerivedData } from "./perception-data-analytics";
 import {
   PerceptionRequestError,
@@ -97,6 +101,12 @@ function normalizeProjectCandidates(value: unknown): ProjectRouteCandidate[] {
 
 function encodeProjectPathSegment(projectId: string): string {
   return encodeURIComponent(projectId);
+}
+
+function resolveOrganizationContext(routeSearch: string): string | undefined {
+  const organizationId =
+    readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
+  return organizationId || undefined;
 }
 
 function clampScore(value: number): number {
@@ -211,6 +221,7 @@ export async function loadPerceptionData(
 ): Promise<PerceptionLoadResult> {
   const mode = resolveRuntimeMode(routeSearch);
   let projectId = readOptionalProjectTokenFromSearch(routeSearch);
+  const organizationId = resolveOrganizationContext(routeSearch);
 
   if (apiBaseURL.trim() === "") {
     throw new PerceptionRequestError(0, "api base url is empty");
@@ -220,6 +231,7 @@ export async function loadPerceptionData(
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",
+        organizationId,
         signal: options?.signal,
       }),
       "projects",
@@ -240,6 +252,7 @@ export async function loadPerceptionData(
     apiRoutes.projects.get(encodeProjectPathSegment(projectId)),
     {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     },
   );
@@ -248,6 +261,7 @@ export async function loadPerceptionData(
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",
+        organizationId,
         signal: options?.signal,
       }),
       "projects",
@@ -261,6 +275,7 @@ export async function loadPerceptionData(
         apiRoutes.projects.get(encodeProjectPathSegment(projectId)),
         {
           method: "GET",
+          organizationId,
           signal: options?.signal,
         },
       );
@@ -272,14 +287,17 @@ export async function loadPerceptionData(
   const [modelsRes, competitorsRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(encodedProjectId), {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.competitors(encodedProjectId), {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.perception(encodedProjectId, { includeDashboard: true }), {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
   ]);
@@ -294,6 +312,7 @@ export async function loadPerceptionData(
     monitoringPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.monitoring(encodedProjectId), {
         method: "GET",
+        organizationId,
         signal: options?.signal,
       }),
       "monitoring",

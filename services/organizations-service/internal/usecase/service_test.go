@@ -38,6 +38,9 @@ func newFakeRepo() *fakeRepo {
 func (f *fakeRepo) Create(_ context.Context, organization *domain.Organization) error {
 	organization.ID = f.nextOrgID
 	f.nextOrgID++
+	if organization.PublicID == "" {
+		organization.PublicID = "org_test"
+	}
 	clone := *organization
 	f.organizations[organization.ID] = &clone
 	return nil
@@ -50,6 +53,17 @@ func (f *fakeRepo) GetByID(_ context.Context, id int64) (*domain.Organization, e
 	}
 	clone := *org
 	return &clone, nil
+}
+
+func (f *fakeRepo) GetByPublicID(_ context.Context, publicID string) (*domain.Organization, error) {
+	for _, org := range f.organizations {
+		if org.PublicID != publicID {
+			continue
+		}
+		clone := *org
+		return &clone, nil
+	}
+	return nil, domain.ErrOrganizationNotFound
 }
 
 func (f *fakeRepo) UpdateName(_ context.Context, id int64, name string) (*domain.Organization, error) {

@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
-import { useI18nScope } from "@/shared/hooks/use-i18n";
+import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
+import { Download } from "lucide-react";
 import type { FilterHeroInsight } from "../../_lib/filters/filter-hero-insight";
 import { useFiltersPanelViewModel } from "../../_lib/filters/use-filters-panel-view-model";
 import { CompetitorFilterSection } from "./competitor-filter-section";
@@ -55,6 +56,9 @@ type FiltersPanelViewModel = {
   showUniqueModelFilters: boolean;
   onModelFilterModeChange: (value: boolean) => void;
   heroInsight: FilterHeroInsight;
+  canExport: boolean;
+  exportDisabled: boolean;
+  handleExportMonitoringData: () => void;
 };
 
 export function FiltersPanel({ className }: FiltersPanelProps) {
@@ -81,9 +85,13 @@ export function FiltersPanel({ className }: FiltersPanelProps) {
     showUniqueModelFilters,
     onModelFilterModeChange,
     heroInsight,
+    canExport,
+    exportDisabled,
+    handleExportMonitoringData,
   }: FiltersPanelViewModel = useFiltersPanelViewModel();
 
   const content = useI18nScope("monitoring-filters-panel");
+  const { t } = useScopedI18n("monitoring-activity-panel");
 
   if (loading) {
     return <Template />;
@@ -93,12 +101,26 @@ export function FiltersPanel({ className }: FiltersPanelProps) {
     "h-8 min-w-[9rem] justify-center px-3 text-xs lg:h-6 lg:min-w-[7.5rem] lg:px-2 lg:text-xs",
     !showResetFilters && "pointer-events-none invisible",
   );
+  const heroActions = canExport ? (
+    <div className="flex flex-wrap items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        className="border-white/20 bg-white/10 text-white hover:bg-white/16 hover:text-white"
+        disabled={exportDisabled}
+        onClick={handleExportMonitoringData}
+      >
+        <Download className="size-4" />
+        {t("exportExcel")}
+      </Button>
+    </div>
+  ) : null;
 
   return (
     <div className={cn("flex h-full min-h-0 flex-col", className)}>
       <div className="min-h-0 flex-1 overflow-y-auto p-2 no-scrollbar lg:min-h-0 lg:p-2">
         <div className="flex flex-col gap-5 pb-4">
-          <FilterHeroInsightCard insight={heroInsight} />
+          <FilterHeroInsightCard insight={heroInsight} actions={heroActions} />
 
           <div className="space-y-6">
             <div className="flex items-start justify-between gap-2">

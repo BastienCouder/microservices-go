@@ -2,6 +2,8 @@ import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
 import type { PromptItem } from "./types";
 
+const MANUAL_PROMPT_ANALYSIS_TIMEOUT_MS = 120_000;
+
 export type RunnablePrompt = Pick<PromptItem, "id" | "sourcePromptId" | "prompt" | "models"> & {
   modelCreditCostSum?: number;
 };
@@ -98,6 +100,7 @@ export async function startPromptAnalysis({
     {
       method: "POST",
       organizationId,
+      timeoutMs: MANUAL_PROMPT_ANALYSIS_TIMEOUT_MS,
       body: JSON.stringify(buildStartPromptAnalysisPayload({ projectId, prompt, now })),
     },
   );

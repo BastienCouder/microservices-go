@@ -24,6 +24,7 @@ var (
 
 type Organization struct {
 	ID              int64
+	PublicID        string
 	Name            string
 	OwnerIdentityID int64
 	CreatedAt       time.Time

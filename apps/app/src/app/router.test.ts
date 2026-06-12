@@ -20,4 +20,13 @@ describe("app router", () => {
     expect(source.includes('pathname: "/content-optimizer"')).toBe(true);
     expect(source.includes("const CrawlerPage")).toBe(false);
   });
+
+  test("mounts admin routes through obfuscated paths and keeps legacy redirects", () => {
+    expect(source.includes("ADMIN_ROUTE_ROOT")).toBe(true);
+    expect(source.includes("adminRoutePaths.models")).toBe(true);
+    expect(source.includes("adminRoutePaths.organizations")).toBe(true);
+    expect(source.includes("adminRoutePaths.pricing")).toBe(true);
+    expect(source.includes("legacyAdminRoutePaths.models")).toBe(true);
+    expect(source.includes('path="/admin/models"')).toBe(false);
+  });
 });

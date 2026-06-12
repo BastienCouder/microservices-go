@@ -71,7 +71,12 @@ func main() {
 	mux := http.NewServeMux()
 	h.Register(mux)
 
-	server := httpsrv.NewServer(cfg.HTTPAddr, mux)
+	server := httpsrv.NewServer(
+		cfg.HTTPAddr,
+		mux,
+		httpsrv.WithReadTimeout(10*time.Second),
+		httpsrv.WithWriteTimeout(2*time.Minute),
+	)
 	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "api-gateway", promhttp.Handler())
 
 	go func() {

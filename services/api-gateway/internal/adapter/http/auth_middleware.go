@@ -42,7 +42,21 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			return
 		}
 
-		if orgID, err := organizationIDFromHeader(r2.Header.Get("X-Organization-ID")); err == nil {
+		rawOrganizationRef := strings.TrimSpace(r2.Header.Get("X-Organization-ID"))
+		if orgID, err := organizationIDFromHeader(rawOrganizationRef); err == nil {
+			claims.Organization = orgID
+		} else if claims.UserID > 0 && rawOrganizationRef != "" {
+			orgID, err := h.resolveScopedOrganizationID(r.Context(), claims.UserID, rawOrganizationRef)
+			if err != nil {
+				if isDependencyUnavailableError(err) {
+					writeJSONError(w, http.StatusServiceUnavailable, "organization dependency unavailable")
+					return
+				}
+				writeJSONError(w, http.StatusForbidden, "organization required")
+				return
+			}
+			r2.Header.Set("X-Organization-ID", strconv.FormatInt(orgID, 10))
+			r2.Header.Set("X-Organization-Public-ID", rawOrganizationRef)
 			claims.Organization = orgID
 		} else if claims.UserID > 0 && requiresOrganizationContext(r2) {
 			orgID, err := h.resolveOrganizationID(r.Context(), claims.UserID)

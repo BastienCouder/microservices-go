@@ -3,7 +3,7 @@ function getWebAuthURL(): string {
   if (typeof value === "string" && value.trim() !== "") {
     return value.trim();
   }
-  return "http://localhost:30000/auth";
+  return "http://localhost:30000/login";
 }
 
 export function navigateToWebAuth(): void {

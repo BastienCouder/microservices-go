@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import {
   ArrowDownRight,
   ArrowRight,
@@ -27,8 +28,10 @@ function getTrendArrow(tone: PerceptionHeroInsight["momentumTone"]) {
 
 export function PerceptionHeroInsightCard({
   insight,
+  actions,
 }: {
   insight: PerceptionHeroInsight;
+  actions?: ReactNode;
 }) {
   const MomentumIcon = getMomentumIcon(insight.momentumTone);
   const TrendArrow = getTrendArrow(insight.momentumTone);
@@ -128,6 +131,12 @@ export function PerceptionHeroInsightCard({
         <p className="relative z-10 mt-2 text-sm leading-relaxed text-primary-foreground/72">
           {insight.microCopy}
         </p>
+      ) : null}
+
+      {actions ? (
+        <div className="relative z-10 mt-4 border-t border-white/12 pt-4">
+          {actions}
+        </div>
       ) : null}
     </section>
   );

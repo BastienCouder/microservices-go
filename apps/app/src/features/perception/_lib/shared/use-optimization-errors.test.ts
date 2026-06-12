@@ -25,4 +25,10 @@ describe("useOptimizationErrors", () => {
     expect(source.includes("queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),")).toBe(true);
     expect(source.includes("queryFn: ({ signal }) => loadOptimizationErrors(apiBaseURL, routeSearch, { signal })")).toBe(false);
   });
+
+  test("scopes the optimization errors query cache by organization", () => {
+    expect(
+      source.includes("appQueryKeys.optimizationErrors(\n      apiBaseURL,\n      projectId,\n      organizationId || null,"),
+    ).toBe(true);
+  });
 });

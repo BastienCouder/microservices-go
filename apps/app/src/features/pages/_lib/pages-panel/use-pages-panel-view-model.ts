@@ -9,6 +9,10 @@ import {
   type MonitoringData,
 } from "@/features/monitoring/_lib/shared/monitoring-data";
 import { appQueryKeys } from "@/lib/query-keys";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 
 import { buildPagesPanelViewModel } from "./page-insights";
 import type { PageModelBadge } from "./types";
@@ -23,12 +27,21 @@ export function usePagesPanelViewModel({
   routeSearch,
 }: UsePagesPanelViewModelInput) {
   const queryContext = useMemo(() => getMonitoringQueryContext(routeSearch), [routeSearch]);
+  const organizationId = useMemo(
+    () => readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID() || null,
+    [routeSearch],
+  );
   const [search, setSearch] = useState("");
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [selectedPageUrl, setSelectedPageUrl] = useState<string | null>(null);
 
   const monitoringQuery = useQuery({
-    queryKey: appQueryKeys.monitoring(apiBaseURL, queryContext.projectId, queryContext.mode),
+    queryKey: appQueryKeys.monitoring(
+      apiBaseURL,
+      queryContext.projectId,
+      organizationId,
+      queryContext.mode,
+    ),
     enabled: apiBaseURL.trim() !== "",
     queryFn: ({ signal }) => loadMonitoringData(apiBaseURL, routeSearch, { signal }),
   });

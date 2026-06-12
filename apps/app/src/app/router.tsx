@@ -6,6 +6,11 @@ import { MonitoringPage } from "@/features/monitoring/index";
 import { ModelsPage } from "@/features/models/index";
 import { PerceptionPage } from "@/features/perception";
 import { PromptsPage } from "@/features/prompts/index";
+import {
+  ADMIN_ROUTE_ROOT,
+  adminRoutePaths,
+  legacyAdminRoutePaths,
+} from "@/shared/admin-routing";
 
 
 
@@ -151,7 +156,7 @@ export function AppRouter({
         }
       />
       <Route
-        path="/admin/models"
+        path={adminRoutePaths.models}
         element={
           <Suspense fallback={null}>
             <AdminModelsPage
@@ -162,7 +167,16 @@ export function AppRouter({
         }
       />
       <Route
-        path="/admin/organizations"
+        path={ADMIN_ROUTE_ROOT}
+        element={
+          <Navigate
+            replace
+            to={{ pathname: adminRoutePaths.organizations, search: routeSearch }}
+          />
+        }
+      />
+      <Route
+        path={adminRoutePaths.organizations}
         element={
           <Suspense fallback={null}>
             <AdminOrganizationsPage
@@ -173,7 +187,7 @@ export function AppRouter({
         }
       />
       <Route
-        path="/admin/pricing"
+        path={adminRoutePaths.pricing}
         element={
           <Suspense fallback={null}>
             <AdminPricingPage
@@ -181,6 +195,33 @@ export function AppRouter({
               routeSearch={routeSearch}
             />
           </Suspense>
+        }
+      />
+      <Route
+        path={legacyAdminRoutePaths.models}
+        element={
+          <Navigate
+            replace
+            to={{ pathname: adminRoutePaths.models, search: routeSearch }}
+          />
+        }
+      />
+      <Route
+        path={legacyAdminRoutePaths.organizations}
+        element={
+          <Navigate
+            replace
+            to={{ pathname: adminRoutePaths.organizations, search: routeSearch }}
+          />
+        }
+      />
+      <Route
+        path={legacyAdminRoutePaths.pricing}
+        element={
+          <Navigate
+            replace
+            to={{ pathname: adminRoutePaths.pricing, search: routeSearch }}
+          />
         }
       />
       <Route

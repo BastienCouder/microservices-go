@@ -16,7 +16,8 @@ RUN VITE_API_BASE_URL="${VITE_API_BASE_URL}" \
 FROM nginx:stable-alpine AS production
 
 ENV API_GATEWAY_INTERNAL_URL=http://api-gateway:8080
-ENV WEB_AUTH_URL=http://localhost:3000/auth
+ENV WEB_AUTH_URL=http://localhost:3000/login
+ENV APP_PUBLIC_URL=http://localhost:30004
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx/default.conf /etc/nginx/templates/default.conf.template

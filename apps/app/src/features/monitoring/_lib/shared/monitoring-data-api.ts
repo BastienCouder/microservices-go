@@ -7,7 +7,11 @@ import {
 import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { attachStableSlugs, findBySlugOrId } from "@/shared/public-slugs";
-import { readOptionalProjectTokenFromSearch } from "@/shared/selection";
+import {
+  readOptionalProjectTokenFromSearch,
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 import {
   createEmptyMonitoringData,
   MonitoringRequestError,
@@ -194,6 +198,12 @@ export function getMonitoringQueryContext(routeSearch: string): MonitoringQueryC
   };
 }
 
+function resolveOrganizationContext(routeSearch: string): string | undefined {
+  const organizationId =
+    readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
+  return organizationId || undefined;
+}
+
 function encodeProjectPathSegment(projectId: string): string {
   return encodeURIComponent(projectId);
 }
@@ -327,6 +337,7 @@ export async function loadMonitoringData(
 ): Promise<MonitoringLoadResult> {
   const { mode, projectId: routeProjectId } = getMonitoringQueryContext(routeSearch);
   const fallback = createEmptyMonitoringData();
+  const organizationId = resolveOrganizationContext(routeSearch);
 
   if (apiBaseURL.trim() === "") {
     return { data: fallback, projectId: null, mode };
@@ -338,6 +349,7 @@ export async function loadMonitoringData(
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",
+        organizationId,
         signal: options?.signal,
       }),
       "projects",
@@ -359,6 +371,7 @@ export async function loadMonitoringData(
     `/projects/${encodeProjectPathSegment(projectId)}`,
     {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     },
   );
@@ -371,6 +384,7 @@ export async function loadMonitoringData(
     const projectsPayload = unwrapRequiredEnvelope(
       await gatewayJSON<unknown>(apiBaseURL, "/projects", {
         method: "GET",
+        organizationId,
         signal: options?.signal,
       }),
       "projects",
@@ -384,6 +398,7 @@ export async function loadMonitoringData(
         `/projects/${encodeProjectPathSegment(projectId)}`,
         {
           method: "GET",
+          organizationId,
           signal: options?.signal,
         },
       );
@@ -395,14 +410,17 @@ export async function loadMonitoringData(
   const [modelsRes, competitorsRes, monitoringRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/models`, {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/competitors`, {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.analysis.monitoring(encodedProjectId), {
       method: "GET",
+      organizationId,
       signal: options?.signal,
     }),
   ]);

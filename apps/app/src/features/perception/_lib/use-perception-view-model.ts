@@ -3,13 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { pushWarningToast } from "@/components/ui/toast-actions";
+import { getAIProviderIconPath } from "@/lib/ai-provider-assets";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadPromptQuotaUsage } from "@/features/prompts/_lib/prompt-quota";
 import { useClientExportAccess } from "@/shared/export-entitlements";
 import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 import {
   derivePerceptionHeatmapFromResponses,
@@ -63,7 +64,7 @@ function buildFallbackModelCatalog(initialData: PerceptionViewData) {
     provider: "",
     providerModelId: modelName,
     description: modelName,
-    iconPath: "/models/openai.svg",
+    iconPath: getAIProviderIconPath(modelName),
     live: true,
     creditCost: 1,
   }));
@@ -117,7 +118,7 @@ export function usePerceptionViewModel(
   const organizationId = useMemo(
     () =>
       readOrganizationIdFromSearch(options.routeSearch ?? "") ||
-      readSelectedOrganizationID(),
+      readSelectedOrganizationPublicID(),
     [options.routeSearch],
   );
 

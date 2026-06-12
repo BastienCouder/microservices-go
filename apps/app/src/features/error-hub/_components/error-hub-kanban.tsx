@@ -254,9 +254,9 @@ export function ErrorHubKanban({
                   <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
                     {tErrorHub("boardByStatus")}
                   </TabsTrigger>
-                  <TabsTrigger value="content" className="px-3 text-xs md:text-sm">
+              {/*    <TabsTrigger value="content" className="px-3 text-xs md:text-sm">
                     {tErrorHub("boardByContent")}
-                  </TabsTrigger>
+                  </TabsTrigger> */}
                 </TabsList>
               </Tabs>
             </div>
@@ -265,7 +265,7 @@ export function ErrorHubKanban({
       </div>
 
       <main className="min-h-0 flex-1 overflow-visible lg:overflow-hidden">
-        {boardView === "content" ? (
+     {/*   {boardView === "content" ? (
           <div className="min-h-0 lg:h-full lg:overflow-y-auto">
             <ErrorHubContentBriefsTab
               actionStatusesByErrorId={actionStatusesByErrorId}
@@ -279,7 +279,7 @@ export function ErrorHubKanban({
               savingErrorIds={savingErrorIds}
             />
           </div>
-        ) : (
+        ) : ( */}
           <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
             {columns.map((column, columnIndex) => (
               <ErrorHubColumn
@@ -302,7 +302,7 @@ export function ErrorHubKanban({
               />
             ))}
           </div>
-        )}
+       {/* )} */}
       </main>
 
       <ErrorHubDetailsPanel

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,7 +11,7 @@ import {
 } from "@/hooks/use-onboarding";
 import {
   buildScopedHref,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
   storeSelectedProjectContext,
 } from "@/shared/selection";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -40,6 +41,7 @@ export function StepAnalysis({
   } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [progress, setProgress] = useState(10);
   const [createdProjectId, setCreatedProjectId] = useState("");
   const [creationError, setCreationError] = useState<string | null>(null);
@@ -77,7 +79,7 @@ export function StepAnalysis({
     const organizationId =
       providedOrganizationId !== undefined
         ? providedOrganizationId.trim()
-        : readSelectedOrganizationID();
+        : readSelectedOrganizationPublicID();
     void createOnboardingProject(apiBaseURL, {
       organizationId,
       organizationName,
@@ -94,7 +96,6 @@ export function StepAnalysis({
         storeSelectedProjectContext({
           organizationId: projectOrganizationId,
           projectId,
-          projectToken: projectSlug,
         });
         clearPersistedOnboardingState();
         setCreatedProjectId(projectSlug);
@@ -103,7 +104,15 @@ export function StepAnalysis({
           pushWarningToast(warnings.join(" "));
         }
         window.setTimeout(() => {
-          navigate(buildScopedHref("/monitoring", { project: projectSlug }));
+          queryClient.removeQueries({
+            queryKey: ["route-project-guard", apiBaseURL],
+          });
+          navigate(
+            buildScopedHref("/monitoring", {
+              project: projectSlug,
+              organizationId: projectOrganizationId,
+            }),
+          );
         }, 250);
       })
       .catch((error) => {
@@ -127,6 +136,7 @@ export function StepAnalysis({
     selectedModels,
     selectedPrompts,
     analysisRetryErrorMessage,
+    queryClient,
     navigate,
     websiteUrl,
   ]);

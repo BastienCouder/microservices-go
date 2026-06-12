@@ -14,6 +14,7 @@ const HOP_BY_HOP_HEADERS = new Set([
   "transfer-encoding",
   "upgrade",
 ]);
+
 const FORWARDED_REQUEST_HEADERS = [
   "accept",
   "accept-language",
@@ -36,8 +37,8 @@ function getKratosProxyURLs(): string[] {
           .map((entry) => entry.trim().replace(/\/$/, ""))
           .filter(Boolean)
       : [];
-  const merged = [...configured, ...DEFAULT_KRATOS_PROXY_URLS];
-  return [...new Set(merged)];
+
+  return [...new Set([...configured, ...DEFAULT_KRATOS_PROXY_URLS])];
 }
 
 function isRetryableNetworkError(error: unknown): boolean {
@@ -66,6 +67,7 @@ function buildHeaders(request: NextRequest, baseURL: string): Headers {
       headers.set(key, value);
     }
   }
+
   headers.set("host", new URL(baseURL).host);
   headers.set("x-forwarded-host", request.headers.get("host") ?? request.nextUrl.host);
   headers.set("x-forwarded-proto", request.nextUrl.protocol.replace(":", ""));
@@ -112,10 +114,12 @@ function buildFallbackRedirect(request: NextRequest): Response {
   const url = request.nextUrl.clone();
   url.pathname = "/login";
   url.searchParams.set("error", "auth_proxy_unavailable");
+
   const returnTo = request.nextUrl.searchParams.get("return_to");
   if (returnTo) {
     url.searchParams.set("return_to", returnTo);
   }
+
   return Response.redirect(url, 307);
 }
 
@@ -130,6 +134,7 @@ async function proxyToKratos(request: NextRequest, path: string[]): Promise<Resp
     try {
       const resolvedBaseURL = await resolveBaseURL(baseURL);
       const targetURL = `${resolvedBaseURL}/${pathname}${request.nextUrl.search}`;
+
       for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
         try {
           response = await fetchFromKratos(request, targetURL, baseURL, body);
@@ -142,6 +147,7 @@ async function proxyToKratos(request: NextRequest, path: string[]): Promise<Resp
           await wait(RETRY_DELAYS_MS[attempt]);
         }
       }
+
       if (response) {
         break;
       }

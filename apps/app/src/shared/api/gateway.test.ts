@@ -1,8 +1,22 @@
 import { afterEach, describe, expect, test } from "bun:test";
 
 import { gatewayJSON, toGatewayError, unwrapGatewayPayload } from "./gateway";
+import {
+  SELECTED_ORG_KEY,
+  storeSelectedOrganizationContext,
+} from "@/shared/selection";
 
 const originalFetch = globalThis.fetch;
+
+function getTestStorage(): Storage | undefined {
+  if (typeof window !== "undefined") {
+    return window.localStorage;
+  }
+  if ("localStorage" in globalThis) {
+    return globalThis.localStorage;
+  }
+  return undefined;
+}
 
 function jsonResponse(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -13,6 +27,8 @@ function jsonResponse(status: number, body: unknown) {
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  getTestStorage()?.removeItem(SELECTED_ORG_KEY);
+  getTestStorage()?.removeItem("selected-organization-internal-id");
 });
 
 describe("gatewayJSON", () => {
@@ -28,6 +44,46 @@ describe("gatewayJSON", () => {
     });
 
     expect(acceptHeader).toBe("application/json");
+  });
+
+  test("sends the provided organization id verbatim in gateway headers", async () => {
+    const storage = new Map<string, string>();
+    const originalWindow = globalThis.window;
+    let organizationHeader = "";
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          setItem: (key: string, value: string) => {
+            storage.set(key, value);
+          },
+          removeItem: (key: string) => {
+            storage.delete(key);
+          },
+        },
+        dispatchEvent: () => true,
+      },
+    });
+    storeSelectedOrganizationContext({
+      organizationId: "2",
+      publicId: "org_a1b2c3d4",
+    });
+    globalThis.fetch = (async (_url, init) => {
+      organizationHeader = new Headers(init?.headers).get("X-Organization-ID") ?? "";
+      return jsonResponse(200, { success: true, data: { loaded: true } });
+    }) as typeof fetch;
+
+    await gatewayJSON<{ loaded: boolean }>("http://api.test", "/projects", {
+      method: "GET",
+      organizationId: "2",
+    });
+
+    expect(organizationHeader).toBe("2");
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
   });
 
   test("returns a timeout result when the gateway request hangs", async () => {
@@ -51,7 +107,8 @@ describe("gatewayJSON", () => {
     expect(response).toEqual({
       ok: false,
       status: 0,
-      error: "La requête a expiré. Réessaie.",
+      error: "The request timed out. Please try again.",
+      details: null,
       rawError: "request timed out",
       kind: "timeout",
     });
@@ -73,7 +130,7 @@ describe("gatewayJSON", () => {
     expect(response).toEqual({
       ok: false,
       status: 502,
-      error: "Le service est temporairement indisponible.",
+      error: "The service is temporarily unavailable.",
       rawError: "request failed",
       kind: "dependency_unavailable",
       details: null,
@@ -123,9 +180,9 @@ describe("gatewayJSON", () => {
     expect(response).toEqual({
       ok: false,
       status: 503,
-      error: "auth dependency unavailable",
+      error: "The service is temporarily unavailable.",
       rawError: "auth dependency unavailable",
-      kind: "unknown",
+      kind: "dependency_unavailable",
       details: { error: "auth dependency unavailable" },
     });
     expect(calls).toBe(1);
@@ -155,14 +212,14 @@ describe("gatewayJSON", () => {
       expect(result.code).toBe("invalid_request");
       expect(result.kind).toBe("validation");
       expect(result.rawError).toBe("invalid subscription: seats must be positive");
-      expect(result.error).toBe("Vérifie les informations saisies.");
+      expect(result.error).toBe("Check the information you entered.");
 
       const error = toGatewayError(result, "fallback");
       expect(error.name).toBe("GatewayError");
       expect(error.status).toBe(400);
       expect(error.code).toBe("invalid_request");
       expect(error.kind).toBe("validation");
-      expect(error.message).toBe("Vérifie les informations saisies.");
+      expect(error.message).toBe("Check the information you entered.");
     }
   });
 
@@ -186,7 +243,7 @@ describe("gatewayJSON", () => {
       expect(result.code).toBe("rate_limited");
       expect(result.kind).toBe("rate_limited");
       expect(result.rawError).toBe("rate limit exceeded");
-      expect(result.error).toBe("Trop de requêtes. Réessaie dans un instant.");
+      expect(result.error).toBe("Too many requests. Please try again in a moment.");
     }
   });
 
@@ -210,7 +267,7 @@ describe("gatewayJSON", () => {
       expect(result.code).toBe("quota_exceeded");
       expect(result.kind).toBe("quota_exceeded");
       expect(result.rawError).toBe("quota exceeded");
-      expect(result.error).toBe("Tu n'as plus de crédits disponibles.");
+      expect(result.error).toBe("You do not have any credits left.");
     }
   });
 
@@ -247,9 +304,9 @@ describe("gatewayJSON", () => {
     if (!result.ok) {
       expect(result.status).toBe(409);
       expect(result.code).toBe(undefined);
-      expect(result.kind).toBe("unknown");
+      expect(result.kind).toBe("conflict");
       expect(result.rawError).toBe("legacy failure");
-      expect(result.error).toBe("legacy failure");
+      expect(result.error).toBe("This action conflicts with the current state.");
     }
   });
 });

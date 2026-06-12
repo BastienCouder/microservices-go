@@ -586,6 +586,10 @@ func (h *Handler) getLatestContentOptimizerCrawl(w http.ResponseWriter, r *http.
 
 	snapshot, err := h.svc.GetLatestContentOptimizerCrawl(r.Context(), projectID, organizationID)
 	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			writeSuccess(w, http.StatusOK, nil)
+			return
+		}
 		h.writeUsecaseError(w, err)
 		return
 	}

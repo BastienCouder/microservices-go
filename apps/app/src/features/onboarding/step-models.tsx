@@ -41,9 +41,12 @@ const EMPTY_MODEL_CATALOG: ModelCatalogItem[] = [];
 const EMPTY_PROVIDER_CREDENTIALS: LLMProviderCredentialStatus[] = [];
 const ONBOARDING_MODEL_SELECTION_LIMIT = 3;
 
-function formatCreditCost(creditCost: number) {
+function formatCreditCost(
+  creditCost: number,
+  t: (key: string, options?: any) => string,
+) {
   const normalized = Math.max(1, Math.floor(creditCost));
-  return `${normalized} credit${normalized > 1 ? "s" : ""}`;
+  return t("creditCost", { count: normalized });
 }
 
 function sameStringArray(left: string[], right: string[]): boolean {
@@ -57,7 +60,7 @@ export function StepModels({
   apiBaseURL,
   organizationId: providedOrganizationId,
   hideBack = false,
-  nextLabel = "Start audit",
+  nextLabel,
 }: StepModelsProps) {
   const { selectedModels, setSelectedModels, nextStep, prevStep } =
     useOnboarding();
@@ -414,6 +417,8 @@ export function StepModels({
       placeholder: t("modelsDeveloperKeysPlaceholder"),
       save: t("modelsDeveloperKeysSave"),
       saving: t("modelsDeveloperKeysSaving"),
+      showKey: t("showApiKey"),
+      hideKey: t("hideApiKey"),
     }),
     [t],
   );
@@ -469,7 +474,7 @@ export function StepModels({
               modelGroup={model.modelGroup}
               size="large"
               disabled={disabled}
-              metaLabel={formatCreditCost(model.creditCost)}
+              metaLabel={formatCreditCost(model.creditCost, t)}
               disabledLabel={
                 disabledByApiKey
                   ? t("modelsDeveloperModelDisabled")
@@ -485,7 +490,7 @@ export function StepModels({
   if (normalizedApiBaseURL === "") {
     content = (
       <div className="rounded-md border border-dashed border-border/70 px-4 py-8 text-sm text-muted-foreground">
-        Configuration API manquante.
+        {t("missingApiConfiguration")}
       </div>
     );
   } else if (catalogQuery.isLoading) {
@@ -524,7 +529,7 @@ export function StepModels({
           onBack={prevStep}
           onNext={nextStep}
           nextDisabled={!canContinue}
-          nextLabel={nextLabel === "Start audit" ? t("startAudit") : nextLabel}
+          nextLabel={nextLabel ?? t("startAudit")}
         />
       }
     >

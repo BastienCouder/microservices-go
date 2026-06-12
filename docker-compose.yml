@@ -41,7 +41,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: http://localhost:50000
-        VITE_WEB_AUTH_URL: http://localhost:30000/auth
+        VITE_WEB_AUTH_URL: http://localhost:30000/login
     image: microservices-go/app:prod
     restart: unless-stopped
     networks:
@@ -49,7 +49,8 @@ services:
       - backend-net
     environment:
       API_GATEWAY_INTERNAL_URL: http://api-gateway:8080
-      WEB_AUTH_URL: http://localhost:30000/auth
+      APP_PUBLIC_URL: http://localhost:30004
+      WEB_AUTH_URL: http://localhost:30000/login
     ports:
       - "127.0.0.1:30004:8080"
     deploy:
@@ -588,7 +589,7 @@ services:
       BILLING_SERVICE_URL: http://billing-service:8086
       ANALYSIS_SERVICE_GRPC_ADDR: analysis-service:9089
       IA_SERVICE_GRPC_ADDR: ia-service:9091
-      PROJECT_IA_PROMPT_TIMEOUT_MS: "30000"
+      PROJECT_IA_PROMPT_TIMEOUT_MS: "90000"
       RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
       RABBITMQ_EXCHANGE: microservices.events
       RABBITMQ_PROJECT_FINALIZE_QUEUE: project.finalize
@@ -714,7 +715,7 @@ services:
       IA_PROVIDER_API_KEY_FILE: /run/secrets/openrouter_api_key
       IA_PROVIDER_HTTP_REFERER: http://localhost:30004
       IA_PROVIDER_APP_NAME: microservices-go
-      IA_PROVIDER_TIMEOUT_MS: "30000"
+      IA_PROVIDER_TIMEOUT_MS: "90000"
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       GRPC_ALLOW_INSECURE: "true"
@@ -1115,7 +1116,7 @@ services:
       WEB_PUBLIC_URL: http://localhost:30000
       APP_PUBLIC_URL: http://localhost:30004
       DOC_PUBLIC_URL: http://localhost:30001
-      WEB_AUTH_URL: http://localhost:30000/auth
+      WEB_AUTH_URL: http://localhost:30000/login
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
@@ -1146,7 +1147,7 @@ services:
       WEB_PUBLIC_URL: http://localhost:30000
       APP_PUBLIC_URL: http://localhost:30004
       DOC_PUBLIC_URL: http://localhost:30001
-      WEB_AUTH_URL: http://localhost:30000/auth
+      WEB_AUTH_URL: http://localhost:30000/login
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri

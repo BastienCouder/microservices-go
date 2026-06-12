@@ -13,9 +13,10 @@ describe("perception client layout", () => {
     expect(source.includes("savingErrorIds={viewModel.savingErrorIds}")).toBe(true);
   });
 
-  test("adds an Excel export action next to the perception analysis button", () => {
+  test("passes the perception analysis and export actions into the hero insight card", () => {
     expect(source.includes("Export Excel")).toBe(true);
     expect(source.includes("Download")).toBe(true);
+    expect(source.includes("heroActions={heroActions}")).toBe(true);
     expect(source.includes("viewModel.canExport")).toBe(true);
     expect(source.includes("viewModel.exportDisabled")).toBe(true);
     expect(source.includes("viewModel.handleExportPerceptionData(periodLabel)")).toBe(true);

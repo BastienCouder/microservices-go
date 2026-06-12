@@ -118,23 +118,29 @@ function PageModelsPreview({ page }: { page: PageInsight }) {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <div className="flex -space-x-1">
-        {visibleModels.map((model) => (
-          <span
-            key={model.id}
-            title={model.label}
-            className="grid h-8 w-8 place-items-center rounded-md border border-border/70 bg-background p-1 shadow-sm"
-          >
-            <img
-              src={toSafeImageAssetPath(model.iconPath)}
-              alt=""
-              width={16}
-              height={16}
-              loading="lazy"
-              decoding="async"
-              className="h-4 w-4 object-contain"
-            />
-          </span>
-        ))}
+        {visibleModels.map((model) => {
+          const safeIconPath = toSafeImageAssetPath(model.iconPath);
+
+          return (
+            <span
+              key={model.id}
+              title={model.label}
+              className="grid h-8 w-8 place-items-center rounded-md border border-border/70 bg-background p-1 shadow-sm"
+            >
+              {safeIconPath ? (
+                <img
+                  src={safeIconPath}
+                  alt=""
+                  width={16}
+                  height={16}
+                  loading="lazy"
+                  decoding="async"
+                  className="h-4 w-4 object-contain"
+                />
+              ) : null}
+            </span>
+          );
+        })}
       </div>
       {page.models.length > visibleModels.length ? (
         <span className="text-xs font-medium text-muted-foreground">
@@ -168,7 +174,7 @@ function PagesModelsFilter({
     id: model.id,
     label: model.label,
     description: t("modelCoverageDescription"),
-    iconSrc: toSafeImageAssetPath(model.iconPath),
+    iconSrc: toSafeImageAssetPath(model.iconPath) || null,
     imageAlt: model.label,
   }));
 

@@ -4,13 +4,15 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { appQueryKeys } from "@/lib/query-keys";
 import { invalidateOrganizationScope } from "@/shared/api/query-refresh";
 import type { UserProfile } from "@/shared/models";
-import { findBySlugOrId } from "@/shared/public-slugs";
+import { findBySlugIdOrPublicId } from "@/shared/public-slugs";
 import {
   buildScopedHref,
+  clearSelectedProjectContext,
   readOrganizationIdFromSearch,
   readRouteQueryParam,
   SELECTED_CONTEXT_CHANGE_EVENT,
   readSelectedOrganizationID,
+  storeSelectedOrganizationContext,
   storeSelectedOrganizationID,
 } from "@/shared/selection";
 import {
@@ -53,6 +55,7 @@ export type OrganizationsPageViewModel = {
   actionError: string | null;
   notice: string | null;
   isInitialLoading: boolean;
+  organizations: OrganizationSummary[];
   selectedOrganization: OrganizationSummary | null;
   resources: OrganizationResources;
   currentUserId: string;
@@ -70,6 +73,7 @@ export type OrganizationsPageViewModel = {
   removeProjectMemberBusy: boolean;
   memberActionBusy: boolean;
   createInvitationBusy: boolean;
+  resendInvitationBusy: boolean;
   revokeInvitationBusy: boolean;
   updateOrganizationBusy: boolean;
   deleteOrganizationBusy: boolean;
@@ -88,12 +92,14 @@ export type OrganizationsPageViewModel = {
   onUpdateRoles: (userId: string, roles: string[]) => void;
   onRemoveMember: (userId: string) => void;
   onCreateInvitation: () => void;
+  onResendInvitation: (invitationId: string) => void;
   onRevokeInvitation: (invitationId: string) => void;
   onUpdateOrganizationName: (name: string) => void;
   onDeleteOrganization: () => void;
   onCreateAPIKey: (name: string) => void;
   onRevokeAPIKey: (keyId: string) => void;
   onClearCreatedAPIKey: () => void;
+  onSelectOrganization: (organizationId: string) => void;
   onRefetchOrganizations: () => void;
 };
 
@@ -104,11 +110,15 @@ function findPreferredOrganizationId(
 ): string {
   const availableIds = new Set(organizations.map((organization) => organization.id));
   const routeOrganization =
-    findBySlugOrId(organizations, readOrganizationIdFromSearch(routeSearch))?.id ?? "";
+    findBySlugIdOrPublicId(organizations, readOrganizationIdFromSearch(routeSearch))?.id ?? "";
+  const currentOrganization =
+    findBySlugIdOrPublicId(organizations, currentId)?.id ?? "";
+  const storedOrganization =
+    findBySlugIdOrPublicId(organizations, readSelectedOrganizationID())?.id ?? "";
   const candidates = [
     routeOrganization,
-    currentId,
-    readSelectedOrganizationID(),
+    currentOrganization,
+    storedOrganization,
     organizations[0]?.id ?? "",
   ];
   return candidates.find((candidate) => candidate && availableIds.has(candidate)) ?? "";
@@ -164,6 +174,8 @@ export function useOrganizationsPageViewModel({
   const selectedOrganizationFromList = organizations.find(
     (organization) => organization.id === selectedOrganizationId,
   );
+  const selectedOrganizationRef =
+    selectedOrganizationFromList?.publicId || selectedOrganizationId;
   const selectedOrganizationRole = selectedOrganizationFromList?.role ?? "viewer";
   const canManageOrganizationFromSummary = canManageOrganizationPages([selectedOrganizationRole]);
 
@@ -191,7 +203,15 @@ export function useOrganizationsPageViewModel({
     const nextId = findPreferredOrganizationId(organizations, routeSearch, selectedOrganizationId);
     if (nextId && nextId !== selectedOrganizationId) {
       setSelectedOrganizationId(nextId);
-      storeSelectedOrganizationID(nextId);
+      const nextOrganization = organizations.find((organization) => organization.id === nextId);
+      if (nextOrganization) {
+        storeSelectedOrganizationContext({
+          organizationId: nextOrganization.id,
+          publicId: nextOrganization.publicId,
+        });
+      } else {
+        storeSelectedOrganizationID(nextId);
+      }
       navigateIfChanged(
         buildScopedHref(`/organizations${routeSearch}`, { org: null }),
         { replace: true },
@@ -201,12 +221,12 @@ export function useOrganizationsPageViewModel({
 
   const resourcesQuery = useQuery({
     queryKey: [
-      ...appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationId),
+      ...appQueryKeys.organizationResources(apiBaseURL, selectedOrganizationRef),
       canManageOrganizationFromSummary ? "manager" : "member",
     ] as const,
-    enabled: apiBaseURL.trim() !== "" && selectedOrganizationId !== "",
+    enabled: apiBaseURL.trim() !== "" && selectedOrganizationRef !== "",
     queryFn: ({ signal }) =>
-      loadOrganizationResources(apiBaseURL, selectedOrganizationId, {
+      loadOrganizationResources(apiBaseURL, selectedOrganizationRef, {
         canManageOrganization: canManageOrganizationFromSummary,
         currentUserEmail: user?.Email ?? "",
         currentUserId: user ? String(user.ID) : "",
@@ -263,13 +283,13 @@ export function useOrganizationsPageViewModel({
     await invalidateOrganizationScope(
       queryClient,
       apiBaseURL,
-      selectedOrganizationId,
+      selectedOrganizationRef,
     );
   };
 
   const mutations = useOrganizationMutations({
     apiBaseURL,
-    selectedOrganizationId,
+    selectedOrganizationId: selectedOrganizationRef,
     currentUserId,
     currentUserRoles,
     resources,
@@ -303,6 +323,7 @@ export function useOrganizationsPageViewModel({
     isInitialLoading:
       organizationsQuery.isLoading ||
       (selectedOrganizationId !== "" && resourcesQuery.isLoading && !resourcesQuery.data),
+    organizations,
     selectedOrganization,
     resources,
     currentUserId,
@@ -312,7 +333,7 @@ export function useOrganizationsPageViewModel({
     invitationDraft,
     createProjectOnboardingHref: buildCreateProjectOnboardingHref(),
     onStartCreateProjectOnboarding: () =>
-      prepareCreateProjectOnboardingContext(selectedOrganizationId),
+      prepareCreateProjectOnboardingContext(selectedOrganizationRef),
     canManageProjects,
     canDeleteProjects,
     deletingProjectId: mutations.deleteProjectMutation.isPending
@@ -326,6 +347,7 @@ export function useOrganizationsPageViewModel({
       mutations.updateMemberRolesMutation.isPending ||
       mutations.removeMemberMutation.isPending,
     createInvitationBusy: mutations.createInvitationMutation.isPending,
+    resendInvitationBusy: mutations.resendInvitationMutation.isPending,
     revokeInvitationBusy: mutations.revokeInvitationMutation.isPending,
     updateOrganizationBusy: mutations.updateOrganizationNameMutation.isPending,
     deleteOrganizationBusy: mutations.deleteOrganizationMutation.isPending,
@@ -356,12 +378,40 @@ export function useOrganizationsPageViewModel({
     onUpdateRoles: (userId, roles) => mutations.updateMemberRolesMutation.mutate({ userId, roles }),
     onRemoveMember: (userId) => mutations.removeMemberMutation.mutate(userId),
     onCreateInvitation: () => mutations.createInvitationMutation.mutate(),
+    onResendInvitation: (invitationId) => mutations.resendInvitationMutation.mutate(invitationId),
     onRevokeInvitation: (invitationId) => mutations.revokeInvitationMutation.mutate(invitationId),
     onUpdateOrganizationName: (name) => mutations.updateOrganizationNameMutation.mutate(name),
     onDeleteOrganization: () => mutations.deleteOrganizationMutation.mutate(),
     onCreateAPIKey: (name) => mutations.createAPIKeyMutation.mutate(name),
     onRevokeAPIKey: (keyId) => mutations.revokeAPIKeyMutation.mutate(keyId),
     onClearCreatedAPIKey: () => setCreatedAPIKey(null),
+    onSelectOrganization: (organizationId) => {
+      const nextOrganizationId = organizationId.trim();
+      if (!nextOrganizationId || nextOrganizationId === selectedOrganizationId) return;
+
+      setSelectedOrganizationId(nextOrganizationId);
+      const nextOrganization = organizations.find(
+        (organization) => organization.id === nextOrganizationId,
+      );
+      if (nextOrganization) {
+        storeSelectedOrganizationContext({
+          organizationId: nextOrganization.id,
+          publicId: nextOrganization.publicId,
+        });
+      } else {
+        storeSelectedOrganizationID(nextOrganizationId);
+      }
+      clearSelectedProjectContext();
+      navigateIfChanged(
+        buildScopedHref(`/organizations${routeSearch}`, {
+          org: null,
+          project: null,
+          projectId: null,
+          project_id: null,
+          section: activeTab === DEFAULT_ORGANIZATION_VIEW_TAB ? null : activeTab,
+        }),
+      );
+    },
     onRefetchOrganizations: () => void organizationsQuery.refetch(),
   };
 }

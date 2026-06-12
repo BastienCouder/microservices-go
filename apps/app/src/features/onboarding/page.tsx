@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 import {
   OnboardingProvider,
@@ -41,11 +41,11 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
   const selectedOrganizationId =
     setupMode === "account"
       ? ""
-      : readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationID();
+      : readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
   const hasOrganizationContext = selectedOrganizationId !== "";
 
   const steps = [
-    ...(!hasOrganizationContext ? [{ component: <StepAccountType />, id: 1 }] : []),
+    /* ...(!hasOrganizationContext ? [{ component: <StepAccountType />, id: 1 }] : []),*/
     {
       component: <StepWebsite askOrganizationName={!hasOrganizationContext} />,
       id: hasOrganizationContext ? 1 : 2,
@@ -129,7 +129,7 @@ export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps)
     setupMode === "account"
       ? ""
       : readOrganizationIdFromSearch(normalizedRouteSearch) ||
-        readSelectedOrganizationID();
+        readSelectedOrganizationPublicID();
   const totalSteps = selectedOrganizationId ? 6 : 8;
   const providerKey =
     setupMode === "resume"

@@ -2,7 +2,7 @@ import type {
   MonitoringData,
   MonitoringPrompt,
 } from "@/features/monitoring/_lib/shared/monitoring-data";
-import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
+import { resolveAIIconPath } from "@/lib/ai-provider-assets";
 import i18n from "@/shared/i18n";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 
@@ -449,6 +449,12 @@ function toPageModelBadge(prompt: MonitoringPrompt): PageModelBadge | null {
       prompt.modelDisplayName.trim() ||
       prompt.modelGroupName.trim(),
     label,
-    iconPath: toSafeImageAssetPath(prompt.modelIconPath),
+    iconPath: resolveAIIconPath(
+      prompt.modelIconPath,
+      prompt.modelProviderModelId,
+      prompt.modelDisplayName,
+      prompt.modelGroupName,
+      prompt.modelId,
+    ),
   };
 }

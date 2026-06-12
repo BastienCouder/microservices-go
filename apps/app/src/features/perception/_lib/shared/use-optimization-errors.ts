@@ -9,7 +9,7 @@ import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   readOrganizationIdFromSearch,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../client-api";
 import { getOptimizationActionMatchIds } from "../optimization-action-ids";
@@ -64,7 +64,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   const organizationId = useMemo(
     () =>
       readOrganizationIdFromSearch(routeSearch) ||
-      readSelectedOrganizationID(),
+      readSelectedOrganizationPublicID(),
     [routeSearch],
   );
   const [persistedActions, setPersistedActions] = useState<PersistedOptimizeAction[]>([]);
@@ -72,7 +72,11 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   const [markingDoneErrorIds, setMarkingDoneErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
   const query = useQuery({
-    queryKey: appQueryKeys.optimizationErrors(apiBaseURL, projectId),
+    queryKey: appQueryKeys.optimizationErrors(
+      apiBaseURL,
+      projectId,
+      organizationId || null,
+    ),
     enabled: apiBaseURL.trim() !== "",
     queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),
   });

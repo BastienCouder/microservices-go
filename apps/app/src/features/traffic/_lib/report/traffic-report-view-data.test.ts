@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import { buildTrafficReportViewData } from "./traffic-report-view-data";
 import type { TrafficDailyPoint, TrafficPage, TrafficSource } from "./types";
+import { adminRoutePaths } from "@/shared/admin-routing";
 
 function buildSources(count: number): TrafficSource[] {
   return Array.from({ length: count }, (_, index) => ({
@@ -97,7 +98,7 @@ describe("buildTrafficReportViewData", () => {
       sources: buildSources(1),
       topPages: [
         {
-          path: "/admin/posts",
+          path: `${adminRoutePaths.organizations}/members`,
           title: "Articles | Admin KAHIER",
           source: "chatgpt.com",
           engine: "ChatGPT",

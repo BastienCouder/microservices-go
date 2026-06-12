@@ -19,9 +19,9 @@ import { Switch } from "@/components/ui/switch";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
 import {
   loadOrganizationSummaries,
-  type OrganizationSummary,
 } from "@/features/organizations/_lib/shared/organization-page-api";
 import { appQueryKeys } from "@/lib/query-keys";
+import { findPrimaryAdminOrganization } from "@/shared/admin-routing";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import {
   loadBillingPlanSettings,
@@ -56,12 +56,6 @@ type NewPlanDraft = PlanDraft & {
 const CORE_PLAN_ORDER = ["starter", "growth", "pro"] as const;
 const HIDDEN_ADMIN_PLANS = new Set(["developer"]);
 const EMPTY_PLANS: BillingPlanSettings[] = [];
-
-function canManageUsage(organization: OrganizationSummary) {
-  return (
-    organization.role === "editor" || organization.role === "super_admin"
-  );
-}
 
 function normalizePlanCode(value: string) {
   return value
@@ -193,7 +187,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   });
 
   const adminOrganization = useMemo(
-    () => (organizationsQuery.data ?? []).find(canManageUsage) ?? null,
+    () => findPrimaryAdminOrganization(organizationsQuery.data ?? []),
     [organizationsQuery.data],
   );
   const organizationId = adminOrganization?.id ?? "";

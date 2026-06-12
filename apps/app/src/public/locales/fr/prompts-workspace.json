@@ -268,6 +268,7 @@
   "deletePromptError": "Impossible de supprimer le prompt.",
   "promptNotFoundError": "Prompt introuvable.",
   "savePromptError": "Impossible d’enregistrer le prompt.",
+  "runPromptApiError": "Impossible de lancer le prompt.",
   "runPromptInsufficientCreditsError": "Crédits insuffisants pour lancer cette analyse.",
   "generatePromptsError": "Impossible de générer les prompts.",
   "generatedPromptsTitle": "Prompts générés",

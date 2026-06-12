@@ -4,10 +4,11 @@ import {
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
   readSelectedProjectID,
-  readSelectedOrganizationID,
+  readSelectedOrganizationPublicID,
   SELECTED_CONTEXT_CHANGE_EVENT,
 } from "@/shared/selection";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
+import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {
   getProviderCredentialOptions,
@@ -25,30 +26,12 @@ type UseModelsPanelViewModelOptions = {
   routeSearch: string;
 };
 
-const API_KEY_PROJECT_REQUIRED_SAVE =
-  "Selectionnez un projet avant d'enregistrer une cle API.";
-const API_KEY_PROJECT_REQUIRED_DELETE =
-  "Selectionnez un projet avant de supprimer une cle API.";
-
-export const PROVIDER_API_KEY_TEXTS = {
-  empty: "Selectionnez un modele pour voir les fournisseurs a configurer.",
-  configured: "Cle configuree",
-  missing: "Cle requise",
-  connect: "Connecter",
-  manage: "Gerer la cle",
-  delete: "Supprimer la cle",
-  fieldLabel: "Cle API",
-  placeholder: "Coller la cle API",
-  save: "Enregistrer",
-  saving: "Enregistrement...",
-};
-
 function readOrganizationId(routeSearch: string): string {
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
   if (routeOrganizationId !== "") {
     return routeOrganizationId;
   }
-  return readSelectedOrganizationID();
+  return readSelectedOrganizationPublicID();
 }
 
 function readCanonicalProjectToken(routeSearch: string): string {
@@ -63,6 +46,7 @@ export function useModelsPanelViewModel({
   apiBaseURL,
   routeSearch,
 }: UseModelsPanelViewModelOptions) {
+  const { t } = useScopedI18n("models");
   const [organizationId, setOrganizationId] = useState(() =>
     readOrganizationId(routeSearch),
   );
@@ -106,6 +90,8 @@ export function useModelsPanelViewModel({
     apiBaseURL,
     organizationId: data.effectiveOrganizationId,
     selectedProjectId: data.selectedProjectId,
+    successMessage: t("projectModelsUpdated"),
+    defaultErrorMessage: t("updateProjectModelsError"),
     onSuccessMessage: (nextMessage) => {
       pushSuccessToast(nextMessage);
     },
@@ -119,19 +105,37 @@ export function useModelsPanelViewModel({
     projectId: data.selectedProjectId,
     onSaveSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({ ...current, [credential.provider]: "" }));
-      pushSuccessToast(`Cle API ${credential.label} enregistree.`);
+      pushSuccessToast(t("providerApiKeySaved", { label: credential.label }));
     },
     onDeleteSuccess: (credential) => {
       setProviderKeyDrafts((current) => ({ ...current, [credential.provider]: "" }));
-      pushSuccessToast(`Cle API ${credential.label} supprimee.`);
+      pushSuccessToast(t("providerApiKeyDeleted", { label: credential.label }));
     },
     onSaveError: (mutationError) => {
-      pushErrorToast(mutationError, "Impossible d'enregistrer la cle API LLM.");
+      pushErrorToast(mutationError, t("saveProviderCredentialError"));
     },
     onDeleteError: (mutationError) => {
-      pushErrorToast(mutationError, "Impossible de supprimer la cle API LLM.");
+      pushErrorToast(mutationError, t("deleteProviderCredentialError"));
     },
   });
+  const providerApiKeyTexts = useMemo(
+    () => ({
+      empty: t("providerKeysEmpty"),
+      configured: t("providerKeysConfigured"),
+      missing: t("providerKeysMissing"),
+      connect: t("providerKeysConnect"),
+      manage: t("providerKeysManage"),
+      delete: t("providerKeysDelete"),
+      fieldLabel: t("providerKeysFieldLabel"),
+      fieldHint: t("providerKeysFieldHint"),
+      placeholder: t("providerKeysPlaceholder"),
+      save: t("providerKeysSave"),
+      saving: t("providerKeysSaving"),
+      showKey: t("showApiKey"),
+      hideKey: t("hideApiKey"),
+    }),
+    [t],
+  );
 
   const providerCredentialOptions = useMemo(
     () =>
@@ -232,32 +236,34 @@ export function useModelsPanelViewModel({
     (provider: string) => {
       if (!permissions.canEdit) return;
       if (!data.selectedProjectId) {
-        pushErrorToast(
-          new Error(API_KEY_PROJECT_REQUIRED_SAVE),
-          API_KEY_PROJECT_REQUIRED_SAVE,
-        );
+        const nextMessage = t("apiKeyProjectRequiredSave");
+        pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
 
       const apiKey = providerKeyDrafts[provider]?.trim();
       if (apiKey) providerMutations.saveProviderCredential(provider, apiKey);
     },
-    [data.selectedProjectId, permissions.canEdit, providerKeyDrafts, providerMutations],
+    [
+      data.selectedProjectId,
+      permissions.canEdit,
+      providerKeyDrafts,
+      providerMutations,
+      t,
+    ],
   );
   const deleteProviderKey = useCallback(
     (provider: string) => {
       if (!permissions.canEdit) return;
       if (!data.selectedProjectId) {
-        pushErrorToast(
-          new Error(API_KEY_PROJECT_REQUIRED_DELETE),
-          API_KEY_PROJECT_REQUIRED_DELETE,
-        );
+        const nextMessage = t("apiKeyProjectRequiredDelete");
+        pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
 
       providerMutations.deleteProviderCredential(provider);
     },
-    [data.selectedProjectId, permissions.canEdit, providerMutations],
+    [data.selectedProjectId, permissions.canEdit, providerMutations, t],
   );
   const toggleProjectModel = useCallback(
     (modelId: string) => {
@@ -274,7 +280,7 @@ export function useModelsPanelViewModel({
       const model = data.catalogById.get(modelId);
       if (!model) return;
       if (data.isDeveloperPlan && !data.providerCredentialsReady) {
-        pushSuccessToast("Chargement des cles API fournisseur...");
+        pushSuccessToast(t("providerApiKeyLoading"));
         return;
       }
       if (
@@ -285,26 +291,26 @@ export function useModelsPanelViewModel({
           data.providerCredentialLookup,
         )
       ) {
-        const nextMessage = `Ajoutez une cle API pour ${model.provider} ou OpenRouter avant d'utiliser ce modele.`;
-        pushErrorToast(
-          new Error(nextMessage),
-          nextMessage,
-        );
+        const nextMessage = t("providerApiKeyRequired", {
+          provider: model.provider,
+        });
+        pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
       if (data.selectedModelIdSet.size >= data.selectionLimit) {
         const nextMessage =
           data.planLabel
-            ? `${data.planLabel} permet jusqu'a ${data.selectionLimit} modele${
-                data.selectionLimit > 1 ? "s" : ""
-              }.`
-            : "La limite de votre plan a ete atteinte.";
+            ? t("selectionLimitReached", {
+                count: data.selectionLimit,
+                plan: data.planLabel,
+              })
+            : t("selectionLimitReachedGeneric");
         pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
       data.setSelectedModelIds((current) => [...current, modelId]);
     },
-    [data, permissions.canEdit],
+    [data, permissions.canEdit, t],
   );
   const saveSelectedModels = useCallback(() => {
     if (!permissions.canEdit) return;
@@ -339,6 +345,7 @@ export function useModelsPanelViewModel({
     providerCredentials: data.providerCredentials,
     providerCredentialLookup: data.providerCredentialLookup,
     providerCredentialsReady: data.providerCredentialsReady,
+    providerApiKeyTexts,
     loadingCatalog: data.loadingCatalog,
     loadingPlan: data.loadingPlan,
     loadingProviderCredentials: data.loadingProviderCredentials,

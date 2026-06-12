@@ -10,6 +10,8 @@ type JsonRecord = Record<string, unknown>;
 
 export type UserOrganizationSummary = {
   id: string;
+  publicId: string;
+  internalId?: string;
   name: string;
   slug: string;
   role: string;
@@ -41,26 +43,36 @@ function normalizeOrganizationRole(role: string): string {
   return "viewer";
 }
 
-function normalizeMembership(value: unknown): { organizationId: string; role: string } | null {
+function normalizeMembership(
+  value: unknown,
+): { organizationId: string; internalId: string; publicId: string; role: string } | null {
   if (!isRecord(value)) return null;
   const organizationId = getIDString(
     value.organizationId ?? value.OrganizationID ?? value.organization_id ?? value.id ?? value.ID,
   );
   if (!organizationId) return null;
+  const internalId = getIDString(value.internalId ?? value.InternalID);
+  const publicId = getString(value.publicId ?? value.PublicID) || organizationId;
   return {
     organizationId,
+    internalId,
+    publicId,
     role: normalizeOrganizationRole(getString(value.role ?? value.Role)),
   };
 }
 
 function normalizeOrganization(
   value: unknown,
-  fallback: { organizationId: string; role: string },
+  fallback: { organizationId: string; internalId: string; publicId: string; role: string },
 ): Omit<UserOrganizationSummary, "slug"> {
   const payload = unwrapGatewayPayload(value);
   const record = isRecord(payload) ? (payload as JsonRecord) : {};
   return {
-    id: getIDString(record.id ?? record.ID) || fallback.organizationId,
+    id: getIDString(record.id ?? record.ID) || fallback.internalId || fallback.organizationId,
+    publicId:
+      getString(record.publicId ?? record.PublicID) || fallback.publicId || fallback.organizationId,
+    internalId:
+      getIDString(record.id ?? record.ID) || fallback.internalId || fallback.organizationId,
     name: getString(record.name ?? record.Name) || `Organisation ${fallback.organizationId}`,
     role: fallback.role,
   };

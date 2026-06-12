@@ -1,3 +1,7 @@
+import {
+  getAIModelFamilyLabel,
+  getAIProviderIconPath,
+} from "@/lib/ai-provider-assets";
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 import i18n from "@/shared/i18n";
 
@@ -352,31 +356,9 @@ export function formatPerceptionErrorTypeLabel(value: string): string {
 }
 
 export function getModelGroupForName(modelName: string): string {
-  const normalized = modelName.trim().toLowerCase();
-  if (
-    normalized.includes("chatgpt") ||
-    normalized.includes("openai") ||
-    normalized.includes("gpt") ||
-    normalized.startsWith("o1") ||
-    normalized.startsWith("o3")
-  ) {
-    return "ChatGPT";
-  }
-  if (normalized.includes("perplexity")) return "Perplexity";
-  if (normalized.includes("claude")) return "Claude";
-  if (normalized.includes("gemini")) return "Gemini";
-  if (normalized.includes("mistral")) return "Mistral";
-  if (normalized.includes("copilot")) return "Copilot";
-  return modelName;
+  return getAIModelFamilyLabel(modelName, modelName);
 }
 
 export function getModelIconForName(modelName: string): string {
-  const group = getModelGroupForName(modelName);
-  if (group === "ChatGPT") return "/models/openai.svg";
-  if (group === "Perplexity") return "/models/perplexity.svg";
-  if (group === "Claude") return "/models/claude.svg";
-  if (group === "Gemini") return "/models/gemini.svg";
-  if (group === "Mistral") return "/models/mistral.svg";
-  if (group === "Copilot") return "/models/copilot.svg";
-  return "/models/openai.svg";
+  return getAIProviderIconPath(modelName);
 }

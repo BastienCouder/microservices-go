@@ -59,7 +59,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	iaPromptTimeoutMS, err := envcfg.OptionalPositiveIntEnv("PROJECT_IA_PROMPT_TIMEOUT_MS", 30000)
+	iaPromptTimeoutMS, err := envcfg.OptionalPositiveIntEnv("PROJECT_IA_PROMPT_TIMEOUT_MS", 90000)
 	if err != nil {
 		return Config{}, err
 	}
