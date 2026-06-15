@@ -16,7 +16,7 @@ type ActionIcon = ComponentType<{ className?: string }>;
 export type ActionsPopoverItem = {
   icon: ActionIcon;
   title: string;
-  description: string;
+  description?: string;
   tone?: "default" | "destructive";
   disabled?: boolean;
   onSelect: () => void;
@@ -24,7 +24,7 @@ export type ActionsPopoverItem = {
 
 type ActionsPopoverProps = {
   title: string;
-  description: string;
+  description?: string;
   items: ActionsPopoverItem[];
   triggerLabel?: string;
   disabled?: boolean;
@@ -73,9 +73,11 @@ function ActionsPopoverItemView({
         <div className={cn("text-sm font-semibold", tone === "destructive" ? "text-rose-700" : "text-foreground")}>
           {title}
         </div>
-        <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
-          {description}
-        </div>
+        {description ? (
+          <div className="mt-0.5 line-clamp-2 text-xs leading-snug text-muted-foreground">
+            {description}
+          </div>
+        ) : null}
       </div>
       <span
         className={cn(

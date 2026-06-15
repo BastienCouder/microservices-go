@@ -1,8 +1,9 @@
 import { memo } from "react";
-import { Bot, Building2, LogOut, ScrollText, Shield } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
+import { SidebarLanguageSwitcher } from "@/components/sidebar/sidebar-language-switcher";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import { adminRoutePaths } from "@/shared/admin-routing";
 import { cn } from "@/shared/utils";
@@ -16,20 +17,25 @@ type AdminSidebarProps = {
 const ADMIN_ITEMS = [
   {
     href: adminRoutePaths.organizations,
-    icon: Building2,
     labelKey: "adminOrganizations",
   },
   {
     href: adminRoutePaths.pricing,
-    icon: ScrollText,
     labelKey: "adminPricing",
   },
   {
     href: adminRoutePaths.models,
-    icon: Bot,
     labelKey: "adminModels",
   },
 ] as const;
+
+function AdminBrandLockup() {
+  return (
+    <span className="ml-2 truncate text-sm font-semibold text-background">
+      <img src="/logo_white.svg" alt="Logo" className="h-10" />
+    </span>
+  );
+}
 
 function AdminSidebarComponent({
   busy = false,
@@ -44,53 +50,48 @@ function AdminSidebarComponent({
     <>
       <aside
         className={cn(
-          "hidden h-screen w-[240px] min-w-[240px] shrink-0 border-r border-border bg-slate-950 text-slate-50 lg:flex lg:flex-col",
+          "sticky top-0 hidden h-screen w-[220px] min-w-[220px] shrink-0 border-r border-border bg-primary text-background lg:flex lg:flex-col",
           className,
         )}
       >
-        <div className="border-b border-slate-800 px-4 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-2xl bg-slate-800 text-sky-300">
-              <Shield className="size-5" />
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-                Admin
-              </p>
-              <p className="text-sm font-semibold text-white">Control space</p>
-            </div>
-          </div>
+        <div className="flex h-14 shrink-0 items-center border-b border-border/40 px-3">
+          <AdminBrandLockup />
         </div>
 
-        <nav className="flex-1 space-y-2 px-3 py-5">
+        <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-6">
+          <div className="px-2 pb-1 text-xs font-bold uppercase tracking-[0.04em] text-white/55">
+            Administration
+          </div>
           {ADMIN_ITEMS.map((item) => {
             const active = location.pathname === item.href;
-            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 to={`${item.href}${search}`}
                 className={cn(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-colors",
+                  "flex rounded-[5px] px-3 py-1.5 text-sm font-medium transition-colors duration-150",
                   active
-                    ? "bg-sky-400/15 text-white"
-                    : "text-slate-300 hover:bg-slate-900 hover:text-white",
+                    ? "bg-white/14 text-white"
+                    : "text-white/78 hover:bg-white/10 hover:text-white",
                 )}
               >
-                <Icon className="size-4 shrink-0" />
                 <span>{content[item.labelKey]}</span>
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-slate-800 p-3">
+        <div className="shrink-0 border-t border-background/40 p-2">
+          <div className="mb-1">
+            <SidebarLanguageSwitcher collapsed={false} />
+          </div>
+
           <Button
             type="button"
             variant="ghost"
             onClick={onLogout}
             disabled={busy}
-            className="w-full justify-between rounded-xl bg-slate-900 px-3 text-slate-200 hover:bg-slate-800 hover:text-white"
+            className="w-full justify-between rounded-md bg-background/10 px-2 py-1.5 text-sm text-background/80 hover:bg-background/20 hover:text-background"
           >
             <span className="flex items-center gap-2">
               <LogOut className="size-4" />
@@ -100,27 +101,24 @@ function AdminSidebarComponent({
         </div>
       </aside>
 
-      <div className="border-b border-border bg-slate-950 px-3 py-3 text-slate-50 lg:hidden">
-        <div className="mb-3 flex items-center gap-2">
-          <Shield className="size-4 text-sky-300" />
-          <span className="text-sm font-semibold">Admin</span>
+      <div className="border-b border-border/40 bg-primary px-3 py-3 text-background lg:hidden">
+        <div className="mb-3 flex items-center">
+          <AdminBrandLockup />
         </div>
         <nav className="flex gap-2 overflow-x-auto pb-1">
           {ADMIN_ITEMS.map((item) => {
             const active = location.pathname === item.href;
-            const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 to={`${item.href}${search}`}
                 className={cn(
-                  "inline-flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-sm",
+                  "inline-flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition-colors duration-150",
                   active
-                    ? "border-sky-400/40 bg-sky-400/15 text-white"
-                    : "border-slate-700 bg-slate-900 text-slate-200",
+                    ? "border-background/20 bg-background text-primary"
+                    : "border-white/12 bg-background/10 text-white/78 hover:bg-background/16 hover:text-white",
                 )}
               >
-                <Icon className="size-4" />
                 <span>{content[item.labelKey]}</span>
               </Link>
             );

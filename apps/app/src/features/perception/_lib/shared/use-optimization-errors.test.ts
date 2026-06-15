@@ -31,4 +31,9 @@ describe("useOptimizationErrors", () => {
       source.includes("appQueryKeys.optimizationErrors(\n      apiBaseURL,\n      projectId,\n      organizationId || null,"),
     ).toBe(true);
   });
+
+  test("uses the resolved organization scope for optimize action reads and writes", () => {
+    expect(source.includes('const actionOrganizationId = organizationId?.trim() || undefined;')).toBe(true);
+    expect(source.includes('{ organizationId: actionOrganizationId },')).toBe(true);
+  });
 });

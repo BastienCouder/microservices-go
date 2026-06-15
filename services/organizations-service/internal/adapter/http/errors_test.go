@@ -7,12 +7,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-
-	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
 )
 
 func TestOrganizationHandlerWritesStructuredValidationError(t *testing.T) {
-	svc := usecase.NewService(stubRepo{})
+	svc := newStubService()
 	handler := NewHandler(svc, nil)
 	mux := http.NewServeMux()
 	handler.Register(mux)

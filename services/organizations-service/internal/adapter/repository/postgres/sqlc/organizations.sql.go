@@ -103,38 +103,6 @@ func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationPara
 	return i, err
 }
 
-const getMemberByOrgAndUser = `-- name: GetMemberByOrgAndUser :one
-SELECT organization_id, user_id, added_at, deleted_at
-FROM organization_members
-WHERE organization_id = $1
-  AND user_id = $2
-  AND deleted_at IS NULL
-`
-
-type GetMemberByOrgAndUserParams struct {
-	OrganizationID int64
-	UserID         int64
-}
-
-type GetMemberByOrgAndUserRow struct {
-	OrganizationID int64
-	UserID         int64
-	AddedAt        pgtype.Timestamptz
-	DeletedAt      pgtype.Timestamptz
-}
-
-func (q *Queries) GetMemberByOrgAndUser(ctx context.Context, arg GetMemberByOrgAndUserParams) (GetMemberByOrgAndUserRow, error) {
-	row := q.db.QueryRow(ctx, getMemberByOrgAndUser, arg.OrganizationID, arg.UserID)
-	var i GetMemberByOrgAndUserRow
-	err := row.Scan(
-		&i.OrganizationID,
-		&i.UserID,
-		&i.AddedAt,
-		&i.DeletedAt,
-	)
-	return i, err
-}
-
 const getInvitationByID = `-- name: GetInvitationByID :one
 SELECT id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 FROM organization_invitations
@@ -218,70 +186,6 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id int64) (Organizati
 		&i.DeletedAt,
 	)
 	return i, err
-}
-
-const insertMemberRole = `-- name: InsertMemberRole :exec
-INSERT INTO member_roles (organization_id, user_id, role)
-SELECT $1, $2, $3
-WHERE EXISTS (
-  SELECT 1
-  FROM organization_members m
-  WHERE m.organization_id = $1
-    AND m.user_id = $2
-    AND m.deleted_at IS NULL
-)
-ON CONFLICT (organization_id, user_id, role) DO NOTHING
-`
-
-type InsertMemberRoleParams struct {
-	OrganizationID int64
-	UserID         int64
-	Role           string
-}
-
-func (q *Queries) InsertMemberRole(ctx context.Context, arg InsertMemberRoleParams) error {
-	_, err := q.db.Exec(ctx, insertMemberRole, arg.OrganizationID, arg.UserID, arg.Role)
-	return err
-}
-
-const listMemberRolesByOrgAndUser = `-- name: ListMemberRolesByOrgAndUser :many
-SELECT role
-FROM member_roles mr
-WHERE mr.organization_id = $1
-  AND mr.user_id = $2
-  AND EXISTS (
-    SELECT 1
-    FROM organization_members m
-    WHERE m.organization_id = $1
-      AND m.user_id = $2
-      AND m.deleted_at IS NULL
-  )
-ORDER BY role
-`
-
-type ListMemberRolesByOrgAndUserParams struct {
-	OrganizationID int64
-	UserID         int64
-}
-
-func (q *Queries) ListMemberRolesByOrgAndUser(ctx context.Context, arg ListMemberRolesByOrgAndUserParams) ([]string, error) {
-	rows, err := q.db.Query(ctx, listMemberRolesByOrgAndUser, arg.OrganizationID, arg.UserID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []string
-	for rows.Next() {
-		var role string
-		if err := rows.Scan(&role); err != nil {
-			return nil, err
-		}
-		items = append(items, role)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const listInvitationsByOrganization = `-- name: ListInvitationsByOrganization :many
@@ -476,30 +380,4 @@ func (q *Queries) UpdateInvitationByID(ctx context.Context, arg UpdateInvitation
 		&i.DeletedAt,
 	)
 	return i, err
-}
-
-const upsertMember = `-- name: UpsertMember :exec
-INSERT INTO organization_members (organization_id, user_id, added_at, deleted_at)
-SELECT o.id, $2, $3, NULL
-FROM organizations o
-WHERE o.id = $1
-  AND o.deleted_at IS NULL
-ON CONFLICT (organization_id, user_id)
-DO UPDATE SET added_at = EXCLUDED.added_at,
-              deleted_at = NULL
-`
-
-type UpsertMemberParams struct {
-	ID      int64
-	UserID  int64
-	AddedAt pgtype.Timestamptz
-}
-
-func (q *Queries) UpsertMember(ctx context.Context, arg UpsertMemberParams) error {
-	_, err := q.db.Exec(ctx, upsertMember,
-		arg.ID,
-		arg.UserID,
-		arg.AddedAt,
-	)
-	return err
 }

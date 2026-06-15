@@ -19,7 +19,7 @@ import {
   usePerceptionViewModel,
 } from "../_lib";
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
-import { CheckCircle2, Download, Play, Sparkles, Target } from "lucide-react";
+import { CheckCircle2, Download, Sparkles, Target } from "lucide-react";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
 type PerceptionClientProps = {
@@ -75,8 +75,8 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           trigger={
             <Button
               size="sm"
-              variant={"secondary"}
-            className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+              variant="secondary"
+              className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
               disabled={
                 viewModel.analysisRunning ||
                 viewModel.perceptionQuotaLoading ||
@@ -124,7 +124,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
         modelCatalog={viewModel.modelCatalog}
         projectId={initialData.metadata.projectId}
         savingErrorIds={viewModel.savingErrorIds}
-        totalErrorCount={initialData.topErrors.length}
+        totalErrorCount={viewModel.filteredTopErrorsTotalCount}
         onCreateAction={permissions.canEdit ? viewModel.handleFix : undefined}
         onRemoveAction={permissions.canEdit ? viewModel.handleRemoveAction : undefined}
       />
@@ -142,9 +142,11 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
               trendData={viewModel.perceptionTrend.data}
               windowLabel={periodLabel}
               analyzedResponses={viewModel.filteredResponses.length}
+              selectedSourceFilter={viewModel.selectedSourceFilter}
               selectedModels={viewModel.selectedModels}
               modelOptions={viewModel.modelCatalog}
               selectedPeriod={viewModel.selectedPeriod}
+              onSourceFilterChange={viewModel.setSelectedSourceFilter}
               onModelToggle={(model) =>
                 viewModel.setSelectedModels((current) =>
                   current.includes(model)
@@ -173,11 +175,11 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
         <div className="space-y-4 px-1 pb-4">
           <Card className="shrink-0 overflow-hidden border-border/60 py-4">
             <CardContent className="p-0">
-          <PerceptionDonutVisual
-            points={viewModel.filteredRadar}
-            periodLabel={periodBadgeLabel}
-            emptyLabel={emptyStateLabel}
-          />
+              <PerceptionDonutVisual
+                points={viewModel.filteredRadar}
+                periodLabel={periodBadgeLabel}
+                emptyLabel={emptyStateLabel}
+              />
             </CardContent>
           </Card>
 

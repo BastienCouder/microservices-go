@@ -66,7 +66,6 @@ describe("sidebar state helpers", () => {
           name: "Website",
           status: "draft",
           brandName: "Acme Brand",
-          brandDescription: "",
           attributionSource: "",
           createdAt: "",
         },

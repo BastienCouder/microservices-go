@@ -5,9 +5,11 @@ export const tailwindConfig = {
   theme: {
     extend: {
       colors: {
-        brand: '#1d4ed8',
-        text: '#111827',
-        muted: '#6b7280',
+        brand: '#326BC8',
+        brandDark: '#21498A',
+        brandSoft: '#EFF5FF',
+        text: '#0F172A',
+        muted: '#64748B',
       },
     },
   },

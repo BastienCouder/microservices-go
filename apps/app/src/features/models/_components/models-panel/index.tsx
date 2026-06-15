@@ -94,6 +94,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
           search={viewModel.search}
           selectedCount={viewModel.selectedModelIds.length}
           selectionLimit={viewModel.selectionLimit}
+          selectionLimitReady={viewModel.selectionLimitReady}
           saveDisabled={viewModel.saveDisabled}
           isSavingModels={viewModel.isSavingModels}
           loading={viewModel.loading}
@@ -112,6 +113,7 @@ export function ModelsPanel({ apiBaseURL, routeSearch }: ModelsPanelProps) {
               models={viewModel.filteredCatalog}
               selectedModelIdSet={viewModel.selectedModelIdSet}
               selectionLimit={viewModel.selectionLimit}
+              selectionLimitReady={viewModel.selectionLimitReady}
               isDeveloperPlan={viewModel.isDeveloperPlan}
               providerCredentialsReady={viewModel.providerCredentialsReady}
               providerCredentials={viewModel.providerCredentials}

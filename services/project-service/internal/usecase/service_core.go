@@ -22,7 +22,6 @@ type Service struct {
 	models                map[string]AIModel
 	brandCanonByProject   map[string]*BrandCanon
 	projectModels         map[string]map[string]bool
-	projectMembers        map[string]map[int64]*ProjectMember
 	modelSelectionChanges map[string]ProjectModelSelectionChangeUsage
 	impactIntegrations    map[string]*ProjectImpactIntegrations
 	providerCredentials   map[string]map[string]*LLMProviderCredentialRecord
@@ -48,7 +47,6 @@ func NewService() *Service {
 		models:                make(map[string]AIModel),
 		brandCanonByProject:   make(map[string]*BrandCanon),
 		projectModels:         make(map[string]map[string]bool),
-		projectMembers:        make(map[string]map[int64]*ProjectMember),
 		modelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage),
 		impactIntegrations:    make(map[string]*ProjectImpactIntegrations),
 		providerCredentials:   make(map[string]map[string]*LLMProviderCredentialRecord),
@@ -104,7 +102,6 @@ func (s *Service) reloadLocked(ctx context.Context) error {
 	s.models = nonNilModelMap(state.Models)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
-	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
 	s.providerCredentials = nonNilProviderCredentialMap(state.ProviderCredentials)
@@ -140,7 +137,6 @@ func (s *Service) snapshotLocked() *persistedState {
 		Models:                make(map[string]AIModel, len(s.models)),
 		BrandCanonByProject:   make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 		ProjectModels:         make(map[string]map[string]bool, len(s.projectModels)),
-		ProjectMembers:        make(map[string]map[int64]*ProjectMember, len(s.projectMembers)),
 		ModelSelectionChanges: make(map[string]ProjectModelSelectionChangeUsage, len(s.modelSelectionChanges)),
 		ImpactIntegrations:    make(map[string]*ProjectImpactIntegrations, len(s.impactIntegrations)),
 		ProviderCredentials:   make(map[string]map[string]*LLMProviderCredentialRecord, len(s.providerCredentials)),
@@ -173,14 +169,6 @@ func (s *Service) snapshotLocked() *persistedState {
 		}
 		state.ProjectModels[projectID] = copied
 	}
-	for projectID, members := range s.projectMembers {
-		copied := make(map[int64]*ProjectMember, len(members))
-		for userID, member := range members {
-			clone := copyProjectMember(member)
-			copied[userID] = &clone
-		}
-		state.ProjectMembers[projectID] = copied
-	}
 	for projectID, usage := range s.modelSelectionChanges {
 		state.ModelSelectionChanges[projectID] = usage
 	}
@@ -209,7 +197,6 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.models = nonNilModelMap(state.Models)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.projectModels = nonNilProjectModelMap(state.ProjectModels)
-	s.projectMembers = nonNilProjectMemberMap(state.ProjectMembers)
 	s.modelSelectionChanges = nonNilModelSelectionChangeUsageMap(state.ModelSelectionChanges)
 	s.impactIntegrations = nonNilProjectImpactIntegrationMap(state.ImpactIntegrations)
 	s.providerCredentials = nonNilProviderCredentialMap(state.ProviderCredentials)
@@ -371,11 +358,26 @@ func copyProject(project *Project) Project {
 	return *project
 }
 
-func copyProjectMember(member *ProjectMember) ProjectMember {
-	if member == nil {
-		return ProjectMember{}
+func applyBrandCanonToProject(project Project, canon *BrandCanon) Project {
+	if canon == nil {
+		return project
 	}
-	return *member
+
+	if brandName := strings.TrimSpace(canon.BrandName); brandName != "" {
+		project.BrandName = brandName
+	}
+	if category := strings.TrimSpace(canon.Category); category != "" {
+		project.Industry = category
+	}
+	if positioning := strings.TrimSpace(canon.Positioning); positioning != "" {
+		project.BrandDescription = positioning
+	}
+
+	return project
+}
+
+func (s *Service) effectiveProjectLocked(project *Project) Project {
+	return applyBrandCanonToProject(copyProject(project), s.brandCanonByProject[project.ID])
 }
 
 func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpactIntegrations {
@@ -470,21 +472,6 @@ func nonNilProjectModelMap(input map[string]map[string]bool) map[string]map[stri
 		return make(map[string]map[string]bool)
 	}
 	return input
-}
-
-func nonNilProjectMemberMap(input map[string]map[int64]*ProjectMember) map[string]map[int64]*ProjectMember {
-	if input == nil {
-		return make(map[string]map[int64]*ProjectMember)
-	}
-	out := make(map[string]map[int64]*ProjectMember, len(input))
-	for projectID, members := range input {
-		out[projectID] = make(map[int64]*ProjectMember, len(members))
-		for userID, member := range members {
-			clone := copyProjectMember(member)
-			out[projectID][userID] = &clone
-		}
-	}
-	return out
 }
 
 func nonNilModelSelectionChangeUsageMap(input map[string]ProjectModelSelectionChangeUsage) map[string]ProjectModelSelectionChangeUsage {
@@ -627,6 +614,7 @@ func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[
 			out = append(out, AnalysisPromptText{
 				ID:       prompt.ID,
 				Text:     prompt.Text,
+				Language: prompt.Language,
 				ModelIDs: effectivePromptModelIDs(prompt, enabledModelIDs),
 			})
 		}

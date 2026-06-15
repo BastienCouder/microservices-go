@@ -16,9 +16,11 @@ export type PerceptionAxisKey =
 export type PerceptionSeverity = "high" | "medium" | "low";
 export type OptimizePriority = "high" | "medium" | "low";
 export type PerceptionTrendPeriodKey = "all" | "7d" | "30d" | "90d" | "last-run";
+export type PerceptionSourceFilter = "perception" | "monitoring" | "all";
 
 export type BrandCanon = {
   brandName: string;
+  shortDescription: string;
   category: string;
   positioning: string;
   audience: string[];
@@ -55,12 +57,16 @@ export type PerceptionError = {
   id: string;
   severity: PerceptionSeverity;
   title: string;
+  titleKey?: string;
   issue: string;
+  issueKey?: string;
   impact: string;
+  impactKey?: string;
   detectedInModels: string[];
   fixType: "prompt_patch" | "website_copy" | "schema_update" | "faq_snippet";
   generatedContent: string;
   generatedContentKey?: string;
+  translationParams?: Record<string, unknown>;
   optimizePriority: OptimizePriority;
   type: string;
 };
@@ -91,6 +97,7 @@ export type PerceptionTrendSeries = {
 export type PerceptionResponseRecord = {
   id: string;
   runId: string;
+  runType: string;
   promptRunId: string;
   modelId: string;
   modelName: string;
@@ -130,6 +137,10 @@ export type PerceptionViewData = {
     projectId?: string | null;
     windowLabel: string;
     analyzedResponses: number;
+    perceptionResponses?: number;
+    monitoringResponsesUsed?: number;
+    sourceMode?: string;
+    visibilityScore?: number;
     models: string[];
     projectModels?: string[];
     modelCatalog: PerceptionModelOption[];
@@ -147,6 +158,7 @@ export type PerceptionApiPayload = {
   scores?: Partial<PerceptionScores>;
   radar?: Array<Partial<PerceptionRadarPoint>>;
   topErrors?: Array<Partial<PerceptionError>>;
+  responses?: unknown;
   metadata?: Partial<PerceptionViewData["metadata"]> & {
     projectModels?: unknown;
   };
@@ -161,6 +173,7 @@ export type PerceptionApiPayloadWithDashboard = PerceptionApiPayload & {
 
 const EMPTY_BRAND_CANON: BrandCanon = {
   brandName: "",
+  shortDescription: "",
   category: "",
   positioning: "",
   audience: [],

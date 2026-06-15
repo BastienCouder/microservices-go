@@ -16,11 +16,13 @@ import { resolveRuntimeMode } from "@/lib/runtime-mode";
 import type {
   BrandCanon,
   BrandCompetitor,
+  PerceptionLoadResult,
   PerceptionViewData,
 } from "@/features/perception/_lib/shared/perception-data";
 import { invalidateQueryKeys } from "@/shared/api/query-refresh";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
+  readOptionalProjectTokenFromSearch,
   readOrganizationIdFromSearch,
   readSelectedOrganizationPublicID,
 } from "@/shared/selection";
@@ -50,16 +52,50 @@ export function BrandCanonEditorPanel({
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [canonDraft, setCanonDraft] = useState<BrandCanon>(initialData.brandCanon);
+  const [canonDraft, setCanonDraft] = useState<BrandCanon>(() => ({
+    ...initialData.brandCanon,
+    shortDescription:
+      initialData.brandCanon.shortDescription.trim() ||
+      deriveShortDescription(initialData.brandCanon),
+  }));
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
   const brandsLocation = buildBrandsLocation(location.search);
   const loadError = initialData.metadata.emptyStateLabel;
-  const shortDescription = deriveShortDescription(canonDraft);
+  const routeProjectToken = readOptionalProjectTokenFromSearch(routeSearch);
   const organizationId =
     readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID() || null;
 
   const update = <K extends keyof BrandCanon>(key: K, value: BrandCanon[K]) => {
     setCanonDraft((current) => ({ ...current, [key]: value }));
+  };
+
+  const patchPerceptionCache = (
+    queryKey: ReturnType<typeof appQueryKeys.perception>,
+    nextCanon: BrandCanon,
+    nextCompetitors: BrandCompetitor[],
+  ) => {
+    queryClient.setQueryData<PerceptionLoadResult | undefined>(queryKey, (current) => {
+      if (!current) return current;
+
+      return {
+        ...current,
+        data: {
+          ...current.data,
+          brandCanon: {
+            ...current.data.brandCanon,
+            ...nextCanon,
+            audience: [...nextCanon.audience],
+            useCases: [...nextCanon.useCases],
+            features: [...nextCanon.features],
+            pricing: {
+              ...current.data.brandCanon.pricing,
+              ...nextCanon.pricing,
+            },
+          },
+          competitors: nextCompetitors.map((competitor) => ({ ...competitor })),
+        },
+      };
+    });
   };
 
   const saveMutation = useMutation({
@@ -73,12 +109,13 @@ export function BrandCanonEditorPanel({
         throw new Error(competitorError);
       }
 
-      const savedBrandCanon = await saveBrandCanonProject(initialData.metadata.projectId, {
+      const nextCanon: BrandCanon = {
         ...canonDraft,
         audience: sanitizeList(canonDraft.audience),
         useCases: sanitizeList(canonDraft.useCases),
         features: sanitizeList(canonDraft.features),
-      });
+      };
+      const savedBrandCanon = await saveBrandCanonProject(initialData.metadata.projectId, nextCanon);
       await syncCompetitors(initialData.metadata.projectId, initialData.competitors, competitorsDraft);
       setCanonDraft((current) => ({
         ...current,
@@ -88,14 +125,51 @@ export function BrandCanonEditorPanel({
         features: sanitizeList(savedBrandCanon.features ?? current.features),
         pricing: { ...current.pricing, ...(savedBrandCanon.pricing ?? {}) },
       }));
-      await invalidateQueryKeys(queryClient, [
+      const runtimeMode = resolveRuntimeMode(routeSearch);
+      const resolvedCanon: BrandCanon = {
+        ...nextCanon,
+        ...savedBrandCanon,
+        audience: sanitizeList(savedBrandCanon.audience ?? nextCanon.audience),
+        useCases: sanitizeList(savedBrandCanon.useCases ?? nextCanon.useCases),
+        features: sanitizeList(savedBrandCanon.features ?? nextCanon.features),
+        pricing: {
+          ...nextCanon.pricing,
+          ...(savedBrandCanon.pricing ?? {}),
+        },
+      };
+      const normalizedCompetitors = competitorsDraft.map((competitor) => ({
+        ...competitor,
+        name: competitor.name.trim(),
+        website: competitor.website.trim(),
+      }));
+      const perceptionKeys: Array<ReturnType<typeof appQueryKeys.perception>> = [
         appQueryKeys.perception(
           apiBaseURL,
           initialData.metadata.projectId ?? null,
           organizationId,
-          resolveRuntimeMode(routeSearch),
+          runtimeMode,
         ),
-      ]);
+      ];
+
+      if (
+        routeProjectToken &&
+        routeProjectToken !== initialData.metadata.projectId
+      ) {
+        perceptionKeys.push(
+          appQueryKeys.perception(
+            apiBaseURL,
+            routeProjectToken,
+            organizationId,
+            runtimeMode,
+          ),
+        );
+      }
+
+      for (const queryKey of perceptionKeys) {
+        patchPerceptionCache(queryKey, resolvedCanon, normalizedCompetitors);
+      }
+
+      await invalidateQueryKeys(queryClient, perceptionKeys);
       pushSuccessToast(t("savedMessage"));
       navigate(brandsLocation);
     },
@@ -147,8 +221,10 @@ export function BrandCanonEditorPanel({
                   description={t("fieldShortDescriptionHint")}
                 >
                   <Textarea
-                    value={shortDescription}
-                    disabled
+                    value={canonDraft.shortDescription}
+                    disabled={!canEdit}
+                    onChange={(e) => update("shortDescription", e.target.value)}
+                    placeholder={t("fieldShortDescriptionPlaceholder")}
                     className="min-h-[96px] text-sm"
                   />
                 </Field>

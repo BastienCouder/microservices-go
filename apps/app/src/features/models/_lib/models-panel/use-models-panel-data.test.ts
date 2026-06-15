@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { resolveSelectedProjectForModels } from "./use-models-panel-data";
+import {
+  resolveBillingOrganizationIdForModels,
+  resolveSelectedProjectForModels,
+} from "./use-models-panel-data";
 
 const dataSource = await Bun.file(
   new URL("./use-models-panel-data.ts", import.meta.url),
@@ -29,16 +32,23 @@ describe("resolveSelectedProjectForModels", () => {
     });
   });
 
-  test("does not fall back when the requested slug is only informational", () => {
+  test("resolves a project by slug without falling back", () => {
     expect(resolveSelectedProjectForModels(projects, "nike")).toEqual({
-      selectedProjectId: "",
-      hasMissingHintedProject: true,
+      selectedProjectId: "prj-2",
+      hasMissingHintedProject: false,
     });
   });
 
   test("resolves project tokens within the current organization scope", () => {
     expect(dataSource.includes("organizationId,")).toBe(true);
     expect(dataSource.includes("resolveProjectTokenToContext(apiBaseURL")).toBe(true);
+    expect(dataSource.includes("resolvedProjectContextQuery.data?.projectId || hintedProjectToken")).toBe(true);
+  });
+
+  test("keeps the selection limit unset until billing entitlements are resolved", () => {
+    expect(dataSource.includes("const resolvedSelectionLimit = billingQuery.data")).toBe(true);
+    expect(dataSource.includes("const selectionLimitReady =")).toBe(true);
+    expect(dataSource.includes("resolvedSelectionLimit ??")).toBe(true);
   });
 
   test("keeps the opaque project id in the canonical models redirect", () => {
@@ -48,5 +58,40 @@ describe("resolveSelectedProjectForModels", () => {
     );
     expect(redirectBlock.includes("project: data.selectedProject.id")).toBe(true);
     expect(redirectBlock.includes("organizationId")).toBe(false);
+  });
+});
+
+describe("resolveBillingOrganizationIdForModels", () => {
+  test("uses the selected project's numeric organization id", () => {
+    expect(
+      resolveBillingOrganizationIdForModels(
+        [
+          { id: "prj-1", organizationId: "1" },
+          { id: "prj-2", organizationId: "2" },
+        ],
+        "prj-2",
+        "org_public",
+      ),
+    ).toBe("2");
+  });
+
+  test("falls back to the first project's numeric organization id", () => {
+    expect(
+      resolveBillingOrganizationIdForModels(
+        [{ id: "prj-1", organizationId: "1" }],
+        "",
+        "org_public",
+      ),
+    ).toBe("1");
+  });
+
+  test("ignores public organization ids for billing quotas", () => {
+    expect(
+      resolveBillingOrganizationIdForModels(
+        [{ id: "prj-1", organizationId: "org_public" }],
+        "prj-1",
+        "org_public",
+      ),
+    ).toBe("");
   });
 });

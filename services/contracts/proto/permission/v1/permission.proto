@@ -13,6 +13,8 @@ message CheckRequest {
   int64 user_id = 2;
   string action = 3;
   string resource = 4;
+  string project_id = 5;
+  string resource_id = 6;
 }
 
 message CheckResponse {

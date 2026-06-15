@@ -13,6 +13,7 @@ import {
 import { buildTrend30dFromRuns } from "./prompt-data-factory";
 import type {
   PromptItem,
+  PromptLanguage,
   PromptKind,
   PromptPageResult,
   PromptRowMode,
@@ -76,6 +77,10 @@ function normalizePromptStatus(value: unknown): PromptItem["status"] | undefined
 
 function normalizePromptKind(value: unknown): PromptKind {
   return getString(value).toLowerCase() === "perception" ? "perception" : "monitoring";
+}
+
+export function normalizePromptLanguage(value: unknown): PromptLanguage {
+  return getString(value).toLowerCase() === "en" ? "en" : "fr";
 }
 
 export function dedupeModels(models: string[]): string[] {
@@ -163,6 +168,7 @@ export function normalizeProjectPromptRecord(entry: Record<string, unknown>): Pr
   return {
     id: getString(getField(entry, ["id", "ID"])),
     text: getString(getField(entry, ["text", "Text"])),
+    language: normalizePromptLanguage(getField(entry, ["language", "Language"])),
     intent: getString(getField(entry, ["intent", "Intent"])) || undefined,
     kind: normalizePromptKind(getField(entry, ["kind", "Kind"])),
     type:

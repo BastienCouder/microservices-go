@@ -28,6 +28,8 @@ func (s *Server) Check(ctx context.Context, req *permissionv1.CheckRequest) (*pe
 		UserID:         req.GetUserId(),
 		Action:         req.Action,
 		Resource:       req.Resource,
+		ProjectID:      req.GetProjectId(),
+		ResourceID:     req.GetResourceId(),
 	})
 	if err != nil {
 		log.Printf("permission grpc check failed: organization_id=%d user_id=%d action=%s resource=%s err=%v", req.GetOrganizationId(), req.GetUserId(), req.GetAction(), req.GetResource(), err)

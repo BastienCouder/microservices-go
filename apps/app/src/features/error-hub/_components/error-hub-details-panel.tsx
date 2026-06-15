@@ -18,6 +18,7 @@ import {
   ErrorDetailsContent,
   buildPerceptionModelLookup,
 } from "../../perception/_components/top-errors-panel";
+import { resolvePerceptionLocalizedText } from "../../perception/_lib";
 type ErrorHubDetailsPanelProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
   generatedIds: ReadonlySet<string>;
@@ -58,6 +59,12 @@ export function ErrorHubDetailsPanel({
   sheetDescription,
 }: ErrorHubDetailsPanelProps) {
   if (!selectedError) return null;
+  const selectedErrorTitle = resolvePerceptionLocalizedText(
+    selectedError.title,
+    selectedError.titleKey,
+    locale,
+    selectedError.translationParams,
+  );
 
   const content = (
     <ErrorDetailsContent
@@ -83,7 +90,7 @@ export function ErrorHubDetailsPanel({
       <Drawer open={selectedError !== null} onOpenChange={onOpenChange}>
         <DrawerContent className="h-[94vh] rounded-t-xl border-none bg-white">
           <DrawerHeader className="sr-only">
-            <DrawerTitle>{selectedError.title}</DrawerTitle>
+            <DrawerTitle>{selectedErrorTitle}</DrawerTitle>
             <DrawerDescription>{sheetDescription}</DrawerDescription>
           </DrawerHeader>
 
@@ -97,7 +104,7 @@ export function ErrorHubDetailsPanel({
     <Sheet open={selectedError !== null} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="!max-w-2xl">
         <SheetHeader className="sr-only">
-          <SheetTitle>{selectedError.title}</SheetTitle>
+          <SheetTitle>{selectedErrorTitle}</SheetTitle>
           <SheetDescription>{sheetDescription}</SheetDescription>
         </SheetHeader>
 

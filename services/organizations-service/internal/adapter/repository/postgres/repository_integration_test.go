@@ -14,7 +14,7 @@ import (
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 )
 
-func TestRepositoryIntegration_MembersRoles(t *testing.T) {
+func TestRepositoryIntegration_OrganizationsAndAPIKeys(t *testing.T) {
 	dsn := os.Getenv("ORG_TEST_DATABASE_URL")
 	if dsn == "" {
 		t.Skip("ORG_TEST_DATABASE_URL is required for integration tests")
@@ -39,7 +39,7 @@ func TestRepositoryIntegration_MembersRoles(t *testing.T) {
 
 	repo := NewRepository(db)
 
-	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(ctx, `TRUNCATE TABLE organization_api_keys, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 
@@ -51,46 +51,65 @@ func TestRepositoryIntegration_MembersRoles(t *testing.T) {
 		t.Fatalf("expected organization id > 0, got %d", org.ID)
 	}
 
-	member := &domain.Member{OrganizationID: org.ID, UserID: 42, Roles: []string{"viewer"}, AddedAt: time.Now().UTC()}
-	if err := repo.UpsertMember(ctx, member); err != nil {
-		t.Fatalf("upsert member: %v", err)
-	}
-
-	updated, err := repo.AssignRole(ctx, org.ID, 42, "editor")
-	if err != nil {
-		t.Fatalf("assign role: %v", err)
-	}
-	if len(updated.Roles) < 2 {
-		t.Fatalf("expected at least 2 roles, got %v", updated.Roles)
-	}
-
-	members, err := repo.ListMembers(ctx, org.ID)
-	if err != nil {
-		t.Fatalf("list members: %v", err)
-	}
-	if len(members) != 2 {
-		t.Fatalf("expected 2 members (creator + added), got %d", len(members))
-	}
-
-	var creatorFound bool
-	for _, m := range members {
-		if m.UserID == org.OwnerIdentityID {
-			creatorFound = true
-			if len(m.Roles) != 1 || m.Roles[0] != "editor" {
-				t.Fatalf("expected organization creator to have role editor, got %v", m.Roles)
-			}
-		}
-	}
-	if !creatorFound {
-		t.Fatalf("expected creator membership for user_id=%d", org.OwnerIdentityID)
-	}
-
 	storedOrg, err := repo.GetByID(ctx, org.ID)
 	if err != nil {
 		t.Fatalf("get organization: %v", err)
 	}
 	if storedOrg.Name != "Acme" {
 		t.Fatalf("unexpected organization name: %s", storedOrg.Name)
+	}
+	if storedOrg.OwnerIdentityID != 1 {
+		t.Fatalf("unexpected owner identity id: %d", storedOrg.OwnerIdentityID)
+	}
+
+	key := &domain.OrganizationAPIKey{
+		OrganizationID: org.ID,
+		Name:           "Production",
+		Prefix:         "org_testpref",
+		KeyHash:        "hash-value",
+		Key:            "org_secret",
+		CreatedAt:      time.Now().UTC().Truncate(time.Second),
+	}
+	if err := repo.CreateAPIKey(ctx, key); err != nil {
+		t.Fatalf("create organization api key: %v", err)
+	}
+	if key.ID <= 0 {
+		t.Fatalf("expected api key id > 0, got %d", key.ID)
+	}
+
+	keys, err := repo.ListAPIKeys(ctx, org.ID)
+	if err != nil {
+		t.Fatalf("list api keys: %v", err)
+	}
+	if len(keys) != 1 {
+		t.Fatalf("expected 1 api key, got %d", len(keys))
+	}
+	if keys[0].Name != "Production" {
+		t.Fatalf("unexpected api key name: %s", keys[0].Name)
+	}
+
+	storedKey, err := repo.GetAPIKeyByHash(ctx, "hash-value")
+	if err != nil {
+		t.Fatalf("get api key by hash: %v", err)
+	}
+	if storedKey.OrganizationID != org.ID {
+		t.Fatalf("unexpected api key organization id: %d", storedKey.OrganizationID)
+	}
+
+	lastUsedAt := time.Now().UTC().Truncate(time.Second)
+	if err := repo.MarkAPIKeyLastUsed(ctx, key.ID, lastUsedAt); err != nil {
+		t.Fatalf("mark api key last used: %v", err)
+	}
+	if err := repo.RevokeAPIKey(ctx, org.ID, key.ID, lastUsedAt); err != nil {
+		t.Fatalf("revoke api key: %v", err)
+	}
+
+	keys, err = repo.ListAPIKeys(ctx, org.ID)
+	if err != nil {
+		t.Fatalf("list api keys after revoke: %v", err)
+	}
+	if len(keys) != 0 {
+		t.Fatalf("expected revoked api keys to be hidden from active listing, got %d", len(keys))
 	}
 }
 
@@ -119,7 +138,7 @@ func TestRepositoryIntegration_InvitationsFlow(t *testing.T) {
 
 	repo := NewRepository(db)
 
-	if _, err := db.Exec(ctx, `TRUNCATE TABLE member_roles, organization_members, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := db.Exec(ctx, `TRUNCATE TABLE organization_api_keys, organization_invitations, organizations RESTART IDENTITY CASCADE`); err != nil {
 		t.Fatalf("truncate tables: %v", err)
 	}
 

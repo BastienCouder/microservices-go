@@ -1,4 +1,5 @@
 import { render } from '@react-email/render';
+import InvitationEmail from './emails/invitation';
 import NotificationEmail from './emails/notification';
 import OTPEmail from './emails/otp';
 
@@ -10,6 +11,15 @@ type RenderNotificationPayload = {
 type RenderOTPPayload = {
   code: string;
   purpose: string;
+};
+
+type InvitationTemplatePayload = {
+  organizationName: string;
+  role?: string;
+  projectId?: string;
+  customMessage?: string;
+  acceptUrl?: string;
+  expiresAt?: string;
 };
 
 function jsonResponse(status: number, payload: unknown): Response {
@@ -25,6 +35,74 @@ function parseJSON<T>(value: string): T | null {
   } catch {
     return null;
   }
+}
+
+function parseInvitationTemplate(title: string, message: string): InvitationTemplatePayload | null {
+  const cleanTitle = title.trim();
+  const cleanMessage = message.trim();
+  if (
+    !cleanTitle.toLowerCase().startsWith('invitation a rejoindre ') &&
+    !cleanMessage.includes("Accepter l'invitation:")
+  ) {
+    return null;
+  }
+
+  const lines = cleanMessage
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((line) => line.trim());
+
+  let organizationName = cleanTitle.replace(/^Invitation a rejoindre\s+/i, '').trim();
+  let role = '';
+  let projectId = '';
+  let acceptUrl = '';
+  let expiresAt = '';
+  const customMessageLines: string[] = [];
+
+  for (const [index, line] of lines.entries()) {
+    if (!line) {
+      continue;
+    }
+    const orgMatch = line.match(/^Vous avez ete invite a rejoindre (.+)\.$/i);
+    if (index === 0 && orgMatch) {
+      organizationName = orgMatch[1].trim();
+      continue;
+    }
+    const roleMatch = line.match(/^Role:\s*(.+)\.$/i);
+    if (roleMatch) {
+      role = roleMatch[1].trim();
+      continue;
+    }
+    const projectMatch = line.match(/^Cette invitation est limitee au projet (.+)\.$/i);
+    if (projectMatch) {
+      projectId = projectMatch[1].trim();
+      continue;
+    }
+    const urlMatch = line.match(/^Accepter l'invitation:\s*(.+)$/i);
+    if (urlMatch) {
+      acceptUrl = urlMatch[1].trim();
+      continue;
+    }
+    const expiresMatch = line.match(/^Expire le:\s*(.+)\.$/i);
+    if (expiresMatch) {
+      expiresAt = expiresMatch[1].trim();
+      continue;
+    }
+    customMessageLines.push(line);
+  }
+
+  if (!organizationName && !acceptUrl) {
+    return null;
+  }
+
+  return {
+    organizationName,
+    role,
+    projectId,
+    customMessage: customMessageLines.join('\n').trim(),
+    acceptUrl,
+    expiresAt,
+  };
 }
 
 const portRaw = process.env.EMAIL_API_PORT;
@@ -54,7 +132,10 @@ Bun.serve({
 
       const subject = parsed.title.trim();
       const message = parsed.message.trim();
-      const html = await render(NotificationEmail({ title: subject, message }));
+      const invitation = parseInvitationTemplate(subject, message);
+      const html = invitation
+        ? await render(InvitationEmail(invitation))
+        : await render(NotificationEmail({ title: subject, message }));
       return jsonResponse(200, { subject, html, text: message });
     }
 

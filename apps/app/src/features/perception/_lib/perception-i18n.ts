@@ -6,6 +6,7 @@ import type {
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 
 type SupportedLocale = "en" | "fr";
+type PerceptionTextParams = Record<string, unknown> | undefined;
 
 const PERIOD_TRANSLATION_KEYS: Record<PerceptionTrendPeriodKey, string> = {
   all: "periodAll",
@@ -68,20 +69,6 @@ const ERROR_TYPE_TRANSLATION_KEYS = {
   monitoring_negative_shift: "errorTypeMonitoringNegativeShift",
   monitoring_model_volatility: "errorTypeMonitoringModelVolatility",
 } as const;
-
-const GENERATED_CONTENT_TRANSLATION_KEYS = new Set([
-  "generatedContentPerceptionPositioningGap",
-  "generatedContentPerceptionCitationGap",
-  "generatedContentPerceptionUseCaseGap",
-  "generatedContentPerceptionSentimentGap",
-  "generatedContentPerceptionCompetitiveGap",
-  "generatedContentMonitoringAlert",
-  "generatedContentMonitoringVisibilityGap",
-  "generatedContentMonitoringCitationGap",
-  "generatedContentMonitoringRankingGap",
-  "generatedContentMonitoringNegativeShift",
-  "generatedContentMonitoringModelVolatility",
-] as const);
 
 const SEVERITY_TRANSLATION_KEYS: Record<PerceptionSeverity, string> = {
   high: "topErrorsSeverityHigh",
@@ -187,10 +174,26 @@ export function resolvePerceptionGeneratedContent(
   value: string,
   key: string | undefined,
   locale: string,
+  options?: PerceptionTextParams,
 ): string {
   const normalizedKey = key?.trim();
-  if (normalizedKey && GENERATED_CONTENT_TRANSLATION_KEYS.has(normalizedKey as never)) {
-    return translatePerception(normalizedKey, locale);
+  if (normalizedKey) {
+    const translated = translatePerception(normalizedKey, locale, options);
+    return translated === normalizedKey ? value : translated;
+  }
+  return value;
+}
+
+export function resolvePerceptionLocalizedText(
+  value: string,
+  key: string | undefined,
+  locale: string,
+  options?: PerceptionTextParams,
+): string {
+  const normalizedKey = key?.trim();
+  if (normalizedKey) {
+    const translated = translatePerception(normalizedKey, locale, options);
+    return translated === normalizedKey ? value : translated;
   }
   return value;
 }

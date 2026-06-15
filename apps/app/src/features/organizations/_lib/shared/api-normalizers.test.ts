@@ -17,7 +17,6 @@ describe("organization api normalizers", () => {
       organizationId: "42",
       name: "Acme",
       brandName: "",
-      brandDescription: "",
       attributionSource: "",
       createdAt: "",
     });

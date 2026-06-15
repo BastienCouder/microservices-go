@@ -16,11 +16,11 @@ func TestListScheduledAnalysisJobsReturnsActivePromptCoverage(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create active project: %v", err)
 	}
+	mustUpdateBrandCanon(t, ctx, svc, activeProject.ID, 42, "Acme", "", "")
 	if _, err := svc.ReplaceProjectModels(ctx, activeProject.ID, 42, []string{"gpt-oss-120b-free", "gemma-3-27b-free"}); err != nil {
 		t.Fatalf("replace models: %v", err)
 	}

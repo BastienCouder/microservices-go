@@ -290,7 +290,7 @@ function SidebarComponent({
       dashboard: buildScopedHref("/monitoring", { project }),
       prompts: buildScopedHref("/prompts", { project, tab: "prompts" }),
       responses: buildScopedHref("/prompts", { project, tab: "responses" }),
-      pages: buildScopedHref("/pages", { project }),
+     // pages: buildScopedHref("/pages", { project }),
       perception: buildScopedHref("/perception", { project }),
       traffic: buildScopedHref("/traffic", { project }),
       models: buildScopedHref("/models", { project }),
@@ -379,7 +379,7 @@ function SidebarComponent({
         item(links.dashboard, content.dashboard),
         item(links.prompts, content.prompts),
         item(links.responses, content.responses),
-        item(links.pages, content.pages),
+      //  item(links.pages, content.pages),
       ],
     },
     {
@@ -419,7 +419,9 @@ function SidebarComponent({
   const settingsSections = [
     {
       title: content.organizations,
-      items: orgTabs.map(({ value, label }) =>
+      items: orgTabs
+        .filter(({ value }) => value !== "apiKeys")
+        .map(({ value, label }) =>
         item(
           organizationLinks[value],
           content[

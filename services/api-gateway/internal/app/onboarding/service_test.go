@@ -23,6 +23,8 @@ func TestBootstrapUsesOrganizationIDFromSuccessEnvelope(t *testing.T) {
 		switch {
 		case r.Method == http.MethodPost && r.URL.Path == "/projects":
 			_, _ = w.Write([]byte(`{"success":true,"data":{"ID":"project-42"}}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/projects/project-42/brand-canon":
+			_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
 		case r.Method == http.MethodPatch && r.URL.Path == "/projects/project-42/models":
 			_, _ = w.Write([]byte(`{"success":true,"data":{}}`))
 		default:

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -19,27 +18,18 @@ import (
 type Repository struct {
 	db      *pgxpool.Pool
 	queries *sqlc.Queries
-	psql    sq.StatementBuilderType
 }
 
 func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{
 		db:      db,
 		queries: sqlc.New(db),
-		psql:    sq.StatementBuilder.PlaceholderFormat(sq.Dollar),
 	}
 }
 
 func (r *Repository) Create(ctx context.Context, organization *domain.Organization) error {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin create organization transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	qtx := r.queries.WithTx(tx)
 	var createdID int64
-	if err := tx.QueryRow(ctx, `
+	if err := r.db.QueryRow(ctx, `
 		INSERT INTO organizations (public_id, name, owner_user_id, created_at, deleted_at)
 		VALUES ($1, $2, $3, $4, NULL)
 		RETURNING id
@@ -47,25 +37,6 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 		&createdID,
 	); err != nil {
 		return fmt.Errorf("insert organization: %w", err)
-	}
-
-	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
-		ID:      createdID,
-		UserID:  organization.OwnerIdentityID,
-		AddedAt: toPgTimestamptz(organization.CreatedAt),
-	}); err != nil {
-		return fmt.Errorf("insert organization creator membership: %w", err)
-	}
-	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
-		OrganizationID: createdID,
-		UserID:         organization.OwnerIdentityID,
-		Role:           domain.RoleEditor,
-	}); err != nil {
-		return fmt.Errorf("insert organization creator role: %w", err)
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit create organization transaction: %w", err)
 	}
 
 	organization.ID = createdID
@@ -180,21 +151,6 @@ func (r *Repository) DeleteOrganization(ctx context.Context, organizationID int6
 	}
 
 	if _, err := tx.Exec(ctx, `
-		DELETE FROM member_roles
-		WHERE organization_id = $1
-	`, organizationID); err != nil {
-		return fmt.Errorf("delete organization member roles: %w", err)
-	}
-
-	if _, err := tx.Exec(ctx, `
-		UPDATE organization_members
-		SET deleted_at = COALESCE(deleted_at, $2)
-		WHERE organization_id = $1
-	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
-		return fmt.Errorf("soft delete organization members: %w", err)
-	}
-
-	if _, err := tx.Exec(ctx, `
 		UPDATE organization_invitations
 		SET project_id = '',
 		    email = 'deleted-invitation-' || id::text || '@anonymized.local',
@@ -208,13 +164,6 @@ func (r *Repository) DeleteOrganization(ctx context.Context, organizationID int6
 		WHERE organization_id = $1
 	`, organizationID, toPgTimestamptz(deletedAt)); err != nil {
 		return fmt.Errorf("anonymize organization invitations: %w", err)
-	}
-
-	if _, err := tx.Exec(ctx, `
-		DELETE FROM project_members
-		WHERE organization_id = $1
-	`, organizationID); err != nil {
-		return fmt.Errorf("delete organization project members: %w", err)
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -232,48 +181,6 @@ func (r *Repository) DeleteOrganization(ctx context.Context, organizationID int6
 		return fmt.Errorf("commit delete organization transaction: %w", err)
 	}
 	return nil
-}
-
-func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) ([]domain.Membership, error) {
-	query := r.psql.Select(
-		"m.organization_id",
-		"m.user_id",
-		"COALESCE(array_agg(distinct r.role) filter (where r.role is not null), '{}'::text[]) AS roles",
-	).
-		From("organization_members m").
-		Join("organizations o ON o.id = m.organization_id").
-		LeftJoin("member_roles r ON r.organization_id = m.organization_id AND r.user_id = m.user_id").
-		Where(sq.Eq{"m.user_id": userID}).
-		Where("m.deleted_at IS NULL").
-		Where("o.deleted_at IS NULL").
-		GroupBy("m.organization_id, m.user_id").
-		OrderBy("m.organization_id ASC")
-
-	sql, args, err := query.ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("build list organizations by user query: %w", err)
-	}
-
-	rows, err := r.db.Query(ctx, sql, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list organizations by user: %w", err)
-	}
-	defer rows.Close()
-
-	memberships := make([]domain.Membership, 0)
-	for rows.Next() {
-		var item domain.Membership
-		var roles []string
-		if err := rows.Scan(&item.OrganizationID, &item.UserID, &roles); err != nil {
-			return nil, fmt.Errorf("scan organization membership: %w", err)
-		}
-		item.Roles = append([]string(nil), roles...)
-		memberships = append(memberships, item)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate organization memberships: %w", err)
-	}
-	return memberships, nil
 }
 
 func (r *Repository) CreateAPIKey(ctx context.Context, key *domain.OrganizationAPIKey) error {
@@ -393,285 +300,6 @@ func (r *Repository) RevokeAPIKey(ctx context.Context, organizationID, keyID int
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrOrganizationNotFound
-	}
-	return nil
-}
-
-func (r *Repository) UpsertMember(ctx context.Context, member *domain.Member) error {
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin upsert member transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	qtx := r.queries.WithTx(tx)
-	if _, err := tx.Exec(ctx, `
-		INSERT INTO organization_members (organization_id, user_id, added_at, deleted_at)
-		SELECT o.id, $2, $3, NULL
-		FROM organizations o
-		WHERE o.id = $1
-		  AND o.deleted_at IS NULL
-		ON CONFLICT (organization_id, user_id)
-		DO UPDATE SET added_at = EXCLUDED.added_at,
-		              deleted_at = NULL
-	`, member.OrganizationID, member.UserID, toPgTimestamptz(member.AddedAt)); err != nil {
-		if isFKViolation(err) {
-			return domain.ErrOrganizationNotFound
-		}
-		return fmt.Errorf("upsert member: %w", err)
-	}
-
-	for _, role := range member.Roles {
-		if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
-			OrganizationID: member.OrganizationID,
-			UserID:         member.UserID,
-			Role:           role,
-		}); err != nil {
-			return fmt.Errorf("insert member role: %w", err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit upsert member transaction: %w", err)
-	}
-
-	return nil
-}
-
-func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]domain.Member, error) {
-	if _, err := r.GetByID(ctx, organizationID); err != nil {
-		return nil, err
-	}
-
-	query := r.psql.Select(
-		"m.organization_id",
-		"m.user_id",
-		"m.added_at",
-		"COALESCE(array_agg(r.role ORDER BY r.role) FILTER (WHERE r.role IS NOT NULL), '{}')",
-	).
-		From("organization_members m").
-		LeftJoin("member_roles r ON r.organization_id = m.organization_id AND r.user_id = m.user_id").
-		Where(sq.Eq{"m.organization_id": organizationID}).
-		Where("m.deleted_at IS NULL").
-		GroupBy("m.organization_id, m.user_id, m.added_at").
-		OrderBy("m.user_id")
-
-	sqlQuery, args, err := query.ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("build list members query: %w", err)
-	}
-
-	rows, err := r.db.Query(ctx, sqlQuery, args...)
-	if err != nil {
-		return nil, fmt.Errorf("list members: %w", err)
-	}
-	defer rows.Close()
-
-	members := make([]domain.Member, 0)
-	for rows.Next() {
-		var member domain.Member
-		var roles []string
-		if err := rows.Scan(&member.OrganizationID, &member.UserID, &member.AddedAt, &roles); err != nil {
-			return nil, fmt.Errorf("scan member: %w", err)
-		}
-		member.Roles = append([]string(nil), roles...)
-		member.DeletedAt = nil
-		members = append(members, member)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate members: %w", err)
-	}
-
-	return members, nil
-}
-
-func (r *Repository) AssignRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
-	if err := r.queries.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
-		OrganizationID: organizationID,
-		UserID:         userID,
-		Role:           role,
-	}); err != nil {
-		if isFKViolation(err) {
-			if _, orgErr := r.GetByID(ctx, organizationID); orgErr != nil {
-				return nil, orgErr
-			}
-			return nil, domain.ErrMemberNotFound
-		}
-		return nil, fmt.Errorf("assign role: %w", err)
-	}
-
-	memberRow, err := r.queries.GetMemberByOrgAndUser(ctx, sqlc.GetMemberByOrgAndUserParams{
-		OrganizationID: organizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrMemberNotFound
-		}
-		return nil, fmt.Errorf("get member: %w", err)
-	}
-
-	roles, err := r.queries.ListMemberRolesByOrgAndUser(ctx, sqlc.ListMemberRolesByOrgAndUserParams{
-		OrganizationID: organizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("list member roles: %w", err)
-	}
-
-	return &domain.Member{
-		OrganizationID: memberRow.OrganizationID,
-		UserID:         memberRow.UserID,
-		AddedAt:        fromPgTimestamptz(memberRow.AddedAt),
-		DeletedAt:      fromPgNullableTimestamptz(memberRow.DeletedAt),
-		Roles:          append([]string(nil), roles...),
-	}, nil
-}
-
-func (r *Repository) UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
-	if _, err := r.GetByID(ctx, organizationID); err != nil {
-		return nil, err
-	}
-
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("begin update member roles transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	member, err := getActiveMember(ctx, tx, organizationID, userID)
-	if err != nil {
-		return nil, err
-	}
-
-	if _, err := tx.Exec(ctx, `
-		DELETE FROM member_roles
-		WHERE organization_id = $1
-		  AND user_id = $2
-	`, organizationID, userID); err != nil {
-		return nil, fmt.Errorf("delete member roles: %w", err)
-	}
-
-	for _, role := range roles {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO member_roles (organization_id, user_id, role)
-			VALUES ($1, $2, $3)
-			ON CONFLICT (organization_id, user_id, role) DO NOTHING
-		`, organizationID, userID, role); err != nil {
-			return nil, fmt.Errorf("insert member role: %w", err)
-		}
-	}
-
-	member.Roles = append([]string(nil), roles...)
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit update member roles transaction: %w", err)
-	}
-	return member, nil
-}
-
-func (r *Repository) RemoveMember(ctx context.Context, organizationID, userID int64, removedAt time.Time) error {
-	if _, err := r.GetByID(ctx, organizationID); err != nil {
-		return err
-	}
-
-	tx, err := r.db.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin remove member transaction: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := getActiveMember(ctx, tx, organizationID, userID); err != nil {
-		return err
-	}
-
-	if _, err := tx.Exec(ctx, `
-		DELETE FROM member_roles
-		WHERE organization_id = $1
-		  AND user_id = $2
-	`, organizationID, userID); err != nil {
-		return fmt.Errorf("delete member roles before removal: %w", err)
-	}
-
-	tag, err := tx.Exec(ctx, `
-		UPDATE organization_members
-		SET deleted_at = $3
-		WHERE organization_id = $1
-		  AND user_id = $2
-		  AND deleted_at IS NULL
-	`, organizationID, userID, toPgTimestamptz(removedAt.UTC()))
-	if err != nil {
-		return fmt.Errorf("remove member: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrMemberNotFound
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit remove member transaction: %w", err)
-	}
-	return nil
-}
-
-func (r *Repository) UpsertProjectMember(ctx context.Context, member *domain.ProjectMember) error {
-	if member == nil {
-		return domain.ErrInvalidMember
-	}
-	_, err := r.db.Exec(ctx, `
-		INSERT INTO project_members (project_id, organization_id, user_id, role, added_at)
-		SELECT $1, o.id, $3, $4, $5
-		FROM organizations o
-		WHERE o.id = $2
-		  AND o.deleted_at IS NULL
-		ON CONFLICT (project_id, user_id)
-		DO UPDATE SET
-			organization_id = EXCLUDED.organization_id,
-			role = EXCLUDED.role
-	`, member.ProjectID, member.OrganizationID, member.UserID, member.Role, toPgTimestamptz(member.AddedAt))
-	if err != nil {
-		return fmt.Errorf("upsert project member: %w", err)
-	}
-	return nil
-}
-
-func (r *Repository) ListProjectMembers(ctx context.Context, organizationID int64, projectID string) ([]domain.ProjectMember, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT project_id, organization_id, user_id, role, added_at
-		FROM project_members
-		WHERE organization_id = $1
-		  AND project_id = $2
-		ORDER BY user_id ASC
-	`, organizationID, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("list project members: %w", err)
-	}
-	defer rows.Close()
-	return scanProjectMembers(rows)
-}
-
-func (r *Repository) ListProjectMembersByUser(ctx context.Context, organizationID, userID int64) ([]domain.ProjectMember, error) {
-	rows, err := r.db.Query(ctx, `
-		SELECT project_id, organization_id, user_id, role, added_at
-		FROM project_members
-		WHERE organization_id = $1
-		  AND user_id = $2
-		ORDER BY project_id ASC
-	`, organizationID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list project members by user: %w", err)
-	}
-	defer rows.Close()
-	return scanProjectMembers(rows)
-}
-
-func (r *Repository) RemoveProjectMember(ctx context.Context, organizationID int64, projectID string, userID int64) error {
-	_, err := r.db.Exec(ctx, `
-		DELETE FROM project_members
-		WHERE organization_id = $1
-		  AND project_id = $2
-		  AND user_id = $3
-	`, organizationID, projectID, userID)
-	if err != nil {
-		return fmt.Errorf("remove project member: %w", err)
 	}
 	return nil
 }
@@ -823,55 +451,20 @@ func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, 
 		return nil, nil, fmt.Errorf("mark invitation accepted: %w", err)
 	}
 
-	addedAt := acceptedAt.UTC()
-	if err := qtx.UpsertMember(ctx, sqlc.UpsertMemberParams{
-		ID:      invitation.OrganizationID,
-		UserID:  userID,
-		AddedAt: toPgTimestamptz(addedAt),
-	}); err != nil {
-		if isFKViolation(err) {
-			return nil, nil, domain.ErrOrganizationNotFound
-		}
-		return nil, nil, fmt.Errorf("upsert invited member: %w", err)
-	}
-	memberRole := invitation.Role
-	if invitation.ProjectID != "" {
-		memberRole = domain.RoleViewer
-	}
-	if err := qtx.InsertMemberRole(ctx, sqlc.InsertMemberRoleParams{
-		OrganizationID: invitation.OrganizationID,
-		UserID:         userID,
-		Role:           memberRole,
-	}); err != nil {
-		return nil, nil, fmt.Errorf("insert invited member role: %w", err)
-	}
-
-	memberRow, err := qtx.GetMemberByOrgAndUser(ctx, sqlc.GetMemberByOrgAndUserParams{
-		OrganizationID: invitation.OrganizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("get invited member: %w", err)
-	}
-	roles, err := qtx.ListMemberRolesByOrgAndUser(ctx, sqlc.ListMemberRolesByOrgAndUserParams{
-		OrganizationID: invitation.OrganizationID,
-		UserID:         userID,
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("list invited member roles: %w", err)
-	}
-
 	if err := tx.Commit(ctx); err != nil {
 		return nil, nil, fmt.Errorf("commit accept invitation transaction: %w", err)
 	}
 
 	updatedInvitation := mapInvitation(updatedRow)
+	memberRole := invitation.Role
+	if invitation.ProjectID != "" {
+		memberRole = domain.RoleViewer
+	}
 	member := &domain.Member{
-		OrganizationID: memberRow.OrganizationID,
-		UserID:         memberRow.UserID,
-		AddedAt:        fromPgTimestamptz(memberRow.AddedAt),
-		DeletedAt:      fromPgNullableTimestamptz(memberRow.DeletedAt),
-		Roles:          append([]string(nil), roles...),
+		OrganizationID: invitation.OrganizationID,
+		UserID:         userID,
+		AddedAt:        acceptedAt.UTC(),
+		Roles:          []string{memberRole},
 	}
 	return &updatedInvitation, member, nil
 }
@@ -914,57 +507,6 @@ func (r *Repository) RefuseInvitationByToken(ctx context.Context, token string, 
 
 	updated := mapInvitation(updatedRow)
 	return &updated, nil
-}
-
-func getActiveMember(ctx context.Context, tx pgx.Tx, organizationID, userID int64) (*domain.Member, error) {
-	var member domain.Member
-	var deletedAt pgtype.Timestamptz
-	if err := tx.QueryRow(ctx, `
-		SELECT organization_id, user_id, added_at, deleted_at
-		FROM organization_members
-		WHERE organization_id = $1
-		  AND user_id = $2
-		  AND deleted_at IS NULL
-	`, organizationID, userID).Scan(
-		&member.OrganizationID,
-		&member.UserID,
-		&member.AddedAt,
-		&deletedAt,
-	); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, domain.ErrMemberNotFound
-		}
-		return nil, fmt.Errorf("get active member: %w", err)
-	}
-	member.DeletedAt = fromPgNullableTimestamptz(deletedAt)
-	return &member, nil
-}
-
-func listActiveMemberRoles(ctx context.Context, tx pgx.Tx, organizationID, userID int64) ([]string, error) {
-	rows, err := tx.Query(ctx, `
-		SELECT role
-		FROM member_roles
-		WHERE organization_id = $1
-		  AND user_id = $2
-		ORDER BY role
-	`, organizationID, userID)
-	if err != nil {
-		return nil, fmt.Errorf("list member roles: %w", err)
-	}
-	defer rows.Close()
-
-	roles := make([]string, 0)
-	for rows.Next() {
-		var role string
-		if err := rows.Scan(&role); err != nil {
-			return nil, fmt.Errorf("scan member role: %w", err)
-		}
-		roles = append(roles, role)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate member roles: %w", err)
-	}
-	return roles, nil
 }
 
 func toPgNullableTimestamptz(value *time.Time) pgtype.Timestamptz {
@@ -1014,29 +556,6 @@ func scanOrganizationAPIKey(row pgx.Row) (domain.OrganizationAPIKey, error) {
 	key.LastUsedAt = fromPgNullableTimestamptz(lastUsedAt)
 	key.RevokedAt = fromPgNullableTimestamptz(revokedAt)
 	return key, nil
-}
-
-func scanProjectMembers(rows pgx.Rows) ([]domain.ProjectMember, error) {
-	members := make([]domain.ProjectMember, 0)
-	for rows.Next() {
-		var member domain.ProjectMember
-		var addedAt pgtype.Timestamptz
-		if err := rows.Scan(
-			&member.ProjectID,
-			&member.OrganizationID,
-			&member.UserID,
-			&member.Role,
-			&addedAt,
-		); err != nil {
-			return nil, fmt.Errorf("scan project member: %w", err)
-		}
-		member.AddedAt = fromPgTimestamptz(addedAt)
-		members = append(members, member)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterate project members: %w", err)
-	}
-	return members, nil
 }
 
 func mapInvitation(row sqlc.OrganizationInvitation) domain.Invitation {

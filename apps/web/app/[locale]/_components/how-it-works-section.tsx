@@ -103,7 +103,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             </span>
             <span className="hidden text-xs text-muted-foreground sm:inline">
               {" "}
-              — {currentPreviewStep.description}
+              {currentPreviewStep.description}
             </span>
           </div>
         </div>

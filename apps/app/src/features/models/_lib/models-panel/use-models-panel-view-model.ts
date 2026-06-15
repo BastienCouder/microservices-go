@@ -60,6 +60,12 @@ export function useModelsPanelViewModel({
     () => readProjectTokenFromSearch(routeSearch) || storedProjectToken,
     [routeSearch, storedProjectToken],
   );
+  const deferScopedLoadsUntilProjectContextResolves = useMemo(
+    () =>
+      readProjectTokenFromSearch(routeSearch) !== "" &&
+      readOrganizationIdFromSearch(routeSearch) === "",
+    [routeSearch],
+  );
 
   useEffect(() => {
     setOrganizationId(readOrganizationId(routeSearch));
@@ -84,6 +90,7 @@ export function useModelsPanelViewModel({
     apiBaseURL,
     organizationId,
     hintedProjectToken,
+    deferScopedLoadsUntilProjectContextResolves,
   });
 
   const saveModelsMutation = useSaveProjectModelsMutation({
@@ -297,7 +304,10 @@ export function useModelsPanelViewModel({
         pushErrorToast(new Error(nextMessage), nextMessage);
         return;
       }
-      if (data.selectedModelIdSet.size >= data.selectionLimit) {
+      if (
+        data.selectionLimitReady &&
+        data.selectedModelIdSet.size >= data.selectionLimit
+      ) {
         const nextMessage =
           data.planLabel
             ? t("selectionLimitReached", {
@@ -330,6 +340,7 @@ export function useModelsPanelViewModel({
     selectedProject: data.selectedProject,
     filteredCatalog,
     selectionLimit: data.selectionLimit,
+    selectionLimitReady: data.selectionLimitReady,
     planLabel: data.planLabel,
     isDeveloperPlan: data.isDeveloperPlan,
     showDeveloperUpgradeBanner: data.showDeveloperUpgradeBanner,

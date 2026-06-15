@@ -34,7 +34,7 @@ func (f fakeProjectLister) ListProjectsByOrganizationForUser(_ context.Context, 
 
 func TestGetOrganizationHierarchyIncludesProjects(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
 			{
@@ -71,7 +71,7 @@ func TestGetOrganizationHierarchyIncludesProjects(t *testing.T) {
 
 func TestGetOrganizationHierarchyForUserUsesProjectScopedListing(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
 			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
@@ -98,7 +98,7 @@ func TestGetOrganizationHierarchyForUserUsesProjectScopedListing(t *testing.T) {
 
 func TestGetOrganizationHierarchyForEditorUserIncludesAllProjects(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
 			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
@@ -128,7 +128,7 @@ func TestGetOrganizationHierarchyForEditorUserIncludesAllProjects(t *testing.T) 
 
 func TestGetOrganizationHierarchyForOrganizationCreatorIncludesAllProjectsEvenWithoutMemberRole(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.EnableProjectHierarchy(fakeProjectLister{
 		projects: []ProjectSummary{
 			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},

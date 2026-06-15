@@ -78,7 +78,6 @@ export type OrganizationProjectSummary = {
   name: string;
   status: string;
   brandName: string;
-  brandDescription: string;
   attributionSource: string;
   createdAt: string;
 };

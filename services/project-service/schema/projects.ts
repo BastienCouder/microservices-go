@@ -14,12 +14,7 @@ export const projects = pgTable("projects", {
     websiteUrl: text("website_url").notNull(),
     attributionSource: text("attribution_source"),
 
-    // Marque (auto-détection + éditable)
-    brandName: text("brand_name"),
-    brandDescription: text("brand_description"),
-    industry: text("industry"),
-
-    // Localisation
+    // Localisation du projet; les champs marque vivent dans brand_canon
     primaryLanguage: text("primary_language").default("fr"),
     country: text("country").default("FR"),
 

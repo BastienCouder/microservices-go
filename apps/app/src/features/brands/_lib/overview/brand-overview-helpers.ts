@@ -3,6 +3,11 @@ import type { BrandCanon } from "@/features/perception/_lib/shared/perception-da
 const BRAND_CANON_EDITOR_PATH = "/perception/brand-canon";
 
 export function deriveShortDescription(canon: BrandCanon): string {
+  const explicitShortDescription = canon.shortDescription.trim();
+  if (explicitShortDescription) {
+    return explicitShortDescription;
+  }
+
   const positioning = canon.positioning.trim();
   if (!positioning) return canon.category.trim();
 

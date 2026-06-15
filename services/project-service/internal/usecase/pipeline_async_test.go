@@ -83,7 +83,6 @@ func TestFinalizeProjectEnqueuesOutboxWithoutBlockingPipeline(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -131,8 +130,6 @@ func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) 
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
-		Industry:       "CRM",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -203,8 +200,6 @@ func TestRunPerceptionAnalysisMultipliesCreditsByModelCost(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
-		Industry:       "CRM",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -241,7 +236,6 @@ func TestRunPerceptionAnalysisReturnsDependencyUnavailableOnProviderFailure(t *t
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -274,7 +268,6 @@ func TestOutboxEventProcessingRunsPipelineOnce(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -339,7 +332,6 @@ func TestOutboxEventProcessingRespectsPromptModelCoverage(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -426,7 +418,6 @@ func TestOutboxEventProcessingPassesProjectProviderAPIKey(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -492,7 +483,6 @@ func TestOutboxEventProcessingPrefersOpenRouterForGPTOSSWhenBothCredentialsExist
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -561,7 +551,6 @@ func TestOutboxEventProcessingPrefersOpenRouterForLegacyGPTOSSCatalogEntries(t *
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -635,7 +624,6 @@ func TestOutboxEventProcessingPrefersOpenRouterForImportedCatalogModelSource(t *
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -716,7 +704,6 @@ func TestRunManualAnalysisExecutesPromptAndRecordsResponse(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -794,7 +781,6 @@ func TestRunManualAnalysisFallsBackToOpenRouterServiceCredential(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)

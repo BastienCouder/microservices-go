@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  loadBillingEntitlements,
   normalizeBillingEntitlements,
   normalizeBillingPlanSettings,
   normalizeBillingPricingTier,
@@ -45,6 +46,71 @@ describe("billing entitlements", () => {
         plan: "starter",
       }).isPaid,
     ).toBe(false);
+  });
+
+  test("resolves public organization ids before requesting billing quotas", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const requestURL = String(url);
+      calls.push({ url: requestURL, init });
+
+      if (requestURL === "https://api.test/organizations/me") {
+        return new Response(
+          JSON.stringify([
+            {
+              organizationId: 7,
+              publicId: "org_2b4d3323672e548ce3395386",
+              role: "owner",
+            },
+          ]),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      if (requestURL === "https://api.test/billing/quotas/7") {
+        return new Response(
+          JSON.stringify({
+            organization_id: 7,
+            plan: "growth",
+            subscription_status: "active",
+            is_paid: true,
+            monthly_quota: 200,
+            seats: 3,
+            model_selection_limit: 6,
+            monthly_model_change_limit: 2,
+            max_projects: 5,
+            allow_ai_briefs: true,
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      return new Response("not found", { status: 404 });
+    }) as typeof fetch;
+
+    try {
+      const result = await loadBillingEntitlements(
+        "https://api.test",
+        "org_2b4d3323672e548ce3395386",
+      );
+
+      expect(result.organizationId).toBe("7");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://api.test/organizations/me",
+      "https://api.test/billing/quotas/7",
+    ]);
+    expect(new Headers(calls[1]?.init?.headers).get("X-Organization-ID")).toBe("7");
   });
 });
 

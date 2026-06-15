@@ -92,7 +92,10 @@ func analyzeResponse(response, brandName string, competitors []string) PromptExe
 		}
 	}
 
-	sentiment := detectSentiment(lowerResponse)
+	sentiment := "neutral"
+	if brandMentioned {
+		sentiment = detectSentiment(lowerResponse)
+	}
 
 	return PromptExecutionAnalysis{
 		BrandMentioned:      brandMentioned,

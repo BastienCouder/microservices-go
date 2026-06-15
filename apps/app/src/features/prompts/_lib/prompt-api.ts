@@ -7,7 +7,13 @@ import {
 import { translateI18nText } from "@/shared/hooks/use-i18n";
 import i18n from "@/shared/i18n";
 import { normalizePromptPage, normalizeProjectPromptRecord, PROMPTS_CATALOG_PAGE_SIZE } from "./prompt-normalizers";
-import type { PromptItem, PromptPageResult, PromptSchedule, ProjectPromptRecord } from "./types";
+import type {
+  PromptItem,
+  PromptLanguage,
+  PromptPageResult,
+  PromptSchedule,
+  ProjectPromptRecord,
+} from "./types";
 
 function currentLocale(): string {
   return i18n.resolvedLanguage || i18n.language || "fr";
@@ -119,11 +125,12 @@ export async function createProjectPrompt(
   organizationId: string,
   projectId: string,
   text: string,
+  language: PromptLanguage,
 ): Promise<ProjectPromptRecord> {
   const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.prompts(projectId), {
     method: "POST",
     organizationId,
-    body: JSON.stringify({ prompts: [text] }),
+    body: JSON.stringify({ prompts: [{ text, language }] }),
   });
 
   const payload = unwrapGatewayPayload(
@@ -190,6 +197,7 @@ export async function patchPrompt(
   promptId: string,
   input: {
     text?: string;
+    language?: PromptLanguage;
     modelIds?: string[];
     schedule?: PromptSchedule;
     status?: PromptItem["status"];

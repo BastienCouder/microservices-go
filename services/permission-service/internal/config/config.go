@@ -7,7 +7,7 @@ type Config struct {
 	MetricsAddr              string
 	GRPCAddr                 string
 	DatabaseURL              string
-	OrganizationsServiceURL  string
+	ProjectServiceURL        string
 	InternalJWTSecret        string
 	InternalJWTIssuer        string
 	GRPCAllowInsecure        bool
@@ -31,15 +31,15 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	organizationsServiceURL, err := envcfg.RequiredEnv("ORGANIZATIONS_SERVICE_URL")
-	if err != nil {
-		return Config{}, err
-	}
 	internalJWTSecret, err := envcfg.SecretFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
 	}
 	internalJWTIssuer, err := envcfg.RequiredEnv("INTERNAL_JWT_ISSUER")
+	if err != nil {
+		return Config{}, err
+	}
+	projectServiceURL, err := envcfg.RequiredEnv("PROJECT_SERVICE_URL")
 	if err != nil {
 		return Config{}, err
 	}
@@ -57,7 +57,7 @@ func Load() (Config, error) {
 		MetricsAddr:              envcfg.OptionalEnv("METRICS_ADDR"),
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
-		OrganizationsServiceURL:  organizationsServiceURL,
+		ProjectServiceURL:        projectServiceURL,
 		InternalJWTSecret:        internalJWTSecret,
 		InternalJWTIssuer:        internalJWTIssuer,
 		GRPCAllowInsecure:        grpcAllowInsecure,

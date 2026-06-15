@@ -15,6 +15,7 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
+	permissionclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/permission"
 	projectclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/project"
 	userclient "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/client/user"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/organizations-service/internal/adapter/grpc"
@@ -46,6 +47,13 @@ func main() {
 
 	repo := postgres.NewRepository(db)
 	svc := usecase.NewService(repo)
+	if cfg.PermissionServiceURL != "" {
+		membershipStore, err := permissionclient.NewClient(cfg.PermissionServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+		if err != nil {
+			log.Fatalf("init permission client: %v", err)
+		}
+		svc.EnablePermissionMemberships(membershipStore)
+	}
 	if cfg.ProjectServiceURL != "" {
 		projectLister, err := projectclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
 		if err != nil {

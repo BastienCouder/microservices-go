@@ -2,10 +2,58 @@ export type RichTextBlock =
   | { type: "heading"; level: number; content: string }
   | { type: "paragraph"; content: string }
   | { type: "ul"; items: string[] }
-  | { type: "ol"; items: string[] };
+  | { type: "ol"; items: string[] }
+  | { type: "table"; headers: string[]; rows: string[][] };
+
+function normalizeMarkdownTableRows(source: string) {
+  return source
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("|") || !/\|\s*:?-{3,}/.test(trimmed) || !/\|\s+\|/.test(trimmed)) {
+        return line;
+      }
+
+      const rows = trimmed
+        .split(/\|\s+\|/g)
+        .map((segment) => segment.trim())
+        .filter(Boolean)
+        .map((segment) => {
+          let row = segment;
+          if (!row.startsWith("|")) row = `| ${row}`;
+          if (!row.endsWith("|")) row = `${row} |`;
+          return row;
+        });
+
+      return rows.join("\n");
+    })
+    .join("\n");
+}
+
+function isMarkdownTableDelimiter(line: string) {
+  return /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?$/.test(line);
+}
+
+function isMarkdownTableRow(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed.includes("|") || isMarkdownTableDelimiter(trimmed)) return false;
+
+  const content = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  return content.split("|").length >= 2;
+}
+
+function parseMarkdownTableRow(line: string) {
+  return line
+    .trim()
+    .replace(/^\|/, "")
+    .replace(/\|$/, "")
+    .split("|")
+    .map((cell) => cell.trim());
+}
 
 export function normalizeResponseRichText(source: string) {
-  return source
+  return normalizeMarkdownTableRows(
+    source
     .replace(/\r\n/g, "\n")
     .replace(/\u00a0/g, " ")
     .replace(/[ \t]+\n/g, "\n")
@@ -16,7 +64,8 @@ export function normalizeResponseRichText(source: string) {
     .replace(/([^\n])\s+([*-]\s+)/g, "$1\n$2")
     .replace(/([^\n])\s+(\d+\.\s+(?:\*\*|[A-ZÀ-ÿ]))/g, "$1\n$2")
     .replace(/\n([*-]|\d+\.)\s+/g, "\n$1 ")
-    .trim();
+    .trim(),
+  );
 }
 
 export function parseResponseRichTextBlocks(source: string): RichTextBlock[] {
@@ -42,8 +91,8 @@ export function parseResponseRichTextBlocks(source: string): RichTextBlock[] {
     listType = null;
   };
 
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index]?.trim() ?? "";
     if (!line) {
       flushParagraph();
       flushList();
@@ -59,6 +108,27 @@ export function parseResponseRichTextBlocks(source: string): RichTextBlock[] {
         level: headingMatch[1].length,
         content: headingMatch[2] ?? "",
       });
+      continue;
+    }
+
+    const nextLine = lines[index + 1]?.trim() ?? "";
+    if (isMarkdownTableRow(line) && isMarkdownTableDelimiter(nextLine)) {
+      flushParagraph();
+      flushList();
+
+      const headers = parseMarkdownTableRow(line);
+      const rows: string[][] = [];
+
+      index += 2;
+      while (index < lines.length) {
+        const tableLine = lines[index]?.trim() ?? "";
+        if (!tableLine || !isMarkdownTableRow(tableLine)) break;
+        rows.push(parseMarkdownTableRow(tableLine));
+        index += 1;
+      }
+
+      blocks.push({ type: "table", headers, rows });
+      index -= 1;
       continue;
     }
 

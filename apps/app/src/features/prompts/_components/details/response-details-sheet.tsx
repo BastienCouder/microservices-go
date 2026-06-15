@@ -22,6 +22,12 @@ function responseMentionClassName(mentioned: boolean) {
     : "border-transparent bg-rose-50 text-rose-700";
 }
 
+function responseSentimentClassName(sentiment: PromptRunRow["sentiment"]) {
+  if (sentiment === "positive") return "border-transparent bg-emerald-50 text-emerald-700";
+  if (sentiment === "negative") return "border-transparent bg-rose-50 text-rose-700";
+  return "border-transparent bg-amber-50 text-amber-700";
+}
+
 function ResponseDataRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-5">
@@ -61,6 +67,12 @@ function ResponseDetailsContent({
   const visual = getModelVisual(response.model);
   const competitorLabel =
     response.competitors.length > 0 ? response.competitors.join(", ") : t("none");
+  const sentimentLabel =
+    response.sentiment === "positive"
+      ? t("sentimentPositive")
+      : response.sentiment === "negative"
+        ? t("sentimentNegative")
+        : t("sentimentNeutral");
 
   return (
     <div className={cn("flex h-full flex-col bg-white font-sans antialiased", mobile && "overflow-y-auto")}>
@@ -109,6 +121,15 @@ function ResponseDetailsContent({
               <span className="text-xs font-bold text-primary">{t("mention")}</span>
               <Badge variant="outline" className={cn("text-sm", responseMentionClassName(response.mention))}>
                 {response.mention ? t("mentioned") : t("missing")}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between gap-4 border-b border-slate-50 pb-5">
+              <span className="text-xs font-bold text-primary">{t("sentiment")}</span>
+              <Badge
+                variant="outline"
+                className={cn("text-sm", responseSentimentClassName(response.sentiment))}
+              >
+                {sentimentLabel}
               </Badge>
             </div>
             <ResponseDataRow label={t("rank")} value={response.rank ? `#${response.rank}` : "-"} />

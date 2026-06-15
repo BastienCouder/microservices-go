@@ -4,7 +4,7 @@ import {
   requireGatewayData,
   unwrapGatewayPayload,
 } from "@/shared/api/gateway";
-import { attachStableSlugs } from "@/shared/public-slugs";
+import { attachStableSlugs, findBySlugIdOrPublicId } from "@/shared/public-slugs";
 
 type JsonRecord = Record<string, unknown>;
 
@@ -14,6 +14,13 @@ export type UserOrganizationSummary = {
   internalId?: string;
   name: string;
   slug: string;
+  role: string;
+};
+
+export type UserOrganizationMembership = {
+  organizationId: string;
+  internalId: string;
+  publicId: string;
   role: string;
 };
 
@@ -45,7 +52,7 @@ function normalizeOrganizationRole(role: string): string {
 
 function normalizeMembership(
   value: unknown,
-): { organizationId: string; internalId: string; publicId: string; role: string } | null {
+): UserOrganizationMembership | null {
   if (!isRecord(value)) return null;
   const organizationId = getIDString(
     value.organizationId ?? value.OrganizationID ?? value.organization_id ?? value.id ?? value.ID,
@@ -63,7 +70,7 @@ function normalizeMembership(
 
 function normalizeOrganization(
   value: unknown,
-  fallback: { organizationId: string; internalId: string; publicId: string; role: string },
+  fallback: UserOrganizationMembership,
 ): Omit<UserOrganizationSummary, "slug"> {
   const payload = unwrapGatewayPayload(value);
   const record = isRecord(payload) ? (payload as JsonRecord) : {};
@@ -78,10 +85,43 @@ function normalizeOrganization(
   };
 }
 
-export async function loadUserOrganizationSummaries(
+export function isNumericOrganizationId(value: string | null | undefined): boolean {
+  const normalized = value?.trim() ?? "";
+  return /^[1-9]\d*$/.test(normalized);
+}
+
+export function resolveNumericOrganizationIdFromMemberships(
+  memberships: UserOrganizationMembership[],
+  organizationToken: string | null | undefined,
+): string {
+  const normalized = organizationToken?.trim() ?? "";
+  if (!normalized) return "";
+  if (isNumericOrganizationId(normalized)) return normalized;
+
+  return (
+    memberships.find(
+      (membership) =>
+        membership.organizationId === normalized ||
+        membership.internalId === normalized ||
+        membership.publicId === normalized,
+    )?.organizationId ?? ""
+  );
+}
+
+export function resolveNumericOrganizationIdFromSummaries(
+  organizations: UserOrganizationSummary[],
+  organizationToken: string | null | undefined,
+): string {
+  const normalized = organizationToken?.trim() ?? "";
+  if (!normalized) return "";
+  if (isNumericOrganizationId(normalized)) return normalized;
+  return findBySlugIdOrPublicId(organizations, normalized)?.id ?? "";
+}
+
+export async function loadUserOrganizationMemberships(
   apiBaseURL: string,
   signal?: AbortSignal,
-): Promise<UserOrganizationSummary[]> {
+): Promise<UserOrganizationMembership[]> {
   const membershipsPayload = await requireGatewayData(
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
       method: "GET",
@@ -93,6 +133,15 @@ export async function loadUserOrganizationSummaries(
   const memberships = getArray(membershipsPayload)
     .map(normalizeMembership)
     .filter((membership): membership is NonNullable<typeof membership> => membership !== null);
+
+  return memberships;
+}
+
+export async function loadUserOrganizationSummaries(
+  apiBaseURL: string,
+  signal?: AbortSignal,
+): Promise<UserOrganizationSummary[]> {
+  const memberships = await loadUserOrganizationMemberships(apiBaseURL, signal);
 
   const organizations = await Promise.all(
     memberships.map(async (membership) => {

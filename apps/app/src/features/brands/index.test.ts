@@ -16,6 +16,12 @@ describe("brands pages", () => {
     expect(editorSource.includes("overflow-y-auto")).toBe(true);
   });
 
+  test("invalidates both slug and canonical project perception caches after saving", () => {
+    expect(editorSource.includes("readOptionalProjectTokenFromSearch")).toBe(true);
+    expect(editorSource.includes("routeProjectToken !== initialData.metadata.projectId")).toBe(true);
+    expect(editorSource.includes("const perceptionKeys = [")).toBe(true);
+  });
+
   test("uses mobile-friendly header actions and adaptive section heights", () => {
     expect(overviewSource.includes('actionsClassName="flex-row items-center justify-start translate-y-0 md:translate-y-5"')).toBe(true);
     expect(overviewSource.includes('className="max-h-[50vh] overflow-y-auto pr-1 sm:h-[220px] sm:max-h-none sm:pr-3"')).toBe(true);

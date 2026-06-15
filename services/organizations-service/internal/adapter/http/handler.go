@@ -551,7 +551,9 @@ func (h *Handler) revokeOrganizationAPIKey(w http.ResponseWriter, r *http.Reques
 func (h *Handler) getOrganizationHierarchy(w http.ResponseWriter, r *http.Request, organizationID int64) {
 	var hierarchy usecase.OrganizationHierarchy
 	var err error
-	if userID, ok := authenticatedUserID(r); ok {
+	if hasOrganizationFullAccess(r) {
+		hierarchy, err = h.svc.GetOrganizationHierarchy(r.Context(), organizationID)
+	} else if userID, ok := authenticatedUserID(r); ok {
 		hierarchy, err = h.svc.GetOrganizationHierarchyForUser(r.Context(), organizationID, userID)
 	} else {
 		hierarchy, err = h.svc.GetOrganizationHierarchy(r.Context(), organizationID)
@@ -968,6 +970,19 @@ func authenticatedOrganizationID(r *http.Request) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func hasOrganizationFullAccess(r *http.Request) bool {
+	raw := strings.TrimSpace(r.Header.Get("X-Organization-Full-Access"))
+	if raw == "" {
+		return false
+	}
+	switch strings.ToLower(raw) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 func (h *Handler) resolveOrganization(raw string, ctx context.Context) (*domain.Organization, error) {

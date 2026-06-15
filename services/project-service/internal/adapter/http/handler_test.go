@@ -201,7 +201,6 @@ func TestManualAnalysisRunRouteExecutesPrompt(t *testing.T) {
 		Name:           "Manual Analysis",
 		Domain:         "manual.test",
 		WebsiteURL:     "https://manual.test",
-		BrandName:      "Manual",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -251,7 +250,6 @@ func TestGeneratePromptsRouteCreatesTenPrompts(t *testing.T) {
 		Name:           "Prompt Generator",
 		Domain:         "generator.test",
 		WebsiteURL:     "https://generator.test",
-		BrandName:      "Generator",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
@@ -448,7 +446,7 @@ func TestActivateProjectRouteIsRemoved(t *testing.T) {
 	}
 }
 
-func TestProjectScopedUserCannotReadUnassignedProjectDirectly(t *testing.T) {
+func TestProjectRouteAuthorizationIsExpectedToBeHandledUpstream(t *testing.T) {
 	svc := usecase.NewService()
 	ctx := context.Background()
 	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
@@ -471,9 +469,6 @@ func TestProjectScopedUserCannotReadUnassignedProjectDirectly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create other project: %v", err)
 	}
-	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign project member: %v", err)
-	}
 
 	handler := NewHandler(svc)
 	mux := http.NewServeMux()
@@ -488,27 +483,26 @@ func TestProjectScopedUserCannotReadUnassignedProjectDirectly(t *testing.T) {
 		t.Fatalf("expected assigned project GET 200, got %d: %s", allowedRec.Code, allowedRec.Body.String())
 	}
 
-	deniedReq := httptest.NewRequest(http.MethodGet, "/projects/"+other.ID, nil)
-	deniedReq.Header.Set("X-Organization-ID", "42")
-	deniedReq.Header.Set("X-Authenticated-User-ID", "99")
-	deniedRec := httptest.NewRecorder()
-	mux.ServeHTTP(deniedRec, deniedReq)
-	if deniedRec.Code != http.StatusForbidden {
-		t.Fatalf("expected unassigned project GET 403, got %d: %s", deniedRec.Code, deniedRec.Body.String())
+	directReq := httptest.NewRequest(http.MethodGet, "/projects/"+other.ID, nil)
+	directReq.Header.Set("X-Organization-ID", "42")
+	directReq.Header.Set("X-Authenticated-User-ID", "99")
+	directRec := httptest.NewRecorder()
+	mux.ServeHTTP(directRec, directReq)
+	if directRec.Code != http.StatusOK {
+		t.Fatalf("expected direct project GET 200 when gateway checks are bypassed, got %d: %s", directRec.Code, directRec.Body.String())
 	}
 }
 
-func TestProjectScopedUserCannotReadUnassignedProjectQueryRoute(t *testing.T) {
+func TestProjectQueryRouteAuthorizationIsExpectedToBeHandledUpstream(t *testing.T) {
 	svc := usecase.NewService()
 	ctx := context.Background()
-	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+	if _, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
 		OrganizationID: 42,
 		CreatedBy:      7,
 		Name:           "Assigned",
 		Domain:         "assigned-query.test",
 		WebsiteURL:     "https://assigned-query.test",
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("create assigned project: %v", err)
 	}
 	other, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
@@ -521,9 +515,6 @@ func TestProjectScopedUserCannotReadUnassignedProjectQueryRoute(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create other project: %v", err)
 	}
-	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign project member: %v", err)
-	}
 
 	handler := NewHandler(svc)
 	mux := http.NewServeMux()
@@ -535,22 +526,21 @@ func TestProjectScopedUserCannotReadUnassignedProjectQueryRoute(t *testing.T) {
 	rec := httptest.NewRecorder()
 
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("expected unassigned project credentials GET 403, got %d: %s", rec.Code, rec.Body.String())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected direct project credentials GET 200 when gateway checks are bypassed, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
 func TestOrganizationFullAccessBypassesProjectScopeGuard(t *testing.T) {
 	svc := usecase.NewService()
 	ctx := context.Background()
-	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+	if _, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
 		OrganizationID: 42,
 		CreatedBy:      7,
 		Name:           "Assigned",
 		Domain:         "assigned-admin.test",
 		WebsiteURL:     "https://assigned-admin.test",
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("create assigned project: %v", err)
 	}
 	other, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
@@ -562,9 +552,6 @@ func TestOrganizationFullAccessBypassesProjectScopeGuard(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create other project: %v", err)
-	}
-	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign project member: %v", err)
 	}
 
 	handler := NewHandler(svc)
@@ -583,17 +570,16 @@ func TestOrganizationFullAccessBypassesProjectScopeGuard(t *testing.T) {
 	}
 }
 
-func TestProjectScopedUserCannotMutateUnassignedNestedResources(t *testing.T) {
+func TestNestedResourceAuthorizationIsExpectedToBeHandledUpstream(t *testing.T) {
 	svc := usecase.NewService()
 	ctx := context.Background()
-	assigned, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
+	if _, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
 		OrganizationID: 42,
 		CreatedBy:      7,
 		Name:           "Assigned",
 		Domain:         "assigned-nested.test",
 		WebsiteURL:     "https://assigned-nested.test",
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("create assigned project: %v", err)
 	}
 	other, err := svc.CreateProject(ctx, usecase.CreateProjectInput{
@@ -605,9 +591,6 @@ func TestProjectScopedUserCannotMutateUnassignedNestedResources(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create other project: %v", err)
-	}
-	if _, err := svc.AssignProjectMember(ctx, assigned.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign project member: %v", err)
 	}
 	prompts, err := svc.AddPrompts(ctx, other.ID, 42, []string{"Unassigned prompt"})
 	if err != nil {
@@ -632,8 +615,8 @@ func TestProjectScopedUserCannotMutateUnassignedNestedResources(t *testing.T) {
 	promptReq.Header.Set("X-Authenticated-User-ID", "99")
 	promptRec := httptest.NewRecorder()
 	mux.ServeHTTP(promptRec, promptReq)
-	if promptRec.Code != http.StatusForbidden {
-		t.Fatalf("expected unassigned prompt PATCH 403, got %d: %s", promptRec.Code, promptRec.Body.String())
+	if promptRec.Code != http.StatusOK {
+		t.Fatalf("expected direct prompt PATCH 200 when gateway checks are bypassed, got %d: %s", promptRec.Code, promptRec.Body.String())
 	}
 
 	competitorReq := httptest.NewRequest(
@@ -646,7 +629,7 @@ func TestProjectScopedUserCannotMutateUnassignedNestedResources(t *testing.T) {
 	competitorReq.Header.Set("X-Authenticated-User-ID", "99")
 	competitorRec := httptest.NewRecorder()
 	mux.ServeHTTP(competitorRec, competitorReq)
-	if competitorRec.Code != http.StatusForbidden {
-		t.Fatalf("expected unassigned competitor PATCH 403, got %d: %s", competitorRec.Code, competitorRec.Body.String())
+	if competitorRec.Code != http.StatusOK {
+		t.Fatalf("expected direct competitor PATCH 200 when gateway checks are bypassed, got %d: %s", competitorRec.Code, competitorRec.Body.String())
 	}
 }

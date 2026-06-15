@@ -7,13 +7,17 @@ import type { ProjectModelMeta } from "@/lib/project-models";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
 import {
   readOrganizationIdFromSearch,
   readSelectedOrganizationPublicID,
 } from "@/shared/selection";
 import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../client-api";
 import { getOptimizationActionMatchIds } from "../optimization-action-ids";
-import { resolvePerceptionGeneratedContent } from "../perception-i18n";
+import {
+  resolvePerceptionGeneratedContent,
+  resolvePerceptionLocalizedText,
+} from "../perception-i18n";
 import {
   loadOptimizationErrors,
   readOptimizationProjectIdFromSearch,
@@ -67,6 +71,10 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
       readSelectedOrganizationPublicID(),
     [routeSearch],
   );
+  const billingOrganization = useResolvedBillingOrganizationId({
+    apiBaseURL,
+    organizationId,
+  });
   const [persistedActions, setPersistedActions] = useState<PersistedOptimizeAction[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [markingDoneErrorIds, setMarkingDoneErrorIds] = useState<Set<string>>(new Set());
@@ -82,12 +90,13 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   });
   const activeProjectId = query.data?.projectId ?? projectId ?? "";
   const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
-    enabled: apiBaseURL.trim() !== "" && organizationId.trim() !== "",
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganization.organizationId),
+    enabled: apiBaseURL.trim() !== "" && billingOrganization.organizationId.trim() !== "",
     queryFn: ({ signal }) =>
-      loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
+      loadBillingEntitlements(apiBaseURL, billingOrganization.organizationId, { signal }),
   });
   const canGenerateAiBrief = billingQuery.data?.allowAiBriefs === true;
+  const actionOrganizationId = organizationId?.trim() || undefined;
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -95,6 +104,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     let isMounted = true;
     void getPerceptionClientJSON<PersistedOptimizeAction[]>(
       apiRoutes.analysis.optimizeActions(activeProjectId),
+      { organizationId: actionOrganizationId },
     )
       .then((actions) => {
         if (isMounted) {
@@ -106,7 +116,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     return () => {
       isMounted = false;
     };
-  }, [activeProjectId]);
+  }, [activeProjectId, actionOrganizationId]);
 
   const generatedIds = useMemo(
     () =>
@@ -153,6 +163,25 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         error.generatedContent,
         error.generatedContentKey,
         locale,
+        error.translationParams,
+      );
+      const localizedTitle = resolvePerceptionLocalizedText(
+        error.title,
+        error.titleKey,
+        locale,
+        error.translationParams,
+      );
+      const localizedIssue = resolvePerceptionLocalizedText(
+        error.issue,
+        error.issueKey,
+        locale,
+        error.translationParams,
+      );
+      const localizedImpact = resolvePerceptionLocalizedText(
+        error.impact,
+        error.impactKey,
+        locale,
+        error.translationParams,
       );
 
       setSavingErrorIds((current) => new Set(current).add(error.id));
@@ -166,9 +195,9 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
           {
             priority: error.optimizePriority,
             type: error.fixType,
-            title: error.title,
-            issue: error.issue,
-            impact: error.impact,
+            title: localizedTitle,
+            issue: localizedIssue,
+            impact: localizedImpact,
             generatedContent: localizedGeneratedContent,
             status: "processing",
             sourceErrorId: error.id,
@@ -181,6 +210,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
               promptsCount: 0,
             },
           },
+          { organizationId: actionOrganizationId },
         );
 
         setPersistedActions((current) => [
@@ -188,9 +218,9 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
             id: result.id,
             priority: error.optimizePriority,
             type: error.fixType,
-            title: error.title,
-            issue: error.issue,
-            impact: error.impact,
+            title: localizedTitle,
+            issue: localizedIssue,
+            impact: localizedImpact,
             generatedContent: result.generatedContent || localizedGeneratedContent,
             status: result.status || "processing",
             sourceErrorId: error.id,
@@ -211,7 +241,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         });
       }
     },
-    [activeProjectId, canGenerateAiBrief, generatedIds, locale, savingErrorIds, t],
+    [activeProjectId, actionOrganizationId, canGenerateAiBrief, generatedIds, locale, savingErrorIds, t],
   );
 
   const handleMarkDone = useCallback(
@@ -230,6 +260,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         const result = await patchPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
           apiRoutes.analysis.optimizeAction(activeProjectId, action.id),
           { status: "done" },
+          { organizationId: actionOrganizationId },
         );
         setPersistedActions((current) =>
           current.map((item) =>
@@ -252,7 +283,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
         });
       }
     },
-    [actionsByErrorId, activeProjectId, markingDoneErrorIds, t],
+    [actionOrganizationId, actionsByErrorId, activeProjectId, markingDoneErrorIds, t],
   );
 
   const reload = useCallback(async () => {

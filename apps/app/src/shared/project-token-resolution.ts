@@ -50,6 +50,20 @@ export type ResolvedProjectTokenContext = {
   organizationId: string;
 };
 
+async function loadProjectTokenCandidates(
+  apiBaseURL: string,
+  input: {
+    organizationId?: string;
+    signal?: AbortSignal;
+  },
+) {
+  return gatewayJSON<unknown>(apiBaseURL, "/projects", {
+    method: "GET",
+    organizationId: input.organizationId,
+    signal: input.signal,
+  });
+}
+
 export async function resolveProjectTokenToContext(
   apiBaseURL: string,
   input: {
@@ -61,26 +75,41 @@ export async function resolveProjectTokenToContext(
   const projectToken = input.projectToken.trim();
   if (projectToken === "") return null;
 
-  const response = await gatewayJSON<unknown>(apiBaseURL, "/projects", {
-    method: "GET",
-    organizationId: input.organizationId,
-    signal: input.signal,
-  });
+  const scopedResponse = await loadProjectTokenCandidates(apiBaseURL, input);
+  const scopedMatch = scopedResponse.ok
+    ? normalizeProjectTokenCandidates(scopedResponse.data).find(
+        (candidate) =>
+          candidate.id === projectToken || candidate.slug === projectToken,
+      )
+    : null;
+  if (scopedMatch) {
+    return {
+      projectId: scopedMatch.id,
+      projectSlug: scopedMatch.slug,
+      organizationId: scopedMatch.organizationId,
+    };
+  }
 
-  if (!response.ok) return null;
+  if (input.organizationId?.trim()) {
+    const unscopedResponse = await loadProjectTokenCandidates(apiBaseURL, {
+      signal: input.signal,
+    });
+    if (!unscopedResponse.ok) return null;
 
-  const project = normalizeProjectTokenCandidates(response.data)
-    .find(
+    const unscopedMatch = normalizeProjectTokenCandidates(unscopedResponse.data).find(
       (candidate) =>
         candidate.id === projectToken || candidate.slug === projectToken,
     );
-  if (!project) return null;
+    if (!unscopedMatch) return null;
 
-  return {
-    projectId: project.id,
-    projectSlug: project.slug,
-    organizationId: project.organizationId,
-  };
+    return {
+      projectId: unscopedMatch.id,
+      projectSlug: unscopedMatch.slug,
+      organizationId: unscopedMatch.organizationId,
+    };
+  }
+
+  return null;
 }
 
 export async function resolveProjectTokenToId(

@@ -31,7 +31,7 @@ export const localeMeta: Record<
   fr: {
     language: "fr-FR",
     ogLocale: "fr_FR",
-    title: "Visia — Créez, gérez et automatisez votre présence digitale",
+    title: "Visia. Créez, gérez et automatisez votre présence digitale",
     titleTemplate: "%s | Visia",
     description:
       "Visia vous aide à créer, gérer et automatiser votre présence digitale avec des outils simples, rapides et adaptés aux créateurs, indépendants et entreprises.",
@@ -54,7 +54,7 @@ export const localeMeta: Record<
   en: {
     language: "en-US",
     ogLocale: "en_US",
-    title: "Visia — Create, manage and automate your digital presence",
+    title: "Visia. Create, manage and automate your digital presence",
     titleTemplate: "%s | Visia",
     description:
       "Visia helps you create, manage and automate your digital presence with simple, fast tools for creators, freelancers and businesses.",

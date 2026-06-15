@@ -1,6 +1,13 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, toGatewayError } from "@/shared/api/gateway";
 import { normalizeBillingPlan } from "@/shared/billing-plan";
+import {
+  isNumericOrganizationId,
+  loadUserOrganizationMemberships,
+  loadUserOrganizationSummaries,
+  resolveNumericOrganizationIdFromMemberships,
+  resolveNumericOrganizationIdFromSummaries,
+} from "@/shared/organizations";
 
 type JsonObject = Record<string, unknown>;
 export type BillingPlanCode = string;
@@ -97,6 +104,36 @@ function asNumber(value: unknown): number {
 function asPlanCode(value: unknown): BillingPlanCode | null {
   const plan = normalizeBillingPlan(asString(value) || null);
   return plan === null ? null : plan;
+}
+
+async function resolveBillingOrganizationId(
+  apiBaseURL: string,
+  organizationId: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const normalized = organizationId.trim();
+  if (!normalized) return "";
+  if (isNumericOrganizationId(normalized)) return normalized;
+
+  const memberships = await loadUserOrganizationMemberships(apiBaseURL, signal);
+  const membershipOrganizationId = resolveNumericOrganizationIdFromMemberships(
+    memberships,
+    normalized,
+  );
+  if (membershipOrganizationId) {
+    return membershipOrganizationId;
+  }
+
+  const organizations = await loadUserOrganizationSummaries(apiBaseURL, signal);
+  const summaryOrganizationId = resolveNumericOrganizationIdFromSummaries(
+    organizations,
+    normalized,
+  );
+  if (summaryOrganizationId) {
+    return summaryOrganizationId;
+  }
+
+  throw new Error("Impossible de resoudre l'identifiant de facturation de l'organisation.");
 }
 
 export function normalizeBillingEntitlements(value: unknown): BillingEntitlements {
@@ -220,12 +257,17 @@ export async function loadBillingEntitlements(
   organizationId: string,
   options?: { signal?: AbortSignal },
 ): Promise<BillingEntitlements> {
+  const resolvedOrganizationId = await resolveBillingOrganizationId(
+    apiBaseURL,
+    organizationId,
+    options?.signal,
+  );
   const result = await gatewayJSON<unknown>(
     apiBaseURL,
-    apiRoutes.billing.quota(organizationId),
+    apiRoutes.billing.quota(resolvedOrganizationId),
     {
       method: "GET",
-      organizationId,
+      organizationId: resolvedOrganizationId,
       signal: options?.signal,
     },
   );

@@ -33,6 +33,7 @@ type ProjectRouteCandidate = {
 type MonitoringRequestScope =
   | "projects"
   | "project"
+  | "project brand canon"
   | "models"
   | "competitors"
   | "monitoring"
@@ -114,6 +115,28 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function normalizeAuthoritativeBrandCanon(value: unknown): Partial<BrandCanon> {
+  const payload = asObject(value);
+
+  return {
+    brandName: asString(getField(payload, ["brandName", "BrandName"])).trim(),
+    category: asString(getField(payload, ["category", "Category"])).trim(),
+    positioning: asString(getField(payload, ["positioning", "Positioning"])).trim(),
+    audience: asArray(getField(payload, ["audience", "Audience"]))
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    useCases: asArray(getField(payload, ["useCases", "UseCases"]))
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+    features: asArray(getField(payload, ["features", "Features"]))
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
+  };
+}
+
 function buildPerceptionBase(
   projectPayload: unknown,
   competitorsPayload: unknown,
@@ -131,6 +154,8 @@ function buildPerceptionBase(
     modelLookup,
     modelCatalog,
   });
+  const sourceMode =
+    derived.perceptionResponseCount > 0 ? "perception_primary" : "fallback_all";
 
   return {
     source: "project",
@@ -147,6 +172,9 @@ function buildPerceptionBase(
       projectId,
       windowLabel: derived.windowLabel,
       analyzedResponses: derived.analyzedResponses,
+      perceptionResponses: derived.perceptionResponseCount,
+      monitoringResponsesUsed: derived.monitoringResponseCount,
+      sourceMode,
       models: derived.models,
       modelCatalog: derived.visibleModelCatalog,
       latestRunId: derived.latestRunId,
@@ -204,10 +232,13 @@ function mergePerceptionData(
       ...payload.metadata,
       runtimeMode,
       projectId,
+      perceptionResponses: base.metadata.perceptionResponses,
+      monitoringResponsesUsed: base.metadata.monitoringResponsesUsed,
+      sourceMode: base.metadata.sourceMode,
       models: base.metadata.models,
       modelCatalog: base.metadata.modelCatalog,
-      analyzedResponses: asNumber(payload.metadata?.analyzedResponses ?? base.metadata.analyzedResponses),
-      windowLabel: payload.metadata?.windowLabel || base.metadata.windowLabel,
+      analyzedResponses: base.metadata.analyzedResponses,
+      windowLabel: base.metadata.windowLabel,
       latestRunId: base.metadata.latestRunId,
       generatedAt: payload.metadata?.generatedAt || base.metadata.generatedAt,
     },
@@ -284,13 +315,18 @@ export async function loadPerceptionData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [modelsRes, competitorsRes, perceptionRes] = await Promise.all([
+  const [modelsRes, competitorsRes, brandCanonRes, perceptionRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.models(encodedProjectId), {
       method: "GET",
       organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.competitors(encodedProjectId), {
+      method: "GET",
+      organizationId,
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.brandCanon(encodedProjectId), {
       method: "GET",
       organizationId,
       signal: options?.signal,
@@ -305,6 +341,7 @@ export async function loadPerceptionData(
   const projectPayload = unwrapRequiredEnvelope(projectRes, "project");
   const modelsPayload = unwrapRequiredEnvelope(modelsRes, "models");
   const competitorsPayload = unwrapRequiredEnvelope(competitorsRes, "competitors");
+  const projectBrandCanonPayload = unwrapRequiredEnvelope(brandCanonRes, "project brand canon");
   const perceptionPayload = asObject(unwrapRequiredEnvelope(perceptionRes, "perception")) as PerceptionApiPayloadWithDashboard;
   let monitoringPayload = readBundledDashboard(perceptionPayload);
 
@@ -332,9 +369,22 @@ export async function loadPerceptionData(
     modelCatalog,
     projectId,
   );
+  const authoritativeBrandCanon = normalizeAuthoritativeBrandCanon(projectBrandCanonPayload);
+  const merged = mergePerceptionData(base, perceptionPayload, mode, projectId);
+  const data: PerceptionViewData = {
+    ...merged,
+    brandCanon: {
+      ...merged.brandCanon,
+      ...authoritativeBrandCanon,
+      audience: authoritativeBrandCanon.audience ?? merged.brandCanon.audience,
+      useCases: authoritativeBrandCanon.useCases ?? merged.brandCanon.useCases,
+      features: authoritativeBrandCanon.features ?? merged.brandCanon.features,
+      pricing: { ...merged.brandCanon.pricing },
+    },
+  };
 
   return {
-    data: mergePerceptionData(base, perceptionPayload, mode, projectId),
+    data,
     projectId,
     mode,
   };

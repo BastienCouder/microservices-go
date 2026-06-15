@@ -9,6 +9,7 @@ import { PerceptionThreeColumnLayout } from "./perception-three-column-layout";
 
 const EMPTY_BRAND_CANON: BrandCanon = {
   brandName: "",
+  shortDescription: "",
   category: "",
   positioning: "",
   audience: [],
@@ -39,9 +40,11 @@ export function PerceptionUnavailableState({
           trendData={[]}
           windowLabel="--"
           analyzedResponses={0}
+          selectedSourceFilter="monitoring"
           selectedModels={[]}
           modelOptions={[]}
           selectedPeriod="30d"
+          onSourceFilterChange={() => undefined}
           onModelToggle={() => undefined}
           onResetModels={() => undefined}
           onPeriodChange={() => undefined}

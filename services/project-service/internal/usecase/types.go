@@ -134,6 +134,7 @@ type Prompt struct {
 	ID        string         `json:"id"`
 	ProjectID string         `json:"projectId"`
 	Text      string         `json:"text"`
+	Language  string         `json:"language"`
 	Intent    string         `json:"intent,omitempty"`
 	Kind      string         `json:"kind"`
 	ModelIDs  []string       `json:"modelIds,omitempty"`
@@ -232,9 +233,6 @@ type CreateProjectInput struct {
 	Domain            string
 	WebsiteURL        string
 	AttributionSource string
-	BrandName         string
-	BrandDescription  string
-	Industry          string
 	PrimaryLanguage   string
 	Country           string
 }
@@ -244,9 +242,6 @@ type UpdateProjectInput struct {
 	Domain            *string
 	WebsiteURL        *string
 	AttributionSource *string
-	BrandName         *string
-	BrandDescription  *string
-	Industry          *string
 }
 
 type UpdateProjectImpactIntegrationsInput struct {
@@ -339,8 +334,14 @@ type SelectProjectGA4OAuthPropertyResult struct {
 	LLMSetup    GA4LLMSetupResult             `json:"llmSetup,omitempty"`
 }
 
+type CreatePromptInput struct {
+	Text     string `json:"text"`
+	Language string `json:"language,omitempty"`
+}
+
 type UpdatePromptInput struct {
 	Text     *string
+	Language *string
 	Intent   *string
 	Kind     *string
 	ModelIDs *[]string
@@ -420,6 +421,7 @@ type ProjectModelSelectionChangeUsage struct {
 type AnalysisPromptText struct {
 	ID       string   `json:"id"`
 	Text     string   `json:"text"`
+	Language string   `json:"language,omitempty"`
 	ModelIDs []string `json:"modelIds,omitempty"`
 }
 
@@ -556,7 +558,6 @@ type persistedState struct {
 	Models                map[string]AIModel                                 `json:"models"`
 	BrandCanonByProject   map[string]*BrandCanon                             `json:"brandCanonByProject"`
 	ProjectModels         map[string]map[string]bool                         `json:"projectModels"`
-	ProjectMembers        map[string]map[int64]*ProjectMember                `json:"projectMembers"`
 	ModelSelectionChanges map[string]ProjectModelSelectionChangeUsage        `json:"modelSelectionChanges"`
 	ImpactIntegrations    map[string]*ProjectImpactIntegrations              `json:"impactIntegrations"`
 	ProviderCredentials   map[string]map[string]*LLMProviderCredentialRecord `json:"providerCredentials"`

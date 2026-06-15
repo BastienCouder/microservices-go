@@ -13,15 +13,22 @@ function readData<T>(result: GatewayResult<unknown>): T {
   ) as T;
 }
 
-function readOrganizationId(): string | undefined {
-  const organizationId = readSelectedOrganizationPublicID();
+type PerceptionClientOptions = {
+  organizationId?: string;
+};
+
+function readOrganizationId(override?: string): string | undefined {
+  const organizationId = override?.trim() || readSelectedOrganizationPublicID();
   return organizationId || undefined;
 }
 
-export async function getPerceptionClientJSON<T>(path: string): Promise<T> {
+export async function getPerceptionClientJSON<T>(
+  path: string,
+  options?: PerceptionClientOptions,
+): Promise<T> {
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "GET",
-    organizationId: readOrganizationId(),
+    organizationId: readOrganizationId(options?.organizationId),
   });
 
   return readData<T>(result);
@@ -30,11 +37,12 @@ export async function getPerceptionClientJSON<T>(path: string): Promise<T> {
 export async function postPerceptionClientJSON<T>(
   path: string,
   body: unknown,
+  options?: PerceptionClientOptions,
 ): Promise<T> {
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "POST",
     body: JSON.stringify(body),
-    organizationId: readOrganizationId(),
+    organizationId: readOrganizationId(options?.organizationId),
   });
 
   return readData<T>(result);
@@ -43,20 +51,24 @@ export async function postPerceptionClientJSON<T>(
 export async function patchPerceptionClientJSON<T>(
   path: string,
   body: unknown,
+  options?: PerceptionClientOptions,
 ): Promise<T> {
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "PATCH",
     body: JSON.stringify(body),
-    organizationId: readOrganizationId(),
+    organizationId: readOrganizationId(options?.organizationId),
   });
 
   return readData<T>(result);
 }
 
-export async function deletePerceptionClientJSON<T>(path: string): Promise<T> {
+export async function deletePerceptionClientJSON<T>(
+  path: string,
+  options?: PerceptionClientOptions,
+): Promise<T> {
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "DELETE",
-    organizationId: readOrganizationId(),
+    organizationId: readOrganizationId(options?.organizationId),
   });
 
   return readData<T>(result);

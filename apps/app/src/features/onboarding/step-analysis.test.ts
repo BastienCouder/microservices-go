@@ -8,6 +8,7 @@ describe("step analysis", () => {
     expect(source.includes("creationError")).toBe(true);
     expect(source.includes("setProgress(10)")).toBe(true);
     expect(source.includes('buildScopedHref("/monitoring"')).toBe(true);
+    expect(source.includes("invalidateOrganizationScope")).toBe(true);
     expect(source.includes("queryClient.removeQueries")).toBe(true);
     expect(source.includes('queryKey: ["route-project-guard", apiBaseURL]')).toBe(true);
     expect(source.includes("organizationId: projectOrganizationId")).toBe(true);

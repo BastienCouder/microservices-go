@@ -84,7 +84,9 @@ export default function App() {
     [location.search],
   );
   const useCompactProjectContext =
-    location.pathname === "/organizations" || location.pathname === "/account";
+    location.pathname === "/organizations" ||
+    location.pathname === "/account" ||
+    location.pathname === "/brand-canon";
   const bypassResolvedContext =
     isOnboardingRoute || isInvitationRoute || isBillingRoute || isAdminRoute;
   const baseRouteSearch = useMemo(
@@ -154,6 +156,7 @@ export default function App() {
       (
         shouldResolveRouteProjectContext &&
         !routeProjectContextQuery.isLoading &&
+        !routeProjectContextQuery.isFetching &&
         routeProjectContextQuery.data !== undefined &&
         resolvedProjectContext === null
       )

@@ -76,7 +76,7 @@ services:
           cpus: '0.25'
  
   email:
-    profiles: ["email"]
+    profiles: ["email", "backend"]
     build:
       dockerfile: apps/email/Dockerfile
     image: microservices-go/email:prod
@@ -294,6 +294,7 @@ services:
       ORG_DB_NAME_FILE: /run/secrets/organizations_db_name
       ORG_DB_SSLMODE_FILE: /run/secrets/db_sslmode
       ORG_DB_PASSWORD_FILE: /run/secrets/orgsvc_db_password
+      PERMISSION_SERVICE_URL: http://permission-service:8085
       USER_SERVICE_URL: http://user-service:8081
       PROJECT_SERVICE_URL: http://project-service:8088
       APP_BASE_URL: http://localhost:30004
@@ -374,6 +375,7 @@ services:
       PERMISSION_DB_NAME: permsvc
       PERMISSION_DB_SSLMODE: disable
       PERMISSION_DB_PASSWORD_FILE: /run/secrets/permsvc_db_password
+      PROJECT_SERVICE_URL: http://project-service:8088
       ORGANIZATIONS_SERVICE_URL: http://organizations-service:8084
       ORGANIZATIONS_SERVICE_GRPC_ADDR: organizations-service:9084
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
@@ -515,6 +517,9 @@ services:
         SERVICE_PATH: notification-service/cmd/api
     image: microservices-go/notification-service:prod
     restart: unless-stopped
+    depends_on:
+      email:
+        condition: service_healthy
     networks:
       - backend-net
       - infra-net
@@ -661,7 +666,7 @@ services:
       IA_SERVICE_URL: http://ia-service:8091
       CONTENT_ISSUE_ANALYZER_MODEL_ID: gpt-oss-20b-free
       CONTENT_ISSUE_ANALYZER_PROVIDER_ID: openrouter
-      OPTIMIZE_ACTION_BRIEF_MODEL_ID: z-ai/glm-4.5-air:free
+      OPTIMIZE_ACTION_BRIEF_MODEL_ID: gpt-oss-120b-free
       OPTIMIZE_ACTION_BRIEF_PROVIDER_ID: openrouter
     secrets:
       - analysissvc_db_password

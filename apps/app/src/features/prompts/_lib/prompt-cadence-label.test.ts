@@ -8,6 +8,7 @@ const basePrompt: PromptItem = {
   sourcePromptId: "prompt-1",
   rowMode: "global",
   prompt: "How visible is the brand?",
+  language: "en",
   kind: "monitoring",
   stage: "Awareness",
   models: ["anthropic-claude-opus-4-6", "deepseek-deepseek-chat"],

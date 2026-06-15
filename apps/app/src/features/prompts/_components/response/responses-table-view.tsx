@@ -38,13 +38,28 @@ function competitorBadgeClassName() {
   return "bg-secondary text-background";
 }
 
+function sentimentBadgeClassName(sentiment: PromptRunRow["sentiment"]) {
+  if (sentiment === "positive") return "bg-emerald-50 text-emerald-700";
+  if (sentiment === "negative") return "bg-rose-50 text-rose-700";
+  return "bg-amber-50 text-amber-700";
+}
+
+function sentimentLabel(
+  sentiment: PromptRunRow["sentiment"],
+  content: Record<string, string>,
+) {
+  if (sentiment === "positive") return content.sentimentPositive;
+  if (sentiment === "negative") return content.sentimentNegative;
+  return content.sentimentNeutral;
+}
+
 function ResponseTableLoadingRows() {
   return (
     <div className="space-y-3 py-4">
       {Array.from({ length: 7 }).map((_, index) => (
         <div
           key={index}
-          className="grid gap-3 rounded-md border bg-background p-3 lg:grid-cols-[110px_160px_minmax(220px,1fr)_90px_70px_150px_80px]"
+          className="grid gap-3 rounded-md border bg-background p-3 lg:grid-cols-[110px_160px_minmax(220px,1fr)_90px_110px_70px_150px_80px]"
         >
           <Skeleton className="h-6 w-full rounded-full" />
           <Skeleton className="h-6 w-full rounded-full" />
@@ -53,6 +68,7 @@ function ResponseTableLoadingRows() {
             <Skeleton className="h-3 w-2/3" />
           </div>
           <Skeleton className="h-6 w-20 rounded-full" />
+          <Skeleton className="h-6 w-24 rounded-full" />
           <Skeleton className="h-6 w-12 rounded-full" />
           <Skeleton className="h-6 w-full rounded-full" />
           <Skeleton className="h-5 w-16" />
@@ -113,6 +129,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
     { id: "ai", label: content.ai },
     { id: "prompt", label: content.prompt },
     { id: "mention", label: content.mention },
+    { id: "sentiment", label: content.sentiment },
     { id: "rank", label: content.rank },
     { id: "competitor", label: content.competitor },
     { id: "score", label: content.score },
@@ -215,6 +232,14 @@ export function ResponsesContent(props: ResponsesViewProps) {
                       </Badge>
                     </TableCell>
                     <TableCell className={cellClassName} onClick={openResponse}>
+                      <Badge
+                        variant="secondary"
+                        className={cn("border-transparent text-sm", sentimentBadgeClassName(item.sentiment))}
+                      >
+                        {sentimentLabel(item.sentiment, content)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className={cellClassName} onClick={openResponse}>
                       {item.rank ? (
                         <Badge className={cn("text-sm", props.rankTone(item.rank))}>#{item.rank}</Badge>
                       ) : (
@@ -282,6 +307,9 @@ export function ResponsesContent(props: ResponsesViewProps) {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <Badge variant="secondary" className={mentionBadgeClassName(item.mention)}>
                         {item.mention ? content.mentioned : content.missing}
+                      </Badge>
+                      <Badge variant="secondary" className={sentimentBadgeClassName(item.sentiment)}>
+                        {sentimentLabel(item.sentiment, content)}
                       </Badge>
                       {item.rank ? <Badge className={props.rankTone(item.rank)}>#{item.rank}</Badge> : null}
                       <Badge variant="secondary" className={competitorBadgeClassName()}>

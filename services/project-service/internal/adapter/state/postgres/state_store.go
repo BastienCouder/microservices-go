@@ -131,7 +131,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	if err := insertProjects(ctx, tx, state.Projects); err != nil {
 		return err
 	}
-	if err := insertBrandCanon(ctx, tx, state.BrandCanonByProject); err != nil {
+	if err := insertBrandCanon(ctx, tx, mergedBrandCanonByProject(state.Projects, state.BrandCanonByProject)); err != nil {
 		return err
 	}
 	if err := insertPrompts(ctx, tx, state.Prompts); err != nil {
@@ -165,7 +165,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, created_at, updated_at
+		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at
 		FROM projects
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -178,9 +178,6 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		var (
 			item              usecase.Project
 			attributionSource *string
-			brandName         *string
-			brandDescription  *string
-			industry          *string
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -190,9 +187,6 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			&item.Domain,
 			&item.WebsiteURL,
 			&attributionSource,
-			&brandName,
-			&brandDescription,
-			&industry,
 			&item.PrimaryLanguage,
 			&item.Country,
 			&item.CreatedAt,
@@ -201,9 +195,6 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			return fmt.Errorf("scan project: %w", err)
 		}
 		item.AttributionSource = stringValue(attributionSource)
-		item.BrandName = stringValue(brandName)
-		item.BrandDescription = stringValue(brandDescription)
-		item.Industry = stringValue(industry)
 		project := item
 		state.Projects[item.ID] = &project
 	}
@@ -212,7 +203,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 
 func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, project_id, text, intent, kind, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at
+		SELECT id, project_id, text, language, intent, kind, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at
 		FROM prompts
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -224,6 +215,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 	for rows.Next() {
 		var (
 			item             usecase.Prompt
+			language         *string
 			intent           *string
 			kind             *string
 			scheduleMode     *string
@@ -235,6 +227,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 			&item.ID,
 			&item.ProjectID,
 			&item.Text,
+			&language,
 			&intent,
 			&kind,
 			&scheduleMode,
@@ -247,6 +240,7 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 		); err != nil {
 			return fmt.Errorf("scan prompt: %w", err)
 		}
+		item.Language = stringValue(language)
 		item.Intent = stringValue(intent)
 		item.Kind = stringValue(kind)
 		item.Schedule = usecase.PromptSchedule{
@@ -271,6 +265,9 @@ func (s *StateStore) loadPrompts(ctx context.Context, state *persistedState) err
 			} else {
 				item.Status = usecase.PromptStatusDisabled
 			}
+		}
+		if item.Language == "" {
+			item.Language = "fr"
 		}
 		prompt := item
 		state.Prompts[item.ID] = &prompt
@@ -650,13 +647,79 @@ func insertBrandCanon(ctx context.Context, tx pgx.Tx, canonByProject map[string]
 	return nil
 }
 
+func mergedBrandCanonByProject(
+	projects map[string]*usecase.Project,
+	canonByProject map[string]*usecase.BrandCanon,
+) map[string]*usecase.BrandCanon {
+	merged := make(map[string]*usecase.BrandCanon, len(canonByProject))
+	for projectID, canon := range canonByProject {
+		if canon == nil {
+			continue
+		}
+		clone := *canon
+		clone.ProjectID = projectID
+		if clone.Audience == nil {
+			clone.Audience = []string{}
+		}
+		if clone.UseCases == nil {
+			clone.UseCases = []string{}
+		}
+		if clone.Features == nil {
+			clone.Features = []string{}
+		}
+		merged[projectID] = &clone
+	}
+
+	for projectID, project := range projects {
+		if project == nil {
+			continue
+		}
+		brandName := strings.TrimSpace(project.BrandName)
+		category := strings.TrimSpace(project.Industry)
+		positioning := strings.TrimSpace(project.BrandDescription)
+		if brandName == "" && category == "" && positioning == "" {
+			continue
+		}
+
+		canon := merged[projectID]
+		if canon == nil {
+			canon = &usecase.BrandCanon{
+				ProjectID: projectID,
+				Audience:  []string{},
+				UseCases:  []string{},
+				Features:  []string{},
+				CreatedAt: project.CreatedAt,
+				UpdatedAt: project.UpdatedAt,
+			}
+			merged[projectID] = canon
+		}
+		if strings.TrimSpace(canon.BrandName) == "" {
+			canon.BrandName = brandName
+		}
+		if strings.TrimSpace(canon.Category) == "" {
+			canon.Category = category
+		}
+		if strings.TrimSpace(canon.Positioning) == "" {
+			canon.Positioning = positioning
+		}
+		if canon.CreatedAt.IsZero() {
+			canon.CreatedAt = project.CreatedAt
+		}
+		if canon.UpdatedAt.IsZero() {
+			canon.UpdatedAt = project.UpdatedAt
+		}
+	}
+
+	return merged
+}
+
 func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase.Project) error {
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, brand_name, brand_description, industry, primary_language, country, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmpty(project.BrandName), nullIfEmpty(project.BrandDescription), nullIfEmpty(project.Industry), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt); err != nil {
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
 		}
 	}
@@ -668,8 +731,8 @@ func insertPrompts(ctx context.Context, tx pgx.Tx, prompts map[string]*usecase.P
 		prompt := prompts[promptID]
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO prompts (id, project_id, text, intent, kind, language, country, schedule_mode, schedule_cron, schedule_timezone, status, is_active, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, 'fr', 'FR', $6, $7, $8, $9, $10, $11, $12)
-		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), nullIfEmptyOrFallback(prompt.Kind, usecase.PromptKindMonitoring), nullIfEmptyOrFallback(prompt.Schedule.Mode, usecase.PromptScheduleModeGlobal), nullIfEmptyOrFallback(prompt.Schedule.Cron, usecase.DefaultPromptCron), nullIfEmptyOrFallback(prompt.Schedule.Timezone, usecase.DefaultPromptTimezone), nullIfEmptyOrFallback(prompt.Status, usecase.PromptStatusActive), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
+			VALUES ($1, $2, $3, $4, $5, $6, 'FR', $7, $8, $9, $10, $11, $12, $13)
+		`, prompt.ID, prompt.ProjectID, prompt.Text, nullIfEmpty(prompt.Intent), nullIfEmptyOrFallback(prompt.Kind, usecase.PromptKindMonitoring), nullIfEmptyOrFallback(prompt.Language, "fr"), nullIfEmptyOrFallback(prompt.Schedule.Mode, usecase.PromptScheduleModeGlobal), nullIfEmptyOrFallback(prompt.Schedule.Cron, usecase.DefaultPromptCron), nullIfEmptyOrFallback(prompt.Schedule.Timezone, usecase.DefaultPromptTimezone), nullIfEmptyOrFallback(prompt.Status, usecase.PromptStatusActive), prompt.IsActive, prompt.CreatedAt, prompt.UpdatedAt); err != nil {
 			return fmt.Errorf("insert prompt %s: %w", prompt.ID, err)
 		}
 	}

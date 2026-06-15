@@ -39,6 +39,7 @@ import {
   formatPerceptionPriorityLabel as formatPerceptionPriorityLabelI18n,
   formatPerceptionStatusLabel as formatPerceptionStatusLabelI18n,
   getPerceptionActionStatusTone,
+  resolvePerceptionLocalizedText,
   resolvePerceptionGeneratedContent,
   getPerceptionSeverityLabel,
   getPerceptionPriorityTone,
@@ -97,6 +98,14 @@ export function TopErrorsPanel({
   const selectedActionSaving = selectedError
     ? (savingErrorIds?.has(selectedError.id) ?? false)
     : false;
+  const selectedErrorTitle = selectedError
+    ? resolvePerceptionLocalizedText(
+        selectedError.title,
+        selectedError.titleKey,
+        locale,
+        selectedError.translationParams,
+      )
+    : "";
   const seeMoreHref = buildScopedHref("/error-hub", {
     project: projectId,
     source: "perception",
@@ -163,7 +172,7 @@ export function TopErrorsPanel({
           >
             <DrawerContent className="h-[94vh] rounded-t-xl border-none bg-white">
               <DrawerHeader className="sr-only">
-                <DrawerTitle>{selectedError.title}</DrawerTitle>
+                <DrawerTitle>{selectedErrorTitle}</DrawerTitle>
                 <DrawerDescription>
                   {t("topErrorsSheetDescription")}
                 </DrawerDescription>
@@ -195,7 +204,7 @@ export function TopErrorsPanel({
           >
             <SheetContent side="right" className="!max-w-2xl">
               <SheetHeader className="sr-only">
-                <SheetTitle>{selectedError.title}</SheetTitle>
+                <SheetTitle>{selectedErrorTitle}</SheetTitle>
                 <SheetDescription>
                   {t("topErrorsSheetDescription")}
                 </SheetDescription>
@@ -287,10 +296,29 @@ export function ErrorDetailsContent({
 }) {
   const { t } = useScopedI18n("perception");
   const severity = getSeverityTone(error.severity, locale);
+  const resolvedTitle = resolvePerceptionLocalizedText(
+    error.title,
+    error.titleKey,
+    locale,
+    error.translationParams,
+  );
+  const resolvedIssue = resolvePerceptionLocalizedText(
+    error.issue,
+    error.issueKey,
+    locale,
+    error.translationParams,
+  );
+  const resolvedImpact = resolvePerceptionLocalizedText(
+    error.impact,
+    error.impactKey,
+    locale,
+    error.translationParams,
+  );
   const resolvedGeneratedContent = resolvePerceptionGeneratedContent(
     error.generatedContent,
     error.generatedContentKey,
     locale,
+    error.translationParams,
   );
   const canRemoveAction = Boolean(actionGenerated && onRemoveAction);
   const canMarkDone = Boolean(
@@ -367,7 +395,7 @@ export function ErrorDetailsContent({
             </div>
 
             <h1 className="[overflow-wrap:anywhere] text-xl leading-tight tracking-tight md:text-3xl">
-              {error.title}
+              {resolvedTitle}
             </h1>
 
             {shouldShowActionButton ? (
@@ -416,11 +444,11 @@ export function ErrorDetailsContent({
           </div>
 
           <ErrorTextBlock label={t("topErrorsAiClaim")}>
-            <p>{error.issue}</p>
+            <p>{resolvedIssue}</p>
           </ErrorTextBlock>
 
           <ErrorTextBlock label={t("topErrorsImpact")}>
-            <p>{error.impact}</p>
+            <p>{resolvedImpact}</p>
           </ErrorTextBlock>
 
           <ErrorTextBlock label={t("topErrorsGeneratedFix")}>
@@ -655,6 +683,19 @@ export function PerceptionTopErrorCard({
     error.generatedContent,
     error.generatedContentKey,
     locale,
+    error.translationParams,
+  );
+  const resolvedTitle = resolvePerceptionLocalizedText(
+    error.title,
+    error.titleKey,
+    locale,
+    error.translationParams,
+  );
+  const resolvedIssue = resolvePerceptionLocalizedText(
+    error.issue,
+    error.issueKey,
+    locale,
+    error.translationParams,
   );
   const primaryModel = error.detectedInModels[0]
     ? getPerceptionModelBadgeMeta(error.detectedInModels[0], modelLookup)
@@ -669,7 +710,7 @@ export function PerceptionTopErrorCard({
         type="button"
         className="block w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         onClick={onOpenDetails}
-        aria-label={`${t("topErrorsTitle")}: ${error.title}`}
+        aria-label={`${t("topErrorsTitle")}: ${resolvedTitle}`}
       >
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
@@ -725,10 +766,10 @@ export function PerceptionTopErrorCard({
         </div>
 
         <p className="mb-2 line-clamp-2 text-xs font-semibold leading-relaxed text-foreground/90 transition-colors group-hover:text-foreground md:text-sm">
-          {error.title}
+          {resolvedTitle}
         </p>
         <p className="mb-3 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
-          {error.issue}
+          {resolvedIssue}
         </p>
         {contextMeta ? (
           <div className="mb-3">

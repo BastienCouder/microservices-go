@@ -49,6 +49,30 @@ func TestExecutePromptAnalyzesResponse(t *testing.T) {
 	}
 }
 
+func TestExecutePromptKeepsSentimentNeutralWhenBrandIsNotMentioned(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	result, err := svc.ExecutePrompt(ctx, ExecutePromptInput{
+		PromptID:     "prompt-2",
+		PromptText:   "Quel CRM pour PME ?",
+		ModelID:      "gpt-oss-20b-free",
+		BrandName:    "Acme",
+		Competitors:  []string{"HubSpot", "Pipedrive"},
+		MockResponse: "HubSpot est une excellente option pour une PME. Voir https://hubspot.com",
+	})
+	if err != nil {
+		t.Fatalf("execute prompt: %v", err)
+	}
+
+	if result.Analysis.BrandMentioned {
+		t.Fatalf("expected brand not mentioned")
+	}
+	if result.Analysis.Sentiment != "neutral" {
+		t.Fatalf("expected neutral sentiment when brand is absent, got %q", result.Analysis.Sentiment)
+	}
+}
+
 func TestExecutePromptProviderMode(t *testing.T) {
 	provider := &stubProvider{result: ProviderResult{RawResponse: "Acme est recommande https://acme.com", TokensUsed: 123}}
 	svc, err := NewServiceWithDependencies(Dependencies{Mode: ExecutionModeProvider, Provider: provider})

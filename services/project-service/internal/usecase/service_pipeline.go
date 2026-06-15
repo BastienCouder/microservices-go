@@ -229,7 +229,7 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 		s.mu.Unlock()
 		return AnalysisStartResponse{}, err
 	}
-	projectCopy := copyProject(project)
+	projectCopy := s.effectiveProjectLocked(project)
 	if createdBy > 0 {
 		projectCopy.CreatedBy = createdBy
 	}
@@ -280,6 +280,7 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 		promptTexts = append(promptTexts, AnalysisPromptText{
 			ID:       promptID,
 			Text:     text,
+			Language: prompt.Language,
 			ModelIDs: append([]string(nil), promptModelIDs...),
 		})
 	}
@@ -291,6 +292,25 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 		runType = "manual"
 	}
 	return s.runAnalysis(ctx, projectCopy, promptTexts, modelIDs, competitors, input.RequestID, runType, false)
+}
+
+func buildExecutionPromptText(prompt AnalysisPromptText) string {
+	baseText := strings.TrimSpace(prompt.Text)
+	language, ok := normalizePromptLanguage(prompt.Language)
+	if !ok || baseText == "" {
+		return baseText
+	}
+
+	instruction := "Answer in English."
+	if language == "fr" {
+		instruction = "Reponds en francais."
+	}
+
+	if strings.Contains(strings.ToLower(baseText), strings.ToLower(instruction)) {
+		return baseText
+	}
+
+	return strings.TrimSpace(baseText + "\n\n" + instruction)
 }
 
 func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []AnalysisPromptText, modelIDs []string, competitors []string, requestID string, runType string, force bool) (AnalysisStartResponse, error) {
@@ -409,9 +429,16 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 				credential.ProviderID,
 				credential.ProviderModelID,
 			)
+			executionPromptText := promptRun.PromptText
+			for _, prompt := range prompts {
+				if prompt.ID == promptRun.PromptID {
+					executionPromptText = buildExecutionPromptText(prompt)
+					break
+				}
+			}
 			iaResult, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{
 				PromptID:       promptRun.PromptID,
-				PromptText:     promptRun.PromptText,
+				PromptText:     executionPromptText,
 				ModelID:        credential.ProviderModelID,
 				ProviderID:     credential.ProviderID,
 				ProviderAPIKey: credential.ProviderAPIKey,

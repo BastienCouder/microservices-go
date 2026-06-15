@@ -10,7 +10,7 @@ import (
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
 )
 
-func (h *Handler) checkPermission(ctx context.Context, userID, organizationID int64, action, resource string) (bool, string, error) {
+func (h *Handler) checkPermission(ctx context.Context, userID, organizationID int64, action, resource, projectID, resourceID string) (bool, string, error) {
 	if h.permissionGRPC == nil {
 		return false, "", errors.New("permission grpc client is not configured")
 	}
@@ -39,6 +39,8 @@ func (h *Handler) checkPermission(ctx context.Context, userID, organizationID in
 			UserId:         userID,
 			Action:         action,
 			Resource:       resource,
+			ProjectId:      projectID,
+			ResourceId:     resourceID,
 		}, internalToken)
 		if err != nil {
 			return true, true, err
@@ -119,4 +121,41 @@ func resourceFromPath(path, fallback string) string {
 	default:
 		return fallback
 	}
+}
+
+func projectIDFromPath(path string) string {
+	switch {
+	case strings.HasPrefix(path, "/projects/"):
+		parts := strings.Split(strings.Trim(strings.TrimPrefix(path, "/projects/"), "/"), "/")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	case strings.HasPrefix(path, "/analysis/projects/"):
+		parts := strings.Split(strings.Trim(strings.TrimPrefix(path, "/analysis/projects/"), "/"), "/")
+		if len(parts) > 0 {
+			return strings.TrimSpace(parts[0])
+		}
+	}
+	return ""
+}
+
+func resourceIDFromPath(path, resource string) string {
+	resource = strings.ToLower(strings.TrimSpace(resource))
+	switch resource {
+	case "prompts":
+		if strings.HasPrefix(path, "/prompts/") {
+			parts := strings.Split(strings.Trim(strings.TrimPrefix(path, "/prompts/"), "/"), "/")
+			if len(parts) > 0 {
+				return strings.TrimSpace(parts[0])
+			}
+		}
+	case "competitors":
+		if strings.HasPrefix(path, "/competitors/") {
+			parts := strings.Split(strings.Trim(strings.TrimPrefix(path, "/competitors/"), "/"), "/")
+			if len(parts) > 0 {
+				return strings.TrimSpace(parts[0])
+			}
+		}
+	}
+	return ""
 }

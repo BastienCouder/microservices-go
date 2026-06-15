@@ -208,6 +208,49 @@ function encodeProjectPathSegment(projectId: string): string {
   return encodeURIComponent(projectId);
 }
 
+type AuthoritativeBrandCanon = {
+  brandName: string;
+  category: string;
+  positioning: string;
+  audience: string[];
+};
+
+function normalizeAuthoritativeBrandCanon(value: unknown): AuthoritativeBrandCanon {
+  const payload = asObject(value);
+
+  return {
+    brandName: asString(getField(payload, ["brandName", "BrandName"])).trim(),
+    category: asString(getField(payload, ["category", "Category"])).trim(),
+    positioning: asString(getField(payload, ["positioning", "Positioning"])).trim(),
+    audience: asStringArray(getField(payload, ["audience", "Audience"])),
+  };
+}
+
+function applyAuthoritativeBrandCanon(
+  project: JsonObject,
+  brandCanonPayload: unknown,
+): JsonObject {
+  const canon = normalizeAuthoritativeBrandCanon(brandCanonPayload);
+  const nestedBrandCanon = asObject(getField(project, ["brandCanon", "BrandCanon", "profile", "Profile"]));
+
+  return {
+    ...project,
+    ...(canon.brandName ? { brandName: canon.brandName } : {}),
+    ...(canon.positioning ? { brandDescription: canon.positioning } : {}),
+    ...(canon.category ? { industry: canon.category } : {}),
+    brandCanon: {
+      ...nestedBrandCanon,
+      ...(canon.audience.length > 0
+        ? {
+            audience: canon.audience,
+            personas: canon.audience,
+            targetPersonas: canon.audience,
+          }
+        : {}),
+    },
+  };
+}
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -278,6 +321,8 @@ function pickProjectPersonas(project: JsonObject): string[] {
       "TargetPersonas",
       "personas",
       "Personas",
+      "audience",
+      "Audience",
     ]),
   );
   const brandCanon = asObject(
@@ -291,6 +336,8 @@ function pickProjectPersonas(project: JsonObject): string[] {
       "TargetPersonas",
       "personas",
       "Personas",
+      "audience",
+      "Audience",
     ]),
   );
 
@@ -407,13 +454,18 @@ export async function loadMonitoringData(
 
   const encodedProjectId = encodeProjectPathSegment(projectId);
 
-  const [modelsRes, competitorsRes, monitoringRes] = await Promise.all([
+  const [modelsRes, competitorsRes, brandCanonRes, monitoringRes] = await Promise.all([
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/models`, {
       method: "GET",
       organizationId,
       signal: options?.signal,
     }),
     gatewayJSON<unknown>(apiBaseURL, `/projects/${encodedProjectId}/competitors`, {
+      method: "GET",
+      organizationId,
+      signal: options?.signal,
+    }),
+    gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.brandCanon(encodedProjectId), {
       method: "GET",
       organizationId,
       signal: options?.signal,
@@ -425,7 +477,10 @@ export async function loadMonitoringData(
     }),
   ]);
 
-  const project = asObject(unwrapRequiredEnvelope(projectRes, "project"));
+  const project = applyAuthoritativeBrandCanon(
+    asObject(unwrapRequiredEnvelope(projectRes, "project")),
+    brandCanonRes.ok ? unwrapGatewayPayload(brandCanonRes.data) : {},
+  );
   const modelsPayload = asArray(unwrapRequiredEnvelope(modelsRes, "models"));
   const competitorsPayload = asArray(unwrapRequiredEnvelope(competitorsRes, "competitors"));
   const monitoringPayload = asObject(unwrapRequiredEnvelope(monitoringRes, "monitoring"));

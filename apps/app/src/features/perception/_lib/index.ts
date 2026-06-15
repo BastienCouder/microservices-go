@@ -15,6 +15,7 @@ export {
   getPerceptionPeriodBadgeLabel,
   getPerceptionPeriodLabel,
   resolvePerceptionGeneratedContent,
+  resolvePerceptionLocalizedText,
   getPerceptionSeverityLabel,
 } from "./perception-i18n";
 export {

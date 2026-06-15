@@ -164,14 +164,12 @@ export function PromptActions({
         {
           icon: promptRunnable ? Play : Sparkles,
           title: runLabel,
-          description: promptRunnable ? content.runNowDescription : content.saveBeforeRunDescription,
           disabled: !promptRunnable || promptRunning || runningAnyPrompts,
           onSelect: () => runPrompt(item),
         },
         {
           icon: Pencil,
           title: content.editPrompt,
-          description: content.editPromptDescription,
           onSelect: () => onEditPrompt(sourcePromptId),
         },
       ]
@@ -181,7 +179,6 @@ export function PromptActions({
     {
       icon: Copy,
       title: content.copyPrompt,
-      description: content.copyPromptDescription,
       onSelect: () => {
         if (typeof navigator !== "undefined") void navigator.clipboard.writeText(item.prompt);
       },
@@ -189,7 +186,6 @@ export function PromptActions({
     {
       icon: PanelRightOpen,
       title: content.openDetails,
-      description: content.openDetailsDescription,
       onSelect: () => {
         setSelectedPromptId(item.id);
         setIsPromptDetailsOpen(true);
@@ -198,7 +194,6 @@ export function PromptActions({
     {
       icon: Eye,
       title: content.viewResponses,
-      description: content.viewResponsesDescription,
       onSelect: () => {
         setFocusPromptId(sourcePromptId);
         setTabResponses();
@@ -209,7 +204,6 @@ export function PromptActions({
           {
             icon: Trash2,
             title: content.deletePrompt,
-            description: content.deletePromptDescription,
             tone: "destructive" as const,
             onSelect: () => requestDeletePrompt({ ...item, sourcePromptId }),
           },
@@ -220,7 +214,6 @@ export function PromptActions({
   return (
     <ActionsPopover
       title={content.promptActionsTitle}
-      description={content.promptActionsDescription}
       triggerLabel={content.promptActionsTitle}
       items={actions}
     />

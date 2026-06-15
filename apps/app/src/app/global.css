@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "flag-icons/css/flag-icons.min.css";
 
 @font-face {
   font-family: "Manrope";
@@ -246,7 +247,7 @@
     --chart-legend-fallback: var(--muted);
     --chart-sentiment-positive: var(--primary);
     --chart-sentiment-neutral: 211 55% 58%;
-    --chart-sentiment-negative: 229 47% 62%;
+    --chart-sentiment-negative: 0 72% 58%;
     --chart-perception-positioning: var(--chart-series-1);
     --chart-perception-factual: var(--chart-series-2);
     --chart-perception-sentiment: var(--chart-series-3);
@@ -326,7 +327,7 @@
     --chart-legend-fallback: var(--muted);
     --chart-sentiment-positive: var(--primary);
     --chart-sentiment-neutral: 211 72% 67%;
-    --chart-sentiment-negative: 229 66% 71%;
+    --chart-sentiment-negative: 0 70% 64%;
     --chart-perception-positioning: var(--chart-series-1);
     --chart-perception-factual: var(--chart-series-2);
     --chart-perception-sentiment: var(--chart-series-3);

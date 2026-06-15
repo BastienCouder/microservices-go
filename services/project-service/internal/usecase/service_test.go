@@ -23,6 +23,11 @@ type fakeBillingClient struct {
 	err          error
 }
 
+type fakeProjectMembershipClient struct {
+	membersByUser map[int64][]ProjectMember
+	err           error
+}
+
 func (s *mutableProjectStore) Load(_ context.Context) ([]byte, bool, error) {
 	if s.payload == nil {
 		return nil, false, nil
@@ -50,6 +55,20 @@ func (f *fakeBillingClient) GetCreditCostSettings(_ context.Context) (CreditCost
 		return defaultCreditCostSettings(), nil
 	}
 	return f.creditCosts, nil
+}
+
+func (f *fakeProjectMembershipClient) ListProjectMembersByUser(_ context.Context, organizationID, userID int64) ([]ProjectMember, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	items := f.membersByUser[userID]
+	members := make([]ProjectMember, 0, len(items))
+	for _, item := range items {
+		if item.OrganizationID == organizationID {
+			members = append(members, item)
+		}
+	}
+	return members, nil
 }
 
 func TestProjectFlowCreateFinalize(t *testing.T) {
@@ -187,6 +206,145 @@ func TestUpdateProjectCanRenameProject(t *testing.T) {
 	}
 }
 
+func TestGetProjectAndListProjectsPreferBrandCanonValues(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	brandName := "Acme Canon"
+	category := "AI CRM"
+	positioning := "Modern positioning from brand canon"
+	useCases := []string{"Lead qualification", "CRM recommendation"}
+	features := []string{"AI scoring"}
+	if _, err := svc.UpdateBrandCanon(ctx, project.ID, 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("update brand canon: %v", err)
+	}
+
+	got, err := svc.GetProject(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("get project: %v", err)
+	}
+	if got.BrandName != brandName {
+		t.Fatalf("expected brand name %q from brand canon, got %q", brandName, got.BrandName)
+	}
+	if got.BrandDescription != positioning {
+		t.Fatalf("expected brand description %q from brand canon, got %q", positioning, got.BrandDescription)
+	}
+	if got.Industry != category {
+		t.Fatalf("expected industry %q from brand canon, got %q", category, got.Industry)
+	}
+	if got.Domain != "acme.com" {
+		t.Fatalf("expected domain to stay unchanged, got %q", got.Domain)
+	}
+	if got.WebsiteURL != "https://acme.com" {
+		t.Fatalf("expected website url to stay unchanged, got %q", got.WebsiteURL)
+	}
+
+	projects, err := svc.ListProjects(ctx, 42)
+	if err != nil {
+		t.Fatalf("list projects: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("expected 1 project, got %d", len(projects))
+	}
+	if projects[0].BrandName != brandName {
+		t.Fatalf("expected listed brand name %q from brand canon, got %q", brandName, projects[0].BrandName)
+	}
+	if projects[0].BrandDescription != positioning {
+		t.Fatalf("expected listed brand description %q from brand canon, got %q", positioning, projects[0].BrandDescription)
+	}
+	if projects[0].Industry != category {
+		t.Fatalf("expected listed industry %q from brand canon, got %q", category, projects[0].Industry)
+	}
+}
+
+func TestUpdateBrandCanonUpdatesProjectView(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	brandName := " Acme Updated "
+	brandDescription := " Clear positioning "
+	industry := " B2B AI "
+	updatedCanon, err := svc.UpdateBrandCanon(ctx, project.ID, 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Positioning: &brandDescription,
+		Category:    &industry,
+	})
+	if err != nil {
+		t.Fatalf("update brand canon: %v", err)
+	}
+	if updatedCanon.BrandName != "Acme Updated" {
+		t.Fatalf("expected trimmed brand name, got %q", updatedCanon.BrandName)
+	}
+	if updatedCanon.Positioning != "Clear positioning" {
+		t.Fatalf("expected trimmed brand description, got %q", updatedCanon.Positioning)
+	}
+	if updatedCanon.Category != "B2B AI" {
+		t.Fatalf("expected trimmed industry, got %q", updatedCanon.Category)
+	}
+
+	canon, err := svc.GetBrandCanon(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("get brand canon: %v", err)
+	}
+	if canon.BrandName != "Acme Updated" {
+		t.Fatalf("expected brand canon name to sync, got %q", canon.BrandName)
+	}
+	if canon.Positioning != "Clear positioning" {
+		t.Fatalf("expected brand canon positioning to sync, got %q", canon.Positioning)
+	}
+	if canon.Category != "B2B AI" {
+		t.Fatalf("expected brand canon category to sync, got %q", canon.Category)
+	}
+	if len(canon.UseCases) != 0 {
+		t.Fatalf("expected use cases to remain empty, got %#v", canon.UseCases)
+	}
+	if len(canon.Features) != 0 {
+		t.Fatalf("expected features to remain empty, got %#v", canon.Features)
+	}
+
+	projectView, err := svc.GetProject(ctx, project.ID, 42)
+	if err != nil {
+		t.Fatalf("get project: %v", err)
+	}
+	if projectView.BrandName != "Acme Updated" {
+		t.Fatalf("expected project view brand name to reflect brand canon, got %q", projectView.BrandName)
+	}
+	if projectView.BrandDescription != "Clear positioning" {
+		t.Fatalf("expected project view brand description to reflect brand canon, got %q", projectView.BrandDescription)
+	}
+	if projectView.Industry != "B2B AI" {
+		t.Fatalf("expected project view industry to reflect brand canon, got %q", projectView.Industry)
+	}
+}
+
 func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -207,9 +365,6 @@ func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
 	if _, err := svc.AddCompetitors(ctx, project.ID, 42, []AddCompetitorInput{{Name: "Rival"}}); err != nil {
 		t.Fatalf("add competitors: %v", err)
 	}
-	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign member: %v", err)
-	}
 
 	if err := svc.DeleteProject(ctx, project.ID, 42); err != nil {
 		t.Fatalf("delete project: %v", err)
@@ -219,9 +374,6 @@ func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
 	}
 	if _, ok := svc.projectModels[project.ID]; ok {
 		t.Fatalf("expected project models to be removed")
-	}
-	if _, ok := svc.projectMembers[project.ID]; ok {
-		t.Fatalf("expected project members to be removed")
 	}
 	for _, prompt := range svc.prompts {
 		if prompt.ProjectID == project.ID {
@@ -1433,74 +1585,40 @@ func TestListProjectsFiltersByOrganization(t *testing.T) {
 	}
 }
 
-func TestAssignProjectMemberListsMembers(t *testing.T) {
+func TestListProjectsForUserRequiresProjectMembershipClient(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
 
-	project, err := svc.CreateProject(ctx, CreateProjectInput{
+	if _, err := svc.CreateProject(ctx, CreateProjectInput{
 		OrganizationID: 42,
 		CreatedBy:      1,
 		Name:           "Project scoped",
 		Domain:         "scoped.test",
 		WebsiteURL:     "https://scoped.test",
-	})
-	if err != nil {
+	}); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
 
-	assigned, err := svc.AssignProjectMember(ctx, project.ID, 42, 99, "Viewer")
-	if err != nil {
-		t.Fatalf("assign project member: %v", err)
-	}
-	if assigned.ProjectID != project.ID {
-		t.Fatalf("expected project id %s, got %q", project.ID, assigned.ProjectID)
-	}
-	if assigned.OrganizationID != 42 {
-		t.Fatalf("expected organization 42, got %d", assigned.OrganizationID)
-	}
-	if assigned.UserID != 99 {
-		t.Fatalf("expected user 99, got %d", assigned.UserID)
-	}
-	if assigned.Role != "viewer" {
-		t.Fatalf("expected normalized role viewer, got %q", assigned.Role)
-	}
-
-	members, err := svc.ListProjectMembers(ctx, project.ID, 42)
-	if err != nil {
-		t.Fatalf("list project members: %v", err)
-	}
-	if len(members) != 1 {
-		t.Fatalf("expected 1 project member, got %d", len(members))
-	}
-	if members[0].UserID != 99 {
-		t.Fatalf("expected user 99 in project members, got %d", members[0].UserID)
+	_, err := svc.ListProjectsForUser(ctx, 42, 99)
+	if !errors.Is(err, ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable without membership client, got %v", err)
 	}
 }
 
-func TestAssignProjectMemberRejectsWrongOrganization(t *testing.T) {
-	svc := NewService()
+func TestListProjectsForUserPropagatesMembershipsFromClient(t *testing.T) {
 	ctx := context.Background()
-
-	project, err := svc.CreateProject(ctx, CreateProjectInput{
-		OrganizationID: 42,
-		CreatedBy:      1,
-		Name:           "Project scoped",
-		Domain:         "scoped.test",
-		WebsiteURL:     "https://scoped.test",
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectMembershipClient: &fakeProjectMembershipClient{
+			membersByUser: map[int64][]ProjectMember{
+				99: {
+					{ProjectID: "ignored", OrganizationID: 7, UserID: 99, Role: "viewer"},
+				},
+			},
+		},
 	})
 	if err != nil {
-		t.Fatalf("create project: %v", err)
+		t.Fatalf("new service with memberships: %v", err)
 	}
-
-	_, err = svc.AssignProjectMember(ctx, project.ID, 7, 99, "viewer")
-	if !errors.Is(err, ErrUnauthorized) {
-		t.Fatalf("expected unauthorized error, got %v", err)
-	}
-}
-
-func TestListProjectsForUserReturnsAssignedProjectsOnly(t *testing.T) {
-	svc := NewService()
-	ctx := context.Background()
 
 	first, err := svc.CreateProject(ctx, CreateProjectInput{
 		OrganizationID: 42,
@@ -1522,9 +1640,14 @@ func TestListProjectsForUserReturnsAssignedProjectsOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create second project: %v", err)
 	}
-	if _, err := svc.AssignProjectMember(ctx, first.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign project member: %v", err)
-	}
+
+	client := svc.projectMembershipClient.(*fakeProjectMembershipClient)
+	client.membersByUser[99] = append(client.membersByUser[99], ProjectMember{
+		ProjectID:      first.ID,
+		OrganizationID: 42,
+		UserID:         99,
+		Role:           "viewer",
+	})
 
 	projects, err := svc.ListProjectsForUser(ctx, 42, 99)
 	if err != nil {
@@ -1541,39 +1664,78 @@ func TestListProjectsForUserReturnsAssignedProjectsOnly(t *testing.T) {
 	}
 }
 
-func TestProjectMemberRolesControlProjectActions(t *testing.T) {
-	svc := NewService()
+func TestListProjectsForUserReturnsDependencyUnavailableWhenMembershipLookupFails(t *testing.T) {
 	ctx := context.Background()
-
-	project, err := svc.CreateProject(ctx, CreateProjectInput{
-		OrganizationID: 42,
-		CreatedBy:      1,
-		Name:           "Role scoped",
-		Domain:         "role-scoped.test",
-		WebsiteURL:     "https://role-scoped.test",
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectMembershipClient: &fakeProjectMembershipClient{err: errors.New("boom")},
 	})
 	if err != nil {
+		t.Fatalf("new service with memberships: %v", err)
+	}
+
+	if _, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      1,
+		Name:           "Project scoped",
+		Domain:         "scoped.test",
+		WebsiteURL:     "https://scoped.test",
+	}); err != nil {
 		t.Fatalf("create project: %v", err)
 	}
 
-	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 100, "read"); !errors.Is(err, ErrUnauthorized) {
-		t.Fatalf("expected missing membership to deny read, got %v", err)
+	_, err = svc.ListProjectsForUser(ctx, 42, 99)
+	if !errors.Is(err, ErrDependencyUnavailable) {
+		t.Fatalf("expected dependency unavailable when membership lookup fails, got %v", err)
 	}
-	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 99, "viewer"); err != nil {
-		t.Fatalf("assign viewer: %v", err)
-	}
-	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 99, "read"); err != nil {
-		t.Fatalf("viewer should read assigned project: %v", err)
-	}
-	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 99, "update"); !errors.Is(err, ErrUnauthorized) {
-		t.Fatalf("expected viewer update denied, got %v", err)
+}
+
+func TestListProjectsForUserReturnsAssignedProjectsOnly(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ProjectMembershipClient: &fakeProjectMembershipClient{},
+	})
+	if err != nil {
+		t.Fatalf("new service with memberships: %v", err)
 	}
 
-	if _, err := svc.AssignProjectMember(ctx, project.ID, 42, 98, "editor"); err != nil {
-		t.Fatalf("assign editor: %v", err)
+	first, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      1,
+		Name:           "Assigned",
+		Domain:         "assigned.test",
+		WebsiteURL:     "https://assigned.test",
+	})
+	if err != nil {
+		t.Fatalf("create first project: %v", err)
 	}
-	if err := svc.EnforceUserProjectActionAccess(ctx, project.ID, 42, 98, "delete"); err != nil {
-		t.Fatalf("editor should mutate assigned project: %v", err)
+	second, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      1,
+		Name:           "Hidden",
+		Domain:         "hidden.test",
+		WebsiteURL:     "https://hidden.test",
+	})
+	if err != nil {
+		t.Fatalf("create second project: %v", err)
+	}
+	svc.projectMembershipClient.(*fakeProjectMembershipClient).membersByUser = map[int64][]ProjectMember{
+		99: {
+			{ProjectID: first.ID, OrganizationID: 42, UserID: 99, Role: "viewer"},
+		},
+	}
+
+	projects, err := svc.ListProjectsForUser(ctx, 42, 99)
+	if err != nil {
+		t.Fatalf("list projects for user: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("expected 1 assigned project, got %d", len(projects))
+	}
+	if projects[0].ID != first.ID {
+		t.Fatalf("expected project %s, got %s", first.ID, projects[0].ID)
+	}
+	if projects[0].ID == second.ID {
+		t.Fatalf("project %s should not be visible to assigned user", second.ID)
 	}
 }
 
@@ -1700,7 +1862,6 @@ func mustCreateCredentialProject(t *testing.T, svc *Service, ctx context.Context
 		Name:           "Credential Project",
 		Domain:         "credentials.test",
 		WebsiteURL:     "https://credentials.test",
-		BrandName:      "Credentials",
 	})
 	if err != nil {
 		t.Fatalf("create credential project: %v", err)

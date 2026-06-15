@@ -43,6 +43,7 @@ export const apiRoutes = {
     ga4OAuthProperty: (projectId: string) =>
       `/projects/${projectId}/impact-integrations/ga4/oauth/property`,
     competitors: (projectId: string) => `/projects/${projectId}/competitors`,
+    brandCanon: (projectId: string) => `/projects/${projectId}/brand-canon`,
     promptsStatus: (projectId: string) => `/projects/${projectId}/prompts/status`,
     models: (projectId: string) => `/projects/${projectId}/models`,
     prompts: (

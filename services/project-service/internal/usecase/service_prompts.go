@@ -30,6 +30,25 @@ func normalizePromptKind(raw string) string {
 	}
 }
 
+func normalizePromptLanguage(raw string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(raw))
+	switch {
+	case strings.HasPrefix(normalized, "fr"):
+		return "fr", true
+	case strings.HasPrefix(normalized, "en"):
+		return "en", true
+	default:
+		return "", false
+	}
+}
+
+func defaultPromptLanguage(project Project) string {
+	if language, ok := normalizePromptLanguage(project.PrimaryLanguage); ok {
+		return language
+	}
+	return "fr"
+}
+
 func applyPromptStatus(prompt *Prompt, status string) {
 	prompt.Status = status
 	prompt.IsActive = status == PromptStatusActive
@@ -167,18 +186,34 @@ func (s *Service) AddPromptsWithKind(ctx context.Context, projectID string, orga
 }
 
 func (s *Service) addPromptsWithKind(ctx context.Context, projectID string, organizationID int64, prompts []string, kind string) ([]Prompt, error) {
+	entries := make([]CreatePromptInput, 0, len(prompts))
+	for _, prompt := range prompts {
+		entries = append(entries, CreatePromptInput{Text: prompt})
+	}
+	return s.AddPromptInputsWithKind(ctx, projectID, organizationID, entries, kind)
+}
+
+func (s *Service) AddPromptInputsWithKind(ctx context.Context, projectID string, organizationID int64, prompts []CreatePromptInput, kind string) ([]Prompt, error) {
 	if len(prompts) == 0 {
 		return nil, fmt.Errorf("%w: prompts cannot be empty", ErrValidation)
 	}
 	promptKind := normalizePromptKind(kind)
 
-	normalized := make([]string, 0, len(prompts))
+	type normalizedPromptInput struct {
+		text     string
+		language string
+	}
+
+	normalized := make([]normalizedPromptInput, 0, len(prompts))
 	for _, raw := range prompts {
-		text := strings.TrimSpace(raw)
+		text := strings.TrimSpace(raw.Text)
 		if text == "" {
 			return nil, fmt.Errorf("%w: prompt text cannot be empty", ErrValidation)
 		}
-		normalized = append(normalized, text)
+		normalized = append(normalized, normalizedPromptInput{
+			text:     text,
+			language: strings.TrimSpace(raw.Language),
+		})
 	}
 
 	s.mu.Lock()
@@ -188,9 +223,11 @@ func (s *Service) addPromptsWithKind(ctx context.Context, projectID string, orga
 		return nil, err
 	}
 
-	if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err != nil {
+	project, err := s.getProjectForOrganizationLocked(projectID, organizationID)
+	if err != nil {
 		return nil, err
 	}
+	defaultLanguage := defaultPromptLanguage(*project)
 
 	defaultModelIDs := filterEnabledModels(s.projectModels, s.models, projectID)
 	if len(defaultModelIDs) == 0 {
@@ -199,11 +236,20 @@ func (s *Service) addPromptsWithKind(ctx context.Context, projectID string, orga
 
 	now := s.now().UTC()
 	created := make([]*Prompt, 0, len(normalized))
-	for _, text := range normalized {
+	for _, item := range normalized {
+		language := defaultLanguage
+		if strings.TrimSpace(item.language) != "" {
+			normalizedLanguage, ok := normalizePromptLanguage(item.language)
+			if !ok {
+				return nil, fmt.Errorf("%w: unsupported prompt language", ErrValidation)
+			}
+			language = normalizedLanguage
+		}
 		prompt := &Prompt{
 			ID:        s.nextID("prm"),
 			ProjectID: projectID,
-			Text:      text,
+			Text:      item.text,
+			Language:  language,
 			Kind:      promptKind,
 			ModelIDs:  nonNilStringSlice(defaultModelIDs),
 			Schedule:  defaultPromptSchedule(),
@@ -341,6 +387,16 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 			return Prompt{}, fmt.Errorf("%w: prompt text cannot be empty", ErrValidation)
 		}
 		prompt.Text = value
+	}
+	if input.Language != nil {
+		language, ok := normalizePromptLanguage(*input.Language)
+		if !ok {
+			return Prompt{}, fmt.Errorf("%w: unsupported prompt language", ErrValidation)
+		}
+		prompt.Language = language
+	}
+	if prompt.Language == "" {
+		prompt.Language = defaultPromptLanguage(*project)
 	}
 	if input.Intent != nil {
 		prompt.Intent = strings.TrimSpace(*input.Intent)

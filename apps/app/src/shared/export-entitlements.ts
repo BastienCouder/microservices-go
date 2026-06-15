@@ -5,6 +5,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import { API_CONFIG } from "@/lib/api-config";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { normalizeBillingPlan } from "@/shared/billing-plan";
+import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
 import {
   readOrganizationIdFromSearch,
   readSelectedOrganizationPublicID,
@@ -38,17 +39,24 @@ export function useClientExportAccess({
     () => resolveExportOrganizationId(routeSearch, organizationId),
     [organizationId, routeSearch],
   );
+  const billingOrganization = useResolvedBillingOrganizationId({
+    apiBaseURL,
+    organizationId: resolvedOrganizationId,
+  });
 
   const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, resolvedOrganizationId),
-    enabled: apiBaseURL.trim() !== "" && resolvedOrganizationId !== "",
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganization.organizationId),
+    enabled: apiBaseURL.trim() !== "" && billingOrganization.organizationId !== "",
     queryFn: ({ signal }) =>
-      loadBillingEntitlements(apiBaseURL, resolvedOrganizationId, { signal }),
+      loadBillingEntitlements(apiBaseURL, billingOrganization.organizationId, { signal }),
   });
 
   return {
     canExport: canUseClientExports(billingQuery.data?.plan),
-    loading: billingQuery.isLoading || (billingQuery.isFetching && !billingQuery.data),
+    loading:
+      billingOrganization.isLoading ||
+      billingQuery.isLoading ||
+      (billingQuery.isFetching && !billingQuery.data),
     plan: billingQuery.data?.plan ?? null,
   };
 }

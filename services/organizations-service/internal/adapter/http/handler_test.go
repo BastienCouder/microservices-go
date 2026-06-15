@@ -17,6 +17,12 @@ import (
 
 type stubRepo struct{}
 
+func newStubService() *usecase.Service {
+	svc := usecase.NewService(stubRepo{})
+	svc.EnablePermissionMemberships(stubRepo{})
+	return svc
+}
+
 func (stubRepo) Create(_ context.Context, organization *domain.Organization) error {
 	organization.ID = 1
 	if organization.PublicID == "" {
@@ -154,7 +160,7 @@ func (stubRepo) UpdateMemberRoles(_ context.Context, organizationID, userID int6
 	}, nil
 }
 
-func (stubRepo) RemoveMember(_ context.Context, organizationID, userID int64, _ time.Time) error {
+func (stubRepo) RemoveMember(_ context.Context, organizationID, userID int64) error {
 	if organizationID <= 0 || userID <= 0 {
 		return domain.ErrInvalidMember
 	}
@@ -197,6 +203,13 @@ func (stubRepo) ListProjectMembersByUser(_ context.Context, organizationID, user
 func (stubRepo) RemoveProjectMember(_ context.Context, organizationID int64, projectID string, userID int64) error {
 	if organizationID <= 0 || projectID == "" || userID <= 0 {
 		return domain.ErrInvalidMember
+	}
+	return nil
+}
+
+func (stubRepo) DeleteOrganizationPermissions(_ context.Context, organizationID int64) error {
+	if organizationID <= 0 {
+		return domain.ErrInvalidOrganization
 	}
 	return nil
 }
@@ -253,7 +266,7 @@ func (s stubProjectLister) ListProjectsByOrganization(_ context.Context, organiz
 }
 
 func newTestHandler() *Handler {
-	svc := usecase.NewService(stubRepo{})
+	svc := newStubService()
 	return NewHandler(svc, nil)
 }
 
@@ -406,7 +419,7 @@ func TestDeleteOrganizationRoute(t *testing.T) {
 }
 
 func TestGetOrganizationHierarchyReturnsProjects(t *testing.T) {
-	svc := usecase.NewService(stubRepo{})
+	svc := newStubService()
 	svc.EnableProjectHierarchy(stubProjectLister{
 		projects: []usecase.ProjectSummary{
 			{
@@ -441,8 +454,41 @@ func TestGetOrganizationHierarchyReturnsProjects(t *testing.T) {
 	}
 }
 
+func TestGetOrganizationHierarchyUsesGatewayFullAccess(t *testing.T) {
+	svc := newStubService()
+	svc.EnableProjectHierarchy(stubProjectLister{
+		projects: []usecase.ProjectSummary{
+			{ID: "prj-user", OrganizationID: 1, Name: "Visible"},
+			{ID: "prj-other", OrganizationID: 1, Name: "Also visible"},
+		},
+	})
+	h := NewHandler(svc, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/organizations/1/hierarchy", nil)
+	req.Header.Set("X-Organization-ID", "1")
+	req.Header.Set("X-Authenticated-User-ID", "42")
+	req.Header.Set("X-Organization-Full-Access", "true")
+	resp := httptest.NewRecorder()
+
+	h.organizationRoutes(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", resp.Code)
+	}
+
+	var payload struct {
+		Projects []usecase.ProjectSummary `json:"projects"`
+	}
+	if err := httpjson.DecodeSuccessData(resp.Body, &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(payload.Projects) != 2 {
+		t.Fatalf("expected 2 projects with full access, got %d", len(payload.Projects))
+	}
+}
+
 func TestGetOrganizationHierarchyPropagatesErrors(t *testing.T) {
-	svc := usecase.NewService(stubRepo{})
+	svc := newStubService()
 	svc.EnableProjectHierarchy(stubProjectLister{err: errors.New("boom")})
 	h := NewHandler(svc, nil)
 

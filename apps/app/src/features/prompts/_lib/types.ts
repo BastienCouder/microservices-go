@@ -26,6 +26,7 @@ export type ResponseView = "table" | "timeline";
 export type PromptRowMode = "global" | "model";
 export type PromptScheduleMode = "global" | "per_model";
 export type PromptKind = "monitoring" | "perception";
+export type PromptLanguage = "fr" | "en";
 
 export type PromptSchedule = {
   mode: PromptScheduleMode;
@@ -42,6 +43,7 @@ export type PromptRun = {
   isHistorical?: boolean;
   minutesAgo: number;
   mention: boolean;
+  sentiment: "positive" | "neutral" | "negative";
   rank: number | null;
   competitor: string;
   competitors: string[];
@@ -57,6 +59,7 @@ export type PromptItem = {
   sourcePromptId: string;
   rowMode: PromptRowMode;
   prompt: string;
+  language: PromptLanguage;
   type?: string | null;
   kind: PromptKind;
   stage: Stage;
@@ -95,6 +98,7 @@ export type ModelVisual = {
 export type ProjectPromptRecord = {
   id: string;
   text: string;
+  language: PromptLanguage;
   intent?: string;
   type?: string;
   kind: PromptKind;
@@ -122,6 +126,7 @@ export type SavePromptEditorInput = {
   mode: PromptEditorMode;
   promptId?: string;
   text: string;
+  language: PromptLanguage;
   modelIds: AIModel[];
   schedule: PromptSchedule;
   status: PromptItem["status"];

@@ -7,6 +7,7 @@ type ModelsToolbarProps = {
   search: string;
   selectedCount: number;
   selectionLimit: number;
+  selectionLimitReady: boolean;
   saveDisabled: boolean;
   isSavingModels: boolean;
   loading?: boolean;
@@ -19,6 +20,7 @@ export function ModelsToolbar({
   search,
   selectedCount,
   selectionLimit,
+  selectionLimitReady,
   saveDisabled,
   isSavingModels,
   loading = false,
@@ -36,10 +38,12 @@ export function ModelsToolbar({
     <div className="border-b px-4 py-4 md:px-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <p className="text-sm text-muted-foreground">
-          {t("selectedModelsStatus", {
-            selected: selectedCount,
-            limit: selectionLimit || 0,
-          })}
+          {selectionLimitReady
+            ? t("selectedModelsStatus", {
+                selected: selectedCount,
+                limit: selectionLimit,
+              })
+            : t("selectedCount", { count: selectedCount })}
         </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

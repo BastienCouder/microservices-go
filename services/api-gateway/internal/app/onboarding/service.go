@@ -149,9 +149,6 @@ func (s *Service) bootstrapProject(ctx context.Context, actor Identity, organiza
 		"name":              brandName,
 		"websiteUrl":        websiteURL,
 		"domain":            domain,
-		"brandName":         brandName,
-		"brandDescription":  strings.TrimSpace(req.BrandDescription),
-		"industry":          strings.TrimSpace(req.Industry),
 		"attributionSource": strings.TrimSpace(req.AttributionSource),
 	}, false)
 	if err != nil {
@@ -184,7 +181,22 @@ func (s *Service) bootstrapProjectOptionalData(ctx context.Context, actor Identi
 		path    string
 		payload any
 	}
-	steps := make([]optionalStep, 0, 2)
+	steps := make([]optionalStep, 0, 3)
+
+	brandName := strings.TrimSpace(req.BrandName)
+	brandDescription := strings.TrimSpace(req.BrandDescription)
+	industry := strings.TrimSpace(req.Industry)
+	if brandName != "" || brandDescription != "" || industry != "" {
+		steps = append(steps, optionalStep{
+			name: "brand canon",
+			path: "/projects/" + url.PathEscape(projectID) + "/brand-canon",
+			payload: map[string]any{
+				"brandName":   brandName,
+				"positioning": brandDescription,
+				"category":    industry,
+			},
+		})
+	}
 
 	competitors := cleanCompetitors(req.Competitors)
 	if len(competitors) > 0 {
@@ -215,7 +227,11 @@ func (s *Service) bootstrapProjectOptionalData(ctx context.Context, actor Identi
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			_, err := s.call(ctx, s.projectURL, "project-service", step.path, http.MethodPost, tokenClaims{
+			method := http.MethodPost
+			if step.name == "brand canon" {
+				method = http.MethodPatch
+			}
+			_, err := s.call(ctx, s.projectURL, "project-service", step.path, method, tokenClaims{
 				IdentityID:   actor.IdentityID,
 				UserID:       actor.UserID,
 				Organization: organizationID,
@@ -369,12 +385,15 @@ func cleanCompetitors(values []Competitor) []map[string]string {
 	return out
 }
 
-func cleanPrompts(values []Prompt) []string {
-	out := make([]string, 0, len(values))
+func cleanPrompts(values []Prompt) []map[string]string {
+	out := make([]map[string]string, 0, len(values))
 	for _, value := range values {
 		text := strings.TrimSpace(value.Text)
 		if text != "" {
-			out = append(out, text)
+			out = append(out, map[string]string{
+				"text":     text,
+				"language": strings.TrimSpace(value.Language),
+			})
 		}
 	}
 	return out

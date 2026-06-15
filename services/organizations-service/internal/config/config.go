@@ -7,6 +7,7 @@ type Config struct {
 	MetricsAddr              string
 	GRPCAddr                 string
 	DatabaseURL              string
+	PermissionServiceURL     string
 	ProjectServiceURL        string
 	UserServiceURL           string
 	AppBaseURL               string
@@ -40,6 +41,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	databaseURL, err := DatabaseURLFromEnv()
+	if err != nil {
+		return Config{}, err
+	}
+	permissionServiceURL, err := envcfg.RequiredEnv("PERMISSION_SERVICE_URL")
 	if err != nil {
 		return Config{}, err
 	}
@@ -81,6 +86,7 @@ func Load() (Config, error) {
 		MetricsAddr:              metricsAddr,
 		GRPCAddr:                 grpcAddr,
 		DatabaseURL:              databaseURL,
+		PermissionServiceURL:     permissionServiceURL,
 		ProjectServiceURL:        envcfg.OptionalEnv("PROJECT_SERVICE_URL"),
 		UserServiceURL:           envcfg.OptionalEnv("USER_SERVICE_URL"),
 		AppBaseURL:               envcfg.OptionalEnv("APP_BASE_URL"),

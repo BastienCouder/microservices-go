@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import {
   relativeRunLabel,
 } from "../../_lib/utils";
 import { RichResponseText } from "./rich-response-text";
+import { PromptLanguageIndicator } from "../shared/prompt-language-indicator";
 
 type GetModelVisual = (model: string) => ModelVisual;
 
@@ -146,6 +147,17 @@ function PromptDetailsContent({
               label={t("overviewRank")}
               value={prompt.rank !== null ? prompt.rank.toFixed(1) : "-"}
             />
+            <DataRow
+              label={t("overviewLanguage")}
+              value={
+                <PromptLanguageIndicator
+                  language={prompt.language}
+                  label={prompt.language === "en" ? t("languageEnglish") : t("languageFrench")}
+                  className="justify-end"
+                  flagClassName="text-sm"
+                />
+              }
+            />
             <DataRow label={t("analysisCadenceTitle")} value={cadenceLabel} />
 
             <div className="flex items-center justify-between border-b border-slate-50 pb-5">
@@ -220,7 +232,7 @@ function PromptDetailsContent({
   );
 }
 
-function DataRow({ label, value }: { label: string; value: string }) {
+function DataRow({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex items-center justify-between border-b border-slate-50 pb-5">
       <span className="text-xs font-bold text-primary">{label}</span>

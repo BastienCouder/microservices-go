@@ -63,7 +63,6 @@ function normalizeProject(value: unknown): OrganizationProjectSummary | null {
     name: normalizeString(getField(value, ["name", "Name"])) || "Project",
     status: normalizeString(getField(value, ["status", "Status"])) || "draft",
     brandName: normalizeString(getField(value, ["brandName", "BrandName"])),
-    brandDescription: normalizeString(getField(value, ["brandDescription", "BrandDescription"])),
     attributionSource: normalizeString(getField(value, ["attributionSource", "AttributionSource"])),
     createdAt: normalizeString(getField(value, ["createdAt", "CreatedAt"])),
   };

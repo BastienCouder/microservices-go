@@ -29,7 +29,11 @@ func (s *Service) AssignProjectMember(ctx context.Context, projectID string, org
 		Role:           normalizedRole,
 		AddedAt:        s.now().UTC(),
 	}
-	if err := s.repo.UpsertProjectMember(ctx, member); err != nil {
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return domain.ProjectMember{}, err
+	}
+	if err := store.UpsertProjectMember(ctx, member); err != nil {
 		return domain.ProjectMember{}, fmt.Errorf("assign project member: %w", err)
 	}
 	return *member, nil
@@ -43,7 +47,11 @@ func (s *Service) ListProjectMembers(ctx context.Context, projectID string, orga
 	if err := s.ensureProjectBelongsToOrganization(ctx, projectID, organizationID); err != nil {
 		return nil, err
 	}
-	members, err := s.repo.ListProjectMembers(ctx, organizationID, projectID)
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	members, err := store.ListProjectMembers(ctx, organizationID, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("list project members: %w", err)
 	}
@@ -55,7 +63,11 @@ func (s *Service) ListProjectMembersByUser(ctx context.Context, organizationID, 
 	if organizationID <= 0 || userID <= 0 {
 		return nil, fmt.Errorf("%w: organization id and user id are required", domain.ErrInvalidMember)
 	}
-	members, err := s.repo.ListProjectMembersByUser(ctx, organizationID, userID)
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	members, err := store.ListProjectMembersByUser(ctx, organizationID, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list project members by user: %w", err)
 	}
@@ -71,7 +83,11 @@ func (s *Service) RemoveProjectMember(ctx context.Context, projectID string, org
 	if err := s.ensureProjectBelongsToOrganization(ctx, projectID, organizationID); err != nil {
 		return err
 	}
-	if err := s.repo.RemoveProjectMember(ctx, organizationID, projectID, userID); err != nil {
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return err
+	}
+	if err := store.RemoveProjectMember(ctx, organizationID, projectID, userID); err != nil {
 		return fmt.Errorf("remove project member: %w", err)
 	}
 	return nil

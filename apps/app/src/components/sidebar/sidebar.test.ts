@@ -14,6 +14,7 @@ describe("sidebar navigation", () => {
     expect(source.includes('"/ai-agent-ready"')).toBe(false);
     expect(source.includes("content.adminOrganizations")).toBe(false);
     expect(source.includes('"/admin/organizations"')).toBe(false);
+    expect(source.includes('.filter(({ value }) => value !== "apiKeys")')).toBe(true);
   });
 
   test("keeps the mobile navigation aligned with the sidebar items", async () => {

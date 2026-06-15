@@ -186,8 +186,8 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
       label: <SortableColumnHeader label={content.rank} sortKey="rank" promptSort={props.promptSort} promptSortDirection={props.promptSortDirection} changePromptSort={props.changePromptSort} />,
     },
     {
-      id: "sov",
-      label: <SortableColumnHeader label={content.overviewSov} sortKey="sov" promptSort={props.promptSort} promptSortDirection={props.promptSortDirection} changePromptSort={props.changePromptSort} />,
+      id: "language",
+      label: content.overviewLanguage,
     },
     {
       id: "last-run",

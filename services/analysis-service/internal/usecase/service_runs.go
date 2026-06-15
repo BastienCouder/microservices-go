@@ -528,6 +528,7 @@ func (s *Service) buildPerceptionFromDashboard(
 	result.BrandCanon = brandCanon
 	result.Radar = []PerceptionRadarPoint{}
 	result.TopErrors = []PerceptionError{}
+	result.Responses = []AIResponse{}
 	result.Metadata = map[string]any{
 		"projectId":     projectID,
 		"generatedAt":   time.Now().UTC().Format(time.RFC3339Nano),
@@ -550,6 +551,7 @@ func (s *Service) buildPerceptionFromDashboard(
 		monitoringResponsesUsed = len(responses)
 	}
 	if !dashboard.HasData || len(responses) == 0 {
+		result.Responses = []AIResponse{}
 		result.Metadata["responses"] = 0
 		result.Metadata["analyzedResponses"] = 0
 		result.Metadata["perceptionResponses"] = 0
@@ -580,6 +582,7 @@ func (s *Service) buildPerceptionFromDashboard(
 	result.Scores = derivePerceptionScoresFromMetrics(metrics)
 	result.Radar = derivePerceptionRadarFromMetrics(metrics)
 	result.TopErrors = derivePerceptionTopErrors(brandCanon, result.Scores, result.Radar, metricsByModel)
+	result.Responses = append([]AIResponse(nil), responses...)
 	result.Metadata["models"] = models
 	result.Metadata["latestRunId"] = ""
 	if dashboard.LatestRun != nil {

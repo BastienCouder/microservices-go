@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 
 import { PromptDetailsSheet } from "../details/prompt-details-sheet";
@@ -24,6 +25,25 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
   const state = usePromptsWorkspacePanelViewModel({ apiBaseURL, routeSearch });
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const canEdit = permissions.canEdit;
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const changeTab = (nextTab: "prompts" | "responses") => {
+    state.setTab(nextTab);
+
+    const params = new URLSearchParams(
+      location.search.startsWith("?") ? location.search.slice(1) : location.search,
+    );
+    params.set("tab", nextTab);
+
+    navigate(
+      {
+        pathname: location.pathname,
+        search: `?${params.toString()}`,
+      },
+      { replace: true },
+    );
+  };
 
   if (state.promptEditorState && canEdit) {
     return (
@@ -93,7 +113,7 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
           </div>
         </div>
 
-        <Tabs value={state.tab} onValueChange={(value) => state.setTab(value as "prompts" | "responses")} className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <Tabs value={state.tab} onValueChange={(value) => changeTab(value as "prompts" | "responses")} className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="border-b px-3 py-3 md:px-4">
             <TabsList className="h-10 w-full gap-1.5 rounded-xl md:w-auto p-1.5">
               <TabsTrigger value="prompts">{content.promptsTab}</TabsTrigger>
@@ -122,7 +142,7 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
               setIsPromptDetailsOpen={state.setIsPromptDetailsOpen}
               applyBulkStatus={state.applyBulkStatus}
               setFocusPromptId={state.setFocusPromptId}
-              setTabResponses={() => state.setTab("responses")}
+              setTabResponses={() => changeTab("responses")}
               deletePrompt={state.deletePrompt}
               deleteSelectedPrompts={state.deleteSelectedPrompts}
               onEditPrompt={state.openEditPromptEditor}
@@ -180,9 +200,18 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
             ? (prompt) => state.openPromptDetailsEditor(prompt.sourcePromptId || prompt.id)
             : undefined
         }
-        onSeeMoreResponses={(prompt) => state.showPromptResponses(prompt.sourcePromptId || prompt.id)}
+        onSeeMoreResponses={(prompt) => {
+          changeTab("responses");
+          state.setIsPromptDetailsOpen(false);
+          state.setFocusPromptId(prompt.sourcePromptId || prompt.id);
+        }}
         onOpenResponse={(prompt, responseId) =>
-          state.showPromptResponse(prompt.sourcePromptId || prompt.id, responseId)
+          {
+            changeTab("responses");
+            state.setIsPromptDetailsOpen(false);
+            state.setFocusPromptId(prompt.sourcePromptId || prompt.id);
+            state.setSelectedResponseId(responseId);
+          }
         }
       />
       <ResponseDetailsSheet

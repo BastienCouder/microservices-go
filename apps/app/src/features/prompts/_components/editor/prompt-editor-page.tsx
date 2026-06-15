@@ -15,12 +15,19 @@ import {
   normalizeEditorSchedule,
 } from "../../_lib/prompt-editor";
 import { defaultPromptSchedule } from "../../_lib/utils";
-import type { AIModel, ModelVisual, PromptItem, PromptSchedule } from "../../_lib/types";
+import type {
+  AIModel,
+  ModelVisual,
+  PromptItem,
+  PromptLanguage,
+  PromptSchedule,
+} from "../../_lib/types";
 import {
   PromptCoverageSection,
   PromptTextSection,
 } from "./prompt-editor-sections";
 import { PromptCadenceSection } from "./prompt-cadence-section";
+import { PromptLanguageIndicator } from "../shared/prompt-language-indicator";
 
 type PromptEditorPageProps = {
   mode: "create" | "edit";
@@ -31,6 +38,7 @@ type PromptEditorPageProps = {
   onBack: () => void;
   onSave: (input: {
     text: string;
+    language: PromptLanguage;
     modelIds: AIModel[];
     schedule: PromptSchedule;
     status: PromptItem["status"];
@@ -48,6 +56,7 @@ export function PromptEditorPage({
 }: PromptEditorPageProps) {
   const { locale, t } = useScopedI18n("prompts-workspace");
   const [promptText, setPromptText] = useState("");
+  const [language, setLanguage] = useState<PromptLanguage>("fr");
   const [selectedModels, setSelectedModels] = useState<AIModel[]>([]);
   const [schedule, setSchedule] = useState<PromptSchedule>(defaultPromptSchedule());
   const [status, setStatus] = useState<PromptItem["status"]>("active");
@@ -57,10 +66,11 @@ export function PromptEditorPage({
     const nextModels = prompt?.models.length ? prompt.models : availableModels.slice(0, 1);
     const nextSchedule = normalizeEditorSchedule(prompt?.schedule ?? schedule, nextModels);
     setPromptText(prompt?.prompt ?? "");
+    setLanguage(prompt?.language ?? (locale === "en" ? "en" : "fr"));
     setSelectedModels(nextModels);
     setSchedule(nextSchedule);
     setStatus(prompt?.status ?? "active");
-  }, [availableModels, mode, prompt?.id, prompt?.prompt, prompt?.schedule, promptModelKey]);
+  }, [availableModels, locale, mode, prompt?.id, prompt?.language, prompt?.prompt, prompt?.schedule, promptModelKey]);
 
   useEffect(() => {
     if (availableModels.length === 0) return;
@@ -97,6 +107,13 @@ export function PromptEditorPage({
         meta={
           <>
             <Badge variant="outline">{getPromptStatusLabel(status, locale)}</Badge>
+            <Badge variant="outline">
+              <PromptLanguageIndicator
+                language={language}
+                label={language === "en" ? t("languageEnglish") : t("languageFrench")}
+                flagClassName="text-sm"
+              />
+            </Badge>
             <Badge variant="outline">{t("selectedAiCount", { count: selectedModels.length })}</Badge>
             <Badge variant="outline">{cadenceSummary.badgeLabel}</Badge>
           </>
@@ -114,10 +131,12 @@ export function PromptEditorPage({
         <div className="space-y-5 overflow-x-hidden pb-6">
           <PromptTextSection
             promptText={promptText}
+            language={language}
             maxLength={PROMPT_MAX_LENGTH}
             status={status}
             saving={saving}
             onChangePromptText={setPromptText}
+            onChangeLanguage={setLanguage}
             onChangeStatus={setStatus}
           />
           <PromptCoverageSection
@@ -189,6 +208,7 @@ export function PromptEditorPage({
             onClick={() =>
               onSave({
                 text: promptText,
+                language,
                 modelIds: selectedModels,
                 schedule: normalizedSchedule,
                 status,

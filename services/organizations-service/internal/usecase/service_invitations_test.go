@@ -27,9 +27,13 @@ func (f fakeUserEmailResolver) UserEmail(_ context.Context, userID int64) (strin
 	return f.emails[userID], nil
 }
 
+func (f fakeUserEmailResolver) UserProfile(_ context.Context, userID int64) (UserProfile, error) {
+	return UserProfile{Email: f.emails[userID]}, nil
+}
+
 func TestInvitationCRUDFlow(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -103,7 +107,7 @@ func TestInvitationCRUDFlow(t *testing.T) {
 
 func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	notifier := &fakeInvitationNotifier{}
 	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
 
@@ -145,7 +149,7 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 
 func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	notifier := &fakeInvitationNotifier{}
 	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
 
@@ -198,9 +202,95 @@ func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 	}
 }
 
+func TestCreateInvitationDoesNotSendNotificationEmailWhenEmailAlreadyBelongsToMember(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newTestService(repo)
+	notifier := &fakeInvitationNotifier{}
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationUserEmailValidation(fakeUserEmailResolver{
+		emails: map[int64]string{
+			1: "owner@acme.io",
+			2: "member@acme.io",
+		},
+	})
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	if _, err := svc.AddMember(context.Background(), org.ID, 2); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+
+	if _, err := svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"member@acme.io",
+		"viewer",
+		"Welcome back",
+		nil,
+	); err != nil {
+		t.Fatalf("create invitation: %v", err)
+	}
+
+	if len(notifier.notifications) != 0 {
+		t.Fatalf("expected no notification email, got %d", len(notifier.notifications))
+	}
+}
+
+func TestUpdateInvitationDoesNotResendNotificationEmailWhenEmailAlreadyBelongsToMember(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newTestService(repo)
+	notifier := &fakeInvitationNotifier{}
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationUserEmailValidation(fakeUserEmailResolver{
+		emails: map[int64]string{
+			1: "owner@acme.io",
+			2: "member@acme.io",
+		},
+	})
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+	invitation, err := svc.CreateInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"invitee@acme.io",
+		"viewer",
+		"Welcome to the team",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create invitation: %v", err)
+	}
+	if _, err := svc.AddMember(context.Background(), org.ID, 2); err != nil {
+		t.Fatalf("add member: %v", err)
+	}
+
+	if _, err := svc.UpdateInvitation(
+		context.Background(),
+		org.ID,
+		invitation.ID,
+		"member@acme.io",
+		"editor",
+		"Updated note",
+		nil,
+	); err != nil {
+		t.Fatalf("update invitation: %v", err)
+	}
+
+	if len(notifier.notifications) != 1 {
+		t.Fatalf("expected only original notification email, got %d", len(notifier.notifications))
+	}
+}
+
 func TestAcceptInvitationRejectsAuthenticatedUserEmailMismatch(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.EnableInvitationUserEmailValidation(fakeUserEmailResolver{
 		emails: map[int64]string{
 			1: "owner@acme.io",
@@ -241,7 +331,7 @@ func TestAcceptInvitationRejectsAuthenticatedUserEmailMismatch(t *testing.T) {
 
 func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -290,7 +380,7 @@ func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 
 func TestInvitationAcceptRefuseFlow(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -350,7 +440,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 
 func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {

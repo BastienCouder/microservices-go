@@ -157,6 +157,7 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	assertProjectTableCount(t, ctx, db, "prompt_models", 1)
 	assertProjectTableCount(t, ctx, db, "prompt_model_schedules", 1)
 	assertProjectTableCount(t, ctx, db, "competitors", 1)
+	assertProjectTableCount(t, ctx, db, "brand_canon", 1)
 	assertProjectTableCount(t, ctx, db, "ai_models", 1)
 	assertProjectTableCount(t, ctx, db, "project_models", 1)
 	assertProjectTableCount(t, ctx, db, "project_llm_provider_credentials", 1)
@@ -194,6 +195,17 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	project := projects["prj-1"].(map[string]any)
 	if project["domain"] != "acme.test" {
 		t.Fatalf("expected project domain acme.test, got %#v", project["domain"])
+	}
+	brandCanonByProject := got["brandCanonByProject"].(map[string]any)
+	brandCanon := brandCanonByProject["prj-1"].(map[string]any)
+	if brandCanon["brandName"] != "Acme" {
+		t.Fatalf("expected brand canon brandName Acme, got %#v", brandCanon["brandName"])
+	}
+	if brandCanon["positioning"] != "Acme brand" {
+		t.Fatalf("expected brand canon positioning Acme brand, got %#v", brandCanon["positioning"])
+	}
+	if brandCanon["category"] != "SaaS" {
+		t.Fatalf("expected brand canon category SaaS, got %#v", brandCanon["category"])
 	}
 	models := got["models"].(map[string]any)
 	model := models["gpt-4o"].(map[string]any)

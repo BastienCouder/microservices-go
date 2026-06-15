@@ -65,4 +65,26 @@ describe("perception client api", () => {
       "application/json",
     );
   });
+
+  test("prefers an explicit organization scope override for optimize action requests", async () => {
+    const calls: Array<{ url: string; init?: RequestInit }> = [];
+    installMockWindow();
+    window.localStorage.setItem(SELECTED_ORG_KEY, "42");
+    globalThis.fetch = (async (input, init) => {
+      calls.push({ url: String(input), init });
+      return jsonResponse(200, { data: [] });
+    }) as typeof fetch;
+
+    await getPerceptionClientJSON("/analysis/projects/prj_1/optimize-actions", {
+      organizationId: "84",
+    });
+    await postPerceptionClientJSON(
+      "/analysis/projects/prj_1/optimize-actions",
+      { status: "processing" },
+      { organizationId: "84" },
+    );
+
+    expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("84");
+    expect(new Headers(calls[1]?.init?.headers).get("X-Organization-ID")).toBe("84");
+  });
 });

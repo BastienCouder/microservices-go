@@ -17,7 +17,6 @@ export type OrganizationProject = {
   organizationId: string;
   name: string;
   brandName: string;
-  brandDescription: string;
   attributionSource: string;
   createdAt: string;
 };

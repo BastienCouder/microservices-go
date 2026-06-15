@@ -872,6 +872,9 @@ func TestGetPerceptionWithDashboardReturnsDashboardFromSameLoad(t *testing.T) {
 	if len(perception.Dashboard.Responses) != 1 {
 		t.Fatalf("expected bundled dashboard responses, got %+v", perception.Dashboard.Responses)
 	}
+	if len(perception.Responses) != 1 {
+		t.Fatalf("expected perception responses to reuse the same filtered dataset, got %+v", perception.Responses)
+	}
 	if got := perception.Metadata["responses"]; got != 1 {
 		t.Fatalf("expected perception metadata from the same data set, got %#v", got)
 	}
@@ -978,6 +981,10 @@ func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 	}
 	if metadata["responses"] != float64(2) {
 		t.Fatalf("expected metadata responses 2, got %#v", metadata["responses"])
+	}
+	responses, ok := decoded["responses"].([]any)
+	if !ok || len(responses) != 2 {
+		t.Fatalf("expected serialized perception responses, got %#v", decoded["responses"])
 	}
 }
 
@@ -1266,6 +1273,9 @@ func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
 	models, ok := perception.Metadata["models"].([]string)
 	if !ok || len(models) != 1 || models[0] != "gpt-4o-mini" {
 		t.Fatalf("expected filtered metadata models to only include gpt-4o-mini, got %#v", perception.Metadata["models"])
+	}
+	if len(perception.Responses) != 1 || perception.Responses[0].ModelID != "gpt-4o-mini" {
+		t.Fatalf("expected only filtered perception responses to be returned, got %+v", perception.Responses)
 	}
 }
 

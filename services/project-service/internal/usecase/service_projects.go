@@ -53,9 +53,6 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 		Domain:            domain,
 		WebsiteURL:        websiteURL,
 		AttributionSource: normalizeAttributionSource(input.AttributionSource),
-		BrandName:         strings.TrimSpace(input.BrandName),
-		BrandDescription:  strings.TrimSpace(input.BrandDescription),
-		Industry:          strings.TrimSpace(input.Industry),
 		PrimaryLanguage:   primaryLanguage,
 		Country:           country,
 		CreatedAt:         now,
@@ -77,7 +74,7 @@ func (s *Service) CreateProject(ctx context.Context, input CreateProjectInput) (
 		return Project{}, err
 	}
 
-	created := copyProject(project)
+	created := s.effectiveProjectLocked(project)
 	s.mu.Unlock()
 
 	return created, nil
@@ -95,7 +92,16 @@ func (s *Service) ListProjects(ctx context.Context, organizationID int64) ([]Pro
 		return nil, err
 	}
 
-	return listProjectsFromMap(s.projects, organizationID), nil
+	projects := make([]Project, 0)
+	for _, project := range s.projects {
+		if project != nil && project.OrganizationID == organizationID {
+			projects = append(projects, s.effectiveProjectLocked(project))
+		}
+	}
+	sort.Slice(projects, func(i, j int) bool {
+		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
+	})
+	return projects, nil
 }
 
 func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userID int64) ([]Project, error) {
@@ -110,38 +116,14 @@ func (s *Service) ListProjectsForUser(ctx context.Context, organizationID, userI
 		return nil, err
 	}
 
-	if s.projectMembershipClient != nil {
-		members, err := s.projectMembershipClient.ListProjectMembersByUser(ctx, organizationID, userID)
-		if err != nil {
-			return nil, fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
-		}
-		return s.listProjectsForMembershipsLocked(organizationID, members), nil
+	if s.projectMembershipClient == nil {
+		return nil, fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
 	}
-
-	assignedProjectIDs := make(map[string]struct{})
-	for projectID, members := range s.projectMembers {
-		member, ok := members[userID]
-		if !ok || member.OrganizationID != organizationID {
-			continue
-		}
-		if _, err := s.getProjectForOrganizationLocked(projectID, organizationID); err == nil {
-			assignedProjectIDs[projectID] = struct{}{}
-		}
+	members, err := s.projectMembershipClient.ListProjectMembersByUser(ctx, organizationID, userID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: project memberships unavailable", ErrDependencyUnavailable)
 	}
-	if len(assignedProjectIDs) == 0 {
-		return []Project{}, nil
-	}
-
-	projects := make([]Project, 0, len(assignedProjectIDs))
-	for projectID := range assignedProjectIDs {
-		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID {
-			projects = append(projects, copyProject(project))
-		}
-	}
-	sort.Slice(projects, func(i, j int) bool {
-		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
-	})
-	return projects, nil
+	return s.listProjectsForMembershipsLocked(organizationID, members), nil
 }
 
 func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members []ProjectMember) []Project {
@@ -160,7 +142,7 @@ func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members
 	projects := make([]Project, 0, len(assignedProjectIDs))
 	for projectID := range assignedProjectIDs {
 		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID {
-			projects = append(projects, copyProject(project))
+			projects = append(projects, s.effectiveProjectLocked(project))
 		}
 	}
 	sort.Slice(projects, func(i, j int) bool {
@@ -181,7 +163,7 @@ func (s *Service) GetProject(ctx context.Context, projectID string, organization
 	if err != nil {
 		return Project{}, err
 	}
-	return copyProject(project), nil
+	return s.effectiveProjectLocked(project), nil
 }
 
 func (s *Service) UpdateProject(ctx context.Context, projectID string, organizationID int64, input UpdateProjectInput) (Project, error) {
@@ -222,15 +204,6 @@ func (s *Service) UpdateProject(ctx context.Context, projectID string, organizat
 	if input.AttributionSource != nil {
 		project.AttributionSource = normalizeAttributionSource(*input.AttributionSource)
 	}
-	if input.BrandName != nil {
-		project.BrandName = strings.TrimSpace(*input.BrandName)
-	}
-	if input.BrandDescription != nil {
-		project.BrandDescription = strings.TrimSpace(*input.BrandDescription)
-	}
-	if input.Industry != nil {
-		project.Industry = strings.TrimSpace(*input.Industry)
-	}
 	project.UpdatedAt = s.now().UTC()
 
 	if err := s.persistLocked(ctx); err != nil {
@@ -238,7 +211,7 @@ func (s *Service) UpdateProject(ctx context.Context, projectID string, organizat
 		return Project{}, err
 	}
 
-	return copyProject(project), nil
+	return s.effectiveProjectLocked(project), nil
 }
 
 func (s *Service) DeleteProject(ctx context.Context, projectID string, organizationID int64) error {
@@ -255,7 +228,6 @@ func (s *Service) DeleteProject(ctx context.Context, projectID string, organizat
 	backup := s.snapshotLocked()
 	delete(s.projects, projectID)
 	delete(s.projectModels, projectID)
-	delete(s.projectMembers, projectID)
 	delete(s.modelSelectionChanges, projectID)
 	delete(s.impactIntegrations, projectID)
 	delete(s.providerCredentials, projectID)
@@ -306,7 +278,7 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 	project.UpdatedAt = now
 
 	payload := FinalizePipelinePayload{
-		Project:     copyProject(project),
+		Project:     s.effectiveProjectLocked(project),
 		Prompts:     append([]AnalysisPromptText(nil), prompts...),
 		ModelIDs:    append([]string(nil), models...),
 		Competitors: append([]string(nil), competitors...),
@@ -327,20 +299,7 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 		return FinalizeResult{}, err
 	}
 
-	return FinalizeResult{Project: copyProject(project), PromptCount: len(prompts), ModelCount: len(models)}, nil
-}
-
-func listProjectsFromMap(projectsByID map[string]*Project, organizationID int64) []Project {
-	projects := make([]Project, 0)
-	for _, project := range projectsByID {
-		if project.OrganizationID == organizationID {
-			projects = append(projects, copyProject(project))
-		}
-	}
-	sort.Slice(projects, func(i, j int) bool {
-		return projects[i].CreatedAt.Before(projects[j].CreatedAt)
-	})
-	return projects
+	return FinalizeResult{Project: s.effectiveProjectLocked(project), PromptCount: len(prompts), ModelCount: len(models)}, nil
 }
 
 func countProjectsForOrganization(projectsByID map[string]*Project, organizationID int64) int {

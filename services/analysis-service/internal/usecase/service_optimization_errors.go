@@ -40,17 +40,22 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			severity = normalizeOptimizationSeverity(item.OptimizePriority)
 		}
 		errors = append(errors, OptimizationError{
-			ID:               "perception:" + item.ID,
-			Source:           "perception",
-			Severity:         severity,
-			Title:            strings.TrimSpace(item.Title),
-			Issue:            strings.TrimSpace(item.Issue),
-			Impact:           strings.TrimSpace(item.Impact),
-			Type:             strings.TrimSpace(item.Type),
-			FixType:          strings.TrimSpace(item.FixType),
-			OptimizePriority: strings.TrimSpace(item.OptimizePriority),
-			DetectedInModels: append([]string(nil), item.DetectedInModels...),
-			GeneratedContent: strings.TrimSpace(item.GeneratedContent),
+			ID:                  "perception:" + item.ID,
+			Source:              "perception",
+			Severity:            severity,
+			Title:               strings.TrimSpace(item.Title),
+			TitleKey:            strings.TrimSpace(item.TitleKey),
+			Issue:               strings.TrimSpace(item.Issue),
+			IssueKey:            strings.TrimSpace(item.IssueKey),
+			Impact:              strings.TrimSpace(item.Impact),
+			ImpactKey:           strings.TrimSpace(item.ImpactKey),
+			Type:                strings.TrimSpace(item.Type),
+			FixType:             strings.TrimSpace(item.FixType),
+			OptimizePriority:    strings.TrimSpace(item.OptimizePriority),
+			DetectedInModels:    append([]string(nil), item.DetectedInModels...),
+			GeneratedContent:    strings.TrimSpace(item.GeneratedContent),
+			GeneratedContentKey: strings.TrimSpace(item.GeneratedContentKey),
+			TranslationParams:   copyMetadata(item.TranslationParams),
 		})
 	}
 	errors = append(errors, crawlerErrors...)
@@ -168,14 +173,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Origin:              "derived",
 			Severity:            severity,
 			Title:               "La marque ressort trop peu dans les prompts suivis",
+			TitleKey:            "errorTypeMonitoringVisibilityGap",
 			Issue:               "Le taux de mention reste insuffisant sur les requetes monitoring prioritaires.",
+			IssueKey:            "topErrorsMonitoringVisibilityIssue",
 			Impact:              "La marque risque d'etre absente des recommandations IA sur les moments d'intention cle.",
+			ImpactKey:           "topErrorsMonitoringVisibilityImpact",
 			Type:                "monitoring_visibility_gap",
 			FixType:             "prompt_patch",
 			OptimizePriority:    severity,
 			DetectedInModels:    lowestMentionModels(modelStats, 2),
 			GeneratedContent:    "Revoir les prompts coeur de marche, renforcer les pages de positionnement et les preuves citees par les IA.",
 			GeneratedContentKey: "generatedContentMonitoringVisibilityGap",
+			TranslationParams:   map[string]any{},
 		})
 	}
 	if mentionRate >= 0.45 && citationRate < 0.35 {
@@ -189,14 +198,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Origin:              "derived",
 			Severity:            severity,
 			Title:               "La marque est mentionnee mais manque de sources citees",
+			TitleKey:            "errorTypeMonitoringCitationGap",
 			Issue:               "Les IA citent encore trop rarement des preuves ou URLs fiables quand elles parlent de la marque.",
+			IssueKey:            "topErrorsMonitoringCitationIssue",
 			Impact:              "La credibilite de la marque reste fragile dans les reponses et comparatifs IA.",
+			ImpactKey:           "topErrorsMonitoringCitationImpact",
 			Type:                "monitoring_citation_gap",
 			FixType:             "faq_snippet",
 			OptimizePriority:    severity,
 			DetectedInModels:    lowestCitationModels(modelStats, 2),
 			GeneratedContent:    "Ajouter des contenus davantage citables: FAQ, comparatifs, chiffres, preuves produit et pages de reference.",
 			GeneratedContentKey: "generatedContentMonitoringCitationGap",
+			TranslationParams:   map[string]any{},
 		})
 	}
 	if mentionRate >= 0.45 && topRate < 0.25 && bottomRate >= 0.3 {
@@ -210,14 +223,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Origin:              "derived",
 			Severity:            severity,
 			Title:               "La marque perd les positions hautes sur les prompts suivis",
+			TitleKey:            "errorTypeMonitoringRankingGap",
 			Issue:               "Les reponses mentionnent la marque mais la placent trop rarement en tete et trop souvent en bas de classement.",
+			IssueKey:            "topErrorsMonitoringRankingIssue",
 			Impact:              "La visibilite IA devient moins competitive sur les prompts a forte intention.",
+			ImpactKey:           "topErrorsMonitoringRankingImpact",
 			Type:                "monitoring_ranking_gap",
 			FixType:             "website_copy",
 			OptimizePriority:    severity,
 			DetectedInModels:    worstRankingModels(modelStats, 2),
 			GeneratedContent:    "Clarifier la proposition de valeur, les differentiants et les comparatifs concurrentiels sur les pages cle.",
 			GeneratedContentKey: "generatedContentMonitoringRankingGap",
+			TranslationParams:   map[string]any{},
 		})
 	}
 	if negativeRate >= 0.35 {
@@ -231,14 +248,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Origin:              "derived",
 			Severity:            severity,
 			Title:               "La tonalite des reponses devient trop negative",
+			TitleKey:            "errorTypeMonitoringNegativeShift",
 			Issue:               "Une part trop importante des reponses monitoring parle de la marque avec une tonalite negative.",
+			IssueKey:            "topErrorsMonitoringNegativeShiftIssue",
 			Impact:              "La desirabilite et la confiance baissent dans les recommandations et comparatifs IA.",
+			ImpactKey:           "topErrorsMonitoringNegativeShiftImpact",
 			Type:                "monitoring_negative_shift",
 			FixType:             "website_copy",
 			OptimizePriority:    severity,
 			DetectedInModels:    mostNegativeModels(modelStats, 2),
 			GeneratedContent:    "Renforcer les contenus de reassurance, les cas clients, les preuves de resultat et les objections traitees.",
 			GeneratedContentKey: "generatedContentMonitoringNegativeShift",
+			TranslationParams:   map[string]any{},
 		})
 	}
 	if hasMonitoringVolatility(modelStats) {
@@ -248,14 +269,18 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Origin:              "derived",
 			Severity:            "medium",
 			Title:               "Les modeles racontent des histoires trop differentes sur la marque",
+			TitleKey:            "errorTypeMonitoringModelVolatility",
 			Issue:               "Les performances monitoring varient fortement d'un modele a l'autre, signe d'un positionnement encore instable.",
+			IssueKey:            "topErrorsMonitoringModelVolatilityIssue",
 			Impact:              "La marque peut sembler forte sur certains assistants et faible sur d'autres, ce qui reduit la coherence globale.",
+			ImpactKey:           "topErrorsMonitoringModelVolatilityImpact",
 			Type:                "monitoring_model_volatility",
 			FixType:             "prompt_patch",
 			OptimizePriority:    "medium",
 			DetectedInModels:    volatilityModels(modelStats, 2),
 			GeneratedContent:    "Uniformiser les contenus de positionnement, les cas d'usage et les comparatifs pour reduire l'ecart entre modeles.",
 			GeneratedContentKey: "generatedContentMonitoringModelVolatility",
+			TranslationParams:   map[string]any{},
 		})
 	}
 
@@ -399,23 +424,86 @@ func (s *Service) listCrawlerOptimizationErrors(ctx context.Context, projectID s
 			}
 
 			severity := normalizeOptimizationSeverity(issue.Severity)
+			textKeys := crawlerOptimizationTextKeys(issue, pageURL)
 			items = append(items, OptimizationError{
-				ID:               "crawler:" + id,
-				Source:           "crawler",
-				Resource:         pageURL,
-				Severity:         severity,
-				Title:            strings.TrimSpace(issue.Title),
-				Issue:            strings.TrimSpace(issue.Description),
-				Impact:           crawlerOptimizationImpact(pageURL),
-				Type:             crawlerOptimizationType(issue),
-				FixType:          crawlerOptimizationFixType(issue),
-				OptimizePriority: severity,
-				GeneratedContent: strings.TrimSpace(issue.Recommendation),
-				CreatedAt:        formatOptimizationErrorTime(createdAt),
+				ID:                  "crawler:" + id,
+				Source:              "crawler",
+				Resource:            pageURL,
+				Severity:            severity,
+				Title:               strings.TrimSpace(issue.Title),
+				TitleKey:            textKeys.titleKey,
+				Issue:               strings.TrimSpace(issue.Description),
+				IssueKey:            textKeys.issueKey,
+				Impact:              crawlerOptimizationImpact(pageURL),
+				ImpactKey:           textKeys.impactKey,
+				Type:                crawlerOptimizationType(issue),
+				FixType:             crawlerOptimizationFixType(issue),
+				OptimizePriority:    severity,
+				GeneratedContent:    strings.TrimSpace(issue.Recommendation),
+				GeneratedContentKey: textKeys.generatedContentKey,
+				TranslationParams:   textKeys.params,
+				CreatedAt:           formatOptimizationErrorTime(createdAt),
 			})
 		}
 	}
 	return items, nil
+}
+
+type optimizationTextKeys struct {
+	titleKey            string
+	issueKey            string
+	impactKey           string
+	generatedContentKey string
+	params              map[string]any
+}
+
+func crawlerOptimizationTextKeys(issue ContentOptimizerIssue, pageURL string) optimizationTextKeys {
+	fixType := strings.TrimSpace(issue.FixType)
+	if fixType == "" {
+		return optimizationTextKeys{
+			impactKey: "crawlerImpactPage",
+			params: map[string]any{
+				"resource": pageURL,
+			},
+		}
+	}
+
+	suffix := toCamelCaseKeySuffix(fixType)
+	return optimizationTextKeys{
+		titleKey:            "crawlerIssue" + suffix + "Title",
+		issueKey:            "crawlerIssue" + suffix + "Issue",
+		impactKey:           "crawlerImpactPage",
+		generatedContentKey: "crawlerIssue" + suffix + "Fix",
+		params: map[string]any{
+			"resource": pageURL,
+		},
+	}
+}
+
+func toCamelCaseKeySuffix(value string) string {
+	parts := strings.FieldsFunc(strings.TrimSpace(value), func(r rune) bool {
+		return r == '_' || r == '-' || r == ' '
+	})
+	if len(parts) == 0 {
+		return "Generic"
+	}
+
+	var builder strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		normalized := strings.ToLower(part)
+		builder.WriteString(strings.ToUpper(normalized[:1]))
+		if len(normalized) > 1 {
+			builder.WriteString(normalized[1:])
+		}
+	}
+
+	if builder.Len() == 0 {
+		return "Generic"
+	}
+	return builder.String()
 }
 
 func crawlerOptimizationImpact(pageURL string) string {

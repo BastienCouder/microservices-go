@@ -99,7 +99,7 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 				return
 			}
 
-			allowed, _, err := h.checkPermission(r.Context(), userID, orgID, "admin", "users")
+			allowed, _, err := h.checkPermission(r.Context(), userID, orgID, "admin", "users", "", "")
 			if err != nil {
 				writeJSONError(w, http.StatusBadGateway, "permission service unavailable")
 				return
@@ -125,7 +125,9 @@ func (h *Handler) withAuth(next http.Handler, serviceAudience, defaultResource s
 			}
 			action := actionFromMethod(r2.Method)
 			resource := resourceFromPath(r2.URL.Path, defaultResource)
-			allowed, reason, err := h.checkPermission(r.Context(), userID, orgID, action, resource)
+			projectID := projectIDFromPath(r2.URL.Path)
+			resourceID := resourceIDFromPath(r2.URL.Path, resource)
+			allowed, reason, err := h.checkPermission(r.Context(), userID, orgID, action, resource, projectID, resourceID)
 			if err != nil {
 				log.Printf("permission check failed: user_id=%d organization_id=%d action=%s resource=%s path=%s err=%v", userID, orgID, action, resource, r2.URL.Path, err)
 				writeJSONError(w, http.StatusBadGateway, "permission service unavailable")

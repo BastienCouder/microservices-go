@@ -21,4 +21,23 @@ describe("usePerceptionViewModel", () => {
     expect(source.includes("deletePerceptionClientJSON")).toBe(true);
     expect(source.includes("handleRemoveAction")).toBe(true);
   });
+
+  test("filters responses by source before applying model and period slices", () => {
+    expect(source.includes("selectedSourceFilter")).toBe(true);
+    expect(source.includes("sourceFilter: selectedSourceFilter")).toBe(true);
+    expect(source.includes("getLatestRunIdForResponses")).toBe(true);
+    expect(source.includes("setSelectedSourceFilter")).toBe(true);
+  });
+
+  test("filters top errors by the selected source as well", () => {
+    expect(source.includes("getPerceptionErrorSource")).toBe(true);
+    expect(source.includes("getPerceptionErrorSource(error) === selectedSourceFilter")).toBe(true);
+    expect(source.includes("filteredTopErrorsTotalCount")).toBe(true);
+  });
+
+  test("hides top errors when perception is selected but no perception responses exist", () => {
+    expect(source.includes('selectedSourceFilter === "perception" && sourceScopedResponses.length === 0')).toBe(true);
+    expect(source.includes("return [];")).toBe(true);
+    expect(source.includes("return 0;")).toBe(true);
+  });
 });

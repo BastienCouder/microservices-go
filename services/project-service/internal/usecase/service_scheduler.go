@@ -38,6 +38,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 		if project == nil {
 			continue
 		}
+		effectiveProject := s.effectiveProjectLocked(project)
 
 		enabledModelIDs := filterEnabledModels(s.projectModels, s.models, projectID)
 		if len(enabledModelIDs) == 0 {
@@ -78,11 +79,11 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 			}
 
 			jobs = append(jobs, ScheduledAnalysisJob{
-				ProjectID:           project.ID,
-				ProjectName:         project.Name,
-				OrganizationID:      project.OrganizationID,
-				CreatedBy:           project.CreatedBy,
-				BrandName:           project.BrandName,
+				ProjectID:           effectiveProject.ID,
+				ProjectName:         effectiveProject.Name,
+				OrganizationID:      effectiveProject.OrganizationID,
+				CreatedBy:           effectiveProject.CreatedBy,
+				BrandName:           effectiveProject.BrandName,
 				Competitors:         append([]string(nil), competitors...),
 				PromptID:            prompt.ID,
 				PromptText:          prompt.Text,

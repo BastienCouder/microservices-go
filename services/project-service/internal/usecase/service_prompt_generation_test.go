@@ -66,9 +66,6 @@ func TestGenerateMonitoringPromptsCreatesTenPromptsWithOpenRouterModel(t *testin
 		Name:              "Acme",
 		Domain:            "acme.com",
 		WebsiteURL:        "https://acme.com",
-		BrandName:         "Acme",
-		BrandDescription:  "CRM analytics platform",
-		Industry:          "B2B SaaS",
 		PrimaryLanguage:   "fr",
 		Country:           "FR",
 		AttributionSource: "organic search",
@@ -76,6 +73,7 @@ func TestGenerateMonitoringPromptsCreatesTenPromptsWithOpenRouterModel(t *testin
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
+	mustUpdateBrandCanon(t, ctx, svc, project.ID, 42, "Acme", "B2B SaaS", "CRM analytics platform")
 	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
 		t.Fatalf("save openrouter credential: %v", err)
 	}
@@ -158,14 +156,74 @@ func TestGenerateMonitoringPromptsRejectsInvalidModelOutput(t *testing.T) {
 		Name:           "Acme",
 		Domain:         "acme.com",
 		WebsiteURL:     "https://acme.com",
-		BrandName:      "Acme",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	mustUpdateBrandCanon(t, ctx, svc, project.ID, 42, "Acme", "", "")
+
+	_, err = svc.GenerateMonitoringPrompts(ctx, project.ID, 42)
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestGenerateMonitoringPromptsUsesBrandCanonAsSourceOfTruth(t *testing.T) {
+	ctx := context.Background()
+	iaSpy := &promptGenerationIAClientSpy{
+		result: IAExecutePromptResult{
+			RawResponse: `{"prompts":[
+				"Prompt 1","Prompt 2","Prompt 3","Prompt 4","Prompt 5",
+				"Prompt 6","Prompt 7","Prompt 8","Prompt 9","Prompt 10"
+			]}`,
+		},
+	}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{IAClient: iaSpy})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID:  42,
+		CreatedBy:       7,
+		Name:            "Acme",
+		Domain:          "acme.com",
+		WebsiteURL:      "https://acme.com",
+		PrimaryLanguage: "fr",
+		Country:         "FR",
 	})
 	if err != nil {
 		t.Fatalf("create project: %v", err)
 	}
 
-	_, err = svc.GenerateMonitoringPrompts(ctx, project.ID, 42)
-	if !errors.Is(err, ErrValidation) {
-		t.Fatalf("expected validation error, got %v", err)
+	positioning := "Canonical positioning for SMB CRM buyers"
+	category := "AI CRM"
+	if _, err := svc.UpdateBrandCanon(ctx, project.ID, 42, UpdateBrandCanonInput{
+		Positioning: &positioning,
+		Category:    &category,
+	}); err != nil {
+		t.Fatalf("update brand canon: %v", err)
+	}
+
+	if _, err := svc.GenerateMonitoringPrompts(ctx, project.ID, 42); err != nil {
+		t.Fatalf("generate monitoring prompts: %v", err)
+	}
+	if len(iaSpy.inputs) != 1 {
+		t.Fatalf("expected one IA call, got %d", len(iaSpy.inputs))
+	}
+
+	instruction := iaSpy.inputs[0].PromptText
+	if !strings.Contains(instruction, positioning) {
+		t.Fatalf("expected generation instruction to use brand canon positioning, got %q", instruction)
+	}
+	if !strings.Contains(instruction, category) {
+		t.Fatalf("expected generation instruction to use brand canon category, got %q", instruction)
+	}
+	if strings.Contains(instruction, "Legacy description") {
+		t.Fatalf("expected generation instruction to ignore legacy project description, got %q", instruction)
+	}
+	if strings.Contains(instruction, "Legacy industry") {
+		t.Fatalf("expected generation instruction to ignore legacy project industry, got %q", instruction)
 	}
 }

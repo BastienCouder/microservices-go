@@ -13,6 +13,7 @@ import { ModelCard } from "@/components/shared/model-card";
 import type {
   BrandCanon,
   PerceptionModelOption,
+  PerceptionSourceFilter,
   PerceptionTrendPeriodKey,
   PerceptionViewData,
 } from "../_lib/shared/perception-data";
@@ -38,9 +39,11 @@ export function PerceptionLeftPanel({
   trendData,
   windowLabel,
   analyzedResponses,
+  selectedSourceFilter,
   selectedModels,
   modelOptions,
   selectedPeriod,
+  onSourceFilterChange,
   onModelToggle,
   onResetModels,
   onPeriodChange,
@@ -56,9 +59,11 @@ export function PerceptionLeftPanel({
   trendData: PerceptionViewData["trend"][PerceptionTrendPeriodKey]["data"];
   windowLabel: string;
   analyzedResponses: number;
+  selectedSourceFilter: PerceptionSourceFilter;
   selectedModels: string[];
   modelOptions: PerceptionModelOption[];
   selectedPeriod: PerceptionTrendPeriodKey;
+  onSourceFilterChange: (value: PerceptionSourceFilter) => void;
   onModelToggle: (value: string) => void;
   onResetModels: () => void;
   onPeriodChange: (value: PerceptionTrendPeriodKey) => void;
@@ -111,7 +116,7 @@ export function PerceptionLeftPanel({
             isDemo={isDemo}
             action={
               <Button asChild variant="outline" className="w-full justify-center rounded-lg">
-                <Link to={{ pathname: "/perception/brand-canon", search: brandEditSearch }}>
+                <Link to={{ pathname: "/brand-canon", search: brandEditSearch }}>
                   {t("leftPanelChangeBrand")}
                 </Link>
               </Button>
@@ -122,8 +127,10 @@ export function PerceptionLeftPanel({
         <TabsContent value="filters" className="m-0 min-h-0 flex-1 overflow-y-auto px-2 pb-4 no-scrollbar">
           <PerceptionFiltersPanel
             modelOptions={modelOptions}
+            selectedSourceFilter={selectedSourceFilter}
             selectedModels={selectedModels}
             selectedPeriod={selectedPeriod}
+            onSourceFilterChange={onSourceFilterChange}
             onModelToggle={onModelToggle}
             onResetModels={onResetModels}
             onPeriodChange={onPeriodChange}
@@ -140,8 +147,10 @@ export function PerceptionLeftPanel({
 
 function PerceptionFiltersPanel({
   modelOptions,
+  selectedSourceFilter,
   selectedModels,
   selectedPeriod,
+  onSourceFilterChange,
   onModelToggle,
   onResetModels,
   onPeriodChange,
@@ -151,8 +160,10 @@ function PerceptionFiltersPanel({
   onToggleModelFilterMode,
 }: {
   modelOptions: PerceptionModelOption[];
+  selectedSourceFilter: PerceptionSourceFilter;
   selectedModels: string[];
   selectedPeriod: PerceptionTrendPeriodKey;
+  onSourceFilterChange: (value: PerceptionSourceFilter) => void;
   onModelToggle: (value: string) => void;
   onResetModels: () => void;
   onPeriodChange: (value: PerceptionTrendPeriodKey) => void;
@@ -200,8 +211,33 @@ function PerceptionFiltersPanel({
 
   return (
     <div className="space-y-5">
-      <div className="space-y-1.5">
-        <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersPeriod")}</label>
+      <div className="space-y-2.5">
+        <label className="block px-1 text-xs text-muted-foreground md:text-sm xl:text-xs">
+          {t("filtersDataSource")}
+        </label>
+        <Tabs
+          value={selectedSourceFilter}
+          onValueChange={(value) =>
+            onSourceFilterChange(value as PerceptionSourceFilter)
+          }
+          className="w-full"
+        >
+          <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-muted p-1">
+            <TabsTrigger value="perception" className="px-2 py-1.5 text-xs">
+              {t("filterSourcePerception")}
+            </TabsTrigger>
+            <TabsTrigger value="monitoring" className="px-2 py-1.5 text-xs">
+              {t("filterSourceMonitoring")}
+            </TabsTrigger>
+            <TabsTrigger value="all" className="px-2 py-1.5 text-xs">
+              {t("filterSourceAll")}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      </div>
+
+      <div className="space-y-2.5">
+        <label className="block px-1 text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersPeriod")}</label>
         <PeriodFilterPicker
           value={selectedPeriod}
           onValueChange={(value) => onPeriodChange(value as PerceptionTrendPeriodKey)}
@@ -209,8 +245,8 @@ function PerceptionFiltersPanel({
         />
       </div>
 
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-2">
+      <div className="space-y-2.5">
+        <div className="flex items-center justify-between gap-2 px-1">
           <label className="text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersModels")}</label>
           <div className="flex items-center gap-1">
             <Button

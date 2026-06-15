@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { pushErrorToast, pushWarningToast } from "@/components/ui/toast-actions";
 import { createOnboardingProject } from "@/features/onboarding/onboarding-api";
+import { invalidateOrganizationScope } from "@/shared/api/query-refresh";
 import {
   clearPersistedOnboardingState,
   useOnboarding,
@@ -92,7 +93,7 @@ export function StepAnalysis({
       prompts: selectedPrompts,
       modelIds: selectedModels,
     })
-      .then(({ projectId, projectSlug, organizationId: projectOrganizationId, warnings }) => {
+      .then(async ({ projectId, projectSlug, organizationId: projectOrganizationId, warnings }) => {
         storeSelectedProjectContext({
           organizationId: projectOrganizationId,
           projectId,
@@ -103,6 +104,11 @@ export function StepAnalysis({
         if (warnings.length > 0) {
           pushWarningToast(warnings.join(" "));
         }
+        await invalidateOrganizationScope(
+          queryClient,
+          apiBaseURL,
+          projectOrganizationId,
+        );
         window.setTimeout(() => {
           queryClient.removeQueries({
             queryKey: ["route-project-guard", apiBaseURL],

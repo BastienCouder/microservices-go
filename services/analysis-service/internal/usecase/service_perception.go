@@ -262,15 +262,19 @@ func derivePerceptionTopErrors(
 	metricsByModel map[string][]perceptionResponseMetrics,
 ) []PerceptionError {
 	type candidate struct {
-		errorType        string
-		score            int
-		axis             string
-		title            string
-		issue            string
-		impact           string
-		fixType          string
-		generatedContent string
+		errorType           string
+		score               int
+		axis                string
+		title               string
+		titleKey            string
+		issue               string
+		issueKey            string
+		impact              string
+		impactKey           string
+		fixType             string
+		generatedContent    string
 		generatedContentKey string
+		translationParams   map[string]any
 	}
 
 	brandLabel := strings.TrimSpace(canon.BrandName)
@@ -285,59 +289,92 @@ func derivePerceptionTopErrors(
 
 	candidates := []candidate{
 		{
-			errorType:        "positioning_gap",
-			score:            scores.PositioningAccuracy,
-			axis:             "positioning",
-			title:            "Le positionnement est encore mal cite",
-			issue:            brandLabel + " n'est pas encore rattache de maniere fiable a son positionnement dans toutes les reponses.",
-			impact:           "La marque peut etre oubliee ou mal classee sur les requetes de consideration.",
-			fixType:          "website_copy",
-			generatedContent: "Clarifier la proposition de valeur, la categorie et les scenarios cibles dans les pages d'entree et les FAQ.",
+			errorType:           "positioning_gap",
+			score:               scores.PositioningAccuracy,
+			axis:                "positioning",
+			title:               "Le positionnement est encore mal cite",
+			titleKey:            "topErrorsGeneratedPositioningTitle",
+			issue:               brandLabel + " n'est pas encore rattache de maniere fiable a son positionnement dans toutes les reponses.",
+			issueKey:            "topErrorsGeneratedPositioningIssue",
+			impact:              "La marque peut etre oubliee ou mal classee sur les requetes de consideration.",
+			impactKey:           "topErrorsGeneratedPositioningImpact",
+			fixType:             "website_copy",
+			generatedContent:    "Clarifier la proposition de valeur, la categorie et les scenarios cibles dans les pages d'entree et les FAQ.",
 			generatedContentKey: "generatedContentPerceptionPositioningGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": scores.PositioningAccuracy,
+			},
 		},
 		{
-			errorType:        "citation_gap",
-			score:            scores.FactualAccuracy,
-			axis:             "features",
-			title:            "Factualite encore fragile",
-			issue:            "Les reponses s'appuient encore trop peu sur des sources citees ou des preuves facilement reutilisables.",
-			impact:           "La fiabilite percue de la marque baisse dans les syntheses IA.",
-			fixType:          "faq_snippet",
-			generatedContent: "Ajouter des preuves, chiffres, FAQ et contenus de reference directement citables sur les points cles.",
+			errorType:           "citation_gap",
+			score:               scores.FactualAccuracy,
+			axis:                "features",
+			title:               "Factualite encore fragile",
+			titleKey:            "topErrorsGeneratedCitationTitle",
+			issue:               "Les reponses s'appuient encore trop peu sur des sources citees ou des preuves facilement reutilisables.",
+			issueKey:            "topErrorsGeneratedCitationIssue",
+			impact:              "La fiabilite percue de la marque baisse dans les syntheses IA.",
+			impactKey:           "topErrorsGeneratedCitationImpact",
+			fixType:             "faq_snippet",
+			generatedContent:    "Ajouter des preuves, chiffres, FAQ et contenus de reference directement citables sur les points cles.",
 			generatedContentKey: "generatedContentPerceptionCitationGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": scores.FactualAccuracy,
+			},
 		},
 		{
-			errorType:        "use_case_gap",
-			score:            radarByAxis["use_cases"],
-			axis:             "use_cases",
-			title:            "Cas d'usage encore incomplets",
-			issue:            "Les cas d'usage definis dans le brand canon ne ressortent pas assez souvent dans les reponses.",
-			impact:           "Les IA ne relient pas encore assez la marque aux besoins cibles.",
-			fixType:          "website_copy",
-			generatedContent: "Rendre les use cases prioritaires plus visibles dans la navigation, les hero sections et les pages de comparaison.",
+			errorType:           "use_case_gap",
+			score:               radarByAxis["use_cases"],
+			axis:                "use_cases",
+			title:               "Cas d'usage encore incomplets",
+			titleKey:            "topErrorsGeneratedUseCaseTitle",
+			issue:               "Les cas d'usage definis dans le brand canon ne ressortent pas assez souvent dans les reponses.",
+			issueKey:            "topErrorsGeneratedUseCaseIssue",
+			impact:              "Les IA ne relient pas encore assez la marque aux besoins cibles.",
+			impactKey:           "topErrorsGeneratedUseCaseImpact",
+			fixType:             "website_copy",
+			generatedContent:    "Rendre les use cases prioritaires plus visibles dans la navigation, les hero sections et les pages de comparaison.",
 			generatedContentKey: "generatedContentPerceptionUseCaseGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": radarByAxis["use_cases"],
+			},
 		},
 		{
-			errorType:        "sentiment_gap",
-			score:            scores.SentimentScore,
-			axis:             "sentiment",
-			title:            "Tonalite encore trop neutre",
-			issue:            "Les reponses restent encore trop neutres ou mitigees quand elles parlent de la marque.",
-			impact:           "La desirabilite de la marque baisse dans les recommandations IA.",
-			fixType:          "prompt_patch",
-			generatedContent: "Renforcer les preuves de valeur, resultats clients et differentiants dans les contenus sources.",
+			errorType:           "sentiment_gap",
+			score:               scores.SentimentScore,
+			axis:                "sentiment",
+			title:               "Tonalite encore trop neutre",
+			titleKey:            "topErrorsGeneratedSentimentTitle",
+			issue:               "Les reponses restent encore trop neutres ou mitigees quand elles parlent de la marque.",
+			issueKey:            "topErrorsGeneratedSentimentIssue",
+			impact:              "La desirabilite de la marque baisse dans les recommandations IA.",
+			impactKey:           "topErrorsGeneratedSentimentImpact",
+			fixType:             "prompt_patch",
+			generatedContent:    "Renforcer les preuves de valeur, resultats clients et differentiants dans les contenus sources.",
 			generatedContentKey: "generatedContentPerceptionSentimentGap",
+			translationParams: map[string]any{
+				"score": scores.SentimentScore,
+			},
 		},
 		{
-			errorType:        "competitive_gap",
-			score:            radarByAxis["competitors"],
-			axis:             "competitors",
-			title:            "Lecture concurrentielle encore faible",
-			issue:            "Le positionnement competitif reste variable selon les modeles et les prompts.",
-			impact:           "La marque peut perdre des comparatifs ou apparaitre derriere des alternatives.",
-			fixType:          "schema_update",
-			generatedContent: "Ajouter des comparatifs, tableaux de differenciation et contenus de preuve contre les alternatives majeures.",
+			errorType:           "competitive_gap",
+			score:               radarByAxis["competitors"],
+			axis:                "competitors",
+			title:               "Lecture concurrentielle encore faible",
+			titleKey:            "topErrorsGeneratedCompetitiveTitle",
+			issue:               "Le positionnement competitif reste variable selon les modeles et les prompts.",
+			issueKey:            "topErrorsGeneratedCompetitiveIssue",
+			impact:              "La marque peut perdre des comparatifs ou apparaitre derriere des alternatives.",
+			impactKey:           "topErrorsGeneratedCompetitiveImpact",
+			fixType:             "schema_update",
+			generatedContent:    "Ajouter des comparatifs, tableaux de differenciation et contenus de preuve contre les alternatives majeures.",
 			generatedContentKey: "generatedContentPerceptionCompetitiveGap",
+			translationParams: map[string]any{
+				"score": radarByAxis["competitors"],
+			},
 		},
 	}
 
@@ -363,17 +400,21 @@ func derivePerceptionTopErrors(
 		}
 
 		topErrors = append(topErrors, PerceptionError{
-			ID:               item.errorType,
-			Type:             item.errorType,
-			Severity:         severity,
-			Title:            item.title,
-			Issue:            item.issue,
-			Impact:           item.impact,
-			DetectedInModels: lowScoringPerceptionModels(metricsByModel, item.axis),
-			FixType:          item.fixType,
-			GeneratedContent: item.generatedContent,
+			ID:                  item.errorType,
+			Type:                item.errorType,
+			Severity:            severity,
+			Title:               item.title,
+			TitleKey:            item.titleKey,
+			Issue:               item.issue,
+			IssueKey:            item.issueKey,
+			Impact:              item.impact,
+			ImpactKey:           item.impactKey,
+			DetectedInModels:    lowScoringPerceptionModels(metricsByModel, item.axis),
+			FixType:             item.fixType,
+			GeneratedContent:    item.generatedContent,
 			GeneratedContentKey: item.generatedContentKey,
-			OptimizePriority: priority,
+			TranslationParams:   item.translationParams,
+			OptimizePriority:    priority,
 		})
 	}
 

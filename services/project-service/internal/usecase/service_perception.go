@@ -31,6 +31,7 @@ func buildPerceptionPromptTexts(project Project) []string {
 func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []string) []AnalysisPromptText {
 	now := s.now().UTC()
 	texts := buildPerceptionPromptTexts(project)
+	defaultLanguage := defaultPromptLanguage(project)
 	existingByText := make(map[string]*Prompt)
 	for _, prompt := range s.prompts {
 		if prompt.ProjectID != project.ID || normalizePromptKind(prompt.Kind) != PromptKindPerception {
@@ -47,6 +48,7 @@ func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []stri
 				ID:        s.nextID("prm"),
 				ProjectID: project.ID,
 				Text:      text,
+				Language:  defaultLanguage,
 				Kind:      PromptKindPerception,
 				ModelIDs:  nonNilStringSlice(modelIDs),
 				Schedule: PromptSchedule{
@@ -62,6 +64,9 @@ func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []stri
 			}
 			s.prompts[prompt.ID] = prompt
 		} else {
+			if prompt.Language == "" {
+				prompt.Language = defaultLanguage
+			}
 			prompt.Kind = PromptKindPerception
 			prompt.ModelIDs = nonNilStringSlice(modelIDs)
 			prompt.Schedule = prunePromptScheduleModelCrons(prompt.Schedule, modelIDs)
@@ -77,6 +82,7 @@ func (s *Service) ensurePerceptionPromptsLocked(project Project, modelIDs []stri
 		out = append(out, AnalysisPromptText{
 			ID:       prompt.ID,
 			Text:     prompt.Text,
+			Language: prompt.Language,
 			ModelIDs: nonNilStringSlice(modelIDs),
 		})
 	}
@@ -100,7 +106,7 @@ func (s *Service) RunPerceptionAnalysis(ctx context.Context, projectID string, o
 		s.mu.Unlock()
 		return AnalysisStartResponse{}, err
 	}
-	projectCopy := copyProject(project)
+	projectCopy := s.effectiveProjectLocked(project)
 	if createdBy > 0 {
 		projectCopy.CreatedBy = createdBy
 	}

@@ -18,7 +18,7 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpsrv"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
-	organizationsclient "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/client/organizations"
+	projectclient "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/client/project"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/http"
 	permissionrepo "github.com/bastiencouder/microservices-go/services/permission-service/internal/adapter/repository/postgres"
@@ -42,8 +42,8 @@ func main() {
 	defer db.Close()
 
 	repo := permissionrepo.NewRepository(db)
-	roleResolver := organizationsclient.NewClient(cfg.OrganizationsServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
-	svc := usecase.NewService(repo, roleResolver)
+	scopeResolver := projectclient.NewClient(cfg.ProjectServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
+	svc := usecase.NewService(repo, scopeResolver)
 	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 	g := grpcadapter.NewServer(svc)
 

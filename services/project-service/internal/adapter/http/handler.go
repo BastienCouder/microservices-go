@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strconv"
@@ -34,6 +35,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /projects/llm-provider-credentials/{provider}", h.deleteLLMProviderCredential)
 	mux.HandleFunc("GET /internal/scheduled-analysis/jobs", h.listScheduledAnalysisJobs)
 	mux.HandleFunc("/internal/projects/", h.internalProjectRoutes)
+	mux.HandleFunc("/internal/prompts/", h.internalPromptRoutes)
+	mux.HandleFunc("/internal/competitors/", h.internalCompetitorRoutes)
 	mux.HandleFunc("/projects/", h.projectRoutes)
 	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/prompts/", h.promptRoutes)
@@ -51,9 +54,29 @@ func (h *Handler) internalProjectRoutes(w http.ResponseWriter, r *http.Request) 
 	switch {
 	case len(parts) == 2 && parts[1] == "impact-context" && r.Method == http.MethodGet:
 		h.getProjectImpactContext(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "scope" && r.Method == http.MethodGet:
+		h.getProjectScope(w, r, projectID)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+func (h *Handler) internalPromptRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/internal/prompts/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] != "scope" || r.Method != http.MethodGet {
+		http.NotFound(w, r)
+		return
+	}
+	h.getPromptScope(w, r, parts[0])
+}
+
+func (h *Handler) internalCompetitorRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/internal/competitors/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] != "scope" || r.Method != http.MethodGet {
+		http.NotFound(w, r)
+		return
+	}
+	h.getCompetitorScope(w, r, parts[0])
 }
 
 func (h *Handler) analysisProjectRoutes(w http.ResponseWriter, r *http.Request) {
@@ -83,9 +106,6 @@ type createProjectRequest struct {
 	Domain            string `json:"domain"`
 	WebsiteURL        string `json:"websiteUrl"`
 	AttributionSource string `json:"attributionSource"`
-	BrandName         string `json:"brandName"`
-	BrandDescription  string `json:"brandDescription"`
-	Industry          string `json:"industry"`
 	PrimaryLanguage   string `json:"primaryLanguage"`
 	Country           string `json:"country"`
 }
@@ -115,9 +135,6 @@ func (h *Handler) createProject(w http.ResponseWriter, r *http.Request) {
 		Domain:            req.Domain,
 		WebsiteURL:        req.WebsiteURL,
 		AttributionSource: req.AttributionSource,
-		BrandName:         req.BrandName,
-		BrandDescription:  req.BrandDescription,
-		Industry:          req.Industry,
 		PrimaryLanguage:   req.PrimaryLanguage,
 		Country:           req.Country,
 	})
@@ -159,11 +176,6 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	projectID := parts[0]
-	if organizationID, ok := authenticatedOrganizationID(r); ok {
-		if !h.allowProjectRequest(w, r, projectID, organizationID) {
-			return
-		}
-	}
 
 	switch {
 	case len(parts) == 1 && r.Method == http.MethodGet:
@@ -219,51 +231,6 @@ func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) allowProjectRequest(w http.ResponseWriter, r *http.Request, projectID string, organizationID int64) bool {
-	if hasOrganizationFullAccess(r) {
-		return true
-	}
-	userID, ok := authenticatedUserID(r)
-	if !ok {
-		return true
-	}
-	if err := h.svc.EnforceUserProjectActionAccess(r.Context(), projectID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
-		h.writeUsecaseError(w, err)
-		return false
-	}
-	return true
-}
-
-func (h *Handler) allowPromptRequest(w http.ResponseWriter, r *http.Request, promptID string, organizationID int64) bool {
-	if hasOrganizationFullAccess(r) {
-		return true
-	}
-	userID, ok := authenticatedUserID(r)
-	if !ok {
-		return true
-	}
-	if err := h.svc.EnforceUserPromptActionAccess(r.Context(), promptID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
-		h.writeUsecaseError(w, err)
-		return false
-	}
-	return true
-}
-
-func (h *Handler) allowCompetitorRequest(w http.ResponseWriter, r *http.Request, competitorID string, organizationID int64) bool {
-	if hasOrganizationFullAccess(r) {
-		return true
-	}
-	userID, ok := authenticatedUserID(r)
-	if !ok {
-		return true
-	}
-	if err := h.svc.EnforceUserCompetitorActionAccess(r.Context(), competitorID, organizationID, userID, projectActionFromMethod(r.Method)); err != nil {
-		h.writeUsecaseError(w, err)
-		return false
-	}
-	return true
-}
-
 func (h *Handler) promptRoutes(w http.ResponseWriter, r *http.Request) {
 	parts := splitPathAfter(r.URL.Path, "/prompts/")
 	if len(parts) != 1 || parts[0] == "" {
@@ -271,7 +238,6 @@ func (h *Handler) promptRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	promptID := parts[0]
-
 	switch r.Method {
 	case http.MethodPatch:
 		h.updatePrompt(w, r, promptID)
@@ -289,7 +255,6 @@ func (h *Handler) competitorRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	competitorID := parts[0]
-
 	switch r.Method {
 	case http.MethodPatch:
 		h.updateCompetitor(w, r, competitorID)
@@ -319,9 +284,6 @@ type updateProjectRequest struct {
 	Domain            *string `json:"domain"`
 	WebsiteURL        *string `json:"websiteUrl"`
 	AttributionSource *string `json:"attributionSource"`
-	BrandName         *string `json:"brandName"`
-	BrandDescription  *string `json:"brandDescription"`
-	Industry          *string `json:"industry"`
 }
 
 func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -342,9 +304,6 @@ func (h *Handler) updateProject(w http.ResponseWriter, r *http.Request, projectI
 		Domain:            req.Domain,
 		WebsiteURL:        req.WebsiteURL,
 		AttributionSource: req.AttributionSource,
-		BrandName:         req.BrandName,
-		BrandDescription:  req.BrandDescription,
-		Industry:          req.Industry,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -378,6 +337,42 @@ func (h *Handler) getProjectImpactContext(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeSuccess(w, http.StatusOK, contextValue)
+}
+
+func (h *Handler) getProjectScope(w http.ResponseWriter, r *http.Request, projectID string) {
+	scope, err := h.svc.GetProjectScope(r.Context(), projectID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"organizationId": scope.OrganizationID,
+		"projectId":      scope.ProjectID,
+	})
+}
+
+func (h *Handler) getPromptScope(w http.ResponseWriter, r *http.Request, promptID string) {
+	scope, err := h.svc.GetPromptScope(r.Context(), promptID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"organizationId": scope.OrganizationID,
+		"projectId":      scope.ProjectID,
+	})
+}
+
+func (h *Handler) getCompetitorScope(w http.ResponseWriter, r *http.Request, competitorID string) {
+	scope, err := h.svc.GetCompetitorScope(r.Context(), competitorID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]any{
+		"organizationId": scope.OrganizationID,
+		"projectId":      scope.ProjectID,
+	})
 }
 
 func (h *Handler) listScheduledAnalysisJobs(w http.ResponseWriter, r *http.Request) {
@@ -627,8 +622,34 @@ func (h *Handler) runPerceptionAnalysis(w http.ResponseWriter, r *http.Request, 
 }
 
 type addPromptsRequest struct {
-	Prompts []string `json:"prompts"`
-	Kind    string   `json:"kind"`
+	Prompts []json.RawMessage `json:"prompts"`
+	Kind    string            `json:"kind"`
+}
+
+type addPromptItemPayload struct {
+	Text     string `json:"text"`
+	Language string `json:"language"`
+}
+
+func decodePromptInputs(values []json.RawMessage) ([]usecase.CreatePromptInput, error) {
+	items := make([]usecase.CreatePromptInput, 0, len(values))
+	for _, raw := range values {
+		var text string
+		if err := json.Unmarshal(raw, &text); err == nil {
+			items = append(items, usecase.CreatePromptInput{Text: text})
+			continue
+		}
+
+		var item addPromptItemPayload
+		if err := json.Unmarshal(raw, &item); err != nil {
+			return nil, err
+		}
+		items = append(items, usecase.CreatePromptInput{
+			Text:     item.Text,
+			Language: item.Language,
+		})
+	}
+	return items, nil
 }
 
 func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -642,8 +663,13 @@ func (h *Handler) addPrompts(w http.ResponseWriter, r *http.Request, projectID s
 		httpjson.WriteValidationError(w)
 		return
 	}
+	promptInputs, err := decodePromptInputs(req.Prompts)
+	if err != nil {
+		httpjson.WriteValidationError(w)
+		return
+	}
 
-	prompts, err := h.svc.AddPromptsWithKind(r.Context(), projectID, organizationID, req.Prompts, req.Kind)
+	prompts, err := h.svc.AddPromptInputsWithKind(r.Context(), projectID, organizationID, promptInputs, req.Kind)
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -689,6 +715,7 @@ func (h *Handler) generatePrompts(w http.ResponseWriter, r *http.Request, projec
 
 type updatePromptRequest struct {
 	Text     *string                 `json:"text"`
+	Language *string                 `json:"language"`
 	Intent   *string                 `json:"intent"`
 	Kind     *string                 `json:"kind"`
 	ModelIDs *[]string               `json:"modelIds"`
@@ -703,9 +730,6 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
-	if !h.allowPromptRequest(w, r, promptID, organizationID) {
-		return
-	}
 	var req updatePromptRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		httpjson.WriteValidationError(w)
@@ -713,6 +737,7 @@ func (h *Handler) updatePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	}
 	prompt, err := h.svc.UpdatePrompt(r.Context(), promptID, organizationID, usecase.UpdatePromptInput{
 		Text:     req.Text,
+		Language: req.Language,
 		Intent:   req.Intent,
 		Kind:     req.Kind,
 		ModelIDs: req.ModelIDs,
@@ -758,9 +783,6 @@ func (h *Handler) deletePrompt(w http.ResponseWriter, r *http.Request, promptID 
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-	if !h.allowPromptRequest(w, r, promptID, organizationID) {
 		return
 	}
 	if err := h.svc.DeletePrompt(r.Context(), promptID, organizationID); err != nil {
@@ -820,9 +842,6 @@ func (h *Handler) updateCompetitor(w http.ResponseWriter, r *http.Request, compe
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
-	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
-		return
-	}
 	var req updateCompetitorRequest
 	if err := decodeJSON(w, r, &req); err != nil {
 		httpjson.WriteValidationError(w)
@@ -847,9 +866,6 @@ func (h *Handler) deleteCompetitor(w http.ResponseWriter, r *http.Request, compe
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
 		return
 	}
-	if !h.allowCompetitorRequest(w, r, competitorID, organizationID) {
-		return
-	}
 	if err := h.svc.DeleteCompetitor(r.Context(), competitorID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
@@ -870,9 +886,6 @@ func (h *Handler) listLLMProviderCredentialsForProject(w http.ResponseWriter, r 
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-	if !h.allowProjectRequest(w, r, projectID, organizationID) {
 		return
 	}
 	credentials, err := h.svc.ListLLMProviderCredentials(r.Context(), projectID, organizationID)
@@ -900,9 +913,6 @@ func (h *Handler) updateLLMProviderCredentialForProject(w http.ResponseWriter, r
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-	if !h.allowProjectRequest(w, r, projectID, organizationID) {
 		return
 	}
 	provider = strings.TrimSpace(provider)
@@ -938,9 +948,6 @@ func (h *Handler) deleteLLMProviderCredentialForProject(w http.ResponseWriter, r
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
 		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
-		return
-	}
-	if !h.allowProjectRequest(w, r, projectID, organizationID) {
 		return
 	}
 	provider = strings.TrimSpace(provider)
@@ -1125,19 +1132,6 @@ func hasOrganizationFullAccess(r *http.Request) bool {
 		return true
 	default:
 		return false
-	}
-}
-
-func projectActionFromMethod(method string) string {
-	switch method {
-	case http.MethodPost:
-		return "create"
-	case http.MethodPut, http.MethodPatch:
-		return "update"
-	case http.MethodDelete:
-		return "delete"
-	default:
-		return "read"
 	}
 }
 

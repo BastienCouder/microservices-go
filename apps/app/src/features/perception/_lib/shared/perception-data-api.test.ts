@@ -105,6 +105,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME et equipes sales.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
           dashboard: {
             promptRuns: [
               {
@@ -172,6 +183,7 @@ describe("loadPerceptionData", () => {
     const result = await loadPerceptionData("http://api.test", "");
 
     expect(result.data.brandCanon.brandName).toBe("Acme");
+    expect(result.data.brandCanon.shortDescription).toBe("CRM IA pour PME et equipes sales.");
     expect(result.data.brandCanon.category).toBe("B2B CRM");
     expect(result.data.brandCanon.positioning).toBe("CRM IA pour PME et equipes sales.");
     expect(result.data.brandCanon.audience).toEqual([]);
@@ -227,6 +239,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
           dashboard: {
             promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
             aiResponses: [
@@ -258,7 +281,120 @@ describe("loadPerceptionData", () => {
     expect(result.data.metadata.analyzedResponses).toBe(1);
     expect(requests.some((request) => request.url.includes("/dashboard"))).toBe(false);
     expect(requests.some((request) => request.url.includes("/perception?includeDashboard=1"))).toBe(true);
-    expect(requests).toHaveLength(4);
+    expect(requests.some((request) => request.url.includes("/projects/project-1/brand-canon"))).toBe(true);
+    expect(requests).toHaveLength(5);
+  });
+
+  test("prefers dedicated perception responses over bundled monitoring responses for page analytics", async () => {
+    mockFetchSequence([
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Acme",
+          brandName: "Acme",
+          brandDescription: "CRM IA pour PME.",
+          industry: "B2B CRM",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [
+          {
+            id: "gpt-4o-mini",
+            displayName: "ChatGPT",
+            provider: "openai",
+            groupName: "ChatGPT",
+            isEnabledForProject: true,
+          },
+        ],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: [],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          dashboard: {
+            latestRun: { id: "monitoring-run" },
+            promptRuns: [{ id: "prompt-run-1", promptId: "prompt-1", promptText: "Quel CRM recommander ?" }],
+            aiResponses: [
+              {
+                id: "monitoring-response-1",
+                runId: "monitoring-run",
+                promptRunId: "prompt-run-1",
+                modelId: "gpt-4o-mini",
+                rawResponse: "Acme est rarement citee.",
+                brandMentioned: false,
+                brandPosition: "low",
+                citationFound: false,
+                citedUrls: [],
+                sentiment: "negative",
+                createdAt: "2026-03-10T08:00:00Z",
+              },
+            ],
+          },
+          responses: [
+            {
+              id: "perception-response-1",
+              runId: "perception-run",
+              runType: "perception",
+              promptRunId: "prompt-run-2",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est un CRM pertinent pour les PME.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test"],
+              sentiment: "positive",
+              createdAt: "2026-03-11T09:00:00Z",
+            },
+          ],
+          scores: {
+            positioningAccuracy: 100,
+            factualAccuracy: 100,
+            sentimentScore: 100,
+          },
+          metadata: {
+            generatedAt: "2026-03-11T09:30:00Z",
+            projectModels: ["gpt-4o-mini"],
+            sourceMode: "perception_primary",
+            perceptionResponses: 1,
+            monitoringResponsesUsed: 0,
+          },
+        },
+      }),
+    ]);
+
+    const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
+
+    expect(result.data.metadata.sourceMode).toBe("perception_primary");
+    expect(result.data.metadata.perceptionResponses).toBe(1);
+    expect(result.data.metadata.monitoringResponsesUsed).toBe(1);
+    expect(result.data.responses).toHaveLength(2);
+    expect(result.data.responses.map((response) => response.id)).toEqual([
+      "monitoring-response-1",
+      "perception-response-1",
+    ]);
+    expect(result.data.responses.map((response) => response.runType)).toEqual([
+      "monitoring",
+      "perception",
+    ]);
+    expect(result.data.trend["last-run"].data).toHaveLength(1);
+    expect(result.data.trend["last-run"].data[0]?.positioning).toBe(100);
   });
 
   test("sends the selected organization header for project-scoped perception requests", async () => {
@@ -289,6 +425,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
           dashboard: {
             promptRuns: [],
             aiResponses: [],
@@ -303,6 +450,7 @@ describe("loadPerceptionData", () => {
     await loadPerceptionData("http://api.test", "?projectId=project-1&organizationId=org-9");
 
     expect(requests.map((request) => request.organizationId)).toEqual([
+      "org-9",
       "org-9",
       "org-9",
       "org-9",
@@ -346,6 +494,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: [{ id: "cmp-1", name: "HubSpot" }],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: ["Recommandation CRM"],
+          features: ["IA native"],
+          audience: [],
+        },
       }),
       jsonResponse(200, {
         success: true,
@@ -450,6 +609,8 @@ describe("loadPerceptionData", () => {
     expect(result.data.metadata.models).toEqual(["ChatGPT"]);
     expect(result.data.metadata.modelCatalog.map((model) => model.id)).toEqual(["gpt-4o-mini"]);
     expect(result.data.metadata.analyzedResponses).toBe(1);
+    expect(result.data.brandCanon.useCases).toEqual(["Recommandation CRM"]);
+    expect(result.data.brandCanon.features).toEqual(["IA native"]);
     expect(result.data.responses).toHaveLength(1);
     expect(result.data.responses[0]?.modelId).toBe("gpt-4o-mini");
     expect(result.data.modelAxisHeatmap.rows.map((row) => row.model)).toEqual(["ChatGPT"]);
@@ -492,6 +653,17 @@ describe("loadPerceptionData", () => {
         ],
       }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
+      }),
       jsonResponse(200, {
         success: true,
         data: {
@@ -544,6 +716,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: [{ id: "cmp-1", name: "HubSpot" }],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
       }),
       jsonResponse(200, {
         success: true,
@@ -640,6 +823,17 @@ describe("loadPerceptionData", () => {
       jsonResponse(200, {
         success: true,
         data: [],
+      }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          category: "B2B CRM",
+          positioning: "CRM IA pour PME.",
+          useCases: [],
+          features: [],
+          audience: [],
+        },
       }),
       jsonResponse(200, {
         success: true,

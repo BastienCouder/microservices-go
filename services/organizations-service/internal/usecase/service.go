@@ -16,6 +16,7 @@ import (
 
 type Service struct {
 	repo                 domain.Repository
+	membershipStore      MembershipStore
 	projectLister        ProjectLister
 	invitationNotifier   InvitationNotifier
 	userEmailResolver    UserEmailResolver
@@ -31,6 +32,10 @@ func NewService(repo domain.Repository) *Service {
 
 func (s *Service) EnableProjectHierarchy(projectLister ProjectLister) {
 	s.projectLister = projectLister
+}
+
+func (s *Service) EnablePermissionMemberships(store MembershipStore) {
+	s.membershipStore = store
 }
 
 func (s *Service) EnableInvitationNotifications(notifier InvitationNotifier, appBaseURL, loginURL string) {
@@ -64,6 +69,12 @@ func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIden
 
 	if err := s.repo.Create(ctx, org); err != nil {
 		return nil, fmt.Errorf("create organization: %w", err)
+	}
+	if _, err := s.syncMemberRoles(ctx, org.ID, ownerIdentityID, []string{domain.RoleEditor}); err != nil {
+		if deleteErr := s.repo.DeleteOrganization(ctx, org.ID, s.now().UTC()); deleteErr != nil {
+			return nil, fmt.Errorf("seed organization creator membership: %w (cleanup failed: %v)", err, deleteErr)
+		}
+		return nil, fmt.Errorf("seed organization creator membership: %w", err)
 	}
 
 	return org, nil
@@ -111,6 +122,13 @@ func (s *Service) DeleteOrganization(ctx context.Context, id int64) error {
 	}
 	if err := s.repo.DeleteOrganization(ctx, id, s.now().UTC()); err != nil {
 		return fmt.Errorf("delete organization %d: %w", id, err)
+	}
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return err
+	}
+	if err := store.DeleteOrganizationPermissions(ctx, id); err != nil {
+		return fmt.Errorf("delete organization permissions %d: %w", id, err)
 	}
 	return nil
 }
@@ -234,10 +252,7 @@ func (s *Service) getOrganizationHierarchy(ctx context.Context, organizationID, 
 }
 
 func (s *Service) userCanManageAllProjects(ctx context.Context, organization *domain.Organization, userID int64) (bool, error) {
-	if organization != nil && organization.OwnerIdentityID == userID {
-		return true, nil
-	}
-	memberships, err := s.repo.ListOrganizationsByUser(ctx, userID)
+	memberships, err := s.ListOrganizationsByUser(ctx, userID)
 	if err != nil {
 		return false, fmt.Errorf("list user organization roles: %w", err)
 	}
@@ -247,7 +262,7 @@ func (s *Service) userCanManageAllProjects(ctx context.Context, organization *do
 		}
 		for _, role := range membership.Roles {
 			switch strings.TrimSpace(strings.ToLower(role)) {
-			case domain.RoleEditor:
+			case domain.RoleEditor, domain.RoleSuperAdmin:
 				return true, nil
 			}
 		}
@@ -259,7 +274,11 @@ func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]
 	if userID <= 0 {
 		return nil, fmt.Errorf("%w: user id must be positive", domain.ErrInvalidMember)
 	}
-	memberships, err := s.repo.ListOrganizationsByUser(ctx, userID)
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	memberships, err := store.ListOrganizationsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list organizations by user: %w", err)
 	}
@@ -276,8 +295,11 @@ func (s *Service) AddMember(ctx context.Context, organizationID, userID int64) (
 	if err := member.Validate(); err != nil {
 		return nil, err
 	}
-
-	if err := s.repo.UpsertMember(ctx, member); err != nil {
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	if err := store.UpsertMember(ctx, member); err != nil {
 		return nil, fmt.Errorf("add member: %w", err)
 	}
 
@@ -288,7 +310,11 @@ func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]doma
 	if organizationID <= 0 {
 		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidMember)
 	}
-	members, err := s.repo.ListMembers(ctx, organizationID)
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	members, err := store.ListMembers(ctx, organizationID)
 	if err != nil {
 		return nil, fmt.Errorf("list members: %w", err)
 	}
@@ -314,12 +340,7 @@ func (s *Service) AssignRole(ctx context.Context, organizationID, userID int64, 
 	if organizationID <= 0 || userID <= 0 {
 		return nil, fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
 	}
-
-	member, err := s.repo.AssignRole(ctx, organizationID, userID, normalizedRole)
-	if err != nil {
-		return nil, fmt.Errorf("assign role: %w", err)
-	}
-	return member, nil
+	return s.ensureMemberRole(ctx, organizationID, userID, normalizedRole)
 }
 
 func (s *Service) UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
@@ -330,8 +351,11 @@ func (s *Service) UpdateMemberRoles(ctx context.Context, organizationID, userID 
 	if err != nil {
 		return nil, err
 	}
-
-	member, err := s.repo.UpdateMemberRoles(ctx, organizationID, userID, normalizedRoles)
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+	member, err := store.UpdateMemberRoles(ctx, organizationID, userID, normalizedRoles)
 	if err != nil {
 		return nil, fmt.Errorf("update member roles: %w", err)
 	}
@@ -342,7 +366,11 @@ func (s *Service) RemoveMember(ctx context.Context, organizationID, userID int64
 	if organizationID <= 0 || userID <= 0 {
 		return fmt.Errorf("%w: invalid organization or user id", domain.ErrInvalidMember)
 	}
-	if err := s.repo.RemoveMember(ctx, organizationID, userID, s.now().UTC()); err != nil {
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return err
+	}
+	if err := store.RemoveMember(ctx, organizationID, userID); err != nil {
 		return fmt.Errorf("remove member: %w", err)
 	}
 	return nil
@@ -443,6 +471,9 @@ func (s *Service) sendInvitationNotification(ctx context.Context, invitation *do
 	if s.invitationNotifier == nil || invitation == nil {
 		return nil
 	}
+	if skip, err := s.shouldSkipInvitationNotification(ctx, invitation); err == nil && skip {
+		return nil
+	}
 
 	organizationName := fmt.Sprintf("organisation #%d", invitation.OrganizationID)
 	if org, err := s.repo.GetByID(ctx, invitation.OrganizationID); err == nil && strings.TrimSpace(org.Name) != "" {
@@ -462,6 +493,72 @@ func (s *Service) sendInvitationNotification(ctx context.Context, invitation *do
 		return fmt.Errorf("send invitation notification: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) shouldSkipInvitationNotification(ctx context.Context, invitation *domain.Invitation) (bool, error) {
+	if invitation == nil || s.membershipStore == nil {
+		return false, nil
+	}
+
+	invitationEmail, err := domain.NormalizeInvitationEmail(invitation.Email)
+	if err != nil {
+		return false, err
+	}
+
+	members, err := s.ListMembers(ctx, invitation.OrganizationID)
+	if err != nil {
+		return false, err
+	}
+	for _, member := range members {
+		if member.DeletedAt != nil {
+			continue
+		}
+		memberEmail, ok, err := s.resolveMemberEmail(ctx, member)
+		if err != nil {
+			return false, err
+		}
+		if ok && memberEmail == invitationEmail {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+func (s *Service) resolveMemberEmail(ctx context.Context, member domain.Member) (string, bool, error) {
+	if normalizedEmail, ok, err := normalizeOptionalInvitationEmail(member.Email); err != nil {
+		return "", false, err
+	} else if ok {
+		return normalizedEmail, true, nil
+	}
+
+	if s.userProfileResolver != nil {
+		profile, err := s.userProfileResolver.UserProfile(ctx, member.UserID)
+		if err != nil {
+			return "", false, err
+		}
+		return normalizeOptionalInvitationEmail(profile.Email)
+	}
+	if s.userEmailResolver != nil {
+		email, err := s.userEmailResolver.UserEmail(ctx, member.UserID)
+		if err != nil {
+			return "", false, err
+		}
+		return normalizeOptionalInvitationEmail(email)
+	}
+
+	return "", false, nil
+}
+
+func normalizeOptionalInvitationEmail(raw string) (string, bool, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", false, nil
+	}
+	normalized, err := domain.NormalizeInvitationEmail(raw)
+	if err != nil {
+		return "", false, err
+	}
+	return normalized, true, nil
 }
 
 func (s *Service) buildInvitationAcceptURL(token string) string {
@@ -564,6 +661,16 @@ func (s *Service) AcceptInvitation(ctx context.Context, token string, userID int
 	if err != nil {
 		return nil, nil, fmt.Errorf("accept invitation: %w", err)
 	}
+	if s.membershipStore != nil {
+		orgRole := invitation.Role
+		if strings.TrimSpace(invitation.ProjectID) != "" {
+			orgRole = domain.RoleViewer
+		}
+		member, err = s.ensureMemberRole(ctx, invitation.OrganizationID, userID, orgRole)
+		if err != nil {
+			return nil, nil, fmt.Errorf("sync invited member permissions: %w", err)
+		}
+	}
 	if strings.TrimSpace(invitation.ProjectID) != "" {
 		if _, err := s.AssignProjectMember(
 			ctx,
@@ -659,4 +766,61 @@ func apiKeyPrefix(value string) string {
 		return value
 	}
 	return value[:12]
+}
+
+func (s *Service) ensureMemberRole(ctx context.Context, organizationID, userID int64, role string) (*domain.Member, error) {
+	members, err := s.ListMembers(ctx, organizationID)
+	if err != nil {
+		return nil, err
+	}
+
+	roles := []string{role}
+	for _, member := range members {
+		if member.UserID != userID {
+			continue
+		}
+		roles = append(member.Roles, role)
+		break
+	}
+
+	return s.syncMemberRoles(ctx, organizationID, userID, roles)
+}
+
+func (s *Service) syncMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	normalizedRoles, err := normalizeMemberRoles(roles)
+	if err != nil {
+		return nil, err
+	}
+
+	store, err := s.membershipStoreOrError()
+	if err != nil {
+		return nil, err
+	}
+
+	members, listErr := store.ListMembers(ctx, organizationID)
+	if listErr == nil {
+		for _, existing := range members {
+			if existing.UserID == userID {
+				return store.UpdateMemberRoles(ctx, organizationID, userID, normalizedRoles)
+			}
+		}
+	}
+
+	member := &domain.Member{
+		OrganizationID: organizationID,
+		UserID:         userID,
+		Roles:          normalizedRoles,
+		AddedAt:        s.now().UTC(),
+	}
+	if err := store.UpsertMember(ctx, member); err != nil {
+		return nil, err
+	}
+	return member, nil
+}
+
+func (s *Service) membershipStoreOrError() (MembershipStore, error) {
+	if s.membershipStore == nil {
+		return nil, fmt.Errorf("permission membership store is not configured")
+	}
+	return s.membershipStore, nil
 }

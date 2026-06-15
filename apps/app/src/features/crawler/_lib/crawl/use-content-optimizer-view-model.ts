@@ -15,6 +15,7 @@ import {
 } from "../content-optimizer-api";
 import { loadPromptQuotaUsage } from "@/features/prompts/_lib/prompt-quota";
 import { loadBillingEntitlements } from "@/shared/billing";
+import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
 import {
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
@@ -216,6 +217,10 @@ export function useContentOptimizerViewModel({
       readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID(),
     [routeSearch],
   );
+  const billingOrganization = useResolvedBillingOrganizationId({
+    apiBaseURL,
+    organizationId,
+  });
   const projectScopeKey = useMemo(
     () => `${organizationId.trim()}|${projectId.trim()}`,
     [organizationId, projectId],
@@ -231,9 +236,10 @@ export function useContentOptimizerViewModel({
     queryFn: () => loadPromptQuotaUsage(apiBaseURL, projectId, organizationId),
   });
   const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
-    enabled: apiBaseURL.trim() !== "" && organizationId.trim() !== "",
-    queryFn: () => loadBillingEntitlements(apiBaseURL, organizationId),
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganization.organizationId),
+    enabled: apiBaseURL.trim() !== "" && billingOrganization.organizationId.trim() !== "",
+    queryFn: () =>
+      loadBillingEntitlements(apiBaseURL, billingOrganization.organizationId),
   });
 
   const [projectWebsiteURL, setProjectWebsiteURL] = useState("");

@@ -111,7 +111,6 @@ export function normalizeProject(value: unknown): OrganizationProject | null {
     organizationId: getIDString(getField(value, ["organizationId", "OrganizationID"])),
     name: getString(getField(value, ["name", "Name"])) || "Project",
     brandName: getString(getField(value, ["brandName", "BrandName"])),
-    brandDescription: getString(getField(value, ["brandDescription", "BrandDescription"])),
     attributionSource: getString(getField(value, ["attributionSource", "AttributionSource"])),
     createdAt: getString(getField(value, ["createdAt", "CreatedAt"])),
   };

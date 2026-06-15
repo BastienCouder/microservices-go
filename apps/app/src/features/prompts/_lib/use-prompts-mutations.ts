@@ -183,6 +183,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       mode: nextMode,
       promptId,
       text,
+      language,
       modelIds,
       schedule,
       status,
@@ -212,6 +213,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
             sourcePromptId: nextId,
             rowMode: "global",
             prompt: trimmedText,
+            language,
             kind: "monitoring",
             stage: "Awareness",
             models: nextModels,
@@ -236,8 +238,10 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
           params.organizationId,
           params.activeProjectId,
           trimmedText,
+          language,
         );
         await patchPrompt(params.apiBaseURL, params.organizationId, createdPrompt.id, {
+          language,
           modelIds: nextModels,
           schedule: nextSchedule,
           status,
@@ -256,6 +260,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
               ? {
                   ...item,
                   prompt: trimmedText,
+                  language,
                   models: nextModels,
                   schedule: nextSchedule,
                   effectiveCron: nextSchedule.cron,
@@ -275,6 +280,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
 
       await patchPrompt(params.apiBaseURL, params.organizationId, promptId, {
         text: trimmedText,
+        language,
         modelIds: nextModels,
         schedule: nextSchedule,
         status,

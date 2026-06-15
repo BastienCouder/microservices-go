@@ -23,6 +23,7 @@ type ModelCatalogGridProps = {
   models: ModelCatalogItem[];
   selectedModelIdSet: Set<string>;
   selectionLimit: number;
+  selectionLimitReady: boolean;
   isDeveloperPlan: boolean;
   providerCredentialsReady: boolean;
   providerCredentials: LLMProviderCredentialStatus[];
@@ -35,6 +36,7 @@ export function ModelCatalogGrid({
   models,
   selectedModelIdSet,
   selectionLimit,
+  selectionLimitReady,
   isDeveloperPlan,
   providerCredentialsReady,
   providerCredentials,
@@ -49,7 +51,9 @@ export function ModelCatalogGrid({
       {models.map((model) => {
         const isSelected = selectedModelIdSet.has(model.id);
         const disabledByPlan =
-          !isSelected && selectedModelIdSet.size >= selectionLimit;
+          selectionLimitReady &&
+          !isSelected &&
+          selectedModelIdSet.size >= selectionLimit;
         const disabledByApiKey =
           isDeveloperPlan &&
           providerCredentialsReady &&

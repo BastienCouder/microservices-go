@@ -154,8 +154,11 @@ function normalizeOptimizationError(value: unknown): OptimizationError {
     resource: asString(getField(item, ["resource", "Resource"])) || undefined,
     severity,
     title: asString(getField(item, ["title", "Title"])) || "Erreur detectee",
+    titleKey: asString(getField(item, ["titleKey", "TitleKey"])) || undefined,
     issue: asString(getField(item, ["issue", "Issue"])),
+    issueKey: asString(getField(item, ["issueKey", "IssueKey"])) || undefined,
     impact: asString(getField(item, ["impact", "Impact"])),
+    impactKey: asString(getField(item, ["impactKey", "ImpactKey"])) || undefined,
     detectedInModels: asArray(getField(item, ["detectedInModels", "DetectedInModels"]))
       .map(asString)
       .filter(Boolean),
@@ -164,6 +167,13 @@ function normalizeOptimizationError(value: unknown): OptimizationError {
     generatedContentKey:
       asString(getField(item, ["generatedContentKey", "GeneratedContentKey"])) ||
       undefined,
+    translationParams:
+      ((): Record<string, unknown> | undefined => {
+        const params = getField(item, ["translationParams", "TranslationParams"]);
+        return params && typeof params === "object" && !Array.isArray(params)
+          ? (params as Record<string, unknown>)
+          : undefined;
+      })(),
     optimizePriority: normalizePriority(getField(item, ["optimizePriority", "OptimizePriority"]), severity),
     type,
     createdAt: asString(getField(item, ["createdAt", "CreatedAt"])) || undefined,

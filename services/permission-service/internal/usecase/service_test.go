@@ -12,22 +12,66 @@ type fakeRepo struct {
 	result domain.CheckResult
 }
 
-type fakeRoleResolver struct {
-	roles []string
+type fakeScopeResolver struct {
+	projectID string
 }
 
-func (f *fakeRepo) Check(_ context.Context, _ domain.CheckInput) (domain.CheckResult, error) {
+func (f *fakeRepo) CheckPolicy(_ context.Context, _ domain.CheckInput) (domain.CheckResult, error) {
 	return f.result, nil
 }
 
-func (f *fakeRoleResolver) RolesForUser(_ context.Context, _, _ int64) ([]string, error) {
-	return append([]string(nil), f.roles...), nil
+func (f *fakeRepo) ListOrganizationRoles(_ context.Context, _, _ int64) ([]string, error) {
+	return []string{"viewer"}, nil
+}
+
+func (f *fakeRepo) ListOrganizationsByUser(_ context.Context, _ int64) ([]domain.Membership, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) ListMembers(_ context.Context, _ int64) ([]domain.Member, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) UpsertMember(_ context.Context, _ *domain.Member) error {
+	return nil
+}
+
+func (f *fakeRepo) UpdateMemberRoles(_ context.Context, organizationID, userID int64, roles []string) (*domain.Member, error) {
+	return &domain.Member{OrganizationID: organizationID, UserID: userID, Roles: roles}, nil
+}
+
+func (f *fakeRepo) RemoveMember(_ context.Context, _, _ int64) error {
+	return nil
+}
+
+func (f *fakeRepo) ListProjectMembers(_ context.Context, _ int64, _ string) ([]domain.ProjectMember, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) ListProjectMembersByUser(_ context.Context, _ int64, _ int64) ([]domain.ProjectMember, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) UpsertProjectMember(_ context.Context, _ *domain.ProjectMember) error {
+	return nil
+}
+
+func (f *fakeRepo) RemoveProjectMember(_ context.Context, _ int64, _ string, _ int64) error {
+	return nil
+}
+
+func (f *fakeRepo) DeleteOrganizationPermissions(_ context.Context, _ int64) error {
+	return nil
+}
+
+func (f *fakeScopeResolver) ResolveProjectID(_ context.Context, _ int64, _, _ string) (string, error) {
+	return f.projectID, nil
 }
 
 func TestCheck(t *testing.T) {
 	svc := NewService(
 		&fakeRepo{result: domain.CheckResult{Allowed: true, Reason: "ok"}},
-		&fakeRoleResolver{roles: []string{"viewer"}},
+		&fakeScopeResolver{},
 	)
 	result, err := svc.Check(context.Background(), domain.CheckInput{
 		OrganizationID: 1,

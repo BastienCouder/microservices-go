@@ -28,6 +28,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
+import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
 import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
 type StepModelsProps = {
@@ -72,14 +73,20 @@ export function StepModels({
     Record<string, string>
   >({});
   const normalizedApiBaseURL = apiBaseURL.trim();
+  const billingOrganization = useResolvedBillingOrganizationId({
+    apiBaseURL,
+    organizationId,
+  });
 
   const requiresProjectProviderCredentials = false;
 
   const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, organizationId),
-    enabled: normalizedApiBaseURL !== "" && organizationId !== "",
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganization.organizationId),
+    enabled:
+      normalizedApiBaseURL !== "" &&
+      billingOrganization.organizationId !== "",
     queryFn: ({ signal }) =>
-      loadBillingEntitlements(apiBaseURL, organizationId, { signal }),
+      loadBillingEntitlements(apiBaseURL, billingOrganization.organizationId, { signal }),
   });
 
   const catalogQuery = useQuery({

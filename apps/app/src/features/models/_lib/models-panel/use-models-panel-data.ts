@@ -6,6 +6,7 @@ import { loadBillingEntitlements } from "@/shared/billing";
 import { isDeveloperBillingPlan } from "@/shared/billing-plan";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { resolveProjectTokenToContext } from "@/shared/project-token-resolution";
+import { findBySlugOrId } from "@/shared/public-slugs";
 
 import {
   createProviderCredentialLookup,
@@ -31,12 +32,38 @@ type UseModelsPanelDataOptions = {
   apiBaseURL: string;
   organizationId: string;
   hintedProjectToken: string;
+  deferScopedLoadsUntilProjectContextResolves?: boolean;
 };
 
 type ResolvedSelectedProject = {
   selectedProjectId: string;
   hasMissingHintedProject: boolean;
 };
+
+function isNumericOrganizationID(value: string): boolean {
+  return /^[0-9]+$/.test(value.trim());
+}
+
+export function resolveBillingOrganizationIdForModels(
+  projects: Array<Pick<ModelsProjectSummary, "id" | "organizationId">>,
+  selectedProjectId: string,
+  effectiveOrganizationId: string,
+): string {
+  const selectedProjectOrganizationId =
+    projects.find((project) => project.id === selectedProjectId)?.organizationId ?? "";
+  if (isNumericOrganizationID(selectedProjectOrganizationId)) {
+    return selectedProjectOrganizationId.trim();
+  }
+
+  const firstProjectOrganizationId = projects[0]?.organizationId ?? "";
+  if (isNumericOrganizationID(firstProjectOrganizationId)) {
+    return firstProjectOrganizationId.trim();
+  }
+
+  return isNumericOrganizationID(effectiveOrganizationId)
+    ? effectiveOrganizationId.trim()
+    : "";
+}
 
 export function resolveSelectedProjectForModels(
   projects: Array<Pick<ModelsProjectSummary, "id" | "slug">>,
@@ -50,7 +77,7 @@ export function resolveSelectedProjectForModels(
     };
   }
 
-  const matchedProject = projects.find((project) => project.id === normalizedHint);
+  const matchedProject = findBySlugOrId(projects, normalizedHint);
   if (!matchedProject) {
     return {
       selectedProjectId: "",
@@ -68,6 +95,7 @@ export function useModelsPanelData({
   apiBaseURL,
   organizationId,
   hintedProjectToken,
+  deferScopedLoadsUntilProjectContextResolves = false,
 }: UseModelsPanelDataOptions) {
   const { t } = useScopedI18n("models");
   const normalizedHintedProjectToken = hintedProjectToken.trim();
@@ -87,11 +115,21 @@ export function useModelsPanelData({
         signal,
       }),
   });
+  const resolvedHintedProjectToken =
+    resolvedProjectContextQuery.data?.projectId || hintedProjectToken;
+  const shouldWaitForResolvedProjectContext =
+    deferScopedLoadsUntilProjectContextResolves &&
+    normalizedHintedProjectToken !== "" &&
+    resolvedProjectContextQuery.fetchStatus !== "idle" &&
+    !resolvedProjectContextQuery.isFetched &&
+    !resolvedProjectContextQuery.isError;
   const effectiveOrganizationId =
     resolvedProjectContextQuery.data?.organizationId ||
     organizationId;
   const hasRequiredScope =
-    apiBaseURL.trim() !== "" && effectiveOrganizationId !== "";
+    apiBaseURL.trim() !== "" &&
+    effectiveOrganizationId !== "" &&
+    !shouldWaitForResolvedProjectContext;
   const projectsCatalogQuery = useQuery({
     queryKey: appQueryKeys.modelsProjectCatalog(
       apiBaseURL,
@@ -102,13 +140,6 @@ export function useModelsPanelData({
     queryFn: ({ signal }) =>
       loadProjectsAndCatalog(apiBaseURL, effectiveOrganizationId, { signal }),
   });
-  const billingQuery = useQuery({
-    queryKey: appQueryKeys.billingQuota(apiBaseURL, effectiveOrganizationId),
-    enabled: hasRequiredScope,
-    queryFn: ({ signal }) =>
-      loadBillingEntitlements(apiBaseURL, effectiveOrganizationId, { signal }),
-  });
-
   const projects = projectsCatalogQuery.data?.projects ?? EMPTY_PROJECTS;
   const catalog = projectsCatalogQuery.data?.catalog ?? EMPTY_MODEL_CATALOG;
   const selectedProjectResolution = useMemo(() => {
@@ -118,23 +149,41 @@ export function useModelsPanelData({
         hasMissingHintedProject: false,
       };
     }
-    return resolveSelectedProjectForModels(projects, hintedProjectToken);
-  }, [effectiveOrganizationId, hintedProjectToken, projects]);
+    return resolveSelectedProjectForModels(projects, resolvedHintedProjectToken);
+  }, [effectiveOrganizationId, projects, resolvedHintedProjectToken]);
   const { selectedProjectId, hasMissingHintedProject } = selectedProjectResolution;
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
     [projects, selectedProjectId],
   );
-
+  const billingOrganizationId = useMemo(
+    () =>
+      resolveBillingOrganizationIdForModels(
+        projects,
+        selectedProjectId,
+        effectiveOrganizationId,
+      ),
+    [effectiveOrganizationId, projects, selectedProjectId],
+  );
+  const billingQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganizationId),
+    enabled: apiBaseURL.trim() !== "" && billingOrganizationId !== "",
+    queryFn: ({ signal }) =>
+      loadBillingEntitlements(apiBaseURL, billingOrganizationId, { signal }),
+  });
   const currentPlan = billingQuery.data?.plan ?? null;
   const planLabel = currentPlan ? getPlanLabel(currentPlan) : null;
   const billingSelectionLimit = billingQuery.data?.modelSelectionLimit ?? 0;
+  const resolvedSelectionLimit = billingQuery.data
+    ? billingSelectionLimit > 0
+      ? billingSelectionLimit
+      : catalog.length
+    : null;
   const selectionLimit =
-    billingQuery.data
-      ? billingSelectionLimit > 0
-        ? billingSelectionLimit
-        : catalog.length
-      : 0;
+    resolvedSelectionLimit ??
+    catalog.length;
+  const selectionLimitReady =
+    resolvedSelectionLimit !== null;
   const isDeveloperPlan = isDeveloperBillingPlan(currentPlan);
   const showDeveloperUpgradeBanner =
     !isDeveloperPlan && !billingQuery.isLoading && !billingQuery.error;
@@ -219,7 +268,7 @@ export function useModelsPanelData({
   );
   const loading =
     (normalizedHintedProjectToken !== "" &&
-      resolvedProjectContextQuery.isLoading &&
+      shouldWaitForResolvedProjectContext &&
       !resolvedProjectContextQuery.data) ||
     projectsCatalogQuery.isLoading ||
     (projectsCatalogQuery.isFetching && !projectsCatalogQuery.data) ||
@@ -277,7 +326,7 @@ export function useModelsPanelData({
 
   const loadingCatalog =
     ((normalizedHintedProjectToken !== "" &&
-      resolvedProjectContextQuery.isLoading &&
+      shouldWaitForResolvedProjectContext &&
       !resolvedProjectContextQuery.data)) ||
     projectsCatalogQuery.isLoading ||
     (projectsCatalogQuery.isFetching && !projectsCatalogQuery.data);
@@ -302,6 +351,7 @@ export function useModelsPanelData({
     hasMissingHintedProject,
     planLabel,
     selectionLimit,
+    selectionLimitReady,
     isDeveloperPlan,
     showDeveloperUpgradeBanner,
     providerCredentialsQuery,

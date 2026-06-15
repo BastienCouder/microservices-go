@@ -12,7 +12,6 @@ describe("resolveProjectOrganizationId", () => {
             organizationId: "42",
             name: "Projet",
             brandName: "",
-            brandDescription: "",
             attributionSource: "",
             createdAt: "2026-05-20T00:00:00Z",
           },

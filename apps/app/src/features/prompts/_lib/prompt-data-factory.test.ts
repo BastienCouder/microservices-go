@@ -31,6 +31,7 @@ describe("buildPromptPageItems", () => {
           modelProviderModelId: "openai/gpt-oss-120b:free",
           time: "10m",
           mention: true,
+          sentiment: "positive",
           score: 90,
           response: "Acme est visible",
           competitorsMentioned: [],
@@ -59,6 +60,7 @@ describe("buildPromptPageItems", () => {
           modelProviderModelId: "openai/gpt-oss-120b:free",
           time: "10m",
           mention: true,
+          sentiment: "neutral",
           score: 70,
           response: "Nike reste la marque la plus recommandee sur ce segment.",
           competitorsMentioned: [],
@@ -72,6 +74,7 @@ describe("buildPromptPageItems", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0]?.competitor).toBe("Aucun");
     expect(rows[0]?.competitors).toEqual([]);
+    expect(rows[0]?.sentiment).toBe("neutral");
     expect(rows[0]?.highlights.includes("Aucun concurrent detecte")).toBe(true);
   });
 });

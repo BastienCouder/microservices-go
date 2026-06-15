@@ -18,6 +18,7 @@ type MonitoringPromptInput = {
   time: string;
   createdAt?: string;
   mention: boolean;
+  sentiment: "positive" | "neutral" | "negative";
   rank?: number | null;
   score: number;
   persona?: string | null;
@@ -32,6 +33,7 @@ type MonitoringCompetitor = {
 type ProjectPromptInput = {
   id: string;
   text: string;
+  language?: "fr" | "en";
   intent?: string | null;
   type?: string | null;
   kind?: "monitoring" | "perception";
@@ -183,6 +185,7 @@ export function buildPromptPageItems({
         model,
         minutesAgo: minutes,
         mention: item.mention,
+        sentiment: item.sentiment,
         rank: item.rank ?? null,
         competitor,
         competitors: competitorsMentioned,
@@ -232,6 +235,7 @@ export function buildPromptPageItems({
       sourcePromptId: projectPrompt.id,
       rowMode: "global",
       prompt: projectPrompt.text,
+      language: projectPrompt.language === "en" ? "en" : "fr",
       type: projectPrompt.type?.trim() || null,
       kind: projectPrompt.kind === "perception" ? "perception" : "monitoring",
       stage,
@@ -283,6 +287,7 @@ export function buildResponseRows({
       model,
       minutesAgo,
       mention: item.mention,
+      sentiment: item.sentiment,
       rank: item.rank ?? null,
       competitor,
       competitors: competitorsMentioned,

@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Bot, Layers3, Play, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { promptCadenceLabel, promptStatusLabel, relativeRunLabel } from "../../_
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ModelVisual, PromptItem, PromptRowMode } from "../../_lib/types";
 import { PromptActions, PromptModelBadges } from "./prompt-list-parts";
+import { PromptLanguageIndicator } from "../shared/prompt-language-indicator";
 
 type SharedProps = {
   selectedPromptIds: string[];
@@ -90,14 +92,11 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
         ) : null}
       </TableCell>
       <TableCell>
-        {hasResults ? (
-          <div className="w-16">
-            <div className="text-sm font-medium">{item.sov}%</div>
-            <div className="mt-1 h-1.5 rounded-full bg-muted">
-              <div className="h-1.5 rounded-full bg-primary" style={{ width: `${item.sov}%` }} />
-            </div>
-          </div>
-        ) : null}
+        <PromptLanguageIndicator
+          language={item.language}
+          className="justify-center"
+          flagClassName="text-lg"
+        />
       </TableCell>
       <TableCell>
         {hasResults ? (
@@ -193,7 +192,15 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
               label={content.columnCadence}
               value={promptCadenceLabel(item, props.locale)}
             />
-            <Metric label={content.overviewSov} value={hasResults ? `${item.sov}%` : null} />
+            <Metric
+              label={content.overviewLanguage}
+              value={
+                <PromptLanguageIndicator
+                  language={item.language}
+                  flagClassName="text-base"
+                />
+              }
+            />
             <Metric
               label={content.columnLastRun}
               value={hasResults ? relativeRunLabel(item.lastRunMinutes, props.locale) : null}
@@ -255,7 +262,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
   );
 }
 
-function Metric({ label, value }: { label: string; value: string | null }) {
+function Metric({ label, value }: { label: string; value: ReactNode | null }) {
   return (
     <div>
       <div className="text-xs text-muted-foreground">{label}</div>

@@ -20,6 +20,8 @@ import {
   filterPerceptionResponses,
   type OptimizePriority,
   type PerceptionError,
+  type PerceptionResponseRecord,
+  type PerceptionSourceFilter,
   type PerceptionTrendPeriodKey,
   type PerceptionViewData,
 } from "./shared/perception-data";
@@ -30,7 +32,10 @@ import {
   toCanonicalPerceptionSourceErrorId,
 } from "./optimization-action-ids";
 import { exportPerceptionWorkbook } from "./perception-export";
-import { resolvePerceptionGeneratedContent } from "./perception-i18n";
+import {
+  resolvePerceptionGeneratedContent,
+  resolvePerceptionLocalizedText,
+} from "./perception-i18n";
 
 type OptimizeDraft = {
   id: string;
@@ -96,6 +101,52 @@ function mergeDrafts(
   return Array.from(merged.values());
 }
 
+function getDefaultSourceFilter(
+  initialData: PerceptionViewData,
+): PerceptionSourceFilter {
+  return "perception";
+}
+
+function getLatestRunIdForResponses(
+  responses: PerceptionResponseRecord[],
+  fallbackLatestRunId?: string,
+): string {
+  let latestRunId = "";
+  let latestTimestamp = Number.NEGATIVE_INFINITY;
+
+  for (const response of responses) {
+    if (!response.runId) {
+      continue;
+    }
+
+    const timestamp = response.createdAt
+      ? new Date(response.createdAt).getTime()
+      : Number.NEGATIVE_INFINITY;
+    if (timestamp >= latestTimestamp) {
+      latestTimestamp = timestamp;
+      latestRunId = response.runId;
+    } else if (latestRunId === "") {
+      latestRunId = response.runId;
+    }
+  }
+
+  return latestRunId || fallbackLatestRunId || "";
+}
+
+function getPerceptionErrorSource(error: PerceptionError): Exclude<PerceptionSourceFilter, "all"> {
+  const normalizedType = error.type.trim().toLowerCase();
+  const normalizedId = error.id.trim().toLowerCase();
+
+  if (
+    normalizedType.startsWith("monitoring_") ||
+    normalizedId.startsWith("monitoring_")
+  ) {
+    return "monitoring";
+  }
+
+  return "perception";
+}
+
 export function usePerceptionViewModel(
   initialData: PerceptionViewData,
   options: { apiBaseURL?: string; routeSearch?: string } = {},
@@ -109,6 +160,9 @@ export function usePerceptionViewModel(
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
+  const [selectedSourceFilter, setSelectedSourceFilter] = useState<PerceptionSourceFilter>(
+    () => getDefaultSourceFilter(initialData),
+  );
   const [selectedPeriod, setSelectedPeriod] = useState<PerceptionTrendPeriodKey>("all");
   const [showAllModels, setShowAllModels] = useState(false);
   const [showUniqueModelFilters, setShowUniqueModelFilters] = useState(false);
@@ -149,15 +203,45 @@ export function usePerceptionViewModel(
     [initialData],
   );
 
-  const modelScopedResponses = useMemo(
+  const sourceScopedResponses = useMemo(
     () =>
       filterPerceptionResponses(initialData.responses, {
-        selectedModels,
+        sourceFilter: selectedSourceFilter,
         period: "all",
         referenceDate: initialData.metadata.generatedAt,
         latestRunId: initialData.metadata.latestRunId,
       }),
-    [initialData, selectedModels],
+    [
+      initialData.metadata.generatedAt,
+      initialData.metadata.latestRunId,
+      initialData.responses,
+      selectedSourceFilter,
+    ],
+  );
+
+  const sourceLatestRunId = useMemo(
+    () =>
+      getLatestRunIdForResponses(
+        sourceScopedResponses,
+        initialData.metadata.latestRunId,
+      ),
+    [initialData.metadata.latestRunId, sourceScopedResponses],
+  );
+
+  const modelScopedResponses = useMemo(
+    () =>
+      filterPerceptionResponses(sourceScopedResponses, {
+        selectedModels,
+        period: "all",
+        referenceDate: initialData.metadata.generatedAt,
+        latestRunId: sourceLatestRunId,
+      }),
+    [
+      initialData.metadata.generatedAt,
+      selectedModels,
+      sourceLatestRunId,
+      sourceScopedResponses,
+    ],
   );
 
   const filteredResponses = useMemo(
@@ -165,21 +249,26 @@ export function usePerceptionViewModel(
       filterPerceptionResponses(modelScopedResponses, {
         period: selectedPeriod,
         referenceDate: initialData.metadata.generatedAt,
-        latestRunId: initialData.metadata.latestRunId,
+        latestRunId: sourceLatestRunId,
       }),
-    [initialData.metadata.generatedAt, initialData.metadata.latestRunId, modelScopedResponses, selectedPeriod],
+    [
+      initialData.metadata.generatedAt,
+      modelScopedResponses,
+      selectedPeriod,
+      sourceLatestRunId,
+    ],
   );
 
   const lastRunScores = useMemo(
     () =>
       derivePerceptionScoresFromResponses(
-        filterPerceptionResponses(initialData.responses, {
+        filterPerceptionResponses(modelScopedResponses, {
           period: "last-run",
           referenceDate: initialData.metadata.generatedAt,
-          latestRunId: initialData.metadata.latestRunId,
+          latestRunId: sourceLatestRunId,
         }),
       ),
-    [initialData],
+    [initialData.metadata.generatedAt, modelScopedResponses, sourceLatestRunId],
   );
 
   const actionStatusesByErrorId = useMemo(() => {
@@ -196,11 +285,46 @@ export function usePerceptionViewModel(
     [filteredResponses],
   );
   const filteredTopErrors = useMemo(
-    () =>
-      initialData.topErrors
+    () => {
+      if (selectedSourceFilter === "perception" && sourceScopedResponses.length === 0) {
+        return [];
+      }
+
+      return initialData.topErrors
+        .filter(
+          (error) =>
+            selectedSourceFilter === "all" ||
+            getPerceptionErrorSource(error) === selectedSourceFilter,
+        )
         .filter((error) => actionStatusesByErrorId.get(error.id) !== "done")
-        .slice(0, 3),
-    [actionStatusesByErrorId, initialData.topErrors],
+        .slice(0, 3);
+    },
+    [
+      actionStatusesByErrorId,
+      initialData.topErrors,
+      selectedSourceFilter,
+      sourceScopedResponses.length,
+    ],
+  );
+  const filteredTopErrorsTotalCount = useMemo(
+    () => {
+      if (selectedSourceFilter === "perception" && sourceScopedResponses.length === 0) {
+        return 0;
+      }
+
+      return initialData.topErrors.filter(
+        (error) =>
+          (selectedSourceFilter === "all" ||
+            getPerceptionErrorSource(error) === selectedSourceFilter) &&
+          actionStatusesByErrorId.get(error.id) !== "done",
+      ).length;
+    },
+    [
+      actionStatusesByErrorId,
+      initialData.topErrors,
+      selectedSourceFilter,
+      sourceScopedResponses.length,
+    ],
   );
   const modelAxisHeatmap = useMemo(
     () =>
@@ -214,9 +338,14 @@ export function usePerceptionViewModel(
       derivePerceptionTrendSeries(modelScopedResponses, {
         period: selectedPeriod,
         referenceDate: initialData.metadata.generatedAt,
-        latestRunId: initialData.metadata.latestRunId,
+        latestRunId: sourceLatestRunId,
       }),
-    [initialData.metadata.generatedAt, initialData.metadata.latestRunId, modelScopedResponses, selectedPeriod],
+    [
+      initialData.metadata.generatedAt,
+      modelScopedResponses,
+      selectedPeriod,
+      sourceLatestRunId,
+    ],
   );
   const generatedIds = useMemo(
     () => new Set(optimizeDrafts.flatMap((draft) => getOptimizationActionMatchIds(draft.id))),
@@ -298,6 +427,25 @@ export function usePerceptionViewModel(
       error.generatedContent,
       error.generatedContentKey,
       locale,
+      error.translationParams,
+    );
+    const localizedTitle = resolvePerceptionLocalizedText(
+      error.title,
+      error.titleKey,
+      locale,
+      error.translationParams,
+    );
+    const localizedIssue = resolvePerceptionLocalizedText(
+      error.issue,
+      error.issueKey,
+      locale,
+      error.translationParams,
+    );
+    const localizedImpact = resolvePerceptionLocalizedText(
+      error.impact,
+      error.impactKey,
+      locale,
+      error.translationParams,
     );
 
     if (!initialData.metadata.projectId) {
@@ -309,9 +457,9 @@ export function usePerceptionViewModel(
                 id: error.id,
                 priority: error.optimizePriority,
                 type: error.fixType,
-                title: error.title,
-                issue: error.issue,
-                impact: error.impact,
+                title: localizedTitle,
+                issue: localizedIssue,
+                impact: localizedImpact,
                 generatedContent: localizedGeneratedContent,
                 status: "processing",
               },
@@ -332,9 +480,9 @@ export function usePerceptionViewModel(
         {
           priority: error.optimizePriority,
           type: error.fixType,
-          title: error.title,
-          issue: error.issue,
-          impact: error.impact,
+          title: localizedTitle,
+          issue: localizedIssue,
+          impact: localizedImpact,
           generatedContent: localizedGeneratedContent,
           status: "processing",
           sourceErrorId: toCanonicalPerceptionSourceErrorId(error.id),
@@ -357,9 +505,9 @@ export function usePerceptionViewModel(
                 persistedId: result.id,
                 priority: error.optimizePriority,
                 type: error.fixType,
-                title: error.title,
-                issue: error.issue,
-                impact: error.impact,
+                title: localizedTitle,
+                issue: localizedIssue,
+                impact: localizedImpact,
                 generatedContent: result.generatedContent || localizedGeneratedContent,
                 status: result.status || "processing",
               },
@@ -470,6 +618,8 @@ export function usePerceptionViewModel(
     modelCatalog,
     selectedModels,
     setSelectedModels,
+    selectedSourceFilter,
+    setSelectedSourceFilter,
     selectedPeriod,
     setSelectedPeriod,
     showAllModels,
@@ -479,6 +629,7 @@ export function usePerceptionViewModel(
     filteredResponses,
     filteredRadar,
     filteredTopErrors,
+    filteredTopErrorsTotalCount,
     modelAxisHeatmap,
     perceptionTrend,
     scoreCards,

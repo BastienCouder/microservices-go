@@ -15,12 +15,33 @@ type CheckInput struct {
 	UserID         int64
 	Action         string
 	Resource       string
+	ProjectID      string
+	ResourceID     string
 	Roles          []string
 }
 
 type CheckResult struct {
 	Allowed bool
 	Reason  string
+}
+
+type Membership struct {
+	OrganizationID int64
+	UserID         int64
+	Roles          []string
+}
+
+type Member struct {
+	OrganizationID int64    `json:"organizationId"`
+	UserID         int64    `json:"userId"`
+	Roles          []string `json:"roles"`
+}
+
+type ProjectMember struct {
+	ProjectID      string `json:"projectId"`
+	OrganizationID int64  `json:"organizationId"`
+	UserID         int64  `json:"userId"`
+	Role           string `json:"role"`
 }
 
 func (in *CheckInput) Validate() error {
@@ -35,9 +56,6 @@ func (in *CheckInput) Validate() error {
 	}
 	if strings.TrimSpace(in.Resource) == "" {
 		return fmt.Errorf("%w: resource is required", ErrInvalidPermissionCheck)
-	}
-	if len(in.Roles) == 0 {
-		return fmt.Errorf("%w: at least one role is required", ErrInvalidPermissionCheck)
 	}
 	return nil
 }

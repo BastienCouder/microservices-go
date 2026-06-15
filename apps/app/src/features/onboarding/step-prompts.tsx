@@ -1,8 +1,16 @@
 import { useOnboarding, type PromptWithLanguage } from "@/hooks/use-onboarding";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Plus, Sparkles, Trash2 } from "lucide-react";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { PromptLanguageIndicator } from "@/features/prompts/_components/shared/prompt-language-indicator";
 import {
   OnboardingField,
   OnboardingStep,
@@ -170,14 +178,42 @@ export function StepPrompts({ hideBack = false, nextLabel }: StepPromptsProps) {
             className="space-y-3 rounded-md border border-border/70 p-4"
           >
             <div className="flex items-start gap-2">
-              <Textarea
-                value={prompt.text}
-                onChange={(event) =>
-                  updatePrompt(index, { text: event.target.value })
-                }
-                className="min-h-[96px] text-sm"
-                placeholder={t("promptPlaceholder")}
-              />
+              <div className="flex-1 space-y-3">
+                <Textarea
+                  value={prompt.text}
+                  onChange={(event) =>
+                    updatePrompt(index, { text: event.target.value })
+                  }
+                  className="min-h-[96px] text-sm"
+                  placeholder={t("promptPlaceholder")}
+                />
+                <Select
+                  value={prompt.language || locale}
+                  onValueChange={(value) =>
+                    updatePrompt(index, { language: value })
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-44" size="sm">
+                    <SelectValue placeholder={t("selectLanguage")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fr">
+                      <PromptLanguageIndicator
+                        language="fr"
+                        label={t("languageFrench")}
+                        flagClassName="text-sm"
+                      />
+                    </SelectItem>
+                    <SelectItem value="en">
+                      <PromptLanguageIndicator
+                        language="en"
+                        label={t("languageEnglish")}
+                        flagClassName="text-sm"
+                      />
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 variant="outline"
                 size="icon"

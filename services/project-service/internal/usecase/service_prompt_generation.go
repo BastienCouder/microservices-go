@@ -171,7 +171,7 @@ func (s *Service) GenerateMonitoringPrompts(ctx context.Context, projectID strin
 			providerAPIKey = strings.TrimSpace(credential.APIKey)
 		}
 	}
-	projectCopy := copyProject(project)
+	projectCopy := s.effectiveProjectLocked(project)
 	s.mu.Unlock()
 
 	result, err := s.iaClient.ExecutePrompt(ctx, IAExecutePromptInput{

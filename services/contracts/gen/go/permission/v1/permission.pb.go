@@ -27,6 +27,8 @@ type CheckRequest struct {
 	UserId         int64                  `protobuf:"varint,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Action         string                 `protobuf:"bytes,3,opt,name=action,proto3" json:"action,omitempty"`
 	Resource       string                 `protobuf:"bytes,4,opt,name=resource,proto3" json:"resource,omitempty"`
+	ProjectId      string                 `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	ResourceId     string                 `protobuf:"bytes,6,opt,name=resource_id,json=resourceId,proto3" json:"resource_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -89,6 +91,20 @@ func (x *CheckRequest) GetResource() string {
 	return ""
 }
 
+func (x *CheckRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *CheckRequest) GetResourceId() string {
+	if x != nil {
+		return x.ResourceId
+	}
+	return ""
+}
+
 type CheckResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Allowed       bool                   `protobuf:"varint,1,opt,name=allowed,proto3" json:"allowed,omitempty"`
@@ -145,12 +161,16 @@ var File_proto_permission_v1_permission_proto protoreflect.FileDescriptor
 
 const file_proto_permission_v1_permission_proto_rawDesc = "" +
 	"\n" +
-	"$proto/permission/v1/permission.proto\x12\rpermission.v1\"\x84\x01\n" +
+	"$proto/permission/v1/permission.proto\x12\rpermission.v1\"\xc4\x01\n" +
 	"\fCheckRequest\x12'\n" +
 	"\x0forganization_id\x18\x01 \x01(\x03R\x0eorganizationId\x12\x17\n" +
 	"\auser_id\x18\x02 \x01(\x03R\x06userId\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\x12\x1a\n" +
-	"\bresource\x18\x04 \x01(\tR\bresource\"A\n" +
+	"\bresource\x18\x04 \x01(\tR\bresource\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x05 \x01(\tR\tprojectId\x12\x1f\n" +
+	"\vresource_id\x18\x06 \x01(\tR\n" +
+	"resourceId\"A\n" +
 	"\rCheckResponse\x12\x18\n" +
 	"\aallowed\x18\x01 \x01(\bR\aallowed\x12\x16\n" +
 	"\x06reason\x18\x02 \x01(\tR\x06reason2W\n" +

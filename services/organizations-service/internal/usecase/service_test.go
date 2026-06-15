@@ -35,6 +35,12 @@ func newFakeRepo() *fakeRepo {
 	}
 }
 
+func newTestService(repo *fakeRepo) *Service {
+	svc := NewService(repo)
+	svc.EnablePermissionMemberships(repo)
+	return svc
+}
+
 func (f *fakeRepo) Create(_ context.Context, organization *domain.Organization) error {
 	organization.ID = f.nextOrgID
 	f.nextOrgID++
@@ -249,7 +255,7 @@ func (f *fakeRepo) UpdateMemberRoles(_ context.Context, organizationID, userID i
 	return &clone, nil
 }
 
-func (f *fakeRepo) RemoveMember(_ context.Context, organizationID, userID int64, removedAt time.Time) error {
+func (f *fakeRepo) RemoveMember(_ context.Context, organizationID, userID int64) error {
 	if _, ok := f.organizations[organizationID]; !ok {
 		return domain.ErrOrganizationNotFound
 	}
@@ -258,7 +264,7 @@ func (f *fakeRepo) RemoveMember(_ context.Context, organizationID, userID int64,
 	if !ok || member.DeletedAt != nil {
 		return domain.ErrMemberNotFound
 	}
-	removedAt = removedAt.UTC()
+	removedAt := time.Now().UTC()
 	member.DeletedAt = &removedAt
 	member.Roles = nil
 	f.members[key] = member
@@ -310,6 +316,25 @@ func (f *fakeRepo) RemoveProjectMember(_ context.Context, organizationID int64, 
 	}
 	if f.projectMembers[projectID] != nil {
 		delete(f.projectMembers[projectID], userID)
+	}
+	return nil
+}
+
+func (f *fakeRepo) DeleteOrganizationPermissions(_ context.Context, organizationID int64) error {
+	for key := range f.members {
+		if key[0] == organizationID {
+			delete(f.members, key)
+		}
+	}
+	for projectID, members := range f.projectMembers {
+		for userID, member := range members {
+			if member.OrganizationID == organizationID {
+				delete(members, userID)
+			}
+		}
+		if len(members) == 0 {
+			delete(f.projectMembers, projectID)
+		}
 	}
 	return nil
 }
@@ -477,7 +502,7 @@ func cloneTimePtr(value *time.Time) *time.Time {
 func TestCreateOrganization(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := newFakeRepo()
-		svc := NewService(repo)
+		svc := newTestService(repo)
 		organization, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -489,7 +514,7 @@ func TestCreateOrganization(t *testing.T) {
 
 	t.Run("validation error", func(t *testing.T) {
 		repo := newFakeRepo()
-		svc := NewService(repo)
+		svc := newTestService(repo)
 		_, err := svc.CreateOrganization(context.Background(), "", 0)
 		if !errors.Is(err, domain.ErrInvalidOrganization) {
 			t.Fatalf("expected ErrInvalidOrganization, got %v", err)
@@ -499,7 +524,7 @@ func TestCreateOrganization(t *testing.T) {
 
 func TestUpdateOrganizationName(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	organization, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
 		t.Fatalf("create org: %v", err)
@@ -524,7 +549,7 @@ func TestUpdateOrganizationName(t *testing.T) {
 
 func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	deletedAt := time.Date(2026, 2, 3, 4, 5, 6, 0, time.UTC)
 	svc.now = func() time.Time { return deletedAt }
 
@@ -564,9 +589,8 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 	if stored.Name == "Acme" {
 		t.Fatalf("expected organization name to be anonymized")
 	}
-	member := repo.members[[2]int64{org.ID, 42}]
-	if member.DeletedAt == nil || len(member.Roles) != 0 {
-		t.Fatalf("expected member access to be removed and soft deleted: %+v", member)
+	if _, ok := repo.members[[2]int64{org.ID, 42}]; ok {
+		t.Fatalf("expected member access to be removed from permission store")
 	}
 	for _, invitation := range repo.invitations {
 		if invitation.Email == "person@example.com" || invitation.Message != "" || invitation.DeletedAt == nil {
@@ -582,7 +606,7 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 
 func TestCreateOrganizationAPIKeyReturnsSecretOnceAndListHidesIt(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	organization, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
 		t.Fatalf("create org: %v", err)
@@ -616,7 +640,7 @@ func TestCreateOrganizationAPIKeyReturnsSecretOnceAndListHidesIt(t *testing.T) {
 
 func TestValidateOrganizationAPIKeyReturnsScopedMetadataAndMarksLastUsed(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	now := time.Date(2026, 5, 28, 12, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
 
@@ -650,7 +674,7 @@ func TestValidateOrganizationAPIKeyReturnsScopedMetadataAndMarksLastUsed(t *test
 
 func TestMembersRolesFlow(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -677,14 +701,14 @@ func TestMembersRolesFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list members: %v", err)
 	}
-	if len(members) != 1 {
-		t.Fatalf("expected 1 member, got %d", len(members))
+	if len(members) != 2 {
+		t.Fatalf("expected creator + member, got %d", len(members))
 	}
 }
 
 func TestMemberActionsFlow(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 	svc.now = func() time.Time {
 		return time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC)
 	}
@@ -713,7 +737,7 @@ func TestMemberActionsFlow(t *testing.T) {
 
 func TestUpdateMemberRolesRejectsEmptyRoleSet(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -731,7 +755,7 @@ func TestUpdateMemberRolesRejectsEmptyRoleSet(t *testing.T) {
 
 func TestUpdateMemberRolesRejectsOwnerRole(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewService(repo)
+	svc := newTestService(repo)
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {

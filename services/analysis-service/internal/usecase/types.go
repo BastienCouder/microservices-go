@@ -124,17 +124,21 @@ type PerceptionRadarPoint struct {
 }
 
 type PerceptionError struct {
-	ID                  string   `json:"id"`
-	Severity            string   `json:"severity"`
-	Title               string   `json:"title"`
-	Issue               string   `json:"issue"`
-	Impact              string   `json:"impact"`
-	DetectedInModels    []string `json:"detectedInModels"`
-	FixType             string   `json:"fixType"`
-	GeneratedContent    string   `json:"generatedContent"`
-	GeneratedContentKey string   `json:"generatedContentKey,omitempty"`
-	OptimizePriority    string   `json:"optimizePriority"`
-	Type                string   `json:"type"`
+	ID                  string         `json:"id"`
+	Severity            string         `json:"severity"`
+	Title               string         `json:"title"`
+	TitleKey            string         `json:"titleKey,omitempty"`
+	Issue               string         `json:"issue"`
+	IssueKey            string         `json:"issueKey,omitempty"`
+	Impact              string         `json:"impact"`
+	ImpactKey           string         `json:"impactKey,omitempty"`
+	DetectedInModels    []string       `json:"detectedInModels"`
+	FixType             string         `json:"fixType"`
+	GeneratedContent    string         `json:"generatedContent"`
+	GeneratedContentKey string         `json:"generatedContentKey,omitempty"`
+	TranslationParams   map[string]any `json:"translationParams,omitempty"`
+	OptimizePriority    string         `json:"optimizePriority"`
+	Type                string         `json:"type"`
 }
 
 type PerceptionData struct {
@@ -142,6 +146,7 @@ type PerceptionData struct {
 	Radar      []PerceptionRadarPoint `json:"radar"`
 	TopErrors  []PerceptionError      `json:"topErrors"`
 	BrandCanon BrandCanon             `json:"brandCanon"`
+	Responses  []AIResponse           `json:"responses"`
 	Metadata   map[string]any         `json:"metadata"`
 }
 
@@ -151,21 +156,25 @@ type PerceptionWithDashboardData struct {
 }
 
 type OptimizationError struct {
-	ID                  string   `json:"id"`
-	Source              string   `json:"source"`
-	Origin              string   `json:"origin,omitempty"`
-	Resource            string   `json:"resource,omitempty"`
-	Severity            string   `json:"severity"`
-	Title               string   `json:"title"`
-	Issue               string   `json:"issue"`
-	Impact              string   `json:"impact"`
-	Type                string   `json:"type"`
-	FixType             string   `json:"fixType"`
-	OptimizePriority    string   `json:"optimizePriority"`
-	DetectedInModels    []string `json:"detectedInModels"`
-	GeneratedContent    string   `json:"generatedContent"`
-	GeneratedContentKey string   `json:"generatedContentKey,omitempty"`
-	CreatedAt           string   `json:"createdAt,omitempty"`
+	ID                  string         `json:"id"`
+	Source              string         `json:"source"`
+	Origin              string         `json:"origin,omitempty"`
+	Resource            string         `json:"resource,omitempty"`
+	Severity            string         `json:"severity"`
+	Title               string         `json:"title"`
+	TitleKey            string         `json:"titleKey,omitempty"`
+	Issue               string         `json:"issue"`
+	IssueKey            string         `json:"issueKey,omitempty"`
+	Impact              string         `json:"impact"`
+	ImpactKey           string         `json:"impactKey,omitempty"`
+	Type                string         `json:"type"`
+	FixType             string         `json:"fixType"`
+	OptimizePriority    string         `json:"optimizePriority"`
+	DetectedInModels    []string       `json:"detectedInModels"`
+	GeneratedContent    string         `json:"generatedContent"`
+	GeneratedContentKey string         `json:"generatedContentKey,omitempty"`
+	TranslationParams   map[string]any `json:"translationParams,omitempty"`
+	CreatedAt           string         `json:"createdAt,omitempty"`
 }
 
 type OptimizationErrorColumn struct {

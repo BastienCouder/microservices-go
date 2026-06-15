@@ -1,5 +1,7 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -7,21 +9,26 @@ import {
   PROMPT_STATUS_OPTIONS,
   getPromptStatusLabel,
 } from "../../_lib/prompt-editor";
-import type { AIModel, ModelVisual, PromptItem } from "../../_lib/types";
+import type { AIModel, ModelVisual, PromptItem, PromptLanguage } from "../../_lib/types";
+import { PromptLanguageIndicator } from "../shared/prompt-language-indicator";
 
 export function PromptTextSection({
   promptText,
+  language,
   maxLength,
   status,
   saving,
   onChangePromptText,
+  onChangeLanguage,
   onChangeStatus,
 }: {
   promptText: string;
+  language: PromptLanguage;
   maxLength: number;
   status: PromptItem["status"];
   saving: boolean;
   onChangePromptText: (value: string) => void;
+  onChangeLanguage: (value: PromptLanguage) => void;
   onChangeStatus: (value: PromptItem["status"]) => void;
 }) {
   const { locale, t } = useScopedI18n("prompts-workspace");
@@ -47,6 +54,27 @@ export function PromptTextSection({
         placeholder={t("editorPromptPlaceholder")}
         className="mt-4 min-h-[220px] w-full max-w-full resize-y overflow-x-hidden text-sm leading-7 break-all [overflow-wrap:anywhere]"
       />
+
+      <div className="mt-4 space-y-2">
+        <Label htmlFor="prompt-language">{t("editorLanguageTitle")}</Label>
+        <Select
+          value={language}
+          onValueChange={(value) => onChangeLanguage(value as PromptLanguage)}
+          disabled={saving}
+        >
+          <SelectTrigger id="prompt-language" className="w-full sm:w-56">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="fr">
+              <PromptLanguageIndicator language="fr" label={t("languageFrench")} flagClassName="text-sm" />
+            </SelectItem>
+            <SelectItem value="en">
+              <PromptLanguageIndicator language="en" label={t("languageEnglish")} flagClassName="text-sm" />
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       <div className="mt-5 border-t pt-5">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

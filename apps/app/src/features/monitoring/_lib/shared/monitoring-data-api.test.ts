@@ -73,6 +73,7 @@ describe("loadMonitoringData", () => {
       jsonResponse(200, { success: true, data: { id: "project-1", brandName: "Acme" } }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, {
         success: true,
         data: {
@@ -103,6 +104,7 @@ describe("loadMonitoringData", () => {
       jsonResponse(200, { success: true, data: { id: "project-1", brandName: "Nike" } }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [{ name: "ASICS" }, { name: "Adidas" }] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, {
         success: true,
         data: {
@@ -145,6 +147,7 @@ describe("loadMonitoringData", () => {
       }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, {
         success: true,
         data: {
@@ -189,6 +192,7 @@ describe("loadMonitoringData", () => {
       jsonResponse(200, { success: true, data: { id: "prj_1", brandName: "Acme", name: "Site France" } }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
       jsonResponse(200, { success: true, data: [] }),
     ]);
@@ -212,6 +216,7 @@ describe("loadMonitoringData", () => {
       jsonResponse(200, { success: true, data: { id: "prj_1", brandName: "Acme", name: "Site France" } }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
       jsonResponse(200, { success: true, data: [] }),
     ]);
@@ -227,6 +232,7 @@ describe("loadMonitoringData", () => {
       jsonResponse(200, { success: true, data: { id: "project-1", brandName: "Acme" } }),
       jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
       jsonResponse(200, { success: true, data: [] }),
     ]);
@@ -234,6 +240,7 @@ describe("loadMonitoringData", () => {
     await loadMonitoringData("http://api.test", "?projectId=project-1&organizationId=org-9");
 
     expect(requests.map((request) => request.organizationId)).toEqual([
+      "org-9",
       "org-9",
       "org-9",
       "org-9",
@@ -260,6 +267,7 @@ describe("loadMonitoringData", () => {
         ],
       }),
       jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, { success: true, data: {} }),
       jsonResponse(200, {
         success: true,
         data: {
@@ -287,6 +295,40 @@ describe("loadMonitoringData", () => {
     expect(recentPrompt.modelDisplayName).toBe("Gemma 3 4B");
     expect(recentPrompt.modelGroupName).toBe("gemma");
     expect(recentPrompt.modelProviderModelId).toBe("google/gemma-3-4b-it");
+  });
+
+  test("prefers authoritative brand canon fields when available", async () => {
+    mockFetchSequence([
+      jsonResponse(200, { success: true, data: [{ id: "project-1" }] }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          id: "project-1",
+          name: "Site France",
+          brandName: "Legacy name",
+          brandDescription: "Legacy description",
+          websiteUrl: "https://acme.test",
+        },
+      }),
+      jsonResponse(200, { success: true, data: [{ id: "chatgpt", displayName: "ChatGPT", provider: "openai", isEnabledForProject: true }] }),
+      jsonResponse(200, { success: true, data: [] }),
+      jsonResponse(200, {
+        success: true,
+        data: {
+          brandName: "Acme",
+          positioning: "CRM IA pour PME.",
+          audience: ["Responsables CRM", "Equipes sales"],
+        },
+      }),
+      jsonResponse(200, { success: true, data: { promptRuns: [], aiResponses: [] } }),
+      jsonResponse(200, { success: true, data: [] }),
+    ]);
+
+    const result = await loadMonitoringData("http://api.test", "");
+
+    expect(result.data.project.name).toBe("Acme");
+    expect(result.data.project.tagline).toBe("CRM IA pour PME.");
+    expect(result.data.project.personas).toEqual(["Responsables CRM", "Equipes sales"]);
   });
 });
 

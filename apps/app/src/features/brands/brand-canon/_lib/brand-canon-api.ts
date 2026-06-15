@@ -37,16 +37,7 @@ export async function saveBrandCanonProject(
   projectId: string,
   canon: BrandCanon,
 ): Promise<BrandCanon> {
-  await requestJson(apiRoutes.projects.get(projectId), {
-    method: "PATCH",
-    body: JSON.stringify({
-      brandName: canon.brandName,
-      brandDescription: canon.positioning,
-      industry: canon.category,
-    }),
-  });
-
-  return requestJson<BrandCanon>(apiRoutes.analysis.brandCanon(projectId), {
+  const savedCanon = await requestJson<BrandCanon>(apiRoutes.projects.brandCanon(projectId), {
     method: "PATCH",
     body: JSON.stringify({
       brandName: canon.brandName,
@@ -57,6 +48,11 @@ export async function saveBrandCanonProject(
       features: canon.features,
     }),
   });
+
+  return {
+    ...savedCanon,
+    shortDescription: savedCanon.shortDescription ?? canon.shortDescription,
+  };
 }
 
 export async function syncCompetitors(

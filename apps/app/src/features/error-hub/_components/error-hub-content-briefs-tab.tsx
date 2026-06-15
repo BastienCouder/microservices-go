@@ -16,7 +16,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { pushInfoToast } from "@/components/ui/toast-actions";
 import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
-import { resolvePerceptionGeneratedContent } from "@/features/perception/_lib/perception-i18n";
+import {
+  resolvePerceptionGeneratedContent,
+  resolvePerceptionLocalizedText,
+} from "@/features/perception/_lib/perception-i18n";
 import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
@@ -207,7 +210,32 @@ export function ErrorHubContentBriefsTab({
         selectedError.generatedContent,
         selectedError.generatedContentKey,
         locale,
+        selectedError.translationParams,
       ).trim()
+    : "";
+  const selectedTitle = selectedError
+    ? resolvePerceptionLocalizedText(
+        selectedError.title,
+        selectedError.titleKey,
+        locale,
+        selectedError.translationParams,
+      )
+    : "";
+  const selectedIssue = selectedError
+    ? resolvePerceptionLocalizedText(
+        selectedError.issue,
+        selectedError.issueKey,
+        locale,
+        selectedError.translationParams,
+      )
+    : "";
+  const selectedImpact = selectedError
+    ? resolvePerceptionLocalizedText(
+        selectedError.impact,
+        selectedError.impactKey,
+        locale,
+        selectedError.translationParams,
+      )
     : "";
   const suggestionBlocks = selectedInitialSuggestion
     ? splitGeneratedContent(selectedInitialSuggestion).slice(0, 6)
@@ -262,6 +290,12 @@ export function ErrorHubContentBriefsTab({
             filteredErrors.map((error) => {
               const selected = selectedError?.id === error.id;
               const generated = generatedIds.has(error.id);
+              const resolvedTitle = resolvePerceptionLocalizedText(
+                error.title,
+                error.titleKey,
+                locale,
+                error.translationParams,
+              );
 
               return (
                 <button
@@ -286,7 +320,7 @@ export function ErrorHubContentBriefsTab({
                     </Badge>
                   </div>
                   <p className="line-clamp-2 text-sm font-semibold leading-5">
-                    {error.title}
+                    {resolvedTitle}
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="truncate text-xs text-muted-foreground">
@@ -324,7 +358,7 @@ export function ErrorHubContentBriefsTab({
                     </Badge>
                   </div>
                   <h2 className="text-base font-semibold leading-7">
-                    {selectedError.title}
+                    {selectedTitle}
                   </h2>
                   {selectedError.resource ? (
                     <p className="mt-1 break-all text-xs text-muted-foreground">
@@ -382,7 +416,7 @@ export function ErrorHubContentBriefsTab({
                     {t("detectedProblem")}
                   </div>
                   <p className="text-sm leading-6 text-foreground/90">
-                    {selectedError.issue || t("noDetailsProvided")}
+                    {selectedIssue || t("noDetailsProvided")}
                   </p>
                 </div>
                 <div className="rounded-md border p-4">
@@ -390,7 +424,7 @@ export function ErrorHubContentBriefsTab({
                     {t("impact")}
                   </div>
                   <p className="text-sm leading-6 text-foreground/90">
-                    {selectedError.impact || t("impactToQualify")}
+                    {selectedImpact || t("impactToQualify")}
                   </p>
                 </div>
               </div>

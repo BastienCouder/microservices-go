@@ -17,6 +17,7 @@ import type {
   PerceptionResponseRecord,
   PerceptionScores,
   PerceptionSeverity,
+  PerceptionSourceFilter,
   PerceptionTrendPeriodKey,
   PerceptionTrendPoint,
   PerceptionTrendSeries,
@@ -28,6 +29,7 @@ type JsonObject = Record<string, unknown>;
 type ParsedResponse = {
   id: string;
   runId: string;
+  runType: string;
   promptRunId: string;
   modelId: string;
   modelName: string;
@@ -72,6 +74,10 @@ function asNumber(value: unknown): number {
 
 function asBool(value: unknown): boolean {
   return value === true;
+}
+
+function hasOwn(obj: JsonObject, key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(obj, key);
 }
 
 function getField<T = unknown>(obj: JsonObject, keys: string[]): T | undefined {
@@ -140,6 +146,10 @@ function normalizeSentiment(value: string): "positive" | "neutral" | "negative" 
   return "neutral";
 }
 
+function normalizeResponseSource(value: string): Exclude<PerceptionSourceFilter, "all"> {
+  return value.trim().toLowerCase() === "perception" ? "perception" : "monitoring";
+}
+
 function positionScore(brandPosition: string, brandMentioned: boolean): number {
   const normalized = brandPosition.trim().toLowerCase();
   if (normalized === "top" || normalized === "first" || normalized === "1") return 100;
@@ -173,14 +183,20 @@ function useCaseScore(brandMentioned: boolean): number {
   return brandMentioned ? 100 : 20;
 }
 
+function extractResponseObjects(payload: unknown): JsonObject[] {
+  if (Array.isArray(payload)) {
+    return payload.map(asObject);
+  }
+
+  const responseContainer = asObject(payload);
+  return asArray(getField(responseContainer, ["aiResponses", "responses", "Responses"])).map(asObject);
+}
+
 function parseResponses(
   payload: unknown,
   modelLookup: Map<string, PerceptionModelOption>,
 ): ParsedResponse[] {
-  const monitoring = asObject(payload);
-  const responses = asArray(getField(monitoring, ["aiResponses", "responses", "Responses"])).map(asObject);
-
-  return responses.map((response) => {
+  return extractResponseObjects(payload).map((response) => {
     const modelId =
       asString(getField(response, ["modelId", "ModelID"])) ||
       asString(getField(response, ["model", "Model"]));
@@ -193,6 +209,9 @@ function parseResponses(
     return {
       id: asString(getField(response, ["id", "ID"])),
       runId: asString(getField(response, ["runId", "RunID"])),
+      runType: normalizeResponseSource(
+        asString(getField(response, ["runType", "RunType"])),
+      ),
       promptRunId: asString(getField(response, ["promptRunId", "PromptRunID"])),
       modelId,
       modelName: modelMeta?.displayName || modelId,
@@ -231,6 +250,27 @@ function filterResponsesToProjectModels(
   }
 
   return responses.filter((response) => projectModelFilter.has(response.modelId));
+}
+
+function mergeResponseSets(...responseSets: ParsedResponse[][]): ParsedResponse[] {
+  const merged = new Map<string, ParsedResponse>();
+
+  for (const responses of responseSets) {
+    for (const response of responses) {
+      const key =
+        response.id ||
+        [
+          response.runType,
+          response.runId,
+          response.promptRunId,
+          response.modelId,
+          response.createdAt?.toISOString() ?? "",
+        ].join(":");
+      merged.set(key, response);
+    }
+  }
+
+  return Array.from(merged.values());
 }
 
 function deriveScores(
@@ -303,20 +343,34 @@ function deriveLatestRunIdFromResponses(
 
 function deriveBrandCanon(projectPayload: unknown): BrandCanon {
   const project = asObject(projectPayload);
+  const nestedBrandCanon = asObject(
+    getField(project, ["brandCanon", "BrandCanon", "profile", "Profile"]),
+  );
   const brandName =
+    asString(getField(nestedBrandCanon, ["brandName", "BrandName"])) ||
     asString(getField(project, ["brandName", "BrandName"])) ||
     asString(getField(project, ["name", "Name"]));
-  const category = asString(getField(project, ["industry", "Industry"]));
+  const shortDescription =
+    asString(getField(nestedBrandCanon, ["shortDescription", "ShortDescription", "positioning", "Positioning"])) ||
+    asString(getField(project, ["brandDescription", "BrandDescription"]));
+  const category =
+    asString(getField(nestedBrandCanon, ["category", "Category"])) ||
+    asString(getField(project, ["industry", "Industry"]));
   const positioning =
-    asString(getField(project, ["brandDescription", "BrandDescription"])) ||
+    asString(getField(nestedBrandCanon, ["positioning", "Positioning"])) ||
+    shortDescription ||
     asString(getField(project, ["websiteUrl", "WebsiteURL"])) ||
     asString(getField(project, ["domain", "Domain"]));
 
   return {
     brandName,
+    shortDescription,
     category,
     positioning,
-    audience: [],
+    audience: asArray(getField(nestedBrandCanon, ["audience", "Audience"]))
+      .filter((entry): entry is string => typeof entry === "string")
+      .map((entry) => entry.trim())
+      .filter(Boolean),
     useCases: [],
     pricing: {
       amount: 0,
@@ -636,13 +690,22 @@ function normalizeBackendTopErrors(payload: PerceptionApiPayload): PerceptionErr
       type: error.type || error.id || `backend-perception-error-${index + 1}`,
       severity,
       title: error.title || "",
+      titleKey: error.titleKey || undefined,
       issue: error.issue || "",
+      issueKey: error.issueKey || undefined,
       impact: error.impact || "",
+      impactKey: error.impactKey || undefined,
       detectedInModels: normalizeStringList(error.detectedInModels),
       fixType: normalizeFixType(error.fixType),
       optimizePriority: normalizeOptimizePriority(error.optimizePriority, severity),
       generatedContent: error.generatedContent || "",
       generatedContentKey: error.generatedContentKey || undefined,
+      translationParams:
+        error.translationParams &&
+        typeof error.translationParams === "object" &&
+        !Array.isArray(error.translationParams)
+          ? (error.translationParams as Record<string, unknown>)
+          : undefined,
     };
   });
 }
@@ -664,11 +727,13 @@ function parseResponseRecord(record: PerceptionResponseRecord): ParsedResponse {
 export function filterPerceptionResponses(
   responses: PerceptionResponseRecord[],
   {
+    sourceFilter = "all",
     selectedModels,
     period,
     referenceDate,
     latestRunId,
   }: {
+    sourceFilter?: PerceptionSourceFilter;
     selectedModels?: string[];
     period: PerceptionTrendPeriodKey;
     referenceDate: string;
@@ -679,6 +744,13 @@ export function filterPerceptionResponses(
   const reference = parseISODate(referenceDate) ?? new Date();
 
   return responses.filter((response) => {
+    if (
+      sourceFilter !== "all" &&
+      normalizeResponseSource(response.runType) !== sourceFilter
+    ) {
+      return false;
+    }
+
     if (modelSet.size > 0) {
       const matchesModel = [
         response.modelId,
@@ -766,7 +838,15 @@ export function buildPerceptionDerivedData({
   modelCatalog: PerceptionModelOption[];
 }) {
   const projectModelFilter = parseProjectModelFilter(perceptionPayload.metadata?.projectModels);
-  const responses = filterResponsesToProjectModels(parseResponses(monitoringPayload, modelLookup), projectModelFilter);
+  const usesBundledPerceptionResponses = hasOwn(perceptionPayload as JsonObject, "responses");
+  const monitoringResponses = parseResponses(monitoringPayload, modelLookup);
+  const perceptionResponses = usesBundledPerceptionResponses
+    ? parseResponses(perceptionPayload.responses, modelLookup)
+    : [];
+  const responses = filterResponsesToProjectModels(
+    mergeResponseSets(monitoringResponses, perceptionResponses),
+    projectModelFilter,
+  );
   const monitoringLatestRunId = asString(
     getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"]),
   );
@@ -795,6 +875,12 @@ export function buildPerceptionDerivedData({
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
   );
+  const monitoringResponseCount = responses.filter(
+    (response) => response.runType === "monitoring",
+  ).length;
+  const perceptionResponseCount = responses.filter(
+    (response) => response.runType === "perception",
+  ).length;
 
   return {
     analyzedResponses: responses.length,
@@ -802,8 +888,10 @@ export function buildPerceptionDerivedData({
     competitors,
     generatedAt: (generatedAt || referenceDate).toISOString(),
     latestRunId,
+    monitoringResponseCount,
     modelAxisHeatmap,
     models,
+    perceptionResponseCount,
     radar,
     responses: serializeResponses(responses),
     scores,
