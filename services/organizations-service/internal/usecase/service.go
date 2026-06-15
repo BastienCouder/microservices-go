@@ -41,7 +41,7 @@ func (s *Service) EnablePermissionMemberships(store MembershipStore) {
 func (s *Service) EnableInvitationNotifications(notifier InvitationNotifier, appBaseURL, loginURL string) {
 	s.invitationNotifier = notifier
 	s.invitationAppBaseURL = strings.TrimRight(strings.TrimSpace(appBaseURL), "/")
-	s.invitationLoginURL = strings.TrimSpace(loginURL)
+	s.invitationLoginURL = normalizeInvitationLoginURL(loginURL)
 }
 
 func (s *Service) EnableInvitationUserEmailValidation(resolver UserEmailResolver) {
@@ -400,28 +400,28 @@ func normalizeMemberRoles(roles []string) ([]string, error) {
 func (s *Service) CreateInvitation(
 	ctx context.Context,
 	organizationID, invitedByUserID int64,
-	email, role, message string,
+	email, locale, role, message string,
 	expiresAt *time.Time,
 ) (*domain.Invitation, error) {
-	return s.createInvitation(ctx, organizationID, invitedByUserID, email, role, message, "", expiresAt)
+	return s.createInvitation(ctx, organizationID, invitedByUserID, email, locale, role, message, "", expiresAt)
 }
 
 func (s *Service) CreateProjectInvitation(
 	ctx context.Context,
 	organizationID, invitedByUserID int64,
-	email, role, message, projectID string,
+	email, locale, role, message, projectID string,
 	expiresAt *time.Time,
 ) (*domain.Invitation, error) {
 	if strings.TrimSpace(projectID) == "" {
 		return nil, fmt.Errorf("%w: project id is required", domain.ErrInvalidInvitation)
 	}
-	return s.createInvitation(ctx, organizationID, invitedByUserID, email, role, message, strings.TrimSpace(projectID), expiresAt)
+	return s.createInvitation(ctx, organizationID, invitedByUserID, email, locale, role, message, strings.TrimSpace(projectID), expiresAt)
 }
 
 func (s *Service) createInvitation(
 	ctx context.Context,
 	organizationID, invitedByUserID int64,
-	email, role, message, projectID string,
+	email, locale, role, message, projectID string,
 	expiresAt *time.Time,
 ) (*domain.Invitation, error) {
 	normalizedEmail, err := domain.NormalizeInvitationEmail(email)
@@ -446,13 +446,14 @@ func (s *Service) createInvitation(
 		OrganizationID:  organizationID,
 		ProjectID:       strings.TrimSpace(projectID),
 		Email:           normalizedEmail,
+		Locale:          domain.NormalizeInvitationLocale(locale),
 		Role:            normalizedRole,
 		Token:           token,
 		Message:         strings.TrimSpace(message),
 		Status:          domain.InvitationStatusPending,
 		InvitedByUserID: invitedByUserID,
 		CreatedAt:       now,
-		ExpiresAt:       copyTimePtrUTC(expiresAt),
+		ExpiresAt:       copyTimePtrUTC(defaultInvitationExpiry(now, expiresAt)),
 	}
 	if err := invitation.ValidateForCreate(); err != nil {
 		return nil, err
@@ -479,20 +480,45 @@ func (s *Service) sendInvitationNotification(ctx context.Context, invitation *do
 	if org, err := s.repo.GetByID(ctx, invitation.OrganizationID); err == nil && strings.TrimSpace(org.Name) != "" {
 		organizationName = strings.TrimSpace(org.Name)
 	}
+	projectName := s.resolveInvitationProjectName(ctx, invitation)
 
 	if err := s.invitationNotifier.SendInvitation(ctx, InvitationNotification{
 		Email:            invitation.Email,
 		OrganizationID:   invitation.OrganizationID,
 		OrganizationName: organizationName,
+		Locale:           invitation.Locale,
 		Role:             invitation.Role,
 		Message:          invitation.Message,
-		ProjectID:        invitation.ProjectID,
+		ProjectName:      projectName,
 		AcceptURL:        s.buildInvitationAcceptURL(invitation.Token),
 		ExpiresAt:        copyTimePtrUTC(invitation.ExpiresAt),
 	}); err != nil {
 		return fmt.Errorf("send invitation notification: %w", err)
 	}
 	return nil
+}
+
+func (s *Service) resolveInvitationProjectName(ctx context.Context, invitation *domain.Invitation) string {
+	if invitation == nil {
+		return ""
+	}
+	projectID := strings.TrimSpace(invitation.ProjectID)
+	if projectID == "" {
+		return ""
+	}
+	if s.projectLister == nil {
+		return projectID
+	}
+	projects, err := s.projectLister.ListProjectsByOrganization(ctx, invitation.OrganizationID)
+	if err != nil {
+		return projectID
+	}
+	for _, project := range projects {
+		if strings.TrimSpace(project.ID) == projectID && strings.TrimSpace(project.Name) != "" {
+			return strings.TrimSpace(project.Name)
+		}
+	}
+	return projectID
 }
 
 func (s *Service) shouldSkipInvitationNotification(ctx context.Context, invitation *domain.Invitation) (bool, error) {
@@ -561,6 +587,29 @@ func normalizeOptionalInvitationEmail(raw string) (string, bool, error) {
 	return normalized, true, nil
 }
 
+func defaultInvitationExpiry(now time.Time, expiresAt *time.Time) *time.Time {
+	if expiresAt != nil {
+		return expiresAt
+	}
+	defaultExpiresAt := now.Add(7 * 24 * time.Hour)
+	return &defaultExpiresAt
+}
+
+func normalizeInvitationLoginURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	parsed, err := url.Parse(trimmed)
+	if err != nil {
+		return trimmed
+	}
+	if strings.HasSuffix(parsed.Path, "/auth") {
+		parsed.Path = strings.TrimSuffix(parsed.Path, "/auth") + "/login"
+	}
+	return parsed.String()
+}
+
 func (s *Service) buildInvitationAcceptURL(token string) string {
 	token = strings.TrimSpace(token)
 	if s.invitationAppBaseURL == "" || token == "" {
@@ -570,7 +619,7 @@ func (s *Service) buildInvitationAcceptURL(token string) string {
 	if s.invitationLoginURL == "" {
 		return appInvitationURL
 	}
-	loginURL, err := url.Parse(s.invitationLoginURL)
+	loginURL, err := url.Parse(normalizeInvitationLoginURL(s.invitationLoginURL))
 	if err != nil {
 		return appInvitationURL
 	}
@@ -605,7 +654,7 @@ func (s *Service) GetInvitation(ctx context.Context, organizationID, invitationI
 func (s *Service) UpdateInvitation(
 	ctx context.Context,
 	organizationID, invitationID int64,
-	email, role, message string,
+	email, locale, role, message string,
 	expiresAt *time.Time,
 ) (*domain.Invitation, error) {
 	if organizationID <= 0 || invitationID <= 0 {
@@ -623,9 +672,10 @@ func (s *Service) UpdateInvitation(
 		ID:             invitationID,
 		OrganizationID: organizationID,
 		Email:          normalizedEmail,
+		Locale:         domain.NormalizeInvitationLocale(locale),
 		Role:           normalizedRole,
 		Message:        strings.TrimSpace(message),
-		ExpiresAt:      copyTimePtrUTC(expiresAt),
+		ExpiresAt:      copyTimePtrUTC(defaultInvitationExpiry(s.now().UTC(), expiresAt)),
 	}
 	updated, err := s.repo.UpdateInvitation(ctx, invitation)
 	if err != nil {

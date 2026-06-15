@@ -46,6 +46,7 @@ func TestInvitationCRUDFlow(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
+		"fr",
 		"viewer",
 		"Welcome to the team",
 		&expiresAt,
@@ -84,6 +85,7 @@ func TestInvitationCRUDFlow(t *testing.T) {
 		org.ID,
 		invitation.ID,
 		"invitee+updated@acme.io",
+		"fr",
 		"editor",
 		"Updated note",
 		nil,
@@ -108,8 +110,9 @@ func TestInvitationCRUDFlow(t *testing.T) {
 func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 	repo := newFakeRepo()
 	svc := newTestService(repo)
+	svc.now = func() time.Time { return time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC) }
 	notifier := &fakeInvitationNotifier{}
-	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/login")
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -121,6 +124,7 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
+		"en",
 		"viewer",
 		"Welcome to the team",
 		nil,
@@ -139,10 +143,19 @@ func TestCreateInvitationSendsNotificationEmail(t *testing.T) {
 	if notification.OrganizationName != "Acme" {
 		t.Fatalf("expected organization name Acme, got %q", notification.OrganizationName)
 	}
+	if notification.Locale != "en" {
+		t.Fatalf("expected locale en, got %q", notification.Locale)
+	}
+	if notification.ExpiresAt == nil {
+		t.Fatal("expected default expiration to be set")
+	}
+	if got, want := notification.ExpiresAt.UTC(), time.Date(2026, 1, 8, 12, 0, 0, 0, time.UTC); !got.Equal(want) {
+		t.Fatalf("expected default expiration %s, got %s", want, got)
+	}
 	if !strings.Contains(notification.AcceptURL, invitation.Token) {
 		t.Fatalf("expected accept URL to include token %q, got %q", invitation.Token, notification.AcceptURL)
 	}
-	if !strings.HasPrefix(notification.AcceptURL, "http://localhost:30000/auth?") {
+	if !strings.HasPrefix(notification.AcceptURL, "http://localhost:30000/login?") {
 		t.Fatalf("expected accept URL to start on web auth, got %q", notification.AcceptURL)
 	}
 }
@@ -151,7 +164,7 @@ func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 	repo := newFakeRepo()
 	svc := newTestService(repo)
 	notifier := &fakeInvitationNotifier{}
-	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/login")
 
 	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
 	if err != nil {
@@ -163,6 +176,7 @@ func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
+		"fr",
 		"viewer",
 		"Welcome to the team",
 		nil,
@@ -176,6 +190,7 @@ func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 		org.ID,
 		invitation.ID,
 		"invitee+again@acme.io",
+		"en",
 		"editor",
 		"Second reminder",
 		nil,
@@ -197,6 +212,9 @@ func TestUpdateInvitationResendsNotificationEmail(t *testing.T) {
 	if notification.Message != "Second reminder" {
 		t.Fatalf("expected resent invitee message, got %q", notification.Message)
 	}
+	if notification.Locale != "en" {
+		t.Fatalf("expected resent invitee locale en, got %q", notification.Locale)
+	}
 	if !strings.Contains(notification.AcceptURL, updated.Token) {
 		t.Fatalf("expected accept URL to include token %q, got %q", updated.Token, notification.AcceptURL)
 	}
@@ -206,7 +224,7 @@ func TestCreateInvitationDoesNotSendNotificationEmailWhenEmailAlreadyBelongsToMe
 	repo := newFakeRepo()
 	svc := newTestService(repo)
 	notifier := &fakeInvitationNotifier{}
-	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/login")
 	svc.EnableInvitationUserEmailValidation(fakeUserEmailResolver{
 		emails: map[int64]string{
 			1: "owner@acme.io",
@@ -227,6 +245,7 @@ func TestCreateInvitationDoesNotSendNotificationEmailWhenEmailAlreadyBelongsToMe
 		org.ID,
 		1,
 		"member@acme.io",
+		"fr",
 		"viewer",
 		"Welcome back",
 		nil,
@@ -243,7 +262,7 @@ func TestUpdateInvitationDoesNotResendNotificationEmailWhenEmailAlreadyBelongsTo
 	repo := newFakeRepo()
 	svc := newTestService(repo)
 	notifier := &fakeInvitationNotifier{}
-	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/auth")
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/login")
 	svc.EnableInvitationUserEmailValidation(fakeUserEmailResolver{
 		emails: map[int64]string{
 			1: "owner@acme.io",
@@ -260,6 +279,7 @@ func TestUpdateInvitationDoesNotResendNotificationEmailWhenEmailAlreadyBelongsTo
 		org.ID,
 		1,
 		"invitee@acme.io",
+		"fr",
 		"viewer",
 		"Welcome to the team",
 		nil,
@@ -276,6 +296,7 @@ func TestUpdateInvitationDoesNotResendNotificationEmailWhenEmailAlreadyBelongsTo
 		org.ID,
 		invitation.ID,
 		"member@acme.io",
+		"fr",
 		"editor",
 		"Updated note",
 		nil,
@@ -285,6 +306,48 @@ func TestUpdateInvitationDoesNotResendNotificationEmailWhenEmailAlreadyBelongsTo
 
 	if len(notifier.notifications) != 1 {
 		t.Fatalf("expected only original notification email, got %d", len(notifier.notifications))
+	}
+}
+
+func TestCreateProjectInvitationUsesProjectNameInNotification(t *testing.T) {
+	repo := newFakeRepo()
+	svc := newTestService(repo)
+	svc.EnableProjectHierarchy(fakeProjectLister{
+		projects: []ProjectSummary{
+			{ID: "prj_6f19c6db-6ad5-4b7c-b23b-4178e1b20838", OrganizationID: 1, Name: "Projet GEO"},
+		},
+	})
+	notifier := &fakeInvitationNotifier{}
+	svc.EnableInvitationNotifications(notifier, "http://localhost:30004", "http://localhost:30000/en/auth")
+
+	org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+	if err != nil {
+		t.Fatalf("create org: %v", err)
+	}
+
+	_, err = svc.CreateProjectInvitation(
+		context.Background(),
+		org.ID,
+		1,
+		"invitee@acme.io",
+		"fr",
+		"viewer",
+		"Bienvenue",
+		"prj_6f19c6db-6ad5-4b7c-b23b-4178e1b20838",
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("create project invitation: %v", err)
+	}
+
+	if len(notifier.notifications) != 1 {
+		t.Fatalf("expected 1 notification, got %d", len(notifier.notifications))
+	}
+	if got := notifier.notifications[0].ProjectName; got != "Projet GEO" {
+		t.Fatalf("expected project name Projet GEO, got %q", got)
+	}
+	if !strings.HasPrefix(notifier.notifications[0].AcceptURL, "http://localhost:30000/en/login?") {
+		t.Fatalf("expected localized login URL, got %q", notifier.notifications[0].AcceptURL)
 	}
 }
 
@@ -307,6 +370,7 @@ func TestAcceptInvitationRejectsAuthenticatedUserEmailMismatch(t *testing.T) {
 		org.ID,
 		1,
 		"invitee@acme.io",
+		"fr",
 		"viewer",
 		"",
 		nil,
@@ -343,6 +407,7 @@ func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 		org.ID,
 		1,
 		"owner@acme.io",
+		"fr",
 		"owner",
 		"",
 		nil,
@@ -356,6 +421,7 @@ func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 		org.ID,
 		1,
 		"member@acme.io",
+		"fr",
 		"viewer",
 		"",
 		nil,
@@ -369,6 +435,7 @@ func TestInvitationCannotAssignOwnerRole(t *testing.T) {
 		org.ID,
 		invitation.ID,
 		"member@acme.io",
+		"fr",
 		"owner",
 		"",
 		nil,
@@ -392,6 +459,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 		org.ID,
 		1,
 		"first@acme.io",
+		"fr",
 		"viewer",
 		"",
 		nil,
@@ -421,6 +489,7 @@ func TestInvitationAcceptRefuseFlow(t *testing.T) {
 		org.ID,
 		1,
 		"second@acme.io",
+		"fr",
 		"viewer",
 		"",
 		nil,
@@ -452,6 +521,7 @@ func TestProjectInvitationAcceptAssignsOnlyProjectMembership(t *testing.T) {
 		org.ID,
 		1,
 		"project-user@acme.io",
+		"fr",
 		"viewer",
 		"Projet seulement",
 		"prj-42",

@@ -23,8 +23,12 @@ func (f *fakeEmailSender) Send(_ context.Context, _, _, _, _ string) error {
 
 type fakeTemplateRenderer struct{}
 
-func (f *fakeTemplateRenderer) RenderNotification(_ context.Context, title, message string) (string, string, string, error) {
+func (f *fakeTemplateRenderer) RenderNotification(_ context.Context, title, message, _ string) (string, string, string, error) {
 	return title, "<p>" + message + "</p>", message, nil
+}
+
+func (f *fakeTemplateRenderer) RenderInvitation(_ context.Context, payload InvitationEmailTemplateData) (string, string, string, error) {
+	return "Invitation", "<p>" + payload.OrganizationName + "</p>", payload.OrganizationName, nil
 }
 
 func (f *fakeRepo) Create(_ context.Context, notification *domain.Notification) error {

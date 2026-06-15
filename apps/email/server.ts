@@ -1,25 +1,32 @@
 import { render } from '@react-email/render';
 import InvitationEmail from './emails/invitation';
+import { normalizeLocale, type EmailLocale } from './emails/i18n';
 import NotificationEmail from './emails/notification';
-import OTPEmail from './emails/otp';
+import { renderOTPTemplate } from './emails/otp-template';
 
 type RenderNotificationPayload = {
   title: string;
   message: string;
+  locale?: EmailLocale;
 };
 
 type RenderOTPPayload = {
   code: string;
   purpose: string;
+  expiresIn?: string;
+  locale?: EmailLocale;
 };
 
 type InvitationTemplatePayload = {
   organizationName: string;
+  inviterName?: string;
   role?: string;
+  projectName?: string;
   projectId?: string;
   customMessage?: string;
   acceptUrl?: string;
   expiresAt?: string;
+  locale?: EmailLocale;
 };
 
 function jsonResponse(status: number, payload: unknown): Response {
@@ -54,7 +61,7 @@ function parseInvitationTemplate(title: string, message: string): InvitationTemp
 
   let organizationName = cleanTitle.replace(/^Invitation a rejoindre\s+/i, '').trim();
   let role = '';
-  let projectId = '';
+  let projectName = '';
   let acceptUrl = '';
   let expiresAt = '';
   const customMessageLines: string[] = [];
@@ -75,7 +82,7 @@ function parseInvitationTemplate(title: string, message: string): InvitationTemp
     }
     const projectMatch = line.match(/^Cette invitation est limitee au projet (.+)\.$/i);
     if (projectMatch) {
-      projectId = projectMatch[1].trim();
+      projectName = projectMatch[1].trim();
       continue;
     }
     const urlMatch = line.match(/^Accepter l'invitation:\s*(.+)$/i);
@@ -98,10 +105,11 @@ function parseInvitationTemplate(title: string, message: string): InvitationTemp
   return {
     organizationName,
     role,
-    projectId,
+    projectName,
     customMessage: customMessageLines.join('\n').trim(),
     acceptUrl,
     expiresAt,
+    locale: 'fr',
   };
 }
 
@@ -132,11 +140,76 @@ Bun.serve({
 
       const subject = parsed.title.trim();
       const message = parsed.message.trim();
+      const locale = normalizeLocale(parsed.locale);
       const invitation = parseInvitationTemplate(subject, message);
       const html = invitation
-        ? await render(InvitationEmail(invitation))
-        : await render(NotificationEmail({ title: subject, message }));
+        ? await render(InvitationEmail({ ...invitation, locale }))
+        : await render(NotificationEmail({ title: subject, message, locale }));
       return jsonResponse(200, { subject, html, text: message });
+    }
+
+    if (req.method === 'POST' && url.pathname === '/render/invitation') {
+      const raw = await req.text();
+      const parsed = parseJSON<InvitationTemplatePayload>(raw);
+      if (!parsed || !parsed.organizationName?.trim()) {
+        return jsonResponse(400, { error: 'invalid payload' });
+      }
+
+      const locale = normalizeLocale(parsed.locale);
+      const invitation = {
+        ...parsed,
+        organizationName: parsed.organizationName.trim(),
+        inviterName: parsed.inviterName?.trim(),
+        role: parsed.role?.trim(),
+        projectName: parsed.projectName?.trim() || parsed.projectId?.trim(),
+        projectId: parsed.projectId?.trim(),
+        customMessage: parsed.customMessage?.trim(),
+        acceptUrl: parsed.acceptUrl?.trim(),
+        expiresAt: parsed.expiresAt?.trim(),
+        locale,
+      } satisfies InvitationTemplatePayload;
+
+      const html = await render(InvitationEmail(invitation));
+      const subject =
+        locale === 'en'
+          ? `Invitation to join ${invitation.organizationName}`
+          : `Invitation à rejoindre ${invitation.organizationName}`;
+      const lines = [
+        locale === 'en'
+          ? `You have been invited to join ${invitation.organizationName}.`
+          : `Vous avez été invité à rejoindre ${invitation.organizationName}.`,
+      ];
+
+      if (invitation.role) {
+        lines.push(locale === 'en' ? `Role: ${invitation.role}.` : `Rôle: ${invitation.role}.`);
+      }
+      if (invitation.projectName) {
+        lines.push(
+          locale === 'en'
+            ? `This invitation is limited to project ${invitation.projectName}.`
+            : `Cette invitation est limitée au projet ${invitation.projectName}.`,
+        );
+      }
+      if (invitation.customMessage) {
+        lines.push('', invitation.customMessage);
+      }
+      if (invitation.acceptUrl) {
+        lines.push(
+          '',
+          locale === 'en'
+            ? `Accept invitation: ${invitation.acceptUrl}`
+            : `Accepter l'invitation: ${invitation.acceptUrl}`,
+        );
+      }
+      if (invitation.expiresAt) {
+        lines.push(
+          locale === 'en'
+            ? `Expires on: ${invitation.expiresAt}.`
+            : `Expire le : ${invitation.expiresAt}.`,
+        );
+      }
+
+      return jsonResponse(200, { subject, html, text: lines.join('\n') });
     }
 
     if (req.method === 'POST' && url.pathname === '/render/otp') {
@@ -148,9 +221,13 @@ Bun.serve({
 
       const code = parsed.code.trim();
       const purpose = parsed.purpose.trim();
-      const subject = `Code OTP: ${code}`;
-      const html = await render(OTPEmail({ code, purpose }));
-      const text = `Code OTP: ${code}\nUtilisez ce code pour ${purpose}.`;
+      const locale = normalizeLocale(parsed.locale);
+      const { subject, html, text } = await renderOTPTemplate({
+        code,
+        purpose,
+        expiresIn: parsed.expiresIn,
+        locale,
+      });
       return jsonResponse(200, { subject, html, text });
     }
 

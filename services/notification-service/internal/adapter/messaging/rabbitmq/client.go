@@ -14,6 +14,9 @@ type NotificationMessage struct {
 	Recipient string `json:"recipient"`
 	Subject   string `json:"subject"`
 	Message   string `json:"message"`
+	Template  string `json:"template,omitempty"`
+	Locale    string `json:"locale,omitempty"`
+	Data      json.RawMessage `json:"data,omitempty"`
 }
 
 type Client struct {
@@ -135,6 +138,8 @@ func decodeNotificationMessage(body []byte) (NotificationMessage, error) {
 	message.Recipient = strings.TrimSpace(message.Recipient)
 	message.Subject = strings.TrimSpace(message.Subject)
 	message.Message = strings.TrimSpace(message.Message)
+	message.Template = strings.TrimSpace(strings.ToLower(message.Template))
+	message.Locale = strings.TrimSpace(strings.ToLower(message.Locale))
 	if message.Channel == "" || message.Recipient == "" || message.Subject == "" || message.Message == "" {
 		return NotificationMessage{}, fmt.Errorf("notification message is missing required fields")
 	}

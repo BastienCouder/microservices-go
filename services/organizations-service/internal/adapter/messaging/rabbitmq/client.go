@@ -9,6 +9,7 @@ import (
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
+	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/domain"
 	"github.com/bastiencouder/microservices-go/services/organizations-service/internal/usecase"
 )
 
@@ -17,6 +18,19 @@ type notificationMessage struct {
 	Recipient string `json:"recipient"`
 	Subject   string `json:"subject"`
 	Message   string `json:"message"`
+	Template  string `json:"template,omitempty"`
+	Locale    string `json:"locale,omitempty"`
+	Data      any    `json:"data,omitempty"`
+}
+
+type invitationTemplateData struct {
+	OrganizationName string     `json:"organizationName"`
+	Role             string     `json:"role,omitempty"`
+	ProjectName      string     `json:"projectName,omitempty"`
+	CustomMessage    string     `json:"customMessage,omitempty"`
+	AcceptURL        string     `json:"acceptUrl,omitempty"`
+	ExpiresAt        *time.Time `json:"expiresAt,omitempty"`
+	Locale           string     `json:"locale"`
 }
 
 type Client struct {
@@ -129,20 +143,31 @@ func buildInvitationNotificationMessage(invitation usecase.InvitationNotificatio
 	return notificationMessage{
 		Channel:   "email",
 		Recipient: strings.TrimSpace(invitation.Email),
-		Subject:   "Invitation a rejoindre " + organizationName,
+		Subject:   "Invitation à rejoindre " + organizationName,
 		Message:   buildInvitationMessage(invitation, organizationName),
+		Template:  "invitation",
+		Locale:    domain.NormalizeInvitationLocale(invitation.Locale),
+		Data: invitationTemplateData{
+			OrganizationName: organizationName,
+			Role:             strings.TrimSpace(invitation.Role),
+			ProjectName:      strings.TrimSpace(invitation.ProjectName),
+			CustomMessage:    strings.TrimSpace(invitation.Message),
+			AcceptURL:        strings.TrimSpace(invitation.AcceptURL),
+			ExpiresAt:        invitation.ExpiresAt,
+			Locale:           domain.NormalizeInvitationLocale(invitation.Locale),
+		},
 	}
 }
 
 func buildInvitationMessage(invitation usecase.InvitationNotification, organizationName string) string {
 	lines := []string{
-		"Vous avez ete invite a rejoindre " + organizationName + ".",
+		"Vous avez été invité à rejoindre " + organizationName + ".",
 	}
 	if role := strings.TrimSpace(invitation.Role); role != "" {
-		lines = append(lines, "Role: "+role+".")
+		lines = append(lines, "Rôle: "+role+".")
 	}
-	if projectID := strings.TrimSpace(invitation.ProjectID); projectID != "" {
-		lines = append(lines, "Cette invitation est limitee au projet "+projectID+".")
+	if projectName := strings.TrimSpace(invitation.ProjectName); projectName != "" {
+		lines = append(lines, "Cette invitation est limitée au projet "+projectName+".")
 	}
 	if message := strings.TrimSpace(invitation.Message); message != "" {
 		lines = append(lines, "", message)
@@ -151,7 +176,7 @@ func buildInvitationMessage(invitation usecase.InvitationNotification, organizat
 		lines = append(lines, "", "Accepter l'invitation: "+acceptURL)
 	}
 	if invitation.ExpiresAt != nil {
-		lines = append(lines, "Expire le: "+invitation.ExpiresAt.UTC().Format(time.RFC3339)+".")
+		lines = append(lines, "Expire le : "+invitation.ExpiresAt.UTC().Format(time.RFC3339)+".")
 	}
 	return strings.Join(lines, "\n")
 }

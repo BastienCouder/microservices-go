@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votre code d'inscription</title>
+  </head>
+  <body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;">
+            <tr>
+              <td style="padding:40px 40px 24px 40px;">
+                <div style="font-size:16px;font-weight:700;letter-spacing:-0.02em;">VISIA<span style="color:#f97316;">.</span></div>
+                <h1 style="margin:24px 0 0 0;font-size:36px;line-height:1.05;font-weight:300;letter-spacing:-0.04em;">
+                  Votre code<br><span style="color:#f97316;">d'inscription</span>
+                </h1>
+                <p style="margin:24px 0 0 0;font-size:16px;line-height:1.7;color:#475569;">
+                  Utilisez ce code pour finaliser la création de votre compte.
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 40px 24px 40px;">
+                <div style="border-top:1px solid #e2e8f0;padding-top:24px;">
+                  <div style="font-size:12px;letter-spacing:0.2em;text-transform:uppercase;color:#94a3b8;">Code OTP</div>
+                  <div style="margin-top:20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:40px;font-weight:700;letter-spacing:0.28em;color:#0f172a;">
+                    {{ .RegistrationCode }}
+                  </div>
+                </div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 40px 40px 40px;">
+                <p style="margin:0;font-size:14px;line-height:1.7;color:#64748b;">
+                  Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -160,12 +160,16 @@ export function normalizeInvitation(value: unknown): OrganizationInvitation | nu
   if (!isRecord(value)) return null;
   const id = getIDString(getField(value, ["id", "ID"]));
   if (!id) return null;
+  const locale = getString(getField(value, ["locale", "Locale"])).toLowerCase().startsWith("en")
+    ? "en"
+    : "fr";
 
   return {
     id,
     organizationId: getIDString(getField(value, ["organizationId", "OrganizationID"])),
     projectId: getIDString(getField(value, ["projectId", "ProjectID"])),
     email: getString(getField(value, ["email", "Email"])),
+    locale,
     role: getString(getField(value, ["role", "Role"])) || "viewer",
     token: getString(getField(value, ["token", "Token"])),
     message: getString(getField(value, ["message", "Message"])),

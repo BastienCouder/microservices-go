@@ -8,16 +8,20 @@ import {
   Tailwind,
   Text,
 } from '@react-email/components';
+import { normalizeLocale, type EmailLocale } from './i18n';
 import { tailwindConfig } from './tailwind.config';
 
 interface NotificationEmailProps {
   title: string;
   message: string;
+  locale?: EmailLocale;
 }
 
-export default function NotificationEmail({ title, message }: NotificationEmailProps) {
+export default function NotificationEmail({ title, message, locale }: NotificationEmailProps) {
+  const normalizedLocale = normalizeLocale(locale);
+
   return (
-    <Html lang="fr">
+    <Html lang={normalizedLocale}>
       <Tailwind config={tailwindConfig}>
         <Head />
         <Preview>{title}</Preview>
@@ -35,4 +39,5 @@ export default function NotificationEmail({ title, message }: NotificationEmailP
 NotificationEmail.PreviewProps = {
   title: 'Nouvelle alerte',
   message: 'Votre facture est prete. Consultez votre espace billing.',
+  locale: 'fr',
 } satisfies NotificationEmailProps;

@@ -62,7 +62,7 @@ export function InvitationsPanel({
   resendBusy,
   revokeBusy,
 }: InvitationsPanelProps) {
-  const { t } = useScopedI18n("organizations");
+  const { locale, t } = useScopedI18n("organizations");
   const pendingInvitations = useMemo(
     () => invitations.filter((invitation) => invitation.status === "pending"),
     [invitations],
@@ -84,6 +84,18 @@ export function InvitationsPanel({
             onChange={(event) => onDraftChange({ ...draft, email: event.target.value })}
             placeholder="email@domain.com"
           />
+          <Select
+            value={draft.locale || locale}
+            onValueChange={(value: "fr" | "en") => onDraftChange({ ...draft, locale: value })}
+          >
+            <SelectTrigger className="bg-background w-full">
+              <SelectValue placeholder={t("languagePlaceholder")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="fr">{t("languageFrench")}</SelectItem>
+              <SelectItem value="en">{t("languageEnglish")}</SelectItem>
+            </SelectContent>
+          </Select>
           <Select
             value={draft.projectId || "organization"}
             onValueChange={(value) => {
@@ -154,6 +166,7 @@ export function InvitationsPanel({
                 <TableRow>
                   <TableHead>{t("emailColumn")}</TableHead>
                   <TableHead>{t("scopeColumn")}</TableHead>
+                  <TableHead>{t("languageColumn")}</TableHead>
                   <TableHead>{t("roleColumn")}</TableHead>
                   <TableHead>{t("statusColumn")}</TableHead>
                   <TableHead>{t("sentAtColumn")}</TableHead>
@@ -168,6 +181,9 @@ export function InvitationsPanel({
                       {invitation.projectId
                         ? projectNameById.get(invitation.projectId) ?? t("projectFallback", { id: invitation.projectId })
                         : t("organization")}
+                    </TableCell>
+                    <TableCell>
+                      {invitation.locale === "en" ? t("languageEnglish") : t("languageFrench")}
                     </TableCell>
                     <TableCell>{formatLabel(invitation.role)}</TableCell>
                     <TableCell>

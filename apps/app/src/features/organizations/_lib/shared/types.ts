@@ -44,6 +44,7 @@ export type OrganizationInvitation = {
   organizationId: string;
   projectId: string;
   email: string;
+  locale: "fr" | "en";
   role: string;
   token: string;
   message: string;
@@ -78,6 +79,7 @@ export type ViewTab = "projects" | "members" | "invitations" | "settings" | "api
 
 export type InvitationDraft = {
   email: string;
+  locale: "fr" | "en";
   role: string;
   message: string;
   projectId: string;

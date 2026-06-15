@@ -163,6 +163,7 @@ type Invitation struct {
 	OrganizationID   int64
 	ProjectID        string
 	Email            string
+	Locale           string
 	Role             string
 	Token            string
 	Message          string
@@ -184,6 +185,14 @@ func NormalizeInvitationEmail(raw string) (string, error) {
 		return "", fmt.Errorf("%w: invalid email", ErrInvalidInvitation)
 	}
 	return email, nil
+}
+
+func NormalizeInvitationLocale(raw string) string {
+	locale := strings.ToLower(strings.TrimSpace(raw))
+	if strings.HasPrefix(locale, "en") {
+		return "en"
+	}
+	return "fr"
 }
 
 func (i *Invitation) ValidateForCreate() error {

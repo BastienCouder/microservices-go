@@ -19,6 +19,7 @@ type OrganizationInvitation struct {
 	OrganizationID   int64
 	ProjectID        string
 	Email            string
+	Locale           string
 	Role             string
 	Token            string
 	Message          string

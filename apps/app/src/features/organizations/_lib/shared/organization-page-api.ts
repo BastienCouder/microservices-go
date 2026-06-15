@@ -362,6 +362,7 @@ export async function createOrganizationInvitation(
   organizationId: string,
   input: {
     email: string;
+    locale: "fr" | "en";
     role: string;
     message: string;
     projectId?: string;
@@ -373,6 +374,7 @@ export async function createOrganizationInvitation(
       organizationId,
       body: JSON.stringify({
         email: input.email,
+        locale: input.locale,
         role: input.role,
         message: input.message,
         projectId: input.projectId ?? "",
@@ -407,6 +409,7 @@ export async function resendOrganizationInvitation(
       organizationId,
       body: JSON.stringify({
         email: invitation.email,
+        locale: invitation.locale,
         role: invitation.role,
         message: invitation.message,
         expires_at: invitation.expiresAt || "",

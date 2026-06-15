@@ -41,6 +41,7 @@ INSERT INTO organization_invitations (
   organization_id,
   project_id,
   email,
+  locale,
   role,
   token,
   message,
@@ -52,17 +53,18 @@ INSERT INTO organization_invitations (
   responded_at,
   deleted_at
 )
-SELECT o.id, $2, $3, $4, $5, $6, 'pending', $7, 0, $8, $9, NULL, NULL
+SELECT o.id, $2, $3, $4, $5, $6, $7, 'pending', $8, 0, $9, $10, NULL, NULL
 FROM organizations o
 WHERE o.id = $1
   AND o.deleted_at IS NULL
-RETURNING id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+RETURNING id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 `
 
 type CreateInvitationParams struct {
 	OrganizationID  int64
 	ProjectID       string
 	Email           string
+	Locale          string
 	Role            string
 	Token           string
 	Message         string
@@ -76,6 +78,7 @@ func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationPara
 		arg.OrganizationID,
 		arg.ProjectID,
 		arg.Email,
+		arg.Locale,
 		arg.Role,
 		arg.Token,
 		arg.Message,
@@ -89,6 +92,7 @@ func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationPara
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,
@@ -104,7 +108,7 @@ func (q *Queries) CreateInvitation(ctx context.Context, arg CreateInvitationPara
 }
 
 const getInvitationByID = `-- name: GetInvitationByID :one
-SELECT id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+SELECT id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 FROM organization_invitations
 WHERE organization_id = $1
   AND id = $2
@@ -124,6 +128,7 @@ func (q *Queries) GetInvitationByID(ctx context.Context, arg GetInvitationByIDPa
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,
@@ -139,7 +144,7 @@ func (q *Queries) GetInvitationByID(ctx context.Context, arg GetInvitationByIDPa
 }
 
 const getInvitationByTokenForUpdate = `-- name: GetInvitationByTokenForUpdate :one
-SELECT id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+SELECT id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 FROM organization_invitations
 WHERE token = $1
   AND deleted_at IS NULL
@@ -154,6 +159,7 @@ func (q *Queries) GetInvitationByTokenForUpdate(ctx context.Context, token strin
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,
@@ -189,7 +195,7 @@ func (q *Queries) GetOrganizationByID(ctx context.Context, id int64) (Organizati
 }
 
 const listInvitationsByOrganization = `-- name: ListInvitationsByOrganization :many
-SELECT id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+SELECT id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 FROM organization_invitations
 WHERE organization_id = $1
   AND deleted_at IS NULL
@@ -210,6 +216,7 @@ func (q *Queries) ListInvitationsByOrganization(ctx context.Context, organizatio
 			&i.OrganizationID,
 			&i.ProjectID,
 			&i.Email,
+			&i.Locale,
 			&i.Role,
 			&i.Token,
 			&i.Message,
@@ -238,7 +245,7 @@ SET status = 'accepted',
     responded_at = $3
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+RETURNING id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 `
 
 type MarkInvitationAcceptedParams struct {
@@ -255,6 +262,7 @@ func (q *Queries) MarkInvitationAccepted(ctx context.Context, arg MarkInvitation
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,
@@ -276,7 +284,7 @@ SET status = 'refused',
     responded_at = $3
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+RETURNING id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 `
 
 type MarkInvitationRefusedParams struct {
@@ -293,6 +301,7 @@ func (q *Queries) MarkInvitationRefused(ctx context.Context, arg MarkInvitationR
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,
@@ -334,20 +343,22 @@ func (q *Queries) RevokeInvitationByID(ctx context.Context, arg RevokeInvitation
 const updateInvitationByID = `-- name: UpdateInvitationByID :one
 UPDATE organization_invitations
 SET email = $3,
-    role = $4,
-    message = $5,
-    expires_at = $6
+    locale = $4,
+    role = $5,
+    message = $6,
+    expires_at = $7
 WHERE organization_id = $1
   AND id = $2
   AND status = 'pending'
   AND deleted_at IS NULL
-RETURNING id, organization_id, project_id, email, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
+RETURNING id, organization_id, project_id, email, locale, role, token, message, status, invited_by_user_id, accepted_by_user_id, created_at, expires_at, responded_at, deleted_at
 `
 
 type UpdateInvitationByIDParams struct {
 	OrganizationID int64
 	ID             int64
 	Email          string
+	Locale         string
 	Role           string
 	Message        string
 	ExpiresAt      pgtype.Timestamptz
@@ -358,6 +369,7 @@ func (q *Queries) UpdateInvitationByID(ctx context.Context, arg UpdateInvitation
 		arg.OrganizationID,
 		arg.ID,
 		arg.Email,
+		arg.Locale,
 		arg.Role,
 		arg.Message,
 		arg.ExpiresAt,
@@ -368,6 +380,7 @@ func (q *Queries) UpdateInvitationByID(ctx context.Context, arg UpdateInvitation
 		&i.OrganizationID,
 		&i.ProjectID,
 		&i.Email,
+		&i.Locale,
 		&i.Role,
 		&i.Token,
 		&i.Message,

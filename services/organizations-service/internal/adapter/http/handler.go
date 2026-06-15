@@ -615,6 +615,7 @@ func (h *Handler) listMembers(w http.ResponseWriter, r *http.Request, organizati
 
 type createInvitationRequest struct {
 	Email     string `json:"email"`
+	Locale    string `json:"locale"`
 	Role      string `json:"role"`
 	Message   string `json:"message"`
 	ProjectID string `json:"projectId"`
@@ -642,13 +643,14 @@ func (h *Handler) createInvitation(w http.ResponseWriter, r *http.Request, organ
 
 	var invitation *domain.Invitation
 	if strings.TrimSpace(req.ProjectID) == "" {
-		invitation, err = h.svc.CreateInvitation(r.Context(), organizationID, authUserID, req.Email, req.Role, req.Message, expiresAt)
+		invitation, err = h.svc.CreateInvitation(r.Context(), organizationID, authUserID, req.Email, req.Locale, req.Role, req.Message, expiresAt)
 	} else {
 		invitation, err = h.svc.CreateProjectInvitation(
 			r.Context(),
 			organizationID,
 			authUserID,
 			req.Email,
+			req.Locale,
 			req.Role,
 			req.Message,
 			req.ProjectID,
@@ -694,6 +696,7 @@ func (h *Handler) getInvitationByID(w http.ResponseWriter, r *http.Request, orga
 
 type updateInvitationRequest struct {
 	Email     string `json:"email"`
+	Locale    string `json:"locale"`
 	Role      string `json:"role"`
 	Message   string `json:"message"`
 	ExpiresAt string `json:"expires_at"`
@@ -722,6 +725,7 @@ func (h *Handler) updateInvitation(w http.ResponseWriter, r *http.Request, organ
 		organizationID,
 		invitationID,
 		req.Email,
+		req.Locale,
 		req.Role,
 		req.Message,
 		expiresAt,

@@ -314,13 +314,17 @@ export function useOrganizationMutations({
       if (!email) throw new Error("L'email est obligatoire.");
       await createOrganizationInvitation(apiBaseURL, selectedOrganizationId, {
         email,
+        locale: invitationDraft.locale,
         role,
         message: invitationDraft.message.trim(),
         projectId: invitationDraft.projectId.trim(),
       });
     },
     onSuccess: async () => {
-      setInvitationDraft(EMPTY_INVITATION_DRAFT);
+      setInvitationDraft({
+        ...EMPTY_INVITATION_DRAFT,
+        locale: invitationDraft.locale,
+      });
       setNotice("Invitation envoyee.");
       setLocalError(null);
       await invalidateOrganizationData();

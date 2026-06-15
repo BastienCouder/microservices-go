@@ -11,37 +11,38 @@ import {
   Tailwind,
   Text,
 } from '@react-email/components';
+import { normalizeLocale, getWelcomeCopy, type EmailLocale } from './i18n';
 import { tailwindConfig } from './tailwind.config';
 
 interface WelcomeEmailProps {
   firstName: string;
   verificationUrl: string;
+  locale?: EmailLocale;
 }
 
-export default function WelcomeEmail({ firstName, verificationUrl }: WelcomeEmailProps) {
+export default function WelcomeEmail({ firstName, verificationUrl, locale }: WelcomeEmailProps) {
+  const normalizedLocale = normalizeLocale(locale);
+  const copy = getWelcomeCopy(normalizedLocale);
+
   return (
-    <Html lang="fr">
+    <Html lang={normalizedLocale}>
       <Tailwind config={tailwindConfig}>
         <Head />
-        <Preview>Confirme ton compte</Preview>
+        <Preview>{copy.preview}</Preview>
         <Body className="bg-slate-100 py-10 font-sans">
           <Container className="mx-auto max-w-xl rounded-lg bg-white p-8">
-            <Heading className="m-0 text-2xl font-semibold text-text">Bienvenue {firstName}</Heading>
-            <Text className="mt-4 text-base leading-6 text-text">
-              Confirme ton email pour activer ton compte et accéder a toutes les fonctionnalites.
-            </Text>
+            <Heading className="m-0 text-2xl font-semibold text-text">{copy.heading(firstName)}</Heading>
+            <Text className="mt-4 text-base leading-6 text-text">{copy.body}</Text>
             <Section className="mt-6">
               <Button
                 href={verificationUrl}
                 className="box-border rounded-md bg-brand px-5 py-3 text-center text-sm font-medium text-white no-underline"
               >
-                Confirmer mon email
+                {copy.cta}
               </Button>
             </Section>
             <Hr className="border-solid border-slate-200 my-8" />
-            <Text className="m-0 text-sm leading-6 text-muted">
-              Si tu n'es pas a l'origine de cette demande, tu peux ignorer cet email.
-            </Text>
+            <Text className="m-0 text-sm leading-6 text-muted">{copy.footer}</Text>
           </Container>
         </Body>
       </Tailwind>
@@ -52,4 +53,5 @@ export default function WelcomeEmail({ firstName, verificationUrl }: WelcomeEmai
 WelcomeEmail.PreviewProps = {
   firstName: 'Bastien',
   verificationUrl: 'https://example.com/verify/abc123',
+  locale: 'fr',
 } satisfies WelcomeEmailProps;

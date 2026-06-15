@@ -37,9 +37,10 @@ type InvitationNotification struct {
 	Email            string
 	OrganizationID   int64
 	OrganizationName string
+	Locale           string
 	Role             string
 	Message          string
-	ProjectID        string
+	ProjectName      string
 	AcceptURL        string
 	ExpiresAt        *time.Time
 }

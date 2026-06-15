@@ -105,7 +105,15 @@ func runEmailNotificationConsumerLoop(ctx context.Context, cfg config.Config, sv
 		err = client.ConsumeNotifications(ctx, func(loopCtx context.Context, message rabbitmqadapter.NotificationMessage) error {
 			processCtx, cancel := context.WithTimeout(loopCtx, 30*time.Second)
 			defer cancel()
-			_, err := svc.Send(processCtx, message.Channel, message.Recipient, message.Subject, message.Message)
+			_, err := svc.SendMessage(processCtx, usecase.DeliveryMessage{
+				Channel:   message.Channel,
+				Recipient: message.Recipient,
+				Subject:   message.Subject,
+				Message:   message.Message,
+				Template:  message.Template,
+				Locale:    message.Locale,
+				Data:      message.Data,
+			})
 			if err != nil {
 				log.Printf("email notification delivery failed: recipient=%s subject=%q error=%v", message.Recipient, message.Subject, err)
 				_ = sleepWithContext(loopCtx, 10*time.Second)

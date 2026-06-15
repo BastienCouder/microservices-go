@@ -15,6 +15,7 @@ import {
   storeSelectedOrganizationContext,
   storeSelectedOrganizationID,
 } from "@/shared/selection";
+import { useLocale } from "@/shared/hooks/use-i18n";
 import {
   canManageOrganizationPages,
   DEFAULT_ORGANIZATION_VIEW_TAB,
@@ -143,6 +144,7 @@ export function useOrganizationsPageViewModel({
   routeSearch,
   user,
 }: UseOrganizationsPageViewModelInput): OrganizationsPageViewModel {
+  const { locale } = useLocale();
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
@@ -150,7 +152,10 @@ export function useOrganizationsPageViewModel({
   const [selectedOrganizationId, setSelectedOrganizationId] = useState(readSelectedOrganizationID);
   const [projectSearch, setProjectSearch] = useState("");
   const [projectMemberDrafts, setProjectMemberDrafts] = useState<Record<string, ProjectMemberDraft>>({});
-  const [invitationDraft, setInvitationDraft] = useState<InvitationDraft>(EMPTY_INVITATION_DRAFT);
+  const [invitationDraft, setInvitationDraft] = useState<InvitationDraft>({
+    ...EMPTY_INVITATION_DRAFT,
+    locale: locale === "en" ? "en" : "fr",
+  });
   const [createdAPIKey, setCreatedAPIKey] = useState<OrganizationAPIKey | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);

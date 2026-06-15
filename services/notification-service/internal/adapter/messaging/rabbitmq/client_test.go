@@ -7,7 +7,10 @@ func TestDecodeNotificationMessage(t *testing.T) {
 		"channel": "email",
 		"recipient": "invitee@example.com",
 		"subject": "Invitation",
-		"message": "Welcome"
+		"message": "Welcome",
+		"template": "invitation",
+		"locale": "en",
+		"data": {"organizationName":"Acme"}
 	}`))
 	if err != nil {
 		t.Fatalf("decode notification message: %v", err)
@@ -24,5 +27,11 @@ func TestDecodeNotificationMessage(t *testing.T) {
 	}
 	if message.Message != "Welcome" {
 		t.Fatalf("expected message Welcome, got %q", message.Message)
+	}
+	if message.Template != "invitation" {
+		t.Fatalf("expected template invitation, got %q", message.Template)
+	}
+	if message.Locale != "en" {
+		t.Fatalf("expected locale en, got %q", message.Locale)
 	}
 }

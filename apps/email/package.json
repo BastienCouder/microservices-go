@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "email dev --dir ./emails --port 3002",
     "build": "email export --dir ./emails --outDir ./dist",
-    "api": "bun run ./server.ts"
+    "api": "bun run ./server.ts",
+    "export:kratos-otp": "bun run ./scripts/export-kratos-otp.ts"
   },
   "dependencies": {
     "@react-email/components": "latest",
@@ -14,6 +15,7 @@
     "react-dom": "19.1.0"
   },
   "devDependencies": {
+    "@react-email/preview-server": "5.2.9",
     "@types/node": "24.10.0",
     "@types/react": "19.1.0",
     "@types/react-dom": "19.1.0",

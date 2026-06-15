@@ -396,6 +396,7 @@ func (f *fakeRepo) UpdateInvitation(_ context.Context, invitation *domain.Invita
 		return nil, domain.ErrInvitationAlreadyHandled
 	}
 	current.Email = invitation.Email
+	current.Locale = invitation.Locale
 	current.Role = invitation.Role
 	current.Message = invitation.Message
 	current.ExpiresAt = cloneTimePtr(invitation.ExpiresAt)
@@ -571,6 +572,7 @@ func TestDeleteOrganizationSoftDeletesAndAnonymizesSensitiveData(t *testing.T) {
 		org.ID,
 		1,
 		"person@example.com",
+		"fr",
 		"viewer",
 		"Private onboarding note",
 		nil,

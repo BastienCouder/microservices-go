@@ -18,6 +18,7 @@ export const EMPTY_RESOURCES: OrganizationResources = {
 
 export const EMPTY_INVITATION_DRAFT: InvitationDraft = {
   email: "",
+  locale: "fr",
   role: "viewer",
   message: "",
   projectId: "",
