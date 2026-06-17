@@ -33,6 +33,11 @@ import {
 } from "./optimization-action-ids";
 import { exportPerceptionWorkbook } from "./perception-export";
 import {
+  getDefaultPerceptionFilters,
+  readPersistedPerceptionFilters,
+  writePersistedPerceptionFilters,
+} from "./perception-filters-storage";
+import {
   resolvePerceptionGeneratedContent,
   resolvePerceptionLocalizedText,
 } from "./perception-i18n";
@@ -152,6 +157,18 @@ export function usePerceptionViewModel(
   options: { apiBaseURL?: string; routeSearch?: string } = {},
 ) {
   const { locale, t } = useScopedI18n("perception");
+  const modelCatalog = useMemo(
+    () =>
+      initialData.metadata.modelCatalog.length > 0
+        ? initialData.metadata.modelCatalog
+        : buildFallbackModelCatalog(initialData),
+    [initialData],
+  );
+  const persistedFilters = useMemo(
+    () => readPersistedPerceptionFilters(modelCatalog.map((model) => model.id)),
+    [modelCatalog],
+  );
+  const defaultFilters = useMemo(() => getDefaultPerceptionFilters(), []);
   const exportAccess = useClientExportAccess({
     apiBaseURL: options.apiBaseURL,
     routeSearch: options.routeSearch,
@@ -159,13 +176,25 @@ export function usePerceptionViewModel(
   const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
-  const [selectedModels, setSelectedModels] = useState<string[]>([]);
-  const [selectedSourceFilter, setSelectedSourceFilter] = useState<PerceptionSourceFilter>(
-    () => getDefaultSourceFilter(initialData),
+  const [selectedModels, setSelectedModels] = useState<string[]>(
+    () => persistedFilters.selectedModels ?? defaultFilters.selectedModels,
   );
-  const [selectedPeriod, setSelectedPeriod] = useState<PerceptionTrendPeriodKey>("all");
+  const [selectedSourceFilter, setSelectedSourceFilter] =
+    useState<PerceptionSourceFilter>(
+      () =>
+        persistedFilters.selectedSourceFilter ??
+        getDefaultSourceFilter(initialData),
+    );
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<PerceptionTrendPeriodKey>(
+      () => persistedFilters.selectedPeriod ?? defaultFilters.selectedPeriod,
+    );
   const [showAllModels, setShowAllModels] = useState(false);
-  const [showUniqueModelFilters, setShowUniqueModelFilters] = useState(false);
+  const [showUniqueModelFilters, setShowUniqueModelFilters] = useState(
+    () =>
+      persistedFilters.showUniqueModelFilters ??
+      defaultFilters.showUniqueModelFilters,
+  );
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [lastAnalysisCredits, setLastAnalysisCredits] = useState<number | null>(null);
@@ -195,13 +224,19 @@ export function usePerceptionViewModel(
     };
   }, [initialData.metadata.projectId]);
 
-  const modelCatalog = useMemo(
-    () =>
-      initialData.metadata.modelCatalog.length > 0
-        ? initialData.metadata.modelCatalog
-        : buildFallbackModelCatalog(initialData),
-    [initialData],
-  );
+  useEffect(() => {
+    writePersistedPerceptionFilters({
+      selectedModels,
+      selectedSourceFilter,
+      selectedPeriod,
+      showUniqueModelFilters,
+    });
+  }, [
+    selectedModels,
+    selectedPeriod,
+    selectedSourceFilter,
+    showUniqueModelFilters,
+  ]);
 
   const sourceScopedResponses = useMemo(
     () =>

@@ -53,7 +53,7 @@ func NewClient(cfg Config) (*Client, error) {
 
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 8 * time.Second}
+		httpClient = &http.Client{Timeout: 90 * time.Second}
 	}
 
 	providerID := strings.TrimSpace(cfg.ProviderID)

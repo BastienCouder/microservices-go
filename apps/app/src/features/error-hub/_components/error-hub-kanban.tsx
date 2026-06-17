@@ -13,7 +13,6 @@ import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { buildPerceptionModelLookup } from "../../perception/_components/top-errors-panel";
 import { ErrorHubColumn } from "./error-hub-column";
-import { ErrorHubContentBriefsTab } from "./error-hub-content-briefs-tab";
 import { ErrorHubDetailsPanel } from "./error-hub-details-panel";
 import { ErrorHubFiltersToolbar } from "./error-hub-filters-toolbar";
 import {
@@ -124,14 +123,14 @@ export function ErrorHubKanban({
   const columns = useMemo(
     () => {
       const grouped =
-        boardView === "status"
+        canGenerateAiBrief && boardView === "status"
           ? groupErrorsByActionStatus(filteredErrors, actionStatusesByErrorId)
           : groupErrorsBySeverity(filteredErrors, actionStatusesByErrorId);
 
       return grouped.map((column) => ({
         ...column,
         title:
-          boardView === "status"
+          canGenerateAiBrief && boardView === "status"
             ? column.id === "todo"
               ? tErrorHub("statusColumnTodo")
               : column.id === "processing"
@@ -144,7 +143,7 @@ export function ErrorHubKanban({
                 : tErrorHub("severityColumnLow"),
       }));
     },
-    [actionStatusesByErrorId, boardView, filteredErrors, tErrorHub],
+    [actionStatusesByErrorId, boardView, canGenerateAiBrief, filteredErrors, tErrorHub],
   );
 
   const allCompetitorsSelected = selectedCompetitors.length === 0;
@@ -240,69 +239,52 @@ export function ErrorHubKanban({
                 toggleCompetitor={toggleCompetitor}
                 toggleModel={toggleModel}
               />
+              {canGenerateAiBrief ? (
                 <Tabs
-                value={boardView}
-                onValueChange={(value) =>
-                  setBoardView(value as ErrorHubBoardView)
-                }
-                className="w-full md:w-auto"
-              >
-                <TabsList className="h-10 w-full md:w-auto">
-                  <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
-                    {tErrorHub("boardBySeverity")}
-                  </TabsTrigger>
-                  <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
-                    {tErrorHub("boardByStatus")}
-                  </TabsTrigger>
-              {/*    <TabsTrigger value="content" className="px-3 text-xs md:text-sm">
-                    {tErrorHub("boardByContent")}
-                  </TabsTrigger> */}
-                </TabsList>
-              </Tabs>
+                  value={boardView}
+                  onValueChange={(value) =>
+                    setBoardView(value as ErrorHubBoardView)
+                  }
+                  className="w-full md:w-auto"
+                >
+                  <TabsList className="h-10 w-full md:w-auto">
+                    <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
+                      {tErrorHub("boardBySeverity")}
+                    </TabsTrigger>
+                    <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
+                      {tErrorHub("boardByStatus")}
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              ) : null}
             </div>
           </div>
         </div>
       </div>
 
       <main className="min-h-0 flex-1 overflow-visible lg:overflow-hidden">
-     {/*   {boardView === "content" ? (
-          <div className="min-h-0 lg:h-full lg:overflow-y-auto">
-            <ErrorHubContentBriefsTab
+        <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
+          {columns.map((column, columnIndex) => (
+            <ErrorHubColumn
+              key={column.id}
+              {...column}
               actionStatusesByErrorId={actionStatusesByErrorId}
-              canGenerateAiBrief={canGenerateAiBrief}
-              errors={filteredErrors}
-              generatedContentByErrorId={generatedContentByErrorId}
+              columnId={column.id}
+              columnIndex={columnIndex}
+              emptyLabel={persistError}
               generatedIds={generatedIds}
               loading={loading}
-              onCreateAction={onCreateAction}
+              locale={locale}
+              markingDoneErrorIds={markingDoneErrorIds}
+              modelLookup={modelLookup}
+              onCreateAction={canGenerateAiBrief ? onCreateAction : undefined}
+              onMarkDone={canGenerateAiBrief ? onMarkDone : undefined}
               onOpenDetails={setSelectedError}
               savingErrorIds={savingErrorIds}
+              totalColumns={columns.length}
             />
-          </div>
-        ) : ( */}
-          <div className="grid min-h-0 gap-8 pt-4 lg:h-full lg:grid-cols-3">
-            {columns.map((column, columnIndex) => (
-              <ErrorHubColumn
-                key={column.id}
-                {...column}
-                actionStatusesByErrorId={actionStatusesByErrorId}
-                columnId={column.id}
-                columnIndex={columnIndex}
-                emptyLabel={persistError}
-                generatedIds={generatedIds}
-                loading={loading}
-                locale={locale}
-                markingDoneErrorIds={markingDoneErrorIds}
-                modelLookup={modelLookup}
-                onCreateAction={onCreateAction}
-                onMarkDone={onMarkDone}
-                onOpenDetails={setSelectedError}
-                savingErrorIds={savingErrorIds}
-                totalColumns={columns.length}
-              />
-            ))}
-          </div>
-       {/* )} */}
+          ))}
+        </div>
       </main>
 
       <ErrorHubDetailsPanel
@@ -314,8 +296,8 @@ export function ErrorHubKanban({
         locale={locale}
         markingDoneErrorIds={markingDoneErrorIds}
         modelLookup={modelLookup}
-        onCreateAction={onCreateAction}
-        onMarkDone={onMarkDone}
+        onCreateAction={canGenerateAiBrief ? onCreateAction : undefined}
+        onMarkDone={canGenerateAiBrief ? onMarkDone : undefined}
         onOpenChange={handleDetailsOpenChange}
         savingErrorIds={savingErrorIds}
         selectedError={selectedError}
