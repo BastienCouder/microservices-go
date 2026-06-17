@@ -9,6 +9,7 @@ import {
   PerceptionTopErrorCard,
   buildPerceptionModelLookup,
 } from "../../perception/_components/top-errors-panel";
+import { canCreateActionFromError } from "../_lib/error-hub-utils";
 import { ErrorHubColumnLoading } from "./template";
 
 type ErrorHubColumnProps = {
@@ -98,7 +99,9 @@ export function ErrorHubColumn({
               actionStatus={actionStatusesByErrorId.get(error.id)}
               markingActionDone={markingDoneErrorIds.has(error.id)}
               onCreateAction={
-                onCreateAction ? () => void onCreateAction(error) : undefined
+                onCreateAction && canCreateActionFromError(error)
+                  ? () => void onCreateAction(error)
+                  : undefined
               }
               onMarkActionDone={onMarkDone ? () => void onMarkDone(error) : undefined}
             />

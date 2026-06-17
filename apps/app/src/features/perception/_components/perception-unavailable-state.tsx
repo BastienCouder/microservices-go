@@ -6,6 +6,7 @@ import type { BrandCanon } from "../_lib/shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PerceptionLeftPanel } from "./perception-left-panel";
 import { PerceptionThreeColumnLayout } from "./perception-three-column-layout";
+import { t } from "i18next";
 
 const EMPTY_BRAND_CANON: BrandCanon = {
   brandName: "",
@@ -79,7 +80,12 @@ export function PerceptionUnavailableState({
           </Card>
         </div>
       }
-      right={
+
+    />
+  );
+}
+
+{ /* right={
         <div className="px-1 pb-4">
           <Card className="border-border/60">
             <CardHeader className="pb-2">
@@ -92,10 +98,7 @@ export function PerceptionUnavailableState({
             </CardContent>
           </Card>
         </div>
-      }
-    />
-  );
-}
+      } */}
 
 export function BrandCanonUnavailableState({
   error,

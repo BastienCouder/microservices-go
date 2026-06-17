@@ -19,6 +19,7 @@ import {
   buildPerceptionModelLookup,
 } from "../../perception/_components/top-errors-panel";
 import { resolvePerceptionLocalizedText } from "../../perception/_lib";
+import { canCreateActionFromError } from "../_lib/error-hub-utils";
 type ErrorHubDetailsPanelProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
   generatedIds: ReadonlySet<string>;
@@ -79,7 +80,9 @@ export function ErrorHubDetailsPanel({
       actionStatus={actionStatusesByErrorId.get(selectedError.id)}
       markingActionDone={markingDoneErrorIds.has(selectedError.id)}
       onCreateAction={
-        onCreateAction ? () => void onCreateAction(selectedError) : undefined
+        onCreateAction && canCreateActionFromError(selectedError)
+          ? () => void onCreateAction(selectedError)
+          : undefined
       }
       onMarkActionDone={onMarkDone ? () => void onMarkDone(selectedError) : undefined}
     />

@@ -14,6 +14,7 @@ describe("organization view tabs", () => {
       "projects",
       "members",
       "invitations",
+      "billing",
       "settings",
       "apiKeys",
     ]);
@@ -21,6 +22,7 @@ describe("organization view tabs", () => {
       "Projects",
       "Users",
       "Invitations",
+      "Billing",
       "Settings",
       "API keys",
     ]);

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { appQueryKeys } from "@/lib/query-keys";
@@ -27,10 +27,12 @@ export type PricingPlan = {
   name: string;
   price: string;
   yearlyPrice: string;
+  annualBillingText?: string;
   quota: string;
   description: string;
   features: string[];
   highlighted?: boolean;
+  custom?: boolean;
 };
 
 function getInitialOrganizationName(userEmail?: string): string {
@@ -45,8 +47,9 @@ function buildPricingPlans(
     {
       id: "starter",
       name: getBillingPlanLabel("starter"),
-      price: "49 EUR",
-      yearlyPrice: "39 EUR",
+      price: "59 EUR",
+      yearlyPrice: "49 EUR",
+      annualBillingText: t("starterAnnualBilling"),
       quota: t("starterQuota"),
       description: t("starterDescription"),
       features: [t("starterFeatureSeats"), t("starterFeatureModels"), t("starterFeatureMonitoring")],
@@ -54,8 +57,9 @@ function buildPricingPlans(
     {
       id: "growth",
       name: getBillingPlanLabel("growth"),
-      price: "149 EUR",
-      yearlyPrice: "119 EUR",
+      price: "199 EUR",
+      yearlyPrice: "159 EUR",
+      annualBillingText: t("growthAnnualBilling"),
       quota: t("growthQuota"),
       description: t("growthDescription"),
       features: [t("growthFeatureSeats"), t("growthFeatureModels"), t("growthFeaturePrompts")],
@@ -64,11 +68,26 @@ function buildPricingPlans(
     {
       id: "pro",
       name: getBillingPlanLabel("pro"),
-      price: "399 EUR",
-      yearlyPrice: "319 EUR",
+      price: "499 EUR",
+      yearlyPrice: "399 EUR",
+      annualBillingText: t("proAnnualBilling"),
       quota: t("proQuota"),
       description: t("proDescription"),
       features: [t("proFeatureSeats"), t("proFeatureQuota"), t("proFeatureLaunch")],
+    },
+    {
+      id: "enterprise",
+      name: "Enterprise",
+      price: t("customPrice"),
+      yearlyPrice: t("customPrice"),
+      quota: t("enterpriseQuota"),
+      description: t("enterpriseDescription"),
+      features: [
+        t("enterpriseFeatureCredits"),
+        t("enterpriseFeatureProjects"),
+        t("enterpriseFeatureSecurity"),
+      ],
+      custom: true,
     },
   ];
 }
@@ -89,10 +108,12 @@ function getCheckoutNotice(
 
 export function useBillingGateViewModel({
   apiBaseURL,
+  organizationId = "",
   routeSearch,
   userEmail,
 }: {
   apiBaseURL: string;
+  organizationId?: string;
   routeSearch: string;
   userEmail?: string;
 }) {
@@ -100,9 +121,15 @@ export function useBillingGateViewModel({
   const queryClient = useQueryClient();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [organizationName, setOrganizationName] = useState(() => getInitialOrganizationName(userEmail));
-  const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState(organizationId);
   const [localError, setLocalError] = useState("");
   const plans = useMemo(() => buildPricingPlans(t), [t]);
+
+  useEffect(() => {
+    if (organizationId.trim()) {
+      setSelectedOrganizationId(organizationId);
+    }
+  }, [organizationId]);
 
   const organizationsQuery = useQuery({
     queryKey: appQueryKeys.organizations(apiBaseURL, null),
@@ -113,6 +140,7 @@ export function useBillingGateViewModel({
   const organizations = organizationsQuery.data ?? [];
   const activeOrganizationId =
     selectedOrganizationId ||
+    organizationId ||
     organizations[0]?.id ||
     "";
   const hasOrganizations = organizations.length > 0;

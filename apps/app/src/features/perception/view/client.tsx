@@ -210,7 +210,9 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           </div>
         </div>
       }
-      right={rightColumn}
+     
     />
   );
 }
+
+{/* right={rightColumn}/ */}

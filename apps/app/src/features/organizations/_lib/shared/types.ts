@@ -75,7 +75,13 @@ export type OrganizationResources = {
   apiKeys: OrganizationAPIKey[];
 };
 
-export type ViewTab = "projects" | "members" | "invitations" | "settings" | "apiKeys";
+export type ViewTab =
+  | "projects"
+  | "members"
+  | "invitations"
+  | "billing"
+  | "settings"
+  | "apiKeys";
 
 export type InvitationDraft = {
   email: string;

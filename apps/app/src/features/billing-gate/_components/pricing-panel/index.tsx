@@ -1,5 +1,12 @@
-import { ArrowRight, Check, Gift, Handshake, Loader2, RefreshCw } from "lucide-react";
-import { useEffect } from "react";
+import {
+  ArrowRight,
+  Building2,
+  Check,
+  Code,
+  Loader2,
+  Zap,
+} from "lucide-react";
+import { useEffect, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,13 +22,35 @@ import { useBillingGateViewModel } from "../../_lib/pricing/use-billing-gate-vie
 
 type PricingPanelProps = {
   apiBaseURL: string;
+  embedded?: boolean;
+  organizationId?: string;
   routeSearch: string;
+  showOrganizationPicker?: boolean;
   userEmail?: string;
 };
 
-export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPanelProps) {
+const planIcons: Record<string, ReactNode> = {
+  starter: <Code className="h-4 w-4" />,
+  growth: <Zap className="h-4 w-4" />,
+  pro: <Building2 className="h-4 w-4" />,
+  enterprise: <Building2 className="h-4 w-4" />,
+};
+
+export function PricingPanel({
+  apiBaseURL,
+  embedded = false,
+  organizationId,
+  routeSearch,
+  showOrganizationPicker = true,
+  userEmail,
+}: PricingPanelProps) {
   const { t } = useScopedI18n("billing-gate");
-  const viewModel = useBillingGateViewModel({ apiBaseURL, routeSearch, userEmail });
+  const viewModel = useBillingGateViewModel({
+    apiBaseURL,
+    organizationId,
+    routeSearch,
+    userEmail,
+  });
 
   useEffect(() => {
     if (viewModel.checkoutNotice) {
@@ -45,171 +74,179 @@ export function PricingPanel({ apiBaseURL, routeSearch, userEmail }: PricingPane
   }, [routeSearch, viewModel.actionError]);
 
   const handleCheckout = (plan: CheckoutPlan) => {
+    if (plan === "enterprise") {
+      window.location.href = "mailto:sales@riligar.com?subject=Enterprise%20plan";
+      return;
+    }
     viewModel.startCheckout(plan);
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f8fb] text-foreground">
-      <header className="border-b border-border/70 bg-white/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-              {t("eyebrow")}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-foreground">
-              {t("title")}
+    <div className={cn("text-foreground", embedded ? "" : "min-h-screen bg-background")}>
+      <main className={cn("mx-auto w-full", embedded ? "py-1" : "max-w-[1400px] px-6 py-16 lg:px-12 lg:py-20")}>
+        <section className="relative">
+          <div className="mb-8 max-w-3xl lg:mb-10">
+            <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+              {embedded ? t("organizationTitle") : t("title")}
             </h1>
+            <p className="mt-5 text-base leading-7 text-muted-foreground sm:text-lg">
+              {t("description")}
+            </p>
           </div>
 
-          <div className="inline-flex w-fit rounded-lg border border-border bg-background p-1">
-            <Button
-              size="sm"
-              variant={viewModel.billingCycle === "monthly" ? "default" : "ghost"}
-              onClick={() => viewModel.setBillingCycle("monthly")}
-            >
-              {t("monthly")}
-            </Button>
-            <Button
-              size="sm"
-              variant={viewModel.billingCycle === "yearly" ? "default" : "ghost"}
-              onClick={() => viewModel.setBillingCycle("yearly")}
-            >
-              {t("yearly")}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto grid w-full max-w-7xl gap-6 px-4 py-8 sm:px-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:px-8">
-        <section className="space-y-5">
-          {!viewModel.hasOrganizations ? (
-            <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-              <label className="text-sm font-medium text-foreground" htmlFor="organization-name">
-                {t("organizationName")}
-              </label>
-              <input
-                className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/20 transition focus:ring-4"
-                id="organization-name"
-                value={viewModel.organizationName}
-                onChange={(event) => viewModel.setOrganizationName(event.target.value)}
-                placeholder={t("organizationNamePlaceholder")}
-              />
+          <div className="mb-8 flex flex-col gap-4 rounded-2xl border border-foreground/10 bg-background p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:mb-10">
+            <div>
+              <p className="text-sm font-medium text-foreground">
+                {viewModel.billingCycle === "yearly"
+                  ? t("annualHelper")
+                  : t("monthlyHelper")}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {viewModel.billingStatus
+                  ? t("billingStatus", { status: viewModel.billingStatus })
+                  : t("pricingSource")}
+              </p>
             </div>
-          ) : (
-            <div className="rounded-lg border border-border bg-white p-4 shadow-sm">
-              <p className="text-sm font-medium text-foreground">{t("activeOrganization")}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {viewModel.organizations.map((organization) => (
-                  <Button
-                    key={organization.id}
-                    size="sm"
-                    variant={viewModel.selectedOrganizationId === organization.id ? "default" : "outline"}
-                    onClick={() => viewModel.setSelectedOrganizationId(organization.id)}
-                  >
-                    {organization.name}
-                  </Button>
-                ))}
-              </div>
-              {viewModel.billingStatus ? (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {t("billingStatus", { status: viewModel.billingStatus })}
-                </p>
-              ) : null}
-            </div>
-          )}
 
-          <div className="grid gap-4 lg:grid-cols-3">
-            {viewModel.plans.map((plan) => (
-              <article
-                key={plan.id}
+            <div className="grid grid-cols-2 rounded-full border border-foreground/10 bg-muted/40 p-1">
+              <button
+                type="button"
+                onClick={() => viewModel.setBillingCycle("monthly")}
                 className={cn(
-                  "flex min-h-[430px] flex-col rounded-lg border bg-white p-5 shadow-sm",
-                  plan.highlighted ? "border-primary shadow-md" : "border-border",
+                  "rounded-full px-5 py-2 text-sm font-medium transition-all",
+                  viewModel.billingCycle === "monthly"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-xl font-semibold">{plan.name}</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">{plan.description}</p>
-                  </div>
-                  {plan.highlighted ? <Badge>{t("popular")}</Badge> : null}
-                </div>
+                {t("monthly")}
+              </button>
+              <button
+                type="button"
+                onClick={() => viewModel.setBillingCycle("yearly")}
+                className={cn(
+                  "rounded-full px-5 py-2 text-sm font-medium transition-all",
+                  viewModel.billingCycle === "yearly"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span>{t("yearly")}</span>
+                <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                  {t("annualBadge")}
+                </span>
+              </button>
+            </div>
+          </div>
 
-                <div className="mt-6">
-                  <p className="text-2xl font-semibold">
-                    {viewModel.billingCycle === "yearly" ? plan.yearlyPrice : plan.price}
-                    <span className="text-sm font-medium text-muted-foreground"> {t("perMonth")}</span>
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">{plan.quota}</p>
-                </div>
-
-                <ul className="mt-6 flex-1 space-y-3">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex gap-2 text-sm leading-5 text-foreground">
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                      <span>{feature}</span>
-                    </li>
+          {showOrganizationPicker ? (
+            !viewModel.hasOrganizations ? (
+              <div className="mb-8 rounded-2xl border border-foreground/10 bg-background p-5">
+                <label className="text-sm font-medium text-foreground" htmlFor="organization-name">
+                  {t("organizationName")}
+                </label>
+                <input
+                  className="mt-2 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm outline-none ring-primary/20 transition focus:ring-4"
+                  id="organization-name"
+                  value={viewModel.organizationName}
+                  onChange={(event) => viewModel.setOrganizationName(event.target.value)}
+                  placeholder={t("organizationNamePlaceholder")}
+                />
+              </div>
+            ) : (
+              <div className="mb-8 rounded-2xl border border-foreground/10 bg-background p-5">
+                <p className="text-sm font-medium text-foreground">{t("activeOrganization")}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {viewModel.organizations.map((organization) => (
+                    <Button
+                      key={organization.id}
+                      size="sm"
+                      variant={viewModel.selectedOrganizationId === organization.id ? "default" : "outline"}
+                      onClick={() => viewModel.setSelectedOrganizationId(organization.id)}
+                    >
+                      {organization.name}
+                    </Button>
                   ))}
-                </ul>
+                </div>
+              </div>
+            )
+          ) : null}
 
-                <Button
-                  className="mt-6 w-full"
-                  disabled={viewModel.isSubmitting || viewModel.isChecking}
-                  onClick={() => handleCheckout(plan.id)}
-                >
-                  {viewModel.isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {viewModel.plans.map((plan) => {
+              const price =
+                viewModel.billingCycle === "yearly"
+                  ? plan.yearlyPrice
+                  : plan.price;
+
+              return (
+                <article
+                  key={plan.id}
+                  className={cn(
+                    "relative flex min-h-[520px] flex-col rounded-2xl bg-background p-8 lg:p-10",
+                    plan.highlighted
+                      ? "border-2 border-primary xl:-my-4 xl:py-12"
+                      : "border border-foreground/10",
                   )}
-                  {t("continue")}
-                </Button>
-              </article>
-            ))}
+                >
+                  {plan.highlighted ? (
+                    <Badge className="absolute right-5 top-5">{t("popular")}</Badge>
+                  ) : null}
+
+                  <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-primary">
+                    {planIcons[plan.id]}
+                  </div>
+
+                  <h2 className="text-2xl font-semibold text-foreground">{plan.name}</h2>
+                  <p className="mt-3 min-h-[72px] text-sm leading-6 text-muted-foreground">
+                    {plan.description}
+                  </p>
+
+                  <div className="mt-8">
+                    <div className="flex items-end gap-2">
+                      <span className="text-4xl font-semibold tracking-tight text-foreground">
+                        {price}
+                      </span>
+                      {!plan.custom ? (
+                        <span className="pb-1 text-sm font-medium text-muted-foreground">
+                          {t("perMonth")}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 min-h-[22px] text-sm text-muted-foreground">
+                      {viewModel.billingCycle === "yearly" && plan.annualBillingText
+                        ? plan.annualBillingText
+                        : plan.quota}
+                    </p>
+                  </div>
+
+                  <ul className="mt-8 flex-1 space-y-3">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex gap-3 text-sm leading-6 text-foreground">
+                        <Check className="mt-1 h-4 w-4 shrink-0 text-primary" />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <Button
+                    className="mt-8 w-full"
+                    disabled={!plan.custom && (viewModel.isSubmitting || viewModel.isChecking)}
+                    onClick={() => handleCheckout(plan.id)}
+                    variant={plan.highlighted ? "default" : "outline"}
+                  >
+                    {viewModel.isSubmitting && !plan.custom ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <ArrowRight className="h-4 w-4" />
+                    )}
+                    {plan.custom ? t("contactSales") : t("continue")}
+                  </Button>
+                </article>
+              );
+            })}
           </div>
         </section>
-
-        <aside className="space-y-4">
-          <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <Handshake className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">{t("affiliateProgram")}</h2>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              {t("affiliateDescription")}
-            </p>
-            <div className="mt-5 space-y-3">
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-sm font-medium">{t("recurringCommission")}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {t("recurringCommissionDescription")}
-                </p>
-              </div>
-              <div className="rounded-lg border border-border bg-muted/40 p-3">
-                <p className="text-sm font-medium">{t("assistedIntro")}</p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                  {t("assistedIntroDescription")}
-                </p>
-              </div>
-            </div>
-            <Button asChild className="mt-5 w-full" variant="outline">
-              <a href="mailto:partners@riligar.com?subject=Programme%20affiliation">
-                <Gift className="h-4 w-4" />
-                {t("becomePartner")}
-              </a>
-            </Button>
-          </section>
-
-          <section className="rounded-lg border border-border bg-white p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5 text-primary" />
-              <h2 className="text-lg font-semibold">{t("afterPayment")}</h2>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground">
-              {t("afterPaymentDescription")}
-            </p>
-          </section>
-        </aside>
       </main>
     </div>
   );

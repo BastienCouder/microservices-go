@@ -112,4 +112,11 @@ describe("error hub", () => {
       normalizedSource.includes("errors={(data?.errors ?? []).filter(isErrorHubError)}"),
     ).toBe(true);
   });
+
+  test("hides action creation for generic crawler errors", () => {
+    expect(utilsSource.includes("canCreateActionFromError")).toBe(true);
+    expect(utilsSource.includes('error.type === "crawler_issue"')).toBe(true);
+    expect(columnSource.includes("canCreateActionFromError(error)")).toBe(true);
+    expect(detailsSource.includes("canCreateActionFromError(selectedError)")).toBe(true);
+  });
 });

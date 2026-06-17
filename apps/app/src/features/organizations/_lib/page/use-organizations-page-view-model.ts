@@ -51,6 +51,8 @@ type UseOrganizationsPageViewModelInput = {
 };
 
 export type OrganizationsPageViewModel = {
+  apiBaseURL: string;
+  routeSearch: string;
   activeTab: ViewTab;
   activeError: string | null;
   actionError: string | null;
@@ -130,6 +132,7 @@ function normalizeViewTab(value: string): ViewTab {
     value === "projects" ||
     value === "members" ||
     value === "invitations" ||
+    value === "billing" ||
     value === "settings" ||
     value === "apiKeys"
   ) {
@@ -321,6 +324,8 @@ export function useOrganizationsPageViewModel({
   });
 
   return {
+    apiBaseURL,
+    routeSearch,
     activeTab: effectiveActiveTab,
     activeError,
     actionError: localError,

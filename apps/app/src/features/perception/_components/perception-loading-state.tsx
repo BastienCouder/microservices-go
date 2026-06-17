@@ -84,23 +84,6 @@ export function PerceptionLoadingState() {
           </Card>
         </div>
       }
-      right={
-        <div className="px-1 pb-4">
-          <Card className="border-border/60">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle><Skeleton className="h-4 w-36" /></CardTitle>
-                <Skeleton className="h-5 w-8 rounded-full" />
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Skeleton className="h-[116px] w-full rounded-md" />
-              <Skeleton className="h-[116px] w-full rounded-md" />
-              <Skeleton className="h-[116px] w-full rounded-md" />
-            </CardContent>
-          </Card>
-        </div>
-      }
     />
   );
 }

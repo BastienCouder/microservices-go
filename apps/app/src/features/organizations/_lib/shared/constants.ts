@@ -30,6 +30,7 @@ export const ORGANIZATION_VIEW_TABS: { value: ViewTab; label: string }[] = [
   { value: "projects", label: "Projects" },
   { value: "members", label: "Users" },
   { value: "invitations", label: "Invitations" },
+  { value: "billing", label: "Billing" },
   { value: "settings", label: "Settings" },
   { value: "apiKeys", label: "API keys" },
 ];

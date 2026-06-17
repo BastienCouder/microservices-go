@@ -472,7 +472,7 @@ func crawlerOptimizationTextKeys(issue ContentOptimizerIssue, pageURL string) op
 	return optimizationTextKeys{
 		titleKey:            "crawlerIssue" + suffix + "Title",
 		issueKey:            "crawlerIssue" + suffix + "Issue",
-		impactKey:           "crawlerImpactPage",
+		impactKey:           "crawlerIssue" + suffix + "Impact",
 		generatedContentKey: "crawlerIssue" + suffix + "Fix",
 		params: map[string]any{
 			"resource": pageURL,

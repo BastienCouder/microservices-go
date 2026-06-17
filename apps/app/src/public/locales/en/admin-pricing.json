@@ -28,7 +28,7 @@
   "monthlyChangesLabel": "Changes / month",
   "maxProjectsLabel": "Maximum projects",
   "unlimitedHint": "0 = unlimited",
-  "aiBriefLabel": "AI brief",
+  "aiBriefLabel": "AI brief enabled",
   "creating": "Creating...",
   "createPlan": "Create this plan",
   "mostChosen": "Most chosen",

@@ -8,6 +8,7 @@ import { ApiKeysPanel } from "./_components/api-keys";
 import { MembersPanel } from "./_components/members";
 import { ProjectsPanel } from "./_components/projects";
 import { SettingsPanel } from "./_components/settings";
+import { PricingPanel } from "@/features/billing-gate/_components/pricing-panel";
 import { LoadingState } from "./_components/shared/template";
 import { EmptyBlock } from "./_components/shared/empty-block";
 import { OrganizationSummaryPanel } from "./_components/summary";
@@ -66,6 +67,8 @@ export function OrganizationsLayout({
   onClearCreatedAPIKey,
   onSelectOrganization,
   onRefetchOrganizations,
+  apiBaseURL,
+  routeSearch,
 }: OrganizationsPageViewModel) {
   const { t } = useScopedI18n("organizations");
 
@@ -148,6 +151,16 @@ export function OrganizationsLayout({
                   busy={createInvitationBusy}
                   resendBusy={resendInvitationBusy}
                   revokeBusy={revokeInvitationBusy}
+                />
+              ) : null}
+
+            {activeTab === "billing" ? (
+                <PricingPanel
+                  apiBaseURL={apiBaseURL}
+                  routeSearch={routeSearch}
+                  organizationId={selectedOrganization.id}
+                  showOrganizationPicker={false}
+                  embedded
                 />
               ) : null}
 

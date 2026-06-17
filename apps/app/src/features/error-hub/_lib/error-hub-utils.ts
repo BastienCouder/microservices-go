@@ -244,6 +244,15 @@ export function filterErrorsBySource(
   return errors.filter((error) => error.source === sourceFilter);
 }
 
+export function canCreateActionFromError(error: OptimizationError) {
+  if (error.source !== "crawler") return true;
+
+  const hasSpecificSuggestion = Boolean(error.generatedContentKey?.trim());
+  const isGenericCrawlerError = error.type === "crawler_issue";
+
+  return hasSpecificSuggestion && !isGenericCrawlerError;
+}
+
 export function getFilteredErrors({
   actionStatusFilter,
   actionStatusesByErrorId,
