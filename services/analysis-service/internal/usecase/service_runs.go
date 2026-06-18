@@ -9,6 +9,40 @@ import (
 	"time"
 )
 
+const (
+	promptKindMonitoring = "monitoring"
+	promptKindPerception = "perception"
+)
+
+func normalizePromptKind(raw string) string {
+	if strings.TrimSpace(strings.ToLower(raw)) == promptKindPerception {
+		return promptKindPerception
+	}
+	return promptKindMonitoring
+}
+
+func allPromptsHaveKind(prompts []PromptText, kind string) bool {
+	if len(prompts) == 0 {
+		return false
+	}
+	normalizedKind := normalizePromptKind(kind)
+	for _, prompt := range prompts {
+		if normalizePromptKind(prompt.Kind) != normalizedKind {
+			return false
+		}
+	}
+	return true
+}
+
+func analysisRunAcceptsResponses(status string) bool {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "failed", "errored", "cancelled", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user", "completed":
+		return false
+	default:
+		return true
+	}
+}
+
 func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (StartAnalysisResult, error) {
 	requestID := strings.TrimSpace(input.RequestID)
 	projectID := strings.TrimSpace(input.ProjectID)
@@ -30,7 +64,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	if runType == "" {
 		runType = "manual"
 	}
-	if runType != "manual" && runType != "scheduled" && runType != "perception" {
+	if runType != "manual" && runType != "scheduled" {
 		return StartAnalysisResult{}, fmt.Errorf("%w: invalid runType", ErrValidation)
 	}
 
@@ -43,6 +77,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 		normalizedPrompts = append(normalizedPrompts, PromptText{
 			ID:   promptID,
 			Text: strings.TrimSpace(prompt.Text),
+			Kind: normalizePromptKind(prompt.Kind),
 		})
 	}
 
@@ -96,7 +131,8 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 		}
 	}
 
-	if runType == "perception" && !input.Force {
+	requestsPerception := allPromptsHaveKind(normalizedPrompts, promptKindPerception)
+	if requestsPerception && !input.Force {
 		if existing := s.latestFreshPerceptionRunLocked(projectID, s.now().UTC()); existing != nil {
 			promptRuns := s.promptRunsForRunLocked(existing.ID)
 			s.mu.Unlock()
@@ -167,6 +203,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 			RunID:      run.ID,
 			PromptID:   prompt.ID,
 			PromptText: prompt.Text,
+			Kind:       normalizePromptKind(prompt.Kind),
 			CreatedAt:  now,
 		}
 		s.promptRuns[promptRun.ID] = promptRun
@@ -209,7 +246,7 @@ func (s *Service) latestFreshPerceptionRunLocked(projectID string, now time.Time
 	runIDs := s.runsByProject[projectID]
 	for i := len(runIDs) - 1; i >= 0; i-- {
 		run := s.runs[runIDs[i]]
-		if run == nil || run.RunType != "perception" {
+		if run == nil || !s.runHasPromptKindLocked(run.ID, promptKindPerception) {
 			continue
 		}
 		if run.CreatedAt.Before(cutoff) {
@@ -220,6 +257,19 @@ func (s *Service) latestFreshPerceptionRunLocked(projectID string, now time.Time
 		}
 	}
 	return nil
+}
+
+func (s *Service) runHasPromptKindLocked(runID string, kind string) bool {
+	for _, promptRunID := range s.promptRunsByRun[runID] {
+		promptRun := s.promptRuns[promptRunID]
+		if promptRun == nil {
+			continue
+		}
+		if normalizePromptKind(promptRun.Kind) == normalizePromptKind(kind) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error {
@@ -243,6 +293,10 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 	if !ok {
 		s.mu.Unlock()
 		return fmt.Errorf("%w: run", ErrNotFound)
+	}
+	if !analysisRunAcceptsResponses(run.Status) {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: analysis run is not accepting responses", ErrValidation)
 	}
 	promptRun, ok := s.promptRuns[promptRunID]
 	if !ok {
@@ -328,6 +382,53 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 	)
 
 	return nil
+}
+
+func (s *Service) CancelAnalysisRun(ctx context.Context, runID string, organizationID int64) (AnalysisRun, error) {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return AnalysisRun{}, fmt.Errorf("%w: runId is required", ErrValidation)
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return AnalysisRun{}, err
+	}
+	run, ok := s.runs[runID]
+	if !ok {
+		s.mu.Unlock()
+		return AnalysisRun{}, fmt.Errorf("%w: run", ErrNotFound)
+	}
+	projectID := run.ProjectID
+	s.mu.Unlock()
+
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return AnalysisRun{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return AnalysisRun{}, err
+	}
+	run, ok = s.runs[runID]
+	if !ok {
+		return AnalysisRun{}, fmt.Errorf("%w: run", ErrNotFound)
+	}
+	if !analysisRunAcceptsResponses(run.Status) {
+		return copyAnalysisRun(run), nil
+	}
+
+	backup := s.snapshotLocked()
+	run.Status = "cancelled_by_user"
+	run.UpdatedAt = s.now().UTC()
+	if err := s.persistLocked(ctx); err != nil {
+		s.restoreLocked(backup)
+		return AnalysisRun{}, err
+	}
+	return copyAnalysisRun(run), nil
 }
 
 func (s *Service) ListAnalysisRuns(ctx context.Context, projectID string, organizationID int64, limit int) ([]AnalysisRun, error) {
@@ -540,7 +641,7 @@ func (s *Service) buildPerceptionFromDashboard(
 	if hasProjectModels {
 		responses = filterResponsesByModelIDs(responses, projectModels)
 	}
-	perceptionResponses := filterResponsesByRunType(responses, "perception")
+	perceptionResponses := filterResponsesByPromptKind(responses, promptKindPerception)
 	monitoringResponsesUsed := 0
 	sourceMode := "fallback_all"
 	if len(perceptionResponses) > 0 {
@@ -598,10 +699,17 @@ func (s *Service) buildPerceptionFromDashboard(
 	return result, nil
 }
 
-func filterResponsesByRunType(responses []AIResponse, runType string) []AIResponse {
+func normalizeResponsePromptKind(response AIResponse) string {
+	if normalizePromptKind(response.PromptKind) == promptKindPerception {
+		return promptKindPerception
+	}
+	return promptKindMonitoring
+}
+
+func filterResponsesByPromptKind(responses []AIResponse, kind string) []AIResponse {
 	out := make([]AIResponse, 0, len(responses))
 	for _, response := range responses {
-		if strings.TrimSpace(response.RunType) == runType {
+		if normalizeResponsePromptKind(response) == normalizePromptKind(kind) {
 			out = append(out, response)
 		}
 	}

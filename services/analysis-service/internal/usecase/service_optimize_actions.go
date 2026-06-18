@@ -54,9 +54,17 @@ func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, or
 			return OptimizeAction{}, err
 		}
 
+		briefSettings, err := s.getProjectAIBriefSettings(ctx, projectID, organizationID)
+		if err != nil {
+			_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
+			return OptimizeAction{}, err
+		}
+
 		brief, err := s.optimizeActionBriefGenerator.GenerateOptimizeActionBrief(ctx, OptimizeActionBriefInput{
 			ProjectID:        projectID,
 			OrganizationID:   organizationID,
+			ModelID:          briefSettings.BriefProviderModelID,
+			ProviderID:       briefSettings.BriefProvider,
 			Priority:         priority,
 			Type:             actionType,
 			Title:            title,
@@ -74,6 +82,11 @@ func (s *Service) CreateOptimizeAction(ctx context.Context, projectID string, or
 		} else if strings.TrimSpace(brief) != "" {
 			generatedContent = strings.TrimSpace(brief)
 			metadata["briefSource"] = "ai"
+			if briefSettings.BriefModelID != "" {
+				metadata["briefModelId"] = briefSettings.BriefModelID
+				metadata["briefProvider"] = briefSettings.BriefProvider
+				metadata["briefProviderModelId"] = briefSettings.BriefProviderModelID
+			}
 			_, _ = s.CompleteCreditUsage(ctx, reservation.ID)
 		} else {
 			_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)

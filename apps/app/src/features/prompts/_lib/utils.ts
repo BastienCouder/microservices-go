@@ -93,6 +93,16 @@ function formatHourMinute(hour: number, minute: number) {
 export function describeCron(cron: string, locale = "en") {
   const value = cron.trim();
   if (value === "0 * * * *") return translateI18nText("prompts-workspace", "cronHourly", locale);
+  if (value === "0 9 */2 * *") {
+    return translateI18nText("prompts-workspace", "cronEveryTwoDaysAt", locale, {
+      time: "09:00",
+    });
+  }
+  if (value === "0 9 * * 1") {
+    return translateI18nText("prompts-workspace", "cronWeeklyOnMondayAt", locale, {
+      time: "09:00",
+    });
+  }
   if (value === "0 9 * * 1,4") return translateI18nText("prompts-workspace", "cronTwiceWeekly", locale);
   if (value === "30 8 * * 6,0") {
     return translateI18nText("prompts-workspace", "cronWeekendsAt", locale, {

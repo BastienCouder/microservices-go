@@ -8,6 +8,7 @@ export const promptRuns = pgTable("prompt_runs", {
     id: text("id").primaryKey(),
     analysisRunId: text("analysis_run_id").notNull().references(() => analysisRuns.id, { onDelete: "cascade" }),
     promptId: text("prompt_id").notNull(), // Référence prompts.id via project-service
+    kind: text("kind").notNull().default("monitoring"),
 
     status: text("status").default("queued").notNull(), // queued | running | completed | failed
 

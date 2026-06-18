@@ -41,7 +41,7 @@ export function PerceptionUnavailableState({
           trendData={[]}
           windowLabel="--"
           analyzedResponses={0}
-          selectedSourceFilter="monitoring"
+          selectedSourceFilter="perception"
           selectedModels={[]}
           modelOptions={[]}
           selectedPeriod="30d"

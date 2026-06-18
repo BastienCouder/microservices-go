@@ -211,30 +211,36 @@ function PerceptionFiltersPanel({
 
   return (
     <div className="space-y-5">
-      <div className="space-y-2.5">
-        <label className="block px-1 text-xs text-muted-foreground md:text-sm xl:text-xs">
-          {t("filtersDataSource")}
-        </label>
-        <Tabs
-          value={selectedSourceFilter}
-          onValueChange={(value) =>
-            onSourceFilterChange(value as PerceptionSourceFilter)
-          }
-          className="w-full"
-        >
-          <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-muted p-1">
-            <TabsTrigger value="perception" className="px-2 py-1.5 text-xs">
-              {t("filterSourcePerception")}
-            </TabsTrigger>
-            <TabsTrigger value="monitoring" className="px-2 py-1.5 text-xs">
-              {t("filterSourceMonitoring")}
-            </TabsTrigger>
-            <TabsTrigger value="all" className="px-2 py-1.5 text-xs">
-              {t("filterSourceAll")}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-      </div>
+      {/*
+        Keep the source filter implementation here for later.
+        For now the perception page is intentionally locked to the dedicated
+        `perception` source until the monitoring flow is ready.
+
+        <div className="space-y-2.5">
+          <label className="block px-1 text-xs text-muted-foreground md:text-sm xl:text-xs">
+            {t("filtersDataSource")}
+          </label>
+          <Tabs
+            value={selectedSourceFilter}
+            onValueChange={(value) =>
+              onSourceFilterChange(value as PerceptionSourceFilter)
+            }
+            className="w-full"
+          >
+            <TabsList className="grid h-auto w-full grid-cols-3 rounded-xl bg-muted p-1">
+              <TabsTrigger value="perception" className="px-2 py-1.5 text-xs">
+                {t("filterSourcePerception")}
+              </TabsTrigger>
+              <TabsTrigger value="monitoring" className="px-2 py-1.5 text-xs">
+                {t("filterSourceMonitoring")}
+              </TabsTrigger>
+              <TabsTrigger value="all" className="px-2 py-1.5 text-xs">
+                {t("filterSourceAll")}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      */}
 
       <div className="space-y-2.5">
         <label className="block px-1 text-xs text-muted-foreground md:text-sm xl:text-xs">{t("filtersPeriod")}</label>

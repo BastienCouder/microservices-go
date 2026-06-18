@@ -55,6 +55,9 @@ func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 			if run := s.runs[runID]; run != nil {
 				response.RunType = run.RunType
 			}
+			if promptRun := s.promptRuns[response.PromptRunID]; promptRun != nil {
+				response.PromptKind = normalizePromptKind(promptRun.Kind)
+			}
 			out = append(out, response)
 		}
 	}
@@ -78,6 +81,9 @@ func (s *Service) responsesForProjectLocked(projectID string) []AIResponse {
 				response := copyResponse(item)
 				if run := s.runs[runID]; run != nil {
 					response.RunType = run.RunType
+				}
+				if promptRun := s.promptRuns[response.PromptRunID]; promptRun != nil {
+					response.PromptKind = normalizePromptKind(promptRun.Kind)
 				}
 				out = append(out, response)
 			}
@@ -272,6 +278,13 @@ func copyOptimizeAction(action *OptimizeAction) OptimizeAction {
 	return out
 }
 
+func copyProjectAIBriefSettings(settings *ProjectAIBriefSettings) ProjectAIBriefSettings {
+	if settings == nil {
+		return ProjectAIBriefSettings{}
+	}
+	return *settings
+}
+
 func min(a, b int) int {
 	if a < b {
 		return a
@@ -331,6 +344,18 @@ func nonNilOptimizeActionMap(input map[string]*OptimizeAction) map[string]*Optim
 	out := make(map[string]*OptimizeAction, len(input))
 	for key, value := range input {
 		clone := copyOptimizeAction(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilAIBriefSettingsMap(input map[string]*ProjectAIBriefSettings) map[string]*ProjectAIBriefSettings {
+	if input == nil {
+		return make(map[string]*ProjectAIBriefSettings)
+	}
+	out := make(map[string]*ProjectAIBriefSettings, len(input))
+	for key, value := range input {
+		clone := copyProjectAIBriefSettings(value)
 		out[key] = &clone
 	}
 	return out

@@ -153,7 +153,7 @@ func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromp
 	}
 
 	var grpcResp *iav1.ExecutePromptResponse
-	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, c.attemptTimeout, func(attemptCtx context.Context) (bool, error) {
+	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 0, func(attemptCtx context.Context) (bool, error) {
 		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
 		resp, callErr := c.client.ExecutePrompt(callCtx, &iav1.ExecutePromptRequest{
 			PromptId:       input.PromptID,
@@ -245,7 +245,11 @@ func (c *Client) executeWithResilience(
 	backoff := baseBackoff
 	var lastErr error
 	for i := 0; i < attempts; i++ {
-		attemptCtx, cancel := context.WithTimeout(ctx, attemptTimeout)
+		attemptCtx := ctx
+		cancel := func() {}
+		if attemptTimeout > 0 {
+			attemptCtx, cancel = context.WithTimeout(ctx, attemptTimeout)
+		}
 		retryable, callErr := call(attemptCtx)
 		cancel()
 		if callErr == nil {

@@ -1,7 +1,12 @@
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
-import { pushWarningToast } from "@/components/ui/toast-actions";
+import {
+  dismissToast,
+  pushInfoToast,
+  pushLoadingToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import { appQueryKeys } from "@/lib/query-keys";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
 import {
@@ -535,6 +540,10 @@ export function useContentOptimizerViewModel({
     onMutate: () => {
       const previousDiscovery = discoveryResult;
       const previousPhase = phase;
+      const toastId = pushLoadingToast(
+        t("discoveryToastTitle"),
+        t("backgroundAnalysisDescription"),
+      );
       setError(null);
       setPhase("discovering");
       setActiveJobId("");
@@ -543,9 +552,14 @@ export function useContentOptimizerViewModel({
         clearResultsState();
         writeStoredDiscovery(projectId, organizationId, projectWebsiteURL, null);
       }
-      return { previousDiscovery, previousPhase };
+      return { previousDiscovery, previousPhase, toastId };
     },
-    onSuccess: (job) => {
+    onSuccess: (job, _variables, context) => {
+      dismissToast(context?.toastId);
+      pushInfoToast(
+        t("backgroundAnalysisAcceptedTitle"),
+        t("backgroundAnalysisAcceptedDescription"),
+      );
       setActiveJobId(job.id);
       setActiveJobKind("discover");
       setDiscoveryResult({
@@ -557,6 +571,7 @@ export function useContentOptimizerViewModel({
       });
     },
     onError: (nextError, _variables, context) => {
+      dismissToast(context?.toastId);
       if (context?.previousDiscovery?.records.length) {
         setDiscoveryResult(context.previousDiscovery);
         setPhase(context.previousPhase === "completed" ? "completed" : "review");
@@ -591,6 +606,10 @@ export function useContentOptimizerViewModel({
       const limit =
         options?.limit ??
         Math.max((options?.includePatterns ?? Array.from(selectedURLs)).length, 1);
+      const toastId = pushLoadingToast(
+        t("analysisInProgress"),
+        t("backgroundAnalysisDescription"),
+      );
 
       setError(null);
       setPhase("crawling");
@@ -598,9 +617,14 @@ export function useContentOptimizerViewModel({
       setActiveJobKind(null);
       setCrawlResult(null);
       setSelectedResultURL("");
-      return { limit };
+      return { limit, toastId };
     },
     onSuccess: (job, _options, context) => {
+      dismissToast(context?.toastId);
+      pushInfoToast(
+        t("backgroundAnalysisAcceptedTitle"),
+        t("backgroundAnalysisAcceptedDescription"),
+      );
       setActiveJobId(job.id);
       setActiveJobKind("crawl");
       setCrawlResult({
@@ -611,7 +635,8 @@ export function useContentOptimizerViewModel({
         records: [],
       });
     },
-    onError: (nextError) => {
+    onError: (nextError, _options, context) => {
+      dismissToast(context?.toastId);
       setPhase("review");
       setError(
         nextError instanceof Error
@@ -630,19 +655,30 @@ export function useContentOptimizerViewModel({
       });
     },
     onMutate: () => {
+      const toastId = pushLoadingToast(
+        t("analysisInProgress"),
+        t("backgroundAnalysisDescription"),
+      );
       setError(null);
       setPhase("crawling");
       setActiveJobId("");
       setActiveJobKind(null);
       setCrawlResult(null);
       setSelectedResultURL("");
+      return { toastId };
     },
-    onSuccess: (result) => {
+    onSuccess: (result, _variables, context) => {
+      dismissToast(context?.toastId);
+      pushInfoToast(
+        t("analysisCompletedToastTitle"),
+        t("analysisCompletedToastDescription"),
+      );
       setCrawlResult(result);
       applySelectedRecords(result.records);
       setPhase("completed");
     },
-    onError: (nextError) => {
+    onError: (nextError, _variables, context) => {
+      dismissToast(context?.toastId);
       setPhase("review");
       setError(
         nextError instanceof Error

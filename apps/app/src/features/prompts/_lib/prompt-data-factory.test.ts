@@ -77,4 +77,49 @@ describe("buildPromptPageItems", () => {
     expect(rows[0]?.sentiment).toBe("neutral");
     expect(rows[0]?.highlights.includes("Aucun concurrent detecte")).toBe(true);
   });
+
+  test("filters out perception responses from IA responses rows", () => {
+    const rows = buildResponseRows({
+      recentPrompts: [
+        {
+          responseId: "resp-monitoring",
+          promptId: "prompt-1",
+          text: "Quelle marque de CRM choisir ?",
+          promptKind: "monitoring",
+          modelId: "gpt-oss-120b-free",
+          modelGroupName: "gpt-oss",
+          modelDisplayName: "gpt-oss-120b",
+          modelProviderModelId: "openai/gpt-oss-120b:free",
+          time: "10m",
+          mention: true,
+          sentiment: "positive",
+          score: 88,
+          response: "Acme ressort bien sur ce comparatif.",
+          competitorsMentioned: [],
+        },
+        {
+          responseId: "resp-perception",
+          promptId: "prompt-2",
+          text: "Who is Acme for?",
+          promptKind: "perception",
+          modelId: "gpt-oss-120b-free",
+          modelGroupName: "gpt-oss",
+          modelDisplayName: "gpt-oss-120b",
+          modelProviderModelId: "openai/gpt-oss-120b:free",
+          time: "5m",
+          mention: true,
+          sentiment: "neutral",
+          score: 70,
+          response: "Acme is for sales teams.",
+          competitorsMentioned: [],
+        },
+      ] as never,
+      competitors: [],
+      availableModels: ["gpt-oss-120b-free"],
+      stages: ["Awareness", "Consideration", "Decision"],
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.id).toBe("resp-monitoring");
+  });
 });

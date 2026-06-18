@@ -29,6 +29,8 @@ import type {
   PerceptionError,
 } from "./perception-data";
 
+const DISABLE_GATEWAY_TIMEOUT_MS = 0;
+
 type OptimizeActionStatus = "draft" | "published" | "processing" | "done" | string;
 
 type PersistedOptimizeAction = {
@@ -44,7 +46,21 @@ type PersistedOptimizeAction = {
   metadata?: Record<string, unknown> | null;
 };
 
+type AIBriefSettings = {
+  projectId: string;
+  briefModelId?: string;
+  briefProvider?: string;
+  briefProviderModelId?: string;
+};
+
+type SaveAIBriefSettingsInput = {
+  briefModelId: string;
+  briefProvider: string;
+  briefProviderModelId: string;
+};
+
 type UseOptimizationErrorsResult = {
+  aiBriefSettings: AIBriefSettings | null;
   competitors: string[];
   canGenerateAiBrief: boolean;
   data: OptimizationErrorsBoard | null;
@@ -56,7 +72,9 @@ type UseOptimizationErrorsResult = {
   modelCatalog: ProjectModelMeta[];
   error: string | null;
   persistError: string | null;
+  savingAIBriefSettings: boolean;
   savingErrorIds: ReadonlySet<string>;
+  saveAIBriefSettings: (input: SaveAIBriefSettingsInput) => Promise<void>;
   handleFix: (error: OptimizationError) => Promise<void>;
   handleMarkDone: (error: OptimizationError) => Promise<void>;
   reload: () => Promise<void>;
@@ -64,6 +82,7 @@ type UseOptimizationErrorsResult = {
 
 export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): UseOptimizationErrorsResult {
   const { locale, t } = useScopedI18n("perception");
+  const { t: tErrorHub } = useScopedI18n("error-hub");
   const projectId = readOptimizationProjectIdFromSearch(routeSearch);
   const organizationId = useMemo(
     () =>
@@ -97,6 +116,23 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   });
   const canGenerateAiBrief = billingQuery.data?.allowAiBriefs === true;
   const actionOrganizationId = organizationId?.trim() || undefined;
+  const {
+    data: aiBriefSettingsData,
+    refetch: refetchAIBriefSettings,
+  } = useQuery({
+    queryKey: appQueryKeys.aiBriefSettings(
+      apiBaseURL,
+      activeProjectId || null,
+      organizationId || null,
+    ),
+    enabled: apiBaseURL.trim() !== "" && activeProjectId.trim() !== "",
+    queryFn: () =>
+      getPerceptionClientJSON<AIBriefSettings>(
+        apiRoutes.analysis.aiBriefSettings(activeProjectId),
+        { organizationId: actionOrganizationId },
+      ),
+  });
+  const [savingAIBriefSettings, setSavingAIBriefSettings] = useState(false);
 
   useEffect(() => {
     if (!activeProjectId) return;
@@ -210,7 +246,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
               promptsCount: 0,
             },
           },
-          { organizationId: actionOrganizationId },
+          { organizationId: actionOrganizationId, timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS },
         );
 
         setPersistedActions((current) => [
@@ -242,6 +278,31 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
       }
     },
     [activeProjectId, actionOrganizationId, canGenerateAiBrief, generatedIds, locale, savingErrorIds, t],
+  );
+
+  const saveAIBriefSettings = useCallback(
+    async (input: SaveAIBriefSettingsInput) => {
+      if (!activeProjectId || savingAIBriefSettings) return;
+      setPersistError(null);
+      setSavingAIBriefSettings(true);
+      try {
+        await patchPerceptionClientJSON<AIBriefSettings>(
+          apiRoutes.analysis.aiBriefSettings(activeProjectId),
+          input,
+          { organizationId: actionOrganizationId },
+        );
+        refetchAIBriefSettings().catch(() => undefined);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : tErrorHub("aiBriefModelSaveError");
+        setPersistError(message);
+        pushErrorToast(err, message);
+        throw err;
+      } finally {
+        setSavingAIBriefSettings(false);
+      }
+    },
+    [activeProjectId, actionOrganizationId, refetchAIBriefSettings, savingAIBriefSettings, tErrorHub],
   );
 
   const handleMarkDone = useCallback(
@@ -291,6 +352,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   }, [query.refetch]);
 
   return {
+    aiBriefSettings: aiBriefSettingsData ?? null,
     competitors: query.data?.competitors ?? [],
     canGenerateAiBrief,
     data: query.data?.data ?? null,
@@ -302,7 +364,9 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     modelCatalog: query.data?.modelCatalog ?? [],
     error: query.error instanceof Error ? query.error.message : null,
     persistError,
+    savingAIBriefSettings,
     savingErrorIds,
+    saveAIBriefSettings,
     handleFix,
     handleMarkDone,
     reload,

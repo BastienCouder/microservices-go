@@ -55,6 +55,11 @@ function asNumber(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+function normalizePromptLanguage(value: unknown): "fr" | "en" {
+  const language = asString(value).trim().toLowerCase();
+  return language.startsWith("en") ? "en" : "fr";
+}
+
 function getField<T = unknown>(obj: JsonObject, keys: string[]): T | undefined {
   for (const key of keys) {
     if (key in obj) {
@@ -146,6 +151,7 @@ function buildPerceptionBase(
   modelCatalog: PerceptionModelOption[],
   projectId: string,
 ): PerceptionViewData {
+  const project = asObject(projectPayload);
   const derived = buildPerceptionDerivedData({
     projectPayload,
     competitorsPayload,
@@ -170,6 +176,9 @@ function buildPerceptionBase(
     metadata: {
       ...perceptionPayload.metadata,
       projectId,
+      primaryLanguage: normalizePromptLanguage(
+        getField(project, ["primaryLanguage", "PrimaryLanguage"]),
+      ),
       windowLabel: derived.windowLabel,
       analyzedResponses: derived.analyzedResponses,
       perceptionResponses: derived.perceptionResponseCount,

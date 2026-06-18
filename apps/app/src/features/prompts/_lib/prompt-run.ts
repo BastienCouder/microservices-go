@@ -1,8 +1,8 @@
 import { apiRoutes } from "@/lib/api-config";
-import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
+import { gatewayJSON, requireGatewayResult, unwrapGatewayPayload } from "@/shared/api/gateway";
 import type { PromptItem } from "./types";
 
-const MANUAL_PROMPT_ANALYSIS_TIMEOUT_MS = 120_000;
+const DISABLE_GATEWAY_TIMEOUT_MS = 0;
 
 export type RunnablePrompt = Pick<PromptItem, "id" | "sourcePromptId" | "prompt" | "models"> & {
   modelCreditCostSum?: number;
@@ -34,6 +34,21 @@ export type StartPromptAnalysisPayload = {
   modelCreditCostSum: number;
   runType: "manual";
 };
+
+export type StartPromptAnalysisResult = {
+  runId: string;
+};
+
+function normalizeStartPromptAnalysisResult(value: unknown): StartPromptAnalysisResult {
+  if (!value || typeof value !== "object") return { runId: "" };
+  const record = value as Record<string, unknown>;
+  const analysisRun = record.analysisRun;
+  if (analysisRun && typeof analysisRun === "object") {
+    const runId = (analysisRun as Record<string, unknown>).id;
+    return { runId: typeof runId === "string" ? runId : "" };
+  }
+  return { runId: "" };
+}
 
 function dedupeValues(values: string[]): string[] {
   const seen = new Set<string>();
@@ -93,19 +108,22 @@ export async function startPromptAnalysis({
   projectId,
   prompt,
   now,
-}: StartPromptAnalysisInput): Promise<void> {
+}: StartPromptAnalysisInput): Promise<StartPromptAnalysisResult> {
   const response = await gatewayJSON<unknown>(
     apiBaseURL,
     apiRoutes.analysis.analyze(projectId),
     {
       method: "POST",
       organizationId,
-      timeoutMs: MANUAL_PROMPT_ANALYSIS_TIMEOUT_MS,
+      timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS,
       body: JSON.stringify(buildStartPromptAnalysisPayload({ projectId, prompt, now })),
     },
   );
 
-  requireGatewayResult(response, "Impossible de lancer le prompt.");
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(response, "Impossible de lancer le prompt."),
+  );
+  return normalizeStartPromptAnalysisResult(payload);
 }
 
 export async function startPromptAnalyses({
@@ -114,14 +132,17 @@ export async function startPromptAnalyses({
   projectId,
   prompts,
   now,
-}: StartPromptAnalysesInput): Promise<void> {
+}: StartPromptAnalysesInput): Promise<StartPromptAnalysisResult[]> {
+  const results: StartPromptAnalysisResult[] = [];
   for (const prompt of prompts) {
-    await startPromptAnalysis({
+    const result = await startPromptAnalysis({
       apiBaseURL,
       organizationId,
       projectId,
       prompt,
       now,
     });
+    results.push(result);
   }
+  return results;
 }

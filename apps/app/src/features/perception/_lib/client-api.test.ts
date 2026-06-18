@@ -87,4 +87,33 @@ describe("perception client api", () => {
     expect(new Headers(calls[0]?.init?.headers).get("X-Organization-ID")).toBe("84");
     expect(new Headers(calls[1]?.init?.headers).get("X-Organization-ID")).toBe("84");
   });
+
+  test("supports a custom timeout for long perception requests", async () => {
+    installMockWindow();
+    let aborted = false;
+    globalThis.fetch = (async (_input, init) => {
+      await new Promise((resolve, reject) => {
+        const timeout = globalThis.setTimeout(resolve, 20);
+        init?.signal?.addEventListener(
+          "abort",
+          () => {
+            aborted = true;
+            globalThis.clearTimeout(timeout);
+            reject(init.signal?.reason ?? new Error("aborted"));
+          },
+          { once: true },
+        );
+      });
+      return jsonResponse(200, { data: { ok: true } });
+    }) as typeof fetch;
+
+    await expect(
+      postPerceptionClientJSON(
+        "/analysis/projects/prj_1/perception/run",
+        { force: true },
+        { timeoutMs: 1 },
+      ),
+    ).rejects.toThrow("Impossible de charger les donnees de perception.");
+    expect(aborted).toBe(true);
+  });
 });

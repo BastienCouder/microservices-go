@@ -98,6 +98,7 @@ export type PerceptionResponseRecord = {
   id: string;
   runId: string;
   runType: string;
+  promptKind?: string;
   promptRunId: string;
   modelId: string;
   modelName: string;
@@ -143,6 +144,7 @@ export type PerceptionViewData = {
     visibilityScore?: number;
     models: string[];
     projectModels?: string[];
+    primaryLanguage?: "fr" | "en";
     modelCatalog: PerceptionModelOption[];
     generatedAt: string;
     latestRunId?: string;
@@ -244,6 +246,7 @@ export function createEmptyPerceptionViewData(
       analyzedResponses: 0,
       models: [],
       projectModels: [],
+      primaryLanguage: "fr",
       modelCatalog: [],
       generatedAt,
       emptyStateLabel: normalizedEmptyStateLabel,

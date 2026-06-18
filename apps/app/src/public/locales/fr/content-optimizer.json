@@ -26,5 +26,10 @@
   "creditConsumptionTemplate": "{{actionLabel}} consommera environ {{credits}} crédits. {{quotaLabel}}",
   "discoverCreditConsumptionTemplate": "Découvrir les pages consommera environ {{credits}} crédits. {{quotaLabel}}",
   "discoveryToastTitle": "Découverte des pages en cours.",
-  "discoveryToastDescription": "Les pages détectées seront proposées à la sélection dès que la découverte est terminée."
+  "discoveryToastDescription": "Les pages détectées seront proposées à la sélection dès que la découverte est terminée.",
+  "backgroundAnalysisDescription": "La requête est en cours. Vous pouvez changer de page, le traitement continue côté serveur.",
+  "backgroundAnalysisAcceptedTitle": "Analyse lancée",
+  "backgroundAnalysisAcceptedDescription": "Le traitement continue en arrière-plan. Revenez sur cette page pour suivre les résultats.",
+  "analysisCompletedToastTitle": "Analyse terminée",
+  "analysisCompletedToastDescription": "Les résultats sont prêts."
 }

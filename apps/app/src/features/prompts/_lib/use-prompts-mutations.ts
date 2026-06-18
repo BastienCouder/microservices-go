@@ -2,14 +2,17 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import {
+  dismissToast,
   pushErrorToast,
+  pushInfoToast,
+  pushLoadingToast,
   pushSuccessToast,
   pushWarningToast,
 } from "@/components/ui/toast-actions";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON, requireGatewayResult } from "@/shared/api/gateway";
-import { createProjectPrompt, deleteProjectPrompt, generateProjectPrompts, patchPrompt, patchPromptModels, patchPromptSchedule } from "./prompt-api";
+import { cancelAnalysisRun, createProjectPrompt, deleteProjectPrompt, generateProjectPrompts, patchPrompt, patchPromptModels, patchPromptSchedule } from "./prompt-api";
 import {
   addSeedPrompts,
   applyBulkPromptStatus,
@@ -64,6 +67,7 @@ type UsePromptsMutationsParams = {
   persistedPromptIds: Set<string>;
   setManualPrompts: Dispatch<SetStateAction<PromptItem[]>>;
   setPendingPromptRuns: Dispatch<SetStateAction<PromptRunProgressEntry[]>>;
+  setCancelledAnalysisRunIds: Dispatch<SetStateAction<string[]>>;
   setPromptPage: Dispatch<SetStateAction<number>>;
   setPromptEditorState: Dispatch<SetStateAction<{ mode: "create" | "edit"; promptId?: string } | null>>;
   setEditingPromptModelsId: Dispatch<SetStateAction<string | null>>;
@@ -304,6 +308,34 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
     },
   });
 
+  const cancelAnalysisMutation = useMutation({
+    mutationFn: async (runId: string) => {
+      await cancelAnalysisRun(params.apiBaseURL, params.organizationId, runId);
+      return runId;
+    },
+    onMutate: (runId) => {
+      params.setPendingPromptRuns([]);
+      params.setRunningPromptRowIds([]);
+      params.setCancelledAnalysisRunIds((current) =>
+        current.includes(runId) ? current : [...current, runId],
+      );
+    },
+    onSuccess: async () => {
+      await params.queryClient.invalidateQueries({
+        queryKey: ["analysis-runs", params.apiBaseURL, params.organizationId, params.activeProjectId],
+      });
+      await params.queryClient.invalidateQueries({
+        predicate: (query) =>
+          isMonitoringQueryForProject(query.queryKey, params.apiBaseURL, params.activeProjectId),
+      });
+      await params.refetchPromptQuota();
+      pushInfoToast(t("cancelAnalysisSuccessTitle"), t("cancelAnalysisSuccessDescription"));
+    },
+    onError: (error) => {
+      pushErrorToast(error, t("cancelAnalysisError"));
+    },
+  });
+
   const runPromptsMutation = useMutation({
     mutationFn: async (promptsToRun: PromptItem[]) => {
       const requestedCredits = estimatePromptRunsCredits(promptsToRun);
@@ -311,7 +343,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         pushInsufficientCreditsToast(requestedCredits);
         throw new Error(t("runPromptInsufficientCreditsError"));
       }
-      await startPromptAnalyses({
+      const results = await startPromptAnalyses({
         apiBaseURL: params.apiBaseURL,
         organizationId: params.organizationId,
         projectId: params.activeProjectId,
@@ -323,7 +355,10 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
           modelCreditCostSum: estimatePromptRunCredits(prompt),
         })),
       });
-      return promptsToRun.map((prompt) => prompt.id);
+      return {
+        promptIds: promptsToRun.map((prompt) => prompt.id),
+        runIds: results.map((result) => result.runId).filter((runId) => runId !== ""),
+      };
     },
     onMutate: (promptsToRun) => {
       const nextEntries = createPromptRunProgressEntries(
@@ -342,9 +377,14 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         return [...retained, ...nextEntries];
       });
       params.setRunningPromptRowIds(nextEntries.map((prompt) => prompt.rowId));
-      return { rowIds: nextEntries.map((prompt) => prompt.rowId) };
+      const toastId = pushLoadingToast(
+        t("runPromptInProgressTitle"),
+        t("runPromptInProgressDescription", { count: promptsToRun.length }),
+      );
+      return { rowIds: nextEntries.map((prompt) => prompt.rowId), toastId };
     },
     onError: (error, promptsToRun, context) => {
+      dismissToast(context?.toastId);
       const failedRowIds = new Set(
         context?.rowIds ?? promptsToRun.map((prompt) => prompt.id),
       );
@@ -356,7 +396,22 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       );
       pushErrorToast(error, t("runPromptApiError"));
     },
-    onSuccess: async () => {
+    onSuccess: async (data, promptsToRun, context) => {
+      dismissToast(context?.toastId);
+      pushInfoToast(
+        t("runPromptAcceptedTitle"),
+        t("runPromptAcceptedDescription", { count: promptsToRun.length }),
+        data.runIds.length > 0
+          ? {
+              label: t("stopAnalysisButton"),
+              onClick: () => {
+                for (const runId of data.runIds) {
+                  cancelAnalysisMutation.mutate(runId);
+                }
+              },
+            }
+          : undefined,
+      );
       await params.queryClient.invalidateQueries({
         predicate: (query) =>
           isMonitoringQueryForProject(query.queryKey, params.apiBaseURL, params.activeProjectId),
@@ -488,6 +543,7 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
     bulkPromptStatusMutation,
     savePromptEditorMutation,
     deletePromptMutation,
+    cancelAnalysisMutation,
     updatePromptModelsMutation,
     updatePromptScheduleMutation,
     generatePromptsMutation,

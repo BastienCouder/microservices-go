@@ -39,6 +39,10 @@ func (s *handlerAnalysisClientSpy) RecordResponse(_ context.Context, _ string, _
 	return nil
 }
 
+func (s *handlerAnalysisClientSpy) IsAnalysisRunCancelled(_ context.Context, _ string, _ int64) (bool, error) {
+	return false, nil
+}
+
 type handlerIAClientSpy struct {
 	execCalls int
 	result    usecase.IAExecutePromptResult

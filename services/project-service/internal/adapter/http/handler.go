@@ -557,8 +557,10 @@ type runManualAnalysisRequest struct {
 }
 
 type runPerceptionAnalysisRequest struct {
-	RequestID string `json:"requestId"`
-	Force     bool   `json:"force"`
+	RequestID string   `json:"requestId"`
+	PromptIDs []string `json:"promptIds"`
+	ModelIDs  []string `json:"modelIds"`
+	Force     bool     `json:"force"`
 }
 
 func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -612,6 +614,8 @@ func (h *Handler) runPerceptionAnalysis(w http.ResponseWriter, r *http.Request, 
 
 	result, err := h.svc.RunPerceptionAnalysis(r.Context(), projectID, organizationID, createdBy, usecase.RunPerceptionAnalysisInput{
 		RequestID: req.RequestID,
+		PromptIDs: req.PromptIDs,
+		ModelIDs:  req.ModelIDs,
 		Force:     req.Force,
 	})
 	if err != nil {

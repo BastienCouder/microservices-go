@@ -9,14 +9,107 @@ import i18n from "@/shared/i18n";
 import { normalizePromptPage, normalizeProjectPromptRecord, PROMPTS_CATALOG_PAGE_SIZE } from "./prompt-normalizers";
 import type {
   PromptItem,
+  PromptKind,
   PromptLanguage,
   PromptPageResult,
   PromptSchedule,
   ProjectPromptRecord,
 } from "./types";
 
+export type AnalysisRunRecord = {
+  id: string;
+  projectId: string;
+  runType: string;
+  status: string;
+  promptsCount: number;
+  modelsCount: number;
+  creditsCount: number;
+  expectedResponses: number;
+  completedResponses: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function currentLocale(): string {
   return i18n.resolvedLanguage || i18n.language || "fr";
+}
+
+function normalizeAnalysisRunRecord(value: unknown): AnalysisRunRecord | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const id = typeof record.id === "string" ? record.id.trim() : "";
+  if (!id) return null;
+  return {
+    id,
+    projectId: typeof record.projectId === "string" ? record.projectId : "",
+    runType: typeof record.runType === "string" ? record.runType : "",
+    status: typeof record.status === "string" ? record.status : "",
+    promptsCount: typeof record.promptsCount === "number" ? record.promptsCount : 0,
+    modelsCount: typeof record.modelsCount === "number" ? record.modelsCount : 0,
+    creditsCount: typeof record.creditsCount === "number" ? record.creditsCount : 0,
+    expectedResponses: typeof record.expectedResponses === "number" ? record.expectedResponses : 0,
+    completedResponses: typeof record.completedResponses === "number" ? record.completedResponses : 0,
+    createdAt: typeof record.createdAt === "string" ? record.createdAt : "",
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+  };
+}
+
+export async function loadAnalysisRuns(
+  apiBaseURL: string,
+  organizationId: string,
+  projectId: string,
+  limit = 10,
+  signal?: AbortSignal,
+): Promise<AnalysisRunRecord[]> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.analysis.runs(projectId, limit),
+    {
+      method: "GET",
+      organizationId,
+      signal,
+    },
+  );
+
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(
+      response,
+      translateI18nText("prompts-workspace", "loadRunsError", currentLocale()),
+    ),
+  );
+  if (!Array.isArray(payload)) return [];
+  return payload
+    .map(normalizeAnalysisRunRecord)
+    .filter((run): run is AnalysisRunRecord => run !== null);
+}
+
+export async function cancelAnalysisRun(
+  apiBaseURL: string,
+  organizationId: string,
+  runId: string,
+): Promise<AnalysisRunRecord> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.analysis.cancelRun(runId),
+    {
+      method: "POST",
+      organizationId,
+    },
+  );
+
+  const payload = unwrapGatewayPayload(
+    requireGatewayResult(
+      response,
+      translateI18nText("prompts-workspace", "cancelAnalysisError", currentLocale()),
+    ),
+  );
+  const run = normalizeAnalysisRunRecord(payload);
+  if (!run) {
+    throw new Error(
+      translateI18nText("prompts-workspace", "cancelAnalysisError", currentLocale()),
+    );
+  }
+  return run;
 }
 
 export async function loadPromptPage(
@@ -126,11 +219,12 @@ export async function createProjectPrompt(
   projectId: string,
   text: string,
   language: PromptLanguage,
+  kind: PromptKind = "monitoring",
 ): Promise<ProjectPromptRecord> {
   const response = await gatewayJSON<unknown>(apiBaseURL, apiRoutes.projects.prompts(projectId), {
     method: "POST",
     organizationId,
-    body: JSON.stringify({ prompts: [{ text, language }] }),
+    body: JSON.stringify({ prompts: [{ text, language }], kind }),
   });
 
   const payload = unwrapGatewayPayload(
@@ -198,6 +292,7 @@ export async function patchPrompt(
   input: {
     text?: string;
     language?: PromptLanguage;
+    kind?: PromptKind;
     modelIds?: string[];
     schedule?: PromptSchedule;
     status?: PromptItem["status"];

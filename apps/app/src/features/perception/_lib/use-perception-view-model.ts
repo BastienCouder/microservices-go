@@ -2,7 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { pushWarningToast } from "@/components/ui/toast-actions";
+import {
+  dismissToast,
+  pushInfoToast,
+  pushLoadingToast,
+  pushWarningToast,
+} from "@/components/ui/toast-actions";
 import { getAIProviderIconPath } from "@/lib/ai-provider-assets";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
@@ -41,6 +46,8 @@ import {
   resolvePerceptionGeneratedContent,
   resolvePerceptionLocalizedText,
 } from "./perception-i18n";
+
+const DISABLE_GATEWAY_TIMEOUT_MS = 0;
 
 type OptimizeDraft = {
   id: string;
@@ -181,9 +188,7 @@ export function usePerceptionViewModel(
   );
   const [selectedSourceFilter, setSelectedSourceFilter] =
     useState<PerceptionSourceFilter>(
-      () =>
-        persistedFilters.selectedSourceFilter ??
-        getDefaultSourceFilter(initialData),
+      () => getDefaultSourceFilter(initialData),
     );
   const [selectedPeriod, setSelectedPeriod] =
     useState<PerceptionTrendPeriodKey>(
@@ -529,6 +534,7 @@ export function usePerceptionViewModel(
             promptsCount: 0,
           },
         },
+        { timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS },
       );
 
       setOptimizeDrafts((current) =>
@@ -570,7 +576,7 @@ export function usePerceptionViewModel(
         0,
       ),
     );
-    return 10 + 5 * modelCreditCostSum;
+    return 3 * modelCreditCostSum;
   }, [modelCatalog]);
   const quotaQuery = useQuery({
     queryKey: appQueryKeys.promptQuota(
@@ -595,14 +601,23 @@ export function usePerceptionViewModel(
     quotaQuery.data.monthlyCredits > 0 &&
     quotaQuery.data.remainingCredits < estimatedPerceptionCredits;
 
-  const handleRunPerceptionAnalysis = async () => {
+  const handleRunPerceptionAnalysis = async (input?: {
+    promptIds?: string[];
+    modelIds?: string[];
+    estimatedCredits?: number;
+  }) => {
     const projectId = initialData.metadata.projectId;
     if (!projectId || analysisRunning) return;
-    if (perceptionQuotaExceeded) {
+    const requestedCredits = input?.estimatedCredits ?? estimatedPerceptionCredits;
+    const hasQuotaExceeded =
+      quotaQuery.data?.hasQuota === true &&
+      quotaQuery.data.monthlyCredits > 0 &&
+      quotaQuery.data.remainingCredits < requestedCredits;
+    if (hasQuotaExceeded) {
       pushWarningToast(
         t("analysisInsufficientCreditsTitle"),
         t("analysisInsufficientCreditsDescription", {
-          credits: estimatedPerceptionCredits,
+          credits: requestedCredits,
           remaining: quotaQuery.data?.remainingCredits ?? 0,
           total: quotaQuery.data?.monthlyCredits ?? 0,
         }),
@@ -613,22 +628,36 @@ export function usePerceptionViewModel(
     setAnalysisError(null);
     setLastAnalysisCredits(null);
     setAnalysisRunning(true);
+    const toastId = pushLoadingToast(
+      t("analysisInProgressToastTitle"),
+      t("analysisInProgressToastDescription"),
+    );
     try {
       const result = await postPerceptionClientJSON<{
         RequestedCredits?: number;
         requestedCredits?: number;
       }>(apiRoutes.analysis.perceptionRun(projectId), {
         force: true,
+        promptIds: input?.promptIds ?? [],
+        modelIds: input?.modelIds ?? [],
         requestId: `${projectId}-perception-manual-${Date.now()}`,
+      }, {
+        timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS,
       });
       const credits =
         typeof result.requestedCredits === "number"
           ? result.requestedCredits
           : typeof result.RequestedCredits === "number"
             ? result.RequestedCredits
-            : estimatedPerceptionCredits;
+            : requestedCredits;
       setLastAnalysisCredits(credits);
+      dismissToast(toastId);
+      pushInfoToast(
+        t("analysisAcceptedToastTitle"),
+        t("analysisAcceptedToastDescription"),
+      );
     } catch (err) {
+      dismissToast(toastId);
       setAnalysisError(
         err instanceof Error ? err.message : t("analysisLaunchError"),
       );

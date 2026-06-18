@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { pushInfoToast } from "@/components/ui/toast-actions";
 import { useContentOptimizerViewModel } from "../../_lib/crawl/use-content-optimizer-view-model";
 import { CrawlerPageHeader } from "./_components/crawler-page-header";
 import { CrawlerResultsView } from "./_components/crawler-results-view";
@@ -32,7 +31,6 @@ export function CrawlPanel({
   const viewModel = useContentOptimizerViewModel({ apiBaseURL, routeSearch });
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const { t } = useScopedI18n("content-optimizer");
-  const { t: crawlerT } = useScopedI18n("crawler-panel");
   const copy =
     variant === "contentOptimizer"
       ? {
@@ -210,19 +208,6 @@ export function CrawlPanel({
     viewModel.discover();
   }
 
-  useEffect(() => {
-    if (viewModel.discovering) {
-      pushInfoToast(
-        variant === "contentOptimizer"
-          ? t("discoveryToastTitle")
-          : crawlerT("discoveryToastTitle"),
-        variant === "contentOptimizer"
-          ? t("discoveryToastDescription")
-          : crawlerT("discoveryToastDescription"),
-      );
-    }
-  }, [crawlerT, t, variant, viewModel.discovering]);
-
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-3 p-2 md:p-4">
       {showProjectTransition ? <CrawlPanelTemplate /> : null}
@@ -275,7 +260,7 @@ export function CrawlPanel({
             ) : (
               <CrawlerResultsView
                 errorLabel={viewModel.error}
-                loadingLatest={viewModel.loadingLatest}
+                loadingLatest={viewModel.loadingLatest || viewModel.crawling}
                 query={query}
                 statusFilter={statusFilter}
                 severityFilter={severityFilter}

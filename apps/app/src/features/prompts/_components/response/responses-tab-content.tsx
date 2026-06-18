@@ -8,6 +8,16 @@ type ResponsesTabContentProps = {
   showHistorical: boolean;
   setShowHistorical: (value: boolean) => void;
   loading?: boolean;
+  pendingResponse?: boolean;
+  activeAnalysisRunId?: string | null;
+  onStopAnalysis?: () => void;
+  stoppingAnalysis?: boolean;
+  analysisIssue?: {
+    tone: "warning" | "error";
+    titleKey: string;
+    descriptionKey: string;
+    values?: Record<string, unknown>;
+  } | null;
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;
   filteredResponses: PromptRunRow[];

@@ -18,6 +18,7 @@ var (
 type PromptText struct {
 	ID   string `json:"id"`
 	Text string `json:"text"`
+	Kind string `json:"kind,omitempty"`
 }
 
 type AnalysisRun struct {
@@ -42,6 +43,7 @@ type PromptRun struct {
 	RunID      string    `json:"runId"`
 	PromptID   string    `json:"promptId"`
 	PromptText string    `json:"promptText"`
+	Kind       string    `json:"kind,omitempty"`
 	CreatedAt  time.Time `json:"createdAt"`
 }
 
@@ -49,6 +51,7 @@ type AIResponse struct {
 	ID             string    `json:"id"`
 	RunID          string    `json:"runId"`
 	RunType        string    `json:"runType,omitempty"`
+	PromptKind     string    `json:"promptKind,omitempty"`
 	PromptRunID    string    `json:"promptRunId"`
 	ModelID        string    `json:"modelId"`
 	RawResponse    string    `json:"rawResponse"`
@@ -206,6 +209,21 @@ type OptimizeAction struct {
 	UpdatedAt        time.Time      `json:"updatedAt"`
 }
 
+type ProjectAIBriefSettings struct {
+	ProjectID            string    `json:"projectId"`
+	BriefModelID         string    `json:"briefModelId,omitempty"`
+	BriefProvider        string    `json:"briefProvider,omitempty"`
+	BriefProviderModelID string    `json:"briefProviderModelId,omitempty"`
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+}
+
+type UpdateProjectAIBriefSettingsInput struct {
+	BriefModelID         *string
+	BriefProvider        *string
+	BriefProviderModelID *string
+}
+
 type CreateOptimizeActionInput struct {
 	CreatedBy        int64
 	Priority         string
@@ -302,6 +320,8 @@ type ContentIssueAnalyzer interface {
 type OptimizeActionBriefInput struct {
 	ProjectID        string
 	OrganizationID   int64
+	ModelID          string
+	ProviderID       string
 	Priority         string
 	Type             string
 	Title            string
@@ -357,6 +377,7 @@ type persistedState struct {
 	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 	OptimizeActions     map[string]*OptimizeAction                `json:"optimizeActions"`
 	ActionsByProject    map[string][]string                       `json:"actionsByProject"`
+	AIBriefSettings     map[string]*ProjectAIBriefSettings        `json:"aiBriefSettings"`
 }
 
 type Service struct {
@@ -375,6 +396,7 @@ type Service struct {
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
 	optimizeActions     map[string]*OptimizeAction
 	actionsByProject    map[string][]string
+	aiBriefSettings     map[string]*ProjectAIBriefSettings
 
 	store                          StateStore
 	dashboardCache                 DashboardCache

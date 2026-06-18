@@ -351,7 +351,8 @@ describe("loadPerceptionData", () => {
             {
               id: "perception-response-1",
               runId: "perception-run",
-              runType: "perception",
+              runType: "manual",
+              promptKind: "perception",
               promptRunId: "prompt-run-2",
               modelId: "gpt-4o-mini",
               rawResponse: "Acme est un CRM pertinent pour les PME.",

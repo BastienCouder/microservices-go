@@ -280,6 +280,7 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 		promptTexts = append(promptTexts, AnalysisPromptText{
 			ID:       promptID,
 			Text:     text,
+			Kind:     normalizePromptKind(prompt.Kind),
 			Language: prompt.Language,
 			ModelIDs: append([]string(nil), promptModelIDs...),
 		})
@@ -394,6 +395,20 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 	}
 
 	for _, promptRun := range startResp.PromptRuns {
+		cancelled, err := s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
+		if err != nil {
+			return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+		}
+		if cancelled {
+			log.Printf(
+				"prompt_analysis.cancelled run_id=%s project_id=%s before_prompt_id=%s",
+				startResp.RunID,
+				project.ID,
+				promptRun.PromptID,
+			)
+			return startResp, nil
+		}
+
 		promptModelIDs := effectiveModelIDs
 		for _, prompt := range prompts {
 			if prompt.ID == promptRun.PromptID {
@@ -405,6 +420,21 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		}
 
 		for _, modelID := range promptModelIDs {
+			cancelled, err := s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
+			if err != nil {
+				return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+			}
+			if cancelled {
+				log.Printf(
+					"prompt_analysis.cancelled run_id=%s project_id=%s prompt_id=%s before_model_id=%s",
+					startResp.RunID,
+					project.ID,
+					promptRun.PromptID,
+					modelID,
+				)
+				return startResp, nil
+			}
+
 			credential, err := s.resolveProviderCredentialForModel(ctx, project.ID, project.OrganizationID, modelID)
 			if err != nil {
 				log.Printf(
@@ -459,6 +489,20 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					err,
 				)
 				return AnalysisStartResponse{}, fmt.Errorf("%w: execute ia prompt %s on %s: %v", ErrDependencyUnavailable, promptRun.PromptID, modelID, err)
+			}
+			cancelled, err = s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
+			if err != nil {
+				return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+			}
+			if cancelled {
+				log.Printf(
+					"prompt_analysis.cancelled run_id=%s project_id=%s prompt_id=%s model_id=%s before_record_response=true",
+					startResp.RunID,
+					project.ID,
+					promptRun.PromptID,
+					modelID,
+				)
+				return startResp, nil
 			}
 			err = s.analysisClient.RecordResponse(ctx, startResp.RunID, AnalysisRecordResponseInput{
 				PromptRunID:    promptRun.ID,
@@ -556,18 +600,7 @@ func requestedCreditsForPrompts(prompts []AnalysisPromptText, fallbackModelIDs [
 }
 
 func requestedCreditsForRun(runType string, prompts []AnalysisPromptText, fallbackModelIDs []string, costs map[string]int) int {
-	if strings.TrimSpace(runType) == PromptKindPerception {
-		return requestedCreditsForPerception(fallbackModelIDs, costs)
-	}
 	return requestedCreditsForPrompts(prompts, fallbackModelIDs, costs)
-}
-
-func requestedCreditsForPerception(modelIDs []string, costs map[string]int) int {
-	const (
-		basePerceptionCredits     = 10
-		perceptionCreditsPerModel = 5
-	)
-	return basePerceptionCredits + perceptionCreditsPerModel*modelCreditCostSum(modelIDs, costs)
 }
 
 func modelCreditCost(modelID string, costs map[string]int) int {

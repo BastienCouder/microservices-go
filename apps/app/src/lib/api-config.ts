@@ -107,6 +107,9 @@ export const apiRoutes = {
   },
   analysis: {
     analyze: (projectId: string) => `/analysis/projects/${projectId}/run`,
+    cancelRun: (runId: string) => `/analysis/runs/${encodeURIComponent(runId)}/cancel`,
+    runs: (projectId: string, limit = 10) =>
+      `/analysis/projects/${projectId}/runs?limit=${encodeURIComponent(String(limit))}`,
     perceptionRun: (projectId: string) => `/projects/${encodeURIComponent(projectId)}/analysis/perception/run`,
     quota: (projectId: string) => `/analysis/projects/${projectId}/quota`,
     monitoring: (projectId: string) => `/analysis/projects/${projectId}/dashboard`,
@@ -115,6 +118,7 @@ export const apiRoutes = {
         ? `/analysis/projects/${projectId}/perception?includeDashboard=1`
         : `/analysis/projects/${projectId}/perception`,
     optimizationErrors: (projectId: string) => `/analysis/projects/${projectId}/optimization-errors`,
+    aiBriefSettings: (projectId: string) => `/analysis/projects/${projectId}/ai-brief-settings`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
     optimizeAction: (projectId: string, actionId: string) =>
       `/analysis/projects/${projectId}/optimize-actions/${encodeURIComponent(actionId)}`,

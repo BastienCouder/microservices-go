@@ -91,7 +91,7 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 func filterNonPerceptionResponses(responses []AIResponse) []AIResponse {
 	out := make([]AIResponse, 0, len(responses))
 	for _, response := range responses {
-		if strings.TrimSpace(response.RunType) == "perception" {
+		if normalizeResponsePromptKind(response) == promptKindPerception {
 			continue
 		}
 		out = append(out, response)

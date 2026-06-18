@@ -2,6 +2,7 @@ export { BrandCanonSummary } from "./brand-canon-summary";
 export { PerceptionDonutVisual } from "./perception-donut-visual";
 export { BrandCanonLoadingState, PerceptionLoadingState } from "./perception-loading-state";
 export { PerceptionLeftPanel } from "./perception-left-panel";
+export { PerceptionAnalysisStepperDialog } from "./perception-analysis-stepper-dialog";
 export { PerceptionModelAxisHeatmap } from "./perception-model-axis-heatmap";
 export { PerceptionOptimizeActions } from "./perception-optimize-actions";
 export { PerceptionScoreMiniCard } from "./perception-score-mini-card";

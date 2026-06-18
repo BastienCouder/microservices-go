@@ -1,6 +1,8 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  cadenceBuilderToCron,
+  cronToCadenceBuilder,
   getInitialModelOverrideCron,
   getModelOverrideCron,
   normalizeEditorSchedule,
@@ -44,5 +46,38 @@ describe("normalizeEditorSchedule", () => {
     ).toEqual({
       "deepseek-deepseek-chat": "0 9 * * *",
     });
+  });
+});
+
+describe("cronToCadenceBuilder", () => {
+  test("parses a multi-day cron into builder fields", () => {
+    expect(cronToCadenceBuilder("0 9 * * 1,4")).toEqual({
+      kind: "selected_days",
+      time: "09:00",
+      selectedDays: ["1", "4"],
+      customCron: "0 9 * * 1,4",
+    });
+  });
+
+  test("falls back to custom for unsupported cron expressions", () => {
+    expect(cronToCadenceBuilder("15 */3 * * *")).toEqual({
+      kind: "custom",
+      time: "09:00",
+      selectedDays: ["1", "4"],
+      customCron: "15 */3 * * *",
+    });
+  });
+});
+
+describe("cadenceBuilderToCron", () => {
+  test("builds a selected-days cron from builder fields", () => {
+    expect(
+      cadenceBuilderToCron({
+        kind: "selected_days",
+        time: "14:30",
+        selectedDays: ["4", "1"],
+        customCron: "",
+      }),
+    ).toBe("30 14 * * 1,4");
   });
 });

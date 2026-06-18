@@ -18,6 +18,7 @@ function isErrorHubError(error: OptimizationError) {
 export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
   const {
+    aiBriefSettings,
     competitors,
     canGenerateAiBrief,
     data,
@@ -31,6 +32,8 @@ export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
     markingDoneErrorIds,
     modelCatalog,
     persistError,
+    saveAIBriefSettings,
+    savingAIBriefSettings,
     savingErrorIds,
   } = useOptimizationErrors(apiBaseURL, routeSearch);
 
@@ -40,6 +43,7 @@ export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
       errors={(data?.errors ?? []).filter(isErrorHubError)}
       canGenerateAiBrief={canGenerateAiBrief}
       actionStatusesByErrorId={actionStatusesByErrorId}
+      aiBriefSettings={aiBriefSettings}
       generatedContentByErrorId={generatedContentByErrorId}
       generatedIds={generatedIds}
       initialSourceFilter={readSourceFilterFromSearch(routeSearch)}
@@ -48,7 +52,9 @@ export function ErrorHubPage({ apiBaseURL, routeSearch }: ErrorHubPageProps) {
       modelCatalog={modelCatalog}
       onCreateAction={permissions.canEdit ? handleFix : undefined}
       onMarkDone={permissions.canEdit ? handleMarkDone : undefined}
+      onSaveAIBriefSettings={permissions.canEdit ? saveAIBriefSettings : undefined}
       persistError={persistError || error}
+      savingAIBriefSettings={savingAIBriefSettings}
       savingErrorIds={savingErrorIds}
     />
   );

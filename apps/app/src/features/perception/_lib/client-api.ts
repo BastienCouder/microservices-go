@@ -15,6 +15,7 @@ function readData<T>(result: GatewayResult<unknown>): T {
 
 type PerceptionClientOptions = {
   organizationId?: string;
+  timeoutMs?: number;
 };
 
 function readOrganizationId(override?: string): string | undefined {
@@ -29,6 +30,7 @@ export async function getPerceptionClientJSON<T>(
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "GET",
     organizationId: readOrganizationId(options?.organizationId),
+    timeoutMs: options?.timeoutMs,
   });
 
   return readData<T>(result);
@@ -43,6 +45,7 @@ export async function postPerceptionClientJSON<T>(
     method: "POST",
     body: JSON.stringify(body),
     organizationId: readOrganizationId(options?.organizationId),
+    timeoutMs: options?.timeoutMs,
   });
 
   return readData<T>(result);
@@ -57,6 +60,7 @@ export async function patchPerceptionClientJSON<T>(
     method: "PATCH",
     body: JSON.stringify(body),
     organizationId: readOrganizationId(options?.organizationId),
+    timeoutMs: options?.timeoutMs,
   });
 
   return readData<T>(result);
@@ -69,6 +73,7 @@ export async function deletePerceptionClientJSON<T>(
   const result = await gatewayJSON<unknown>(API_CONFIG.BASE_URL, path, {
     method: "DELETE",
     organizationId: readOrganizationId(options?.organizationId),
+    timeoutMs: options?.timeoutMs,
   });
 
   return readData<T>(result);

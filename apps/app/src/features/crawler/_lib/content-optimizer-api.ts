@@ -369,6 +369,7 @@ export async function analyzeSelectedContentOptimizerRecords(
       method: "POST",
       organizationId: input.organizationId,
       signal,
+      timeoutMs: 0,
       body,
     },
   );
@@ -383,6 +384,7 @@ export async function analyzeSelectedContentOptimizerRecords(
           method: "POST",
           organizationId: input.organizationId,
           signal,
+          timeoutMs: 0,
           body,
         },
       );

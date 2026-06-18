@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	AnalysisService_StartAnalysis_FullMethodName  = "/analysis.v1.AnalysisService/StartAnalysis"
+	AnalysisService_GetAnalysisRun_FullMethodName = "/analysis.v1.AnalysisService/GetAnalysisRun"
 	AnalysisService_RecordResponse_FullMethodName = "/analysis.v1.AnalysisService/RecordResponse"
 )
 
@@ -28,6 +29,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AnalysisServiceClient interface {
 	StartAnalysis(ctx context.Context, in *StartAnalysisRequest, opts ...grpc.CallOption) (*StartAnalysisResponse, error)
+	GetAnalysisRun(ctx context.Context, in *GetAnalysisRunRequest, opts ...grpc.CallOption) (*GetAnalysisRunResponse, error)
 	RecordResponse(ctx context.Context, in *RecordResponseRequest, opts ...grpc.CallOption) (*RecordResponseResponse, error)
 }
 
@@ -49,6 +51,16 @@ func (c *analysisServiceClient) StartAnalysis(ctx context.Context, in *StartAnal
 	return out, nil
 }
 
+func (c *analysisServiceClient) GetAnalysisRun(ctx context.Context, in *GetAnalysisRunRequest, opts ...grpc.CallOption) (*GetAnalysisRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAnalysisRunResponse)
+	err := c.cc.Invoke(ctx, AnalysisService_GetAnalysisRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *analysisServiceClient) RecordResponse(ctx context.Context, in *RecordResponseRequest, opts ...grpc.CallOption) (*RecordResponseResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecordResponseResponse)
@@ -64,6 +76,7 @@ func (c *analysisServiceClient) RecordResponse(ctx context.Context, in *RecordRe
 // for forward compatibility.
 type AnalysisServiceServer interface {
 	StartAnalysis(context.Context, *StartAnalysisRequest) (*StartAnalysisResponse, error)
+	GetAnalysisRun(context.Context, *GetAnalysisRunRequest) (*GetAnalysisRunResponse, error)
 	RecordResponse(context.Context, *RecordResponseRequest) (*RecordResponseResponse, error)
 	mustEmbedUnimplementedAnalysisServiceServer()
 }
@@ -77,6 +90,9 @@ type UnimplementedAnalysisServiceServer struct{}
 
 func (UnimplementedAnalysisServiceServer) StartAnalysis(context.Context, *StartAnalysisRequest) (*StartAnalysisResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method StartAnalysis not implemented")
+}
+func (UnimplementedAnalysisServiceServer) GetAnalysisRun(context.Context, *GetAnalysisRunRequest) (*GetAnalysisRunResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetAnalysisRun not implemented")
 }
 func (UnimplementedAnalysisServiceServer) RecordResponse(context.Context, *RecordResponseRequest) (*RecordResponseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RecordResponse not implemented")
@@ -120,6 +136,24 @@ func _AnalysisService_StartAnalysis_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AnalysisService_GetAnalysisRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAnalysisRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnalysisServiceServer).GetAnalysisRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalysisService_GetAnalysisRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalysisServiceServer).GetAnalysisRun(ctx, req.(*GetAnalysisRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _AnalysisService_RecordResponse_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RecordResponseRequest)
 	if err := dec(in); err != nil {
@@ -148,6 +182,10 @@ var AnalysisService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartAnalysis",
 			Handler:    _AnalysisService_StartAnalysis_Handler,
+		},
+		{
+			MethodName: "GetAnalysisRun",
+			Handler:    _AnalysisService_GetAnalysisRun_Handler,
 		},
 		{
 			MethodName: "RecordResponse",

@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test";
 const source = await Bun.file(new URL("./client.tsx", import.meta.url)).text();
 
 describe("perception client layout", () => {
-  test("hides the generated actions section and keeps fix buttons wired", () => {
+  test("hides the generated briefs section and keeps fix buttons wired", () => {
     expect(source.includes("PerceptionOptimizeActions")).toBe(false);
     expect(source.includes("drafts={viewModel.visibleOptimizeDrafts}")).toBe(false);
     expect(source.includes("persistError={viewModel.persistError}")).toBe(false);

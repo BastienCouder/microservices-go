@@ -542,8 +542,8 @@ export async function loadMonitoringData(
   const responses = asArray(getField(monitoringPayload, ["aiResponses", "responses", "Responses"]))
     .map(asObject)
     .filter((response) => {
-      const runType = asString(getField(response, ["runType", "RunType"])).trim().toLowerCase();
-      if (runType === "perception") {
+      const promptKind = asString(getField(response, ["promptKind", "PromptKind"])).trim().toLowerCase();
+      if (promptKind === "perception") {
         return false;
       }
       if (options?.includeHistoricalModels) {

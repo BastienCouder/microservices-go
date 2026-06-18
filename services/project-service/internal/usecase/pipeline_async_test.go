@@ -8,10 +8,12 @@ import (
 )
 
 type analysisClientSpy struct {
-	startCalls    int
-	recordCalls   int
-	lastStartReq  AnalysisStartRequest
-	recordedCalls []AnalysisRecordResponseInput
+	startCalls           int
+	recordCalls          int
+	cancelCheckCalls     int
+	cancelledAfterChecks int
+	lastStartReq         AnalysisStartRequest
+	recordedCalls        []AnalysisRecordResponseInput
 }
 
 func (s *analysisClientSpy) StartAnalysis(_ context.Context, req AnalysisStartRequest) (AnalysisStartResponse, error) {
@@ -35,6 +37,11 @@ func (s *analysisClientSpy) RecordResponse(_ context.Context, _ string, input An
 	s.recordCalls++
 	s.recordedCalls = append(s.recordedCalls, input)
 	return nil
+}
+
+func (s *analysisClientSpy) IsAnalysisRunCancelled(_ context.Context, _ string, _ int64) (bool, error) {
+	s.cancelCheckCalls++
+	return s.cancelledAfterChecks > 0 && s.cancelCheckCalls >= s.cancelledAfterChecks, nil
 }
 
 type iaClientSpy struct {
@@ -142,8 +149,13 @@ func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) 
 	if result.RunID != "run-1" {
 		t.Fatalf("expected run id run-1, got %q", result.RunID)
 	}
-	if analysisSpy.lastStartReq.RunType != PromptKindPerception {
-		t.Fatalf("expected perception run type, got %q", analysisSpy.lastStartReq.RunType)
+	if analysisSpy.lastStartReq.RunType != "manual" {
+		t.Fatalf("expected manual run type for perception launch, got %q", analysisSpy.lastStartReq.RunType)
+	}
+	for _, prompt := range analysisSpy.lastStartReq.PromptTexts {
+		if prompt.Kind != PromptKindPerception {
+			t.Fatalf("expected perception prompt kind, got %q", prompt.Kind)
+		}
 	}
 	if len(analysisSpy.lastStartReq.PromptTexts) != 3 {
 		t.Fatalf("expected 3 perception prompts, got %d", len(analysisSpy.lastStartReq.PromptTexts))
@@ -154,7 +166,7 @@ func TestRunPerceptionAnalysisUsesThreePromptsAndAllProjectModels(t *testing.T) 
 	if analysisSpy.lastStartReq.ModelCreditCostSum <= 0 {
 		t.Fatalf("expected model credit cost sum to be populated")
 	}
-	expectedCredits := 10 + 5*analysisSpy.lastStartReq.ModelCreditCostSum
+	expectedCredits := len(analysisSpy.lastStartReq.PromptTexts) * analysisSpy.lastStartReq.ModelCreditCostSum
 	if analysisSpy.lastStartReq.RequestedCredits != expectedCredits {
 		t.Fatalf("expected perception requested credits %d, got %d", expectedCredits, analysisSpy.lastStartReq.RequestedCredits)
 	}
@@ -211,9 +223,67 @@ func TestRunPerceptionAnalysisMultipliesCreditsByModelCost(t *testing.T) {
 	if analysisSpy.lastStartReq.ModelCreditCostSum < len(analysisSpy.lastStartReq.ModelIDs)+1 {
 		t.Fatalf("expected premium model to increase credit cost sum, got sum=%d models=%d", analysisSpy.lastStartReq.ModelCreditCostSum, len(analysisSpy.lastStartReq.ModelIDs))
 	}
-	expectedCredits := 10 + 5*analysisSpy.lastStartReq.ModelCreditCostSum
+	expectedCredits := len(analysisSpy.lastStartReq.PromptTexts) * analysisSpy.lastStartReq.ModelCreditCostSum
 	if analysisSpy.lastStartReq.RequestedCredits != expectedCredits {
 		t.Fatalf("expected premium perception credits %d, got %d", expectedCredits, analysisSpy.lastStartReq.RequestedCredits)
+	}
+}
+
+func TestRunPerceptionAnalysisUsesSelectedPromptsAndModels(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+
+	prompts, err := svc.AddPromptInputsWithKind(ctx, project.ID, 42, []CreatePromptInput{
+		{Text: "How is Acme positioned?", Language: "en"},
+		{Text: "Who is Acme for?", Language: "en"},
+	}, PromptKindPerception)
+	if err != nil {
+		t.Fatalf("add perception prompts: %v", err)
+	}
+
+	selectedModelIDs := []string{"gpt-oss-120b-free"}
+	if _, err := svc.RunPerceptionAnalysis(ctx, project.ID, 42, 7, RunPerceptionAnalysisInput{
+		RequestID: "selected-perception",
+		PromptIDs: []string{prompts[1].ID},
+		ModelIDs:  selectedModelIDs,
+	}); err != nil {
+		t.Fatalf("run selected perception: %v", err)
+	}
+
+	if len(analysisSpy.lastStartReq.PromptTexts) != 1 {
+		t.Fatalf("expected one selected prompt, got %d", len(analysisSpy.lastStartReq.PromptTexts))
+	}
+	if analysisSpy.lastStartReq.PromptTexts[0].ID != prompts[1].ID {
+		t.Fatalf("expected selected prompt %s, got %s", prompts[1].ID, analysisSpy.lastStartReq.PromptTexts[0].ID)
+	}
+	if len(analysisSpy.lastStartReq.ModelIDs) != 1 || analysisSpy.lastStartReq.ModelIDs[0] != selectedModelIDs[0] {
+		t.Fatalf("expected selected model ids %#v, got %#v", selectedModelIDs, analysisSpy.lastStartReq.ModelIDs)
+	}
+	if iaSpy.execCalls != 1 {
+		t.Fatalf("expected one IA call, got %d", iaSpy.execCalls)
+	}
+	if analysisSpy.lastStartReq.RequestedCredits != analysisSpy.lastStartReq.ModelCreditCostSum {
+		t.Fatalf("expected requested credits to match selected model cost, got credits=%d sum=%d", analysisSpy.lastStartReq.RequestedCredits, analysisSpy.lastStartReq.ModelCreditCostSum)
 	}
 }
 
@@ -759,6 +829,58 @@ func TestRunManualAnalysisExecutesPromptAndRecordsResponse(t *testing.T) {
 	}
 	if got.ModelID != "openai/gpt-oss-20b:free" {
 		t.Fatalf("expected provider model id, got %q", got.ModelID)
+	}
+}
+
+func TestRunManualAnalysisStopsBeforeExecutingWhenRunIsCancelled(t *testing.T) {
+	ctx := context.Background()
+	analysisSpy := &analysisClientSpy{cancelledAfterChecks: 1}
+	iaSpy := &iaClientSpy{}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		AnalysisClient: analysisSpy,
+		IAClient:       iaSpy,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	project, err := svc.CreateProject(ctx, CreateProjectInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		Name:           "Acme",
+		Domain:         "acme.com",
+		WebsiteURL:     "https://acme.com",
+	})
+	if err != nil {
+		t.Fatalf("create project: %v", err)
+	}
+	prompts, err := svc.AddPrompts(ctx, project.ID, 42, []string{"Quel CRM recommander ?"})
+	if err != nil {
+		t.Fatalf("add prompts: %v", err)
+	}
+	if _, err := svc.SaveLLMProviderCredential(ctx, project.ID, 42, "openrouter", "sk-openrouter"); err != nil {
+		t.Fatalf("save provider credential: %v", err)
+	}
+
+	result, err := svc.RunManualAnalysis(ctx, project.ID, 42, 7, RunManualAnalysisInput{
+		RequestID: "manual-cancelled-request",
+		PromptTexts: []AnalysisPromptText{
+			{ID: prompts[0].ID, Text: prompts[0].Text},
+		},
+		ModelIDs: []string{"gpt-oss-20b-free"},
+	})
+	if err != nil {
+		t.Fatalf("run manual analysis: %v", err)
+	}
+	if result.RunID != "run-1" {
+		t.Fatalf("expected run id run-1, got %q", result.RunID)
+	}
+	if iaSpy.execCalls != 0 {
+		t.Fatalf("expected no ia execution after cancellation, got %d", iaSpy.execCalls)
+	}
+	if analysisSpy.recordCalls != 0 {
+		t.Fatalf("expected no recorded response after cancellation, got %d", analysisSpy.recordCalls)
 	}
 }
 

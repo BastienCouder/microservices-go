@@ -142,7 +142,11 @@ func (c *Client) StartAnalysis(ctx context.Context, req usecase.AnalysisStartReq
 
 	promptTexts := make([]*analysisv1.PromptText, 0, len(req.PromptTexts))
 	for _, prompt := range req.PromptTexts {
-		promptTexts = append(promptTexts, &analysisv1.PromptText{Id: prompt.ID, Text: prompt.Text})
+		promptTexts = append(promptTexts, &analysisv1.PromptText{
+			Id:   prompt.ID,
+			Text: prompt.Text,
+			Kind: prompt.Kind,
+		})
 	}
 	modelCreditCostSum := req.ModelCreditCostSum
 	if modelCreditCostSum <= 0 {
@@ -218,6 +222,39 @@ func (c *Client) RecordResponse(ctx context.Context, runID string, input usecase
 		}
 		return false, nil
 	})
+}
+
+func (c *Client) IsAnalysisRunCancelled(ctx context.Context, runID string, organizationID int64) (bool, error) {
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", internalauth.Claims{
+		Organization: organizationID,
+	})
+	if err != nil {
+		return false, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	var grpcResp *analysisv1.GetAnalysisRunResponse
+	err = c.executeWithResilience(ctx, 2, 50*time.Millisecond, 400*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
+		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		resp, callErr := c.client.GetAnalysisRun(callCtx, &analysisv1.GetAnalysisRunRequest{
+			RunId: runID,
+		})
+		if callErr != nil {
+			return isTransientGRPCError(callErr), callErr
+		}
+		grpcResp = resp
+		return false, nil
+	})
+	if err != nil {
+		return false, err
+	}
+
+	status := strings.TrimSpace(strings.ToLower(grpcResp.GetAnalysisRun().GetStatus()))
+	switch status {
+	case "failed", "errored", "cancelled", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 func (c *Client) executeWithResilience(

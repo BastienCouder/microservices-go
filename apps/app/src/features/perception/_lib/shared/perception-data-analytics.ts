@@ -30,6 +30,7 @@ type ParsedResponse = {
   id: string;
   runId: string;
   runType: string;
+  promptKind: string;
   promptRunId: string;
   modelId: string;
   modelName: string;
@@ -146,8 +147,14 @@ function normalizeSentiment(value: string): "positive" | "neutral" | "negative" 
   return "neutral";
 }
 
-function normalizeResponseSource(value: string): Exclude<PerceptionSourceFilter, "all"> {
-  return value.trim().toLowerCase() === "perception" ? "perception" : "monitoring";
+function resolvePerceptionResponseSource(input: {
+  promptKind?: string;
+}): Exclude<PerceptionSourceFilter, "all"> {
+  const promptKind = asString(input.promptKind).trim().toLowerCase();
+  if (promptKind === "perception") {
+    return "perception";
+  }
+  return "monitoring";
 }
 
 function positionScore(brandPosition: string, brandMentioned: boolean): number {
@@ -209,9 +216,10 @@ function parseResponses(
     return {
       id: asString(getField(response, ["id", "ID"])),
       runId: asString(getField(response, ["runId", "RunID"])),
-      runType: normalizeResponseSource(
-        asString(getField(response, ["runType", "RunType"])),
-      ),
+      runType: resolvePerceptionResponseSource({
+        promptKind: asString(getField(response, ["promptKind", "PromptKind"])),
+      }),
+      promptKind: asString(getField(response, ["promptKind", "PromptKind"])),
       promptRunId: asString(getField(response, ["promptRunId", "PromptRunID"])),
       modelId,
       modelName: modelMeta?.displayName || modelId,
@@ -720,6 +728,7 @@ function serializeResponses(responses: ParsedResponse[]): PerceptionResponseReco
 function parseResponseRecord(record: PerceptionResponseRecord): ParsedResponse {
   return {
     ...record,
+    promptKind: record.promptKind ?? "",
     createdAt: record.createdAt ? parseISODate(record.createdAt) : null,
   };
 }
@@ -746,7 +755,7 @@ export function filterPerceptionResponses(
   return responses.filter((response) => {
     if (
       sourceFilter !== "all" &&
-      normalizeResponseSource(response.runType) !== sourceFilter
+      response.runType !== sourceFilter
     ) {
       return false;
     }

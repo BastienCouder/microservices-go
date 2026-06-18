@@ -19,12 +19,13 @@ describe("perception left panel", () => {
     expect(activeSource.includes("<PerceptionHeroInsightCard insight={heroInsight}")).toBe(true);
   });
 
-  test("includes a dedicated data source filter for perception, monitoring, and both", () => {
+  test("keeps the source filter commented out until monitoring is ready", () => {
     const activeSource = stripComments(source);
 
-    expect(activeSource.includes('t("filtersDataSource")')).toBe(true);
-    expect(activeSource.includes('value="perception"')).toBe(true);
-    expect(activeSource.includes('value="monitoring"')).toBe(true);
-    expect(activeSource.includes('value="all"')).toBe(true);
+    expect(source.includes('t("filtersDataSource")')).toBe(true);
+    expect(source.includes('value="perception"')).toBe(true);
+    expect(source.includes('value="monitoring"')).toBe(true);
+    expect(source.includes('value="all"')).toBe(true);
+    expect(activeSource.includes('t("filtersDataSource")')).toBe(false);
   });
 });

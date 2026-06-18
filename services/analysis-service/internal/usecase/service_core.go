@@ -23,6 +23,7 @@ func NewService() *Service {
 		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
 		optimizeActions:     make(map[string]*OptimizeAction),
 		actionsByProject:    make(map[string][]string),
+		aiBriefSettings:     make(map[string]*ProjectAIBriefSettings),
 	}
 }
 
@@ -89,6 +90,7 @@ func (s *Service) snapshotLocked() *persistedState {
 		ContentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot, len(s.contentCrawls)),
 		OptimizeActions:     make(map[string]*OptimizeAction, len(s.optimizeActions)),
 		ActionsByProject:    make(map[string][]string, len(s.actionsByProject)),
+		AIBriefSettings:     make(map[string]*ProjectAIBriefSettings, len(s.aiBriefSettings)),
 	}
 
 	for key, value := range s.runs {
@@ -138,6 +140,10 @@ func (s *Service) snapshotLocked() *persistedState {
 	for key, ids := range s.actionsByProject {
 		state.ActionsByProject[key] = append([]string(nil), ids...)
 	}
+	for key, value := range s.aiBriefSettings {
+		clone := copyProjectAIBriefSettings(value)
+		state.AIBriefSettings[key] = &clone
+	}
 
 	return state
 }
@@ -159,6 +165,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
 	s.optimizeActions = nonNilOptimizeActionMap(state.OptimizeActions)
 	s.actionsByProject = nonNilSliceMap(state.ActionsByProject)
+	s.aiBriefSettings = nonNilAIBriefSettingsMap(state.AIBriefSettings)
 }
 
 func (s *Service) persistLocked(ctx context.Context) error {

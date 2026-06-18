@@ -26,6 +26,7 @@ type persistedState struct {
 	ContentCrawls      map[string]*usecase.ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 	OptimizeActions    map[string]*usecase.OptimizeAction                `json:"optimizeActions"`
 	ActionsByProject   map[string][]string                               `json:"actionsByProject"`
+	AIBriefSettings    map[string]*usecase.ProjectAIBriefSettings        `json:"aiBriefSettings"`
 }
 
 type StateStore struct {
@@ -49,6 +50,7 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		ContentCrawls:      make(map[string]*usecase.ContentOptimizerCrawlSnapshot),
 		OptimizeActions:    make(map[string]*usecase.OptimizeAction),
 		ActionsByProject:   make(map[string][]string),
+		AIBriefSettings:    make(map[string]*usecase.ProjectAIBriefSettings),
 	}
 
 	if err := s.loadRuns(ctx, &state); err != nil {
@@ -66,8 +68,11 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadOptimizeActions(ctx, &state); err != nil {
 		return nil, false, err
 	}
+	if err := s.loadAIBriefSettings(ctx, &state); err != nil {
+		return nil, false, err
+	}
 
-	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 {
+	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 && len(state.ContentCrawls) == 0 && len(state.OptimizeActions) == 0 && len(state.AIBriefSettings) == 0 {
 		return nil, false, nil
 	}
 
@@ -96,6 +101,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 	for _, statement := range []string{
 		`DELETE FROM content_optimizer_crawls`,
+		`DELETE FROM project_ai_brief_settings`,
 		`DELETE FROM optimize_actions`,
 		`DELETE FROM ai_responses`,
 		`DELETE FROM prompt_runs`,
@@ -119,6 +125,9 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 		return err
 	}
 	if err := insertOptimizeActions(ctx, tx, state.OptimizeActions); err != nil {
+		return err
+	}
+	if err := insertAIBriefSettings(ctx, tx, state.AIBriefSettings); err != nil {
 		return err
 	}
 
@@ -176,7 +185,7 @@ func (s *StateStore) loadRuns(ctx context.Context, state *persistedState) error 
 
 func (s *StateStore) loadPromptRuns(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, run_id, prompt_id, prompt_text, created_at
+		SELECT id, run_id, prompt_id, prompt_text, kind, created_at
 		FROM prompt_runs
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -187,7 +196,7 @@ func (s *StateStore) loadPromptRuns(ctx context.Context, state *persistedState) 
 
 	for rows.Next() {
 		var item usecase.PromptRun
-		if err := rows.Scan(&item.ID, &item.RunID, &item.PromptID, &item.PromptText, &item.CreatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.RunID, &item.PromptID, &item.PromptText, &item.Kind, &item.CreatedAt); err != nil {
 			return fmt.Errorf("scan prompt run: %w", err)
 		}
 		promptRun := item
@@ -324,6 +333,35 @@ func (s *StateStore) loadOptimizeActions(ctx context.Context, state *persistedSt
 	return rows.Err()
 }
 
+func (s *StateStore) loadAIBriefSettings(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, brief_model_id, brief_provider, brief_provider_model_id, created_at, updated_at
+		FROM project_ai_brief_settings
+		ORDER BY updated_at ASC, project_id ASC
+	`)
+	if err != nil {
+		return fmt.Errorf("select project ai brief settings: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var item usecase.ProjectAIBriefSettings
+		if err := rows.Scan(
+			&item.ProjectID,
+			&item.BriefModelID,
+			&item.BriefProvider,
+			&item.BriefProviderModelID,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		); err != nil {
+			return fmt.Errorf("scan project ai brief settings: %w", err)
+		}
+		settings := item
+		state.AIBriefSettings[item.ProjectID] = &settings
+	}
+	return rows.Err()
+}
+
 func insertAnalysisRuns(ctx context.Context, tx pgx.Tx, runs map[string]*usecase.AnalysisRun, runByRequest map[string]string) error {
 	requestIDs := reverseRunRequestMap(runByRequest)
 	for _, runID := range sortedAnalysisRunIDs(runs) {
@@ -343,9 +381,9 @@ func insertPromptRuns(ctx context.Context, tx pgx.Tx, promptRuns map[string]*use
 	for _, promptRunID := range sortedPromptRunIDs(promptRuns) {
 		promptRun := promptRuns[promptRunID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO prompt_runs (id, run_id, prompt_id, prompt_text, created_at)
-			VALUES ($1, $2, $3, $4, $5)
-		`, promptRun.ID, promptRun.RunID, promptRun.PromptID, promptRun.PromptText, promptRun.CreatedAt); err != nil {
+			INSERT INTO prompt_runs (id, run_id, prompt_id, prompt_text, kind, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, promptRun.ID, promptRun.RunID, promptRun.PromptID, promptRun.PromptText, promptRun.Kind, promptRun.CreatedAt); err != nil {
 			return fmt.Errorf("insert prompt run %s: %w", promptRun.ID, err)
 		}
 	}
@@ -403,6 +441,26 @@ func insertOptimizeActions(ctx context.Context, tx pgx.Tx, actions map[string]*u
 	return nil
 }
 
+func insertAIBriefSettings(ctx context.Context, tx pgx.Tx, settingsByProject map[string]*usecase.ProjectAIBriefSettings) error {
+	for _, projectID := range sortedAIBriefSettingsProjectIDs(settingsByProject) {
+		settings := settingsByProject[projectID]
+		if settings == nil || strings.TrimSpace(settings.BriefModelID) == "" || strings.TrimSpace(settings.BriefProviderModelID) == "" {
+			continue
+		}
+		provider := strings.TrimSpace(settings.BriefProvider)
+		if provider == "" {
+			provider = "openrouter"
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO project_ai_brief_settings (project_id, brief_model_id, brief_provider, brief_provider_model_id, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, settings.ProjectID, settings.BriefModelID, provider, settings.BriefProviderModelID, settings.CreatedAt, settings.UpdatedAt); err != nil {
+			return fmt.Errorf("insert project ai brief settings %s: %w", settings.ProjectID, err)
+		}
+	}
+	return nil
+}
+
 func reverseRunRequestMap(runByRequest map[string]string) map[string]string {
 	reversed := make(map[string]string, len(runByRequest))
 	for key, runID := range runByRequest {
@@ -455,6 +513,15 @@ func sortedContentCrawlKeys(items map[string]*usecase.ContentOptimizerCrawlSnaps
 }
 
 func sortedOptimizeActionIDs(items map[string]*usecase.OptimizeAction) []string {
+	ids := make([]string, 0, len(items))
+	for id := range items {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+func sortedAIBriefSettingsProjectIDs(items map[string]*usecase.ProjectAIBriefSettings) []string {
 	ids := make([]string, 0, len(items))
 	for id := range items {
 		ids = append(ids, id)

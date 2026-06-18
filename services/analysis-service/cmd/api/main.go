@@ -126,7 +126,7 @@ func main() {
 		cfg.HTTPAddr,
 		internalauth.NewHTTPMiddleware(cfg.InternalJWTSecret, cfg.InternalJWTIssuer, "analysis-service")(mux),
 		httpsrv.WithReadTimeout(10*time.Second),
-		httpsrv.WithWriteTimeout(20*time.Second),
+		httpsrv.WithWriteTimeout(0),
 	)
 	metricsServer := serviceboot.StartMetricsServer(cfg.MetricsAddr, "analysis-service")
 

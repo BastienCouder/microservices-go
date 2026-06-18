@@ -11,6 +11,7 @@ type MonitoringPromptInput = {
   responseId: string;
   promptId: string;
   text: string;
+  promptKind?: string | null;
   modelId: string;
   modelGroupName: string;
   modelDisplayName: string;
@@ -267,35 +268,37 @@ export function buildResponseRows({
   availableModels: string[];
   stages: Stage[];
 }): PromptRunRow[] {
-  return recentPrompts.map((item, index) => {
-    const model = resolveKnownModel(item, availableModels) as never;
-    const minutesAgo = parseRelativeTimeToMinutes(item.time);
-    const score = Math.max(0, Math.min(100, item.score ?? 0));
-    const competitorsMentioned = dedupeCompetitors(item.competitorsMentioned);
-    const competitor = competitorsMentioned[0] || "Aucun";
+  return recentPrompts
+    .filter((item) => (item.promptKind ?? "").trim().toLowerCase() !== "perception")
+    .map((item, index) => {
+      const model = resolveKnownModel(item, availableModels) as never;
+      const minutesAgo = parseRelativeTimeToMinutes(item.time);
+      const score = Math.max(0, Math.min(100, item.score ?? 0));
+      const competitorsMentioned = dedupeCompetitors(item.competitorsMentioned);
+      const competitor = competitorsMentioned[0] || "Aucun";
 
-    return {
-      id: item.responseId || `response-${index + 1}`,
-      promptId: item.promptId || `prompt-${index + 1}`,
-      prompt: item.text,
-      stage: stages[index % stages.length] || "Awareness",
-      persona: item.persona?.trim() || undefined,
-      models: [model],
-      isHistorical: false,
-      time: item.time,
-      createdAt: item.createdAt,
-      model,
-      minutesAgo,
-      mention: item.mention,
-      sentiment: item.sentiment,
-      rank: item.rank ?? null,
-      competitor,
-      competitors: competitorsMentioned,
-      score,
-      error: item.mention ? null : "Aucune mention",
-      critical: !item.mention && score <= 25,
-      response: item.response || `Extrait de reponse pour "${item.text}".`,
-      highlights: buildHighlights(item, score, competitor),
-    };
-  });
+      return {
+        id: item.responseId || `response-${index + 1}`,
+        promptId: item.promptId || `prompt-${index + 1}`,
+        prompt: item.text,
+        stage: stages[index % stages.length] || "Awareness",
+        persona: item.persona?.trim() || undefined,
+        models: [model],
+        isHistorical: false,
+        time: item.time,
+        createdAt: item.createdAt,
+        model,
+        minutesAgo,
+        mention: item.mention,
+        sentiment: item.sentiment,
+        rank: item.rank ?? null,
+        competitor,
+        competitors: competitorsMentioned,
+        score,
+        error: item.mention ? null : "Aucune mention",
+        critical: !item.mention && score <= 25,
+        response: item.response || `Extrait de reponse pour "${item.text}".`,
+        highlights: buildHighlights(item, score, competitor),
+      };
+    });
 }

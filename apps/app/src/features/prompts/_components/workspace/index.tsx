@@ -175,6 +175,11 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
               showHistorical={state.showHistorical}
               setShowHistorical={state.setShowHistorical}
               loading={state.responsesDataLoading}
+              pendingResponse={state.pendingPromptResponse}
+              activeAnalysisRunId={state.activeAnalysisRunId}
+              onStopAnalysis={state.stopActiveAnalysis}
+              stoppingAnalysis={state.stoppingAnalysis}
+              analysisIssue={state.analysisIssue}
               viewMode={state.viewMode}
               setViewMode={(value) => state.setViewMode(value as ResponseView)}
               filteredResponses={state.filteredResponses}

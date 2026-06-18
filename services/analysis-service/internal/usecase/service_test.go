@@ -120,10 +120,10 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "perception-1", Text: "What is Acme?"},
+			{ID: "perception-1", Text: "What is Acme?", Kind: "perception"},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "perception",
+		RunType:  "manual",
 	})
 	if err != nil {
 		t.Fatalf("start perception: %v", err)
@@ -135,10 +135,10 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "perception-2", Text: "Who is Acme for?"},
+			{ID: "perception-2", Text: "Who is Acme for?", Kind: "perception"},
 		},
 		ModelIDs: []string{"sonar"},
-		RunType:  "perception",
+		RunType:  "manual",
 	})
 	if err != nil {
 		t.Fatalf("reuse perception: %v", err)
@@ -153,10 +153,10 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "perception-3", Text: "How does Acme compare?"},
+			{ID: "perception-3", Text: "How does Acme compare?", Kind: "perception"},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "perception",
+		RunType:  "manual",
 	})
 	if err != nil {
 		t.Fatalf("new weekly perception: %v", err)
@@ -177,11 +177,11 @@ func TestStartAnalysisForceCreatesNewPerceptionRun(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "perception-1", Text: "What is Acme?"},
+			{ID: "perception-1", Text: "What is Acme?", Kind: "perception"},
 		},
 		ModelIDs:         []string{"gpt-4o-mini"},
 		RequestedCredits: 30,
-		RunType:          "perception",
+		RunType:          "manual",
 	})
 	if err != nil {
 		t.Fatalf("start perception: %v", err)
@@ -202,11 +202,11 @@ func TestStartAnalysisForceCreatesNewPerceptionRun(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "perception-2", Text: "Who is Acme for?"},
+			{ID: "perception-2", Text: "Who is Acme for?", Kind: "perception"},
 		},
 		ModelIDs:         []string{"gpt-4o-mini"},
 		RequestedCredits: 30,
-		RunType:          "perception",
+		RunType:          "manual",
 		Force:            true,
 	})
 	if err != nil {

@@ -1,0 +1,2 @@
+ALTER TABLE prompt_runs
+DROP COLUMN IF EXISTS kind;

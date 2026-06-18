@@ -75,7 +75,7 @@ func main() {
 		cfg.HTTPAddr,
 		mux,
 		httpsrv.WithReadTimeout(10*time.Second),
-		httpsrv.WithWriteTimeout(2*time.Minute),
+		httpsrv.WithWriteTimeout(0),
 	)
 	metricsServer := serviceboot.StartMetricsServerWithHandler(cfg.MetricsAddr, "api-gateway", promhttp.Handler())
 

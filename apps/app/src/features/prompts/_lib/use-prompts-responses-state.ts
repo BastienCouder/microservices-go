@@ -21,6 +21,7 @@ import {
   getPromptSelectionKey,
   RESPONSES_BATCH_SIZE,
 } from "./prompt-normalizers";
+import { loadAnalysisRuns, type AnalysisRunRecord } from "./prompt-api";
 import { resolveBulkPromptIds } from "./prompt-mutation-actions";
 import {
   isPromptRunProgressComplete,
@@ -56,6 +57,8 @@ type PromptsWorkspaceLoadingStateInput = {
   promptsCatalogInitialLoading: boolean;
   promptMutationPending: boolean;
 };
+
+const FAILED_RUN_STATUSES = new Set(["failed", "errored", "cancelled", "cancelled_due_to_timeout", "cancelled_due_to_limits"]);
 
 export function getPromptsWorkspaceLoadingState({
   monitoringLoading,
@@ -116,6 +119,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const [editingPromptScheduleId, setEditingPromptScheduleId] = useState<string | null>(null);
   const [runningPromptRowIds, setRunningPromptRowIds] = useState<string[]>([]);
   const [pendingPromptRuns, setPendingPromptRuns] = useState<PromptRunProgressEntry[]>([]);
+  const [cancelledAnalysisRunIds, setCancelledAnalysisRunIds] = useState<string[]>([]);
 
   useEffect(() => {
     setOrganizationId(readOrganizationId(routeSearch));
@@ -208,6 +212,57 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     queryFn: ({ signal }) =>
       loadPromptQuotaUsage(apiBaseURL, source.activeProjectId, organizationId, { signal }),
   });
+  const analysisRunsQuery = useQuery({
+    queryKey: ["analysis-runs", apiBaseURL, organizationId, source.activeProjectId],
+    enabled:
+      apiBaseURL.trim() !== "" &&
+      organizationId.trim() !== "" &&
+      hasActiveProjectId,
+    queryFn: ({ signal }) =>
+      loadAnalysisRuns(apiBaseURL, organizationId, source.activeProjectId, 5, signal),
+    refetchInterval: (query) => {
+      const runs = (query.state.data ?? []) as AnalysisRunRecord[];
+      return runs.some((run) => run.status === "running") ? 4000 : false;
+    },
+  });
+  const analysisRuns = analysisRunsQuery.data ?? [];
+  const cancelledAnalysisRunIdsSet = useMemo(
+    () => new Set(cancelledAnalysisRunIds),
+    [cancelledAnalysisRunIds],
+  );
+  const serverRunningRun =
+    analysisRuns.find(
+      (run) => run.status === "running" && !cancelledAnalysisRunIdsSet.has(run.id),
+    ) ?? null;
+  const latestFailedRun =
+    analysisRuns.find((run) => FAILED_RUN_STATUSES.has(run.status)) ?? null;
+  const serverAnalysisInProgress = Boolean(serverRunningRun);
+  const pendingPromptResponse =
+    pendingPromptRuns.length > 0 || serverAnalysisInProgress;
+  const activeAnalysisRunId = serverAnalysisInProgress ? serverRunningRun?.id ?? null : null;
+  const analysisProgressLabel = serverRunningRun
+    ? `${serverRunningRun.completedResponses}/${serverRunningRun.expectedResponses}`
+    : "";
+  const analysisIssue =
+    latestFailedRun
+        ? {
+            tone: "error" as const,
+            titleKey: "analysisFailedTitle",
+            descriptionKey: "analysisFailedDescription",
+            values: { status: latestFailedRun.status },
+          }
+        : null;
+
+  useEffect(() => {
+    if (cancelledAnalysisRunIds.length === 0 || analysisRuns.length === 0) return;
+    const stillRunning = new Set(
+      analysisRuns.filter((run) => run.status === "running").map((run) => run.id),
+    );
+    setCancelledAnalysisRunIds((current) => {
+      const next = current.filter((runId) => stillRunning.has(runId));
+      return next.length === current.length ? current : next;
+    });
+  }, [analysisRuns, cancelledAnalysisRunIds.length]);
 
   const derived = usePromptsDerivedState({
     monitoringData,
@@ -315,6 +370,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     setEditingPromptScheduleId,
     setHiddenPromptIds,
     setPendingPromptRuns,
+    setCancelledAnalysisRunIds,
     setSelectedPromptIds,
     setSelectedPromptId,
     setRunningPromptRowIds,
@@ -344,9 +400,10 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const runningSelectedPrompts =
     runnableSelectedPrompts.length > 0 &&
     runnableSelectedPrompts.every((item) => runningPromptRowIds.includes(item.id));
+  const runPromptBusy = mutations.runPromptsMutation.isPending || serverAnalysisInProgress;
 
   const runPrompt = (prompt: (typeof derived.selectedPromptRows)[number]) => {
-    if (!mutations.canRunPrompt(prompt) || mutations.runPromptsMutation.isPending) return;
+    if (!mutations.canRunPrompt(prompt) || runPromptBusy) return;
     const credits = mutations.estimatePromptRunsCredits([prompt]);
     if (!mutations.hasEnoughCreditsFor(credits)) {
       mutations.pushInsufficientCreditsToast(credits);
@@ -358,7 +415,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const runSelectedPrompts = () => {
     if (
       runnableSelectedPrompts.length === 0 ||
-      mutations.runPromptsMutation.isPending
+      runPromptBusy
     ) {
       return;
     }
@@ -367,6 +424,11 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       return;
     }
     mutations.runPromptsMutation.mutate(runnableSelectedPrompts);
+  };
+
+  const stopActiveAnalysis = () => {
+    if (!activeAnalysisRunId || mutations.cancelAnalysisMutation.isPending) return;
+    mutations.cancelAnalysisMutation.mutate(activeAnalysisRunId);
   };
 
   const toggleCompetitor = (competitor: string) => {
@@ -443,7 +505,12 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     canRunSelectedPrompts: runnableSelectedPrompts.length > 0,
     selectedRunnablePromptCount: runnableSelectedPrompts.length,
     runningSelectedPrompts,
-    runningAnyPrompts: mutations.runPromptsMutation.isPending || pendingPromptRuns.length > 0,
+    runningAnyPrompts: runPromptBusy || pendingPromptResponse,
+    pendingPromptResponse,
+    activeAnalysisRunId,
+    stopActiveAnalysis,
+    stoppingAnalysis: mutations.cancelAnalysisMutation.isPending,
+    analysisIssue,
     isPromptRunning: (prompt: { id: string } | null | undefined) =>
       Boolean(prompt && runningPromptRowIds.includes(prompt.id)),
     viewMode,

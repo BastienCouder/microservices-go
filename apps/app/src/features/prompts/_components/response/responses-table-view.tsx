@@ -1,4 +1,4 @@
-import { Table2, Workflow } from "lucide-react";
+import { Square, Table2, Workflow } from "lucide-react";
 import { TableVirtuoso, Virtuoso } from "react-virtuoso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -103,12 +103,78 @@ function ResponseTimelineLoadingRows() {
   );
 }
 
+function PendingResponseTableRow({
+  canStop,
+  stopping,
+  onStop,
+  stopLabel,
+}: {
+  canStop: boolean;
+  stopping?: boolean;
+  onStop?: () => void;
+  stopLabel: string;
+}) {
+  return (
+    <>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-12 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-36 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] min-w-[280px] max-w-[360px] px-3">
+        <div className="space-y-2">
+          <Skeleton className="h-4 w-full" />
+          <Skeleton className="h-3 w-3/4" />
+        </div>
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-24 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-20 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-12 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-6 w-28 rounded-full" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            className="h-8 shrink-0"
+            disabled={!canStop || stopping}
+            onClick={onStop}
+          >
+            <Square className="mr-1.5 h-3.5 w-3.5 fill-primary text-primary" />
+            {stopLabel}
+          </Button>
+        </div>
+      </TableCell>
+    </>
+  );
+}
+
 type ResponsesViewProps = {
   noMentionOnly: boolean;
   setNoMentionOnly: (value: boolean) => void;
   showHistorical: boolean;
   setShowHistorical: (value: boolean) => void;
   loading?: boolean;
+  pendingResponse?: boolean;
+  activeAnalysisRunId?: string | null;
+  onStopAnalysis?: () => void;
+  stoppingAnalysis?: boolean;
+  analysisIssue?: {
+    tone: "warning" | "error";
+    titleKey: string;
+    descriptionKey: string;
+    values?: Record<string, unknown>;
+  } | null;
   viewMode: ResponseView;
   setViewMode: (value: ResponseView) => void;
   filteredResponses: PromptRunRow[];
@@ -124,6 +190,9 @@ type ResponsesViewProps = {
 export function ResponsesContent(props: ResponsesViewProps) {
   const content = useI18nScope("prompts-workspace");
   const handleEndReached = () => props.hasMoreResponses && props.loadMoreResponses();
+  const tableRows = props.pendingResponse
+    ? [{ id: "__pending_response__", pending: true as const }, ...props.filteredResponses]
+    : props.filteredResponses;
   const responsesColumns: ResponseColumn[] = [
     { id: "time", label: content.time },
     { id: "ai", label: content.ai },
@@ -175,7 +244,8 @@ export function ResponsesContent(props: ResponsesViewProps) {
             </div>
       </PanelToolbar>
 
-      <div className="min-h-0 flex-1 px-4">
+      <div className="flex min-h-0 flex-1 flex-col px-4">
+        <div className="min-h-0 flex-1">
         {props.loading ? (
           props.viewMode === "table" ? (
             <ResponseTableLoadingRows />
@@ -183,12 +253,12 @@ export function ResponsesContent(props: ResponsesViewProps) {
             <ResponseTimelineLoadingRows />
           )
         ) : props.viewMode === "table" ? (
-          props.filteredResponses.length === 0 ? (
+          props.filteredResponses.length === 0 && !props.pendingResponse ? (
             <EmptyResponsesState />
           ) : (
             <TableVirtuoso
               style={{ height: "100%" }}
-              data={props.filteredResponses}
+              data={tableRows}
               computeItemKey={(_, item) => item.id}
               defaultItemHeight={82}
               endReached={handleEndReached}
@@ -203,6 +273,16 @@ export function ResponsesContent(props: ResponsesViewProps) {
                 </tr>
               )}
               itemContent={(_, item) => {
+                if ("pending" in item) {
+                  return (
+                    <PendingResponseTableRow
+                      canStop={Boolean(props.activeAnalysisRunId)}
+                      stopping={props.stoppingAnalysis}
+                      onStop={props.onStopAnalysis}
+                      stopLabel={content.stopAnalysisButton}
+                    />
+                  );
+                }
                 const modelVisual = props.getModelVisual(item.model);
                 const openResponse = () => props.setSelectedResponseId(item.id);
                 const cellClassName = "cursor-pointer";
@@ -322,6 +402,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
             }}
           />
         )}
+        </div>
       </div>
     </>
   );

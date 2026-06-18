@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   PerceptionDonutVisual,
+  PerceptionAnalysisStepperDialog,
   PerceptionLeftPanel,
   PerceptionModelAxisHeatmap,
   PerceptionScoreMiniCard,
@@ -21,6 +22,10 @@ import {
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
 import { CheckCircle2, Download, Sparkles, Target } from "lucide-react";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
+import {
+  readOrganizationIdFromSearch,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 
 type PerceptionClientProps = {
   apiBaseURL: string;
@@ -37,8 +42,11 @@ const SCORE_CARD_ICONS = {
 export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: PerceptionClientProps) {
   const { locale } = useLocale();
   const { t } = useScopedI18n("perception");
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const viewModel = usePerceptionViewModel(initialData, { apiBaseURL, routeSearch });
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
+  const organizationId =
+    readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
   const emptyStateLabel = initialData.metadata.emptyStateLabel;
   const periodLabel = getPerceptionPeriodLabel(
     viewModel.selectedPeriod,
@@ -51,42 +59,19 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
   const heroActions = (
     <div className="flex flex-col md:flex-row items-center gap-2">
       {permissions.canEdit ? (
-        <ConfirmDialog
-          title={t("confirmAnalysisTitle")}
-          description={
-            viewModel.perceptionMonthlyCredits > 0
-              ? t("confirmAnalysisDescriptionWithQuota", {
-                  credits: viewModel.estimatedPerceptionCredits,
-                  remaining: viewModel.perceptionRemainingCredits,
-                  total: viewModel.perceptionMonthlyCredits,
-                })
-              : t("confirmAnalysisDescriptionWithoutQuota", {
-                  credits: viewModel.estimatedPerceptionCredits,
-                })
+        <Button
+          size="sm"
+          variant="secondary"
+          className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+          disabled={
+            viewModel.analysisRunning ||
+            viewModel.perceptionQuotaLoading ||
+            !initialData.metadata.projectId
           }
-          confirmLabel={
-            viewModel.analysisRunning ? t("analysisRunning") : t("launchAnalysis")
-          }
-          cancelLabel={t("cancel")}
-          confirmVariant="default"
-          loading={viewModel.analysisRunning}
-          onConfirm={viewModel.handleRunPerceptionAnalysis}
-          confirmDisabled={viewModel.perceptionQuotaLoading}
-          trigger={
-            <Button
-              size="sm"
-              variant="secondary"
-              className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
-              disabled={
-                viewModel.analysisRunning ||
-                viewModel.perceptionQuotaLoading ||
-                !initialData.metadata.projectId
-              }
-            >
-              {t("analyzePerception")}
-            </Button>
-          }
-        />
+          onClick={() => setAnalysisDialogOpen(true)}
+        >
+          {t("analyzePerception")}
+        </Button>
       ) : null}
       {viewModel.canExport ? (
         <Button
@@ -132,7 +117,8 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
   );
 
   return (
-    <PerceptionThreeColumnLayout
+    <>
+      <PerceptionThreeColumnLayout
       left={
         <div className="flex h-auto flex-col gap-4 xl:h-full xl:min-h-0">
           <div className="min-h-0 flex-1 overflow-hidden">
@@ -211,7 +197,29 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
         </div>
       }
      
-    />
+      />
+      {initialData.metadata.projectId ? (
+        <PerceptionAnalysisStepperDialog
+          open={analysisDialogOpen}
+          onOpenChange={setAnalysisDialogOpen}
+          apiBaseURL={apiBaseURL}
+          organizationId={organizationId}
+          projectId={initialData.metadata.projectId}
+          brandName={initialData.brandCanon.brandName}
+          category={initialData.brandCanon.category}
+          modelOptions={viewModel.modelCatalog}
+          primaryLanguage={initialData.metadata.primaryLanguage ?? "fr"}
+          running={viewModel.analysisRunning}
+          quotaLoading={viewModel.perceptionQuotaLoading}
+          monthlyCredits={viewModel.perceptionMonthlyCredits}
+          remainingCredits={viewModel.perceptionRemainingCredits}
+          onRun={async (input) => {
+            await viewModel.handleRunPerceptionAnalysis(input);
+            setAnalysisDialogOpen(false);
+          }}
+        />
+      ) : null}
+    </>
   );
 }
 

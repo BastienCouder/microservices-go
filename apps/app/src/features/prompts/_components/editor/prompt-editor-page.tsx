@@ -13,6 +13,7 @@ import {
   getModelOverrideCron,
   getPromptStatusLabel,
   normalizeEditorSchedule,
+  PROMPT_TIMEZONE_OPTIONS,
 } from "../../_lib/prompt-editor";
 import { defaultPromptSchedule } from "../../_lib/utils";
 import type {
@@ -68,7 +69,12 @@ export function PromptEditorPage({
     setPromptText(prompt?.prompt ?? "");
     setLanguage(prompt?.language ?? (locale === "en" ? "en" : "fr"));
     setSelectedModels(nextModels);
-    setSchedule(nextSchedule);
+    setSchedule({
+      ...nextSchedule,
+      timezone: PROMPT_TIMEZONE_OPTIONS.some((option) => option.value === nextSchedule.timezone)
+        ? nextSchedule.timezone
+        : "UTC",
+    });
     setStatus(prompt?.status ?? "active");
   }, [availableModels, locale, mode, prompt?.id, prompt?.language, prompt?.prompt, prompt?.schedule, promptModelKey]);
 
@@ -98,11 +104,7 @@ export function PromptEditorPage({
     <div className="flex pt-44 h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
       <PageHeader
         title={mode === "create" ? t("editorCreateTitle") : t("editorEditTitle")}
-        baseline={
-          mode === "create"
-            ? t("editorCreateBaseline")
-            : t("editorEditBaseline")
-        }
+        baseline=""
         actionsVariant="classic"
         meta={
           <>
@@ -158,7 +160,6 @@ export function PromptEditorPage({
             selectedModels={selectedModels}
             getModelVisual={getModelVisual}
             cadenceModeLabel={cadenceSummary.cadenceModeLabel}
-            scheduleLabel={cadenceSummary.scheduleLabel}
             onSetMode={(nextMode) =>
               setSchedule((current) => ({
                 ...current,

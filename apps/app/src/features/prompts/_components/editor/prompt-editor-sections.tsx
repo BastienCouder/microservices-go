@@ -1,5 +1,6 @@
 "use client";
 import { Badge } from "@/components/ui/badge";
+import { ModelCard } from "@/components/shared/model-card";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,13 +35,10 @@ export function PromptTextSection({
   const { locale, t } = useScopedI18n("prompts-workspace");
 
   return (
-    <section className="rounded-3xl rounded-tr-none bg-background p-5">
+    <section className="rounded-xl rounded-tr-none bg-background p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
+        <div>
           <div className="text-sm font-medium">{t("editorPromptTitle")}</div>
-          <p className="text-sm leading-6 text-muted-foreground">
-            {t("editorPromptDescription")}
-          </p>
         </div>
         <div className="text-xs text-muted-foreground">
           {promptText.length} / {maxLength}
@@ -138,13 +136,10 @@ export function PromptCoverageSection({
   const { t } = useScopedI18n("prompts-workspace");
 
   return (
-    <section className="rounded-3xl bg-background p-5">
+    <section className="rounded-xl bg-background p-5">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-        <div className="space-y-2">
+        <div>
           <div className="text-sm font-medium">{t("editorCoverageTitle")}</div>
-          <p className="text-sm leading-6 text-muted-foreground">
-            {t("editorCoverageDescription")}
-          </p>
         </div>
         <Badge variant="outline">{t("editorCoverageCount", { count: selectedModels.length })}</Badge>
       </div>
@@ -155,42 +150,21 @@ export function PromptCoverageSection({
           const selected = selectedModels.includes(model);
 
           return (
-            <button
+            <div
               key={model}
-              type="button"
-              disabled={saving}
-              onClick={() => onToggleModel(model)}
-              aria-pressed={selected}
-              className={cn(
-                "relative flex w-full cursor-pointer items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-colors",
-                selected
-                  ? "border-primary bg-primary/5"
-                  : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/20",
-              )}
+              className={cn(saving && "pointer-events-none opacity-70")}
             >
-              <div className="absolute right-3 top-3">
-                <div
-                  className={cn(
-                    "flex h-4 w-4 items-center justify-center rounded-full border transition-colors",
-                    selected
-                      ? "border-primary bg-primary/80 text-primary"
-                      : "border-border bg-background/70 text-muted-foreground",
-                  )}
-                />
-              </div>
-
-              <img src={visual.icon} alt={visual.name} className="mt-0.5 h-4 w-4 object-contain" decoding="async" />
-
-              <div className="min-w-0 pr-5">
-                <div className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">
-                  {visual.provider}
-                </div>
-                <div className="truncate text-sm font-semibold leading-6">{visual.name}</div>
-                {visual.label !== visual.name ? (
-                  <div className="truncate text-xs text-muted-foreground">{visual.label}</div>
-                ) : null}
-              </div>
-            </button>
+              <ModelCard
+                name={visual.name}
+                description={visual.label !== visual.name ? visual.label : ""}
+                icon={visual.icon}
+                selected={selected}
+                onClick={() => onToggleModel(model)}
+                modelGroup={visual.provider}
+                size="medium"
+                disabled={saving}
+              />
+            </div>
           );
         })}
       </div>

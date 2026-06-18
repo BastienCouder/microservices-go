@@ -37,6 +37,7 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 		promptTexts = append(promptTexts, usecase.PromptText{
 			ID:   prompt.GetId(),
 			Text: prompt.GetText(),
+			Kind: prompt.GetKind(),
 		})
 	}
 
@@ -58,7 +59,8 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 
 	resp := &analysisv1.StartAnalysisResponse{
 		AnalysisRun: &analysisv1.AnalysisRun{
-			Id: result.AnalysisRun.ID,
+			Id:     result.AnalysisRun.ID,
+			Status: result.AnalysisRun.Status,
 		},
 		PromptRuns: make([]*analysisv1.PromptRun, 0, len(result.PromptRuns)),
 	}
@@ -70,6 +72,27 @@ func (s *Server) StartAnalysis(ctx context.Context, req *analysisv1.StartAnalysi
 		})
 	}
 	return resp, nil
+}
+
+func (s *Server) GetAnalysisRun(ctx context.Context, req *analysisv1.GetAnalysisRunRequest) (*analysisv1.GetAnalysisRunResponse, error) {
+	if strings.TrimSpace(req.GetRunId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "run_id is required")
+	}
+	claims, ok := internalauth.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claims")
+	}
+
+	details, err := s.svc.GetAnalysisRun(ctx, req.GetRunId(), claims.Organization)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &analysisv1.GetAnalysisRunResponse{
+		AnalysisRun: &analysisv1.AnalysisRun{
+			Id:     details.AnalysisRun.ID,
+			Status: details.AnalysisRun.Status,
+		},
+	}, nil
 }
 
 func forceAnalysisFromMetadata(ctx context.Context) bool {

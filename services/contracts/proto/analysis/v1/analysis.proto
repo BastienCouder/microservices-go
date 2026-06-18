@@ -6,12 +6,14 @@ option go_package = "github.com/bastiencouder/microservices-go/contracts/gen/go/
 
 service AnalysisService {
   rpc StartAnalysis(StartAnalysisRequest) returns (StartAnalysisResponse);
+  rpc GetAnalysisRun(GetAnalysisRunRequest) returns (GetAnalysisRunResponse);
   rpc RecordResponse(RecordResponseRequest) returns (RecordResponseResponse);
 }
 
 message PromptText {
   string id = 1;
   string text = 2;
+  string kind = 3;
 }
 
 message PromptRun {
@@ -22,6 +24,15 @@ message PromptRun {
 
 message AnalysisRun {
   string id = 1;
+  string status = 2;
+}
+
+message GetAnalysisRunRequest {
+  string run_id = 1;
+}
+
+message GetAnalysisRunResponse {
+  AnalysisRun analysis_run = 1;
 }
 
 message StartAnalysisRequest {

@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/bastiencouder/microservices-go/contracts/pkg/internalauth"
 	"github.com/bastiencouder/microservices-go/services/analysis-service/internal/usecase"
@@ -53,7 +52,7 @@ func NewClient(cfg Config) (*Client, error) {
 
 	httpClient := cfg.HTTPClient
 	if httpClient == nil {
-		httpClient = &http.Client{Timeout: 90 * time.Second}
+		httpClient = &http.Client{}
 	}
 
 	providerID := strings.TrimSpace(cfg.ProviderID)
@@ -85,11 +84,19 @@ func (c *Client) GenerateOptimizeActionBrief(
 	ctx context.Context,
 	input usecase.OptimizeActionBriefInput,
 ) (string, error) {
+	modelID := strings.TrimSpace(input.ModelID)
+	if modelID == "" {
+		modelID = c.optimizeActionBriefModelID
+	}
+	providerID := strings.TrimSpace(input.ProviderID)
+	if providerID == "" {
+		providerID = c.optimizeActionBriefProviderID
+	}
 	body := executePromptRequest{
 		PromptID:   "content-optimizer-action-brief",
 		PromptText: buildOptimizeActionBriefPrompt(input),
-		ModelID:    c.optimizeActionBriefModelID,
-		ProviderID: c.optimizeActionBriefProviderID,
+		ModelID:    modelID,
+		ProviderID: providerID,
 	}
 
 	rawResponse, err := c.executeStructuredPrompt(ctx, body, input.OrganizationID)

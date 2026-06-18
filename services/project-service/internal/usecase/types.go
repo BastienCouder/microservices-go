@@ -421,6 +421,7 @@ type ProjectModelSelectionChangeUsage struct {
 type AnalysisPromptText struct {
 	ID       string   `json:"id"`
 	Text     string   `json:"text"`
+	Kind     string   `json:"kind,omitempty"`
 	Language string   `json:"language,omitempty"`
 	ModelIDs []string `json:"modelIds,omitempty"`
 }
@@ -459,6 +460,8 @@ type RunManualAnalysisInput struct {
 
 type RunPerceptionAnalysisInput struct {
 	RequestID string
+	PromptIDs []string
+	ModelIDs  []string
 	Force     bool
 }
 
@@ -520,6 +523,7 @@ type OutboxEvent struct {
 
 type AnalysisClient interface {
 	StartAnalysis(ctx context.Context, req AnalysisStartRequest) (AnalysisStartResponse, error)
+	IsAnalysisRunCancelled(ctx context.Context, runID string, organizationID int64) (bool, error)
 	RecordResponse(ctx context.Context, runID string, input AnalysisRecordResponseInput) error
 }
 

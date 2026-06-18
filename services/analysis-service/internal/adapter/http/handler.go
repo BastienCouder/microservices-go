@@ -111,6 +111,10 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getPerception(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "optimization-errors" && r.Method == http.MethodGet:
 		h.getOptimizationErrors(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "ai-brief-settings" && r.Method == http.MethodGet:
+		h.getAIBriefSettings(w, r, projectID)
+	case len(parts) == 2 && parts[1] == "ai-brief-settings" && r.Method == http.MethodPatch:
+		h.updateAIBriefSettings(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "optimize-actions" && r.Method == http.MethodGet:
 		h.listOptimizeActions(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "optimize-actions" && r.Method == http.MethodPost:
@@ -140,6 +144,10 @@ func (h *Handler) runRoutesWithPrefix(w http.ResponseWriter, r *http.Request, pr
 	parts := splitPathAfter(r.URL.Path, prefix)
 	if len(parts) == 1 && parts[0] != "" && r.Method == http.MethodGet {
 		h.getRun(w, r, parts[0])
+		return
+	}
+	if len(parts) == 2 && parts[0] != "" && parts[1] == "cancel" && r.Method == http.MethodPost {
+		h.cancelRun(w, r, parts[0])
 		return
 	}
 	if len(parts) == 2 && parts[0] != "" && parts[1] == "responses" && r.Method == http.MethodPost {
@@ -278,6 +286,21 @@ func (h *Handler) getRun(w http.ResponseWriter, r *http.Request, runID string) {
 	writeSuccess(w, http.StatusOK, details)
 }
 
+func (h *Handler) cancelRun(w http.ResponseWriter, r *http.Request, runID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	run, err := h.svc.CancelAnalysisRun(r.Context(), runID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, run)
+}
+
 type recordResponseRequest struct {
 	PromptRunID    string   `json:"promptRunId"`
 	ModelID        string   `json:"modelId"`
@@ -398,6 +421,51 @@ type createOptimizeActionRequest struct {
 
 type updateOptimizeActionStatusRequest struct {
 	Status string `json:"status"`
+}
+
+type updateAIBriefSettingsRequest struct {
+	BriefModelID         *string `json:"briefModelId"`
+	BriefProvider        *string `json:"briefProvider"`
+	BriefProviderModelID *string `json:"briefProviderModelId"`
+}
+
+func (h *Handler) getAIBriefSettings(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	settings, err := h.svc.GetProjectAIBriefSettings(r.Context(), projectID, organizationID)
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, settings)
+}
+
+func (h *Handler) updateAIBriefSettings(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	var req updateAIBriefSettingsRequest
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
+		return
+	}
+	settings, err := h.svc.UpdateProjectAIBriefSettings(r.Context(), projectID, organizationID, usecase.UpdateProjectAIBriefSettingsInput{
+		BriefModelID:         req.BriefModelID,
+		BriefProvider:        req.BriefProvider,
+		BriefProviderModelID: req.BriefProviderModelID,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, settings)
 }
 
 func (h *Handler) listOptimizeActions(w http.ResponseWriter, r *http.Request, projectID string) {

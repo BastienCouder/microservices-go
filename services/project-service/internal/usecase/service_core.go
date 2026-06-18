@@ -614,6 +614,7 @@ func filterActivePromptsByProject(prompts map[string]*Prompt, projectModels map[
 			out = append(out, AnalysisPromptText{
 				ID:       prompt.ID,
 				Text:     prompt.Text,
+				Kind:     normalizePromptKind(prompt.Kind),
 				Language: prompt.Language,
 				ModelIDs: effectivePromptModelIDs(prompt, enabledModelIDs),
 			})

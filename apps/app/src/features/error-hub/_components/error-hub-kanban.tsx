@@ -1,18 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Sparkles } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
+import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { OptimizationError } from "@/features/perception/_lib/shared/optimization-errors-data";
 import {
   buildProjectModelLookup,
 } from "@/lib/project-models";
+import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import { buildPerceptionModelLookup } from "../../perception/_components/top-errors-panel";
 import { ErrorHubColumn } from "./error-hub-column";
+import {
+  ErrorHubAIBriefModelDialog,
+  type AIBriefModelSettings,
+  type SaveAIBriefModelSettingsInput,
+} from "./error-hub-ai-brief-model-dialog";
 import { ErrorHubDetailsPanel } from "./error-hub-details-panel";
 import { ErrorHubFiltersToolbar } from "./error-hub-filters-toolbar";
 import {
@@ -32,6 +40,7 @@ import {
 
 type ErrorHubKanbanProps = {
   actionStatusesByErrorId: ReadonlyMap<string, string>;
+  aiBriefSettings: AIBriefModelSettings | null;
   canGenerateAiBrief: boolean;
   competitors: string[];
   errors: OptimizationError[];
@@ -43,12 +52,15 @@ type ErrorHubKanbanProps = {
   modelCatalog: Parameters<typeof buildPerceptionModelLookup>[0];
   onCreateAction?: (error: OptimizationError) => void | Promise<void>;
   onMarkDone?: (error: OptimizationError) => void | Promise<void>;
+  onSaveAIBriefSettings?: (input: SaveAIBriefModelSettingsInput) => Promise<void>;
   persistError: string | null;
+  savingAIBriefSettings: boolean;
   savingErrorIds: ReadonlySet<string>;
 };
 
 export function ErrorHubKanban({
   actionStatusesByErrorId,
+  aiBriefSettings,
   canGenerateAiBrief,
   competitors,
   errors,
@@ -60,7 +72,9 @@ export function ErrorHubKanban({
   modelCatalog,
   onCreateAction,
   onMarkDone,
+  onSaveAIBriefSettings,
   persistError,
+  savingAIBriefSettings,
   savingErrorIds,
 }: ErrorHubKanbanProps) {
   const { locale } = useLocale();
@@ -74,6 +88,7 @@ export function ErrorHubKanban({
   const [actionStatusFilter, setActionStatusFilter] =
     useState<ActionStatusFilter>("all");
   const [boardView, setBoardView] = useState<ErrorHubBoardView>("severity");
+  const [aiBriefModelDialogOpen, setAIBriefModelDialogOpen] = useState(false);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>(
     initialSourceFilter ?? "all",
   );
@@ -95,6 +110,33 @@ export function ErrorHubKanban({
     () => buildProjectModelLookup(modelCatalog),
     [modelCatalog],
   );
+  const aiBriefModels = useMemo(
+    () =>
+      modelCatalog
+        .filter((model) => model.providerModelId.trim() !== "")
+        .map((model) => ({
+          id: model.id,
+          displayName: model.displayName,
+          provider: model.provider,
+          groupName: model.groupName,
+          providerModelId: model.providerModelId,
+          description: model.description,
+          iconPath: model.iconPath,
+          live: model.live,
+          creditCost: model.creditCost,
+        })),
+    [modelCatalog],
+  );
+  const selectedAIBriefModel =
+    aiBriefSettings?.briefModelId && projectModelLookup.has(aiBriefSettings.briefModelId)
+      ? projectModelLookup.get(aiBriefSettings.briefModelId)
+      : null;
+  const selectedAIBriefModelIcon = toSafeImageAssetPath(
+    selectedAIBriefModel?.iconPath ?? "",
+  );
+  const selectedAIBriefModelLabel = selectedAIBriefModel
+    ? `${selectedAIBriefModel.displayName} - ${tErrorHub("aiBriefModelButton")}`
+    : tErrorHub("aiBriefModelButton");
 
   const filteredErrors = useMemo(
     () =>
@@ -240,22 +282,46 @@ export function ErrorHubKanban({
                 toggleModel={toggleModel}
               />
               {canGenerateAiBrief ? (
-                <Tabs
-                  value={boardView}
-                  onValueChange={(value) =>
-                    setBoardView(value as ErrorHubBoardView)
-                  }
-                  className="w-full md:w-auto"
-                >
-                  <TabsList className="h-10 w-full md:w-auto">
-                    <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
-                      {tErrorHub("boardBySeverity")}
-                    </TabsTrigger>
-                    <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
-                      {tErrorHub("boardByStatus")}
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="flex flex-col gap-2 md:flex-row md:items-center">
+                  <Tabs
+                    value={boardView}
+                    onValueChange={(value) =>
+                      setBoardView(value as ErrorHubBoardView)
+                    }
+                    className="w-full md:w-auto"
+                  >
+                    <TabsList className="h-10 w-full md:w-auto">
+                      <TabsTrigger value="severity" className="px-3 text-xs md:text-sm">
+                        {tErrorHub("boardBySeverity")}
+                      </TabsTrigger>
+                      <TabsTrigger value="status" className="px-3 text-xs md:text-sm">
+                        {tErrorHub("boardByStatus")}
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-10 justify-center"
+                    onClick={() => setAIBriefModelDialogOpen(true)}
+                  >
+                    {selectedAIBriefModelIcon ? (
+                      <img
+                        src={selectedAIBriefModelIcon}
+                        alt=""
+                        width={16}
+                        height={16}
+                        loading="lazy"
+                        decoding="async"
+                        className="size-4 object-contain"
+                      />
+                    ) : (
+                      <Sparkles className="size-3.5" />
+                    )}
+                    {selectedAIBriefModelLabel}
+                  </Button>
+                </div>
               ) : null}
             </div>
           </div>
@@ -302,6 +368,15 @@ export function ErrorHubKanban({
         savingErrorIds={savingErrorIds}
         selectedError={selectedError}
         sheetDescription={t("topErrorsSheetDescription")}
+      />
+
+      <ErrorHubAIBriefModelDialog
+        models={aiBriefModels}
+        onOpenChange={setAIBriefModelDialogOpen}
+        onSave={onSaveAIBriefSettings}
+        open={aiBriefModelDialogOpen}
+        saving={savingAIBriefSettings}
+        settings={aiBriefSettings}
       />
     </div>
   );

@@ -4,6 +4,7 @@ import { aiResponses } from "./ai-responses";
 import { optimizeActions } from "./optimize-actions";
 import { brandCanon } from "./brand-canon";
 import { contentOptimizations } from "./content-optimizations";
+import { projectAiBriefSettings } from "./ai-brief-settings";
 
 export const schema = {
     analysisRuns,
@@ -12,6 +13,7 @@ export const schema = {
     optimizeActions,
     brandCanon,
     contentOptimizations,
+    projectAiBriefSettings,
 };
 
-export { analysisRuns, promptRuns, aiResponses, optimizeActions, brandCanon, contentOptimizations };
+export { analysisRuns, promptRuns, aiResponses, optimizeActions, brandCanon, contentOptimizations, projectAiBriefSettings };
