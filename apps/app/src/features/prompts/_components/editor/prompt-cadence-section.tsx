@@ -9,7 +9,6 @@ import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   CADENCE_DAY_OPTIONS,
-  CADENCE_TIME_OPTIONS,
   cronToCadenceBuilder,
   cadenceBuilderToCron,
   PROMPT_TIMEZONE_OPTIONS,
@@ -85,31 +84,39 @@ export function PromptCadenceSection({
         </div>
       </div>
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <ModeCard
-          title={t("editorCadenceModeGlobalTitle")}
-          active={schedule.mode === "global"}
+      <div className="mt-4 inline-flex h-10 max-w-full gap-1 rounded-xl border p-1">
+        <Button
+          type="button"
+          size="sm"
+          variant={schedule.mode === "global" ? "default" : "ghost"}
+          className="h-8 rounded-lg px-3 text-sm"
+          disabled={saving}
           onClick={() => onSetMode("global")}
-        />
-        <ModeCard
-          title={t("editorCadenceModePerAiTitle")}
-          active={schedule.mode === "per_model"}
+        >
+          {t("editorCadenceModeGlobalTitle")}
+        </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant={schedule.mode === "per_model" ? "default" : "ghost"}
+          className="h-8 rounded-lg px-3 text-sm"
+          disabled={saving}
           onClick={() => onSetMode("per_model")}
-        />
+        >
+          {t("editorCadenceModePerAiTitle")}
+        </Button>
       </div>
 
-      <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_260px]">
-        <div className="space-y-3">
-          <CadenceBuilderFields
-            scope="global"
-            value={globalBuilder}
-            saving={saving}
-            t={t}
-            onChange={updateGlobalBuilder}
-          />
-        </div>
+      <div className="mt-5 space-y-4">
+        <CadenceBuilderFields
+          scope="global"
+          value={globalBuilder}
+          saving={saving}
+          t={t}
+          onChange={updateGlobalBuilder}
+        />
 
-        <div className="space-y-2">
+        <div className="max-w-sm space-y-2">
           <Label htmlFor="prompt-timezone">{t("timezone")}</Label>
           <Select value={schedule.timezone} onValueChange={onSetTimezone} disabled={saving}>
             <SelectTrigger id="prompt-timezone" className="w-full">
@@ -137,7 +144,7 @@ export function PromptCadenceSection({
               const overrideBuilder = overrideBuilders[model] ?? cronToCadenceBuilder(overrideCron);
 
               return (
-                <div key={model} className="rounded-2xl border border-border/70 bg-muted/10 px-4 py-4">
+                <div key={model} className="rounded-lg border border-border/70 bg-muted/10 px-4 py-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex min-w-0 items-center gap-3">
                       <img src={visual.icon} alt={visual.name} className="h-5 w-5 object-contain" decoding="async" />
@@ -218,7 +225,7 @@ function CadenceBuilderFields({
 
   if (advancedOpen) {
     return (
-      <div className="rounded-2xl border border-border/70 bg-muted/10 p-4">
+      <div className="rounded-lg border border-border/70 bg-muted/10 p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-medium">{t("cadenceAdvancedTitle")}</div>
@@ -259,63 +266,49 @@ function CadenceBuilderFields({
   }
 
   return (
-    <div className="rounded-2xl border border-border/70 bg-muted/10 p-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_160px]">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-medium">{t("cadencePatternLabel")}</div>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-3">
-            <PatternCard
-              title={t("cadenceEveryDayShort")}
-              active={simpleKind === "daily"}
-              onClick={() => onChange((current) => ({ ...current, kind: "daily" }))}
-            />
-            <PatternCard
-              title={t("cadenceEveryTwoDaysShort")}
-              active={simpleKind === "every_two_days"}
-              onClick={() => onChange((current) => ({ ...current, kind: "every_two_days" }))}
-            />
-            <PatternCard
-              title={t("cadenceSelectedDaysLabel")}
-              active={simpleKind === "selected_days"}
-              onClick={() =>
-                onChange((current) => ({
-                  ...current,
-                  kind: "selected_days",
-                  selectedDays: current.selectedDays.length > 0 ? current.selectedDays : ["1"],
-                }))
-              }
-            />
-          </div>
-        </div>
-
+    <div className="space-y-4">
+      <div className="grid gap-4 lg:grid-cols-[minmax(180px,1fr)_minmax(150px,180px)_minmax(260px,1.15fr)]">
         <div className="space-y-2">
-          <Label htmlFor={`${scope}-time`}>{t("cadenceTimeLabel")}</Label>
+          <Label htmlFor={`${scope}-frequency`}>{t("cadenceFrequencyLabel")}</Label>
           <Select
-            value={value.time}
-            onValueChange={(nextTime) => onChange((current) => ({ ...current, time: nextTime }))}
+            value={simpleKind}
+            onValueChange={(nextKind) =>
+              onChange((current) => ({
+                ...current,
+                kind: nextKind as CadenceBuilderValue["kind"],
+                selectedDays: nextKind === "selected_days" && current.selectedDays.length === 0
+                  ? ["1"]
+                  : current.selectedDays,
+              }))
+            }
             disabled={saving}
           >
-            <SelectTrigger id={`${scope}-time`}>
+            <SelectTrigger id={`${scope}-frequency`} className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {CADENCE_TIME_OPTIONS.map((time) => (
-                <SelectItem key={time} value={time}>
-                  {time}
-                </SelectItem>
-              ))}
+              <SelectItem value="daily">{t("cadenceEveryDayShort")}</SelectItem>
+              <SelectItem value="every_two_days">{t("cadenceEveryTwoDaysShort")}</SelectItem>
+              <SelectItem value="selected_days">{t("cadenceSelectedDaysLabel")}</SelectItem>
             </SelectContent>
           </Select>
         </div>
-      </div>
+        <div className="space-y-2">
+          <Label htmlFor={`${scope}-time`}>{t("cadenceTimeLabel")}</Label>
+          <Input
+            id={`${scope}-time`}
+            type="time"
+            value={value.time}
+            step={1800}
+            onChange={(event) => onChange((current) => ({ ...current, time: event.target.value || "09:00" }))}
+            disabled={saving}
+            className="h-8 text-sm"
+          />
+        </div>
 
-      {simpleKind === "selected_days" ? (
-        <div className="mt-4 space-y-2">
-          <div className="text-sm font-medium">{t("cadenceDaysLabel")}</div>
-          <div className="flex flex-wrap gap-2">
+        <div className={cn("space-y-2", simpleKind !== "selected_days" && "opacity-45")}>
+          <Label>{t("cadenceDaysLabel")}</Label>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-7 lg:grid-cols-4 xl:grid-cols-7">
             {CADENCE_DAY_OPTIONS.map((day) => {
               const selected = value.selectedDays.includes(day.value);
               return (
@@ -325,6 +318,13 @@ function CadenceBuilderFields({
                   disabled={saving}
                   onClick={() =>
                     onChange((current) => {
+                      if (simpleKind !== "selected_days") {
+                        return {
+                          ...current,
+                          kind: "selected_days",
+                          selectedDays: [day.value],
+                        };
+                      }
                       const isSelected = current.selectedDays.includes(day.value);
                       const nextSelectedDays = isSelected
                         ? current.selectedDays.filter((item) => item !== day.value)
@@ -336,9 +336,9 @@ function CadenceBuilderFields({
                     })
                   }
                   className={cn(
-                    "rounded-full border px-3 py-2 text-sm transition-colors",
+                    "h-9 rounded-md border px-2 text-sm font-medium transition-colors",
                     selected
-                      ? "border-primary bg-primary/5 text-foreground"
+                      ? "border-primary bg-primary text-primary-foreground shadow-sm"
                       : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/20",
                   )}
                 >
@@ -348,7 +348,7 @@ function CadenceBuilderFields({
             })}
           </div>
         </div>
-      ) : null}
+      </div>
 
       <div className="mt-3 flex justify-end">
         <Button
@@ -362,55 +362,5 @@ function CadenceBuilderFields({
         </Button>
       </div>
     </div>
-  );
-}
-
-function PatternCard({
-  title,
-  active,
-  onClick,
-}: {
-  title: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "rounded-2xl border px-4 py-3 text-left transition-colors",
-        active
-          ? "border-primary bg-primary/5"
-          : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/20",
-      )}
-    >
-      <div className="text-sm font-medium">{title}</div>
-    </button>
-  );
-}
-
-function ModeCard({
-  title,
-  active,
-  onClick,
-}: {
-  title: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "cursor-pointer rounded-2xl border px-4 py-3 text-left transition-colors",
-        active
-          ? "border-primary bg-primary/5"
-          : "border-border/70 bg-background hover:border-primary/30 hover:bg-muted/20",
-      )}
-    >
-      <div className="text-sm font-medium">{title}</div>
-    </button>
   );
 }

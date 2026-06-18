@@ -66,8 +66,8 @@ export function renderPromptDesktopRow(item: PromptItem, props: SharedProps) {
           />
         </div>
       </TableCell>
-      <TableCell>
-        <div className="max-w-[140px] truncate text-sm font-medium xl:max-w-[180px]">
+      <TableCell className="w-[180px] min-w-[180px] align-middle">
+        <div className="max-w-[168px] truncate text-sm font-medium leading-5 xl:max-w-[180px]">
           {promptCadenceLabel(item, props.locale)}
         </div>
       </TableCell>

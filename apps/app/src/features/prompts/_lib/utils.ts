@@ -92,25 +92,35 @@ function formatHourMinute(hour: number, minute: number) {
 
 export function describeCron(cron: string, locale = "en") {
   const value = cron.trim();
-  if (value === "0 * * * *") return translateI18nText("prompts-workspace", "cronHourly", locale);
-  if (value === "0 9 */2 * *") {
+
+  const hourly = /^0{1,2} \* \* \* \*$/.exec(value);
+  if (hourly) return translateI18nText("prompts-workspace", "cronHourly", locale);
+
+  const everyTwoDays = /^(\d{1,2}) (\d{1,2}) \*\/2 \* \*$/.exec(value);
+  if (everyTwoDays) {
     return translateI18nText("prompts-workspace", "cronEveryTwoDaysAt", locale, {
-      time: "09:00",
+      time: formatHourMinute(Number(everyTwoDays[2]), Number(everyTwoDays[1])),
     });
   }
-  if (value === "0 9 * * 1") {
+
+  const weeklyMonday = /^(\d{1,2}) (\d{1,2}) \* \* 1$/.exec(value);
+  if (weeklyMonday) {
     return translateI18nText("prompts-workspace", "cronWeeklyOnMondayAt", locale, {
-      time: "09:00",
+      time: formatHourMinute(Number(weeklyMonday[2]), Number(weeklyMonday[1])),
     });
   }
-  if (value === "0 9 * * 1,4") return translateI18nText("prompts-workspace", "cronTwiceWeekly", locale);
+
+  if (/^(\d{1,2}) (\d{1,2}) \* \* 1,4$/.test(value)) {
+    return translateI18nText("prompts-workspace", "cronTwiceWeekly", locale);
+  }
+
   if (value === "30 8 * * 6,0") {
     return translateI18nText("prompts-workspace", "cronWeekendsAt", locale, {
       time: "08:30",
     });
   }
 
-  const everyHours = /^0 \*\/(\d+) \* \* \*$/.exec(value);
+  const everyHours = /^0{1,2} \*\/(\d+) \* \* \*$/.exec(value);
   if (everyHours) {
     return translateI18nText("prompts-workspace", "cronEveryHours", locale, {
       count: Number(everyHours[1]),
@@ -161,7 +171,7 @@ export function promptCadenceLabel(item: PromptItem, locale = "en") {
       count: overridesCount,
     });
   }
-  return promptScheduleLabel(item.schedule, item.effectiveCron, locale);
+  return describeCron(item.effectiveCron || item.schedule.cron || DEFAULT_PROMPT_CRON, locale);
 }
 
 export function promptStatusLabel(status: PromptItem["status"], locale = "en") {

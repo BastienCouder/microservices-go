@@ -176,7 +176,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
       id: "ai",
       label: <SortableColumnHeader label={props.promptRowMode === "global" ? content.columnAiCoverage : content.ai} sortKey="ai" promptSort={props.promptSort} promptSortDirection={props.promptSortDirection} changePromptSort={props.changePromptSort} />,
     },
-    { id: "cadence", label: content.columnCadence },
+    { id: "cadence", label: content.columnCadence, className: "w-[180px] min-w-[180px]" },
     {
       id: "mention",
       label: <SortableColumnHeader label={props.promptRowMode === "global" ? content.columnGlobalMention : content.columnAiMention} sortKey="mention" promptSort={props.promptSort} promptSortDirection={props.promptSortDirection} changePromptSort={props.changePromptSort} />,
@@ -241,7 +241,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     {hasSelectedPrompts && isMobile && props.canEdit ? (
                       <>
                         <RunSelectedButton
-                          disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts || props.runningAnyPrompts}
+                          disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts}
                           runningSelectedPrompts={props.runningSelectedPrompts}
                           selectedRunnablePromptCount={props.selectedRunnablePromptCount}
                           runSelectedPrompts={props.runSelectedPrompts}
@@ -278,8 +278,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                           disabled={
                             !hasSelectedPrompts ||
                             !props.canRunSelectedPrompts ||
-                            props.runningSelectedPrompts ||
-                            props.runningAnyPrompts
+                            props.runningSelectedPrompts
                           }
                           runningSelectedPrompts={props.runningSelectedPrompts}
                           selectedRunnablePromptCount={props.selectedRunnablePromptCount}

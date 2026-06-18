@@ -50,6 +50,24 @@ describe("promptCadenceLabel", () => {
         },
         "en",
       ),
-    ).toBe("Every day at 09:00 · UTC");
+    ).toBe("Every day at 09:00");
+  });
+
+  test("recognizes every-two-days cadences with padded time fields", () => {
+    expect(
+      promptCadenceLabel(
+        {
+          ...basePrompt,
+          schedule: {
+            ...basePrompt.schedule,
+            mode: "global",
+            cron: "00 09 */2 * *",
+            modelCrons: {},
+          },
+          effectiveCron: "00 09 */2 * *",
+        },
+        "en",
+      ),
+    ).toBe("Every two days at 09:00");
   });
 });

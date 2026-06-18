@@ -120,6 +120,29 @@ function clampScore(value: number): number {
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
+function buildHeatmapFromBackendRadar(
+  current: PerceptionViewData["modelAxisHeatmap"],
+  radar: PerceptionViewData["radar"],
+): PerceptionViewData["modelAxisHeatmap"] {
+  if (radar.length === 0 || current.rows.length === 0) return current;
+
+  const scoresByAxis: Map<string, number> = new Map(
+    radar.map((point) => [point.axis, point.score] as const),
+  );
+  return {
+    ...current,
+    rows: current.rows.map((row) => ({
+      ...row,
+      values: Object.fromEntries(
+        Object.entries(row.values).map(([axis, value]) => [
+          axis,
+          scoresByAxis.get(axis) ?? value,
+        ]),
+      ) as typeof row.values,
+    })),
+  };
+}
+
 function normalizeAuthoritativeBrandCanon(value: unknown): Partial<BrandCanon> {
   const payload = asObject(value);
 
@@ -235,6 +258,7 @@ function mergePerceptionData(
       sentimentScore: clampScore(asNumber(payload.scores?.sentimentScore ?? base.scores.sentimentScore)),
     },
     topErrors: base.topErrors,
+    modelAxisHeatmap: buildHeatmapFromBackendRadar(base.modelAxisHeatmap, radar),
     responses: base.responses,
     metadata: {
       ...base.metadata,

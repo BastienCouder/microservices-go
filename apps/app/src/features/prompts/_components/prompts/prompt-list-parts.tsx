@@ -138,7 +138,6 @@ export function PromptActions({
   canRunPrompt,
   runPrompt,
   isPromptRunning,
-  runningAnyPrompts,
   canEdit,
 }: {
   item: PromptItem;
@@ -164,7 +163,7 @@ export function PromptActions({
         {
           icon: promptRunnable ? Play : Sparkles,
           title: runLabel,
-          disabled: !promptRunnable || promptRunning || runningAnyPrompts,
+          disabled: !promptRunnable || promptRunning,
           onSelect: () => runPrompt(item),
         },
         {

@@ -177,7 +177,8 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
               loading={state.responsesDataLoading}
               pendingResponse={state.pendingPromptResponse}
               activeAnalysisRunId={state.activeAnalysisRunId}
-              onStopAnalysis={state.stopActiveAnalysis}
+              activeAnalysisRunCount={state.activeAnalysisRunCount}
+              onStopAnalysis={state.stopActiveAnalyses}
               stoppingAnalysis={state.stoppingAnalysis}
               analysisIssue={state.analysisIssue}
               viewMode={state.viewMode}

@@ -167,6 +167,7 @@ type ResponsesViewProps = {
   loading?: boolean;
   pendingResponse?: boolean;
   activeAnalysisRunId?: string | null;
+  activeAnalysisRunCount?: number;
   onStopAnalysis?: () => void;
   stoppingAnalysis?: boolean;
   analysisIssue?: {
@@ -203,6 +204,10 @@ export function ResponsesContent(props: ResponsesViewProps) {
     { id: "competitor", label: content.competitor },
     { id: "score", label: content.score },
   ] as const;
+  const stopAnalysisLabel =
+    (props.activeAnalysisRunCount ?? 0) > 1
+      ? content.stopAnalysesButton
+      : content.stopAnalysisButton;
 
   return (
     <>
@@ -276,10 +281,10 @@ export function ResponsesContent(props: ResponsesViewProps) {
                 if ("pending" in item) {
                   return (
                     <PendingResponseTableRow
-                      canStop={Boolean(props.activeAnalysisRunId)}
+                      canStop={Boolean(props.pendingResponse)}
                       stopping={props.stoppingAnalysis}
                       onStop={props.onStopAnalysis}
-                      stopLabel={content.stopAnalysisButton}
+                      stopLabel={stopAnalysisLabel}
                     />
                   );
                 }

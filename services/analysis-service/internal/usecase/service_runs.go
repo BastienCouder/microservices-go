@@ -637,6 +637,8 @@ func (s *Service) buildPerceptionFromDashboard(
 		"projectModels": append([]string(nil), projectModels...),
 		"competitors":   append([]string(nil), competitors...),
 	}
+	brandReadiness := buildPerceptionBrandReadiness(brandCanon, competitors)
+	result.Metadata["brandReadiness"] = perceptionReadinessMetadata(brandReadiness)
 	responses := dashboard.Responses
 	if hasProjectModels {
 		responses = filterResponsesByModelIDs(responses, projectModels)

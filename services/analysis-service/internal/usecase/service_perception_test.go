@@ -2,6 +2,47 @@ package usecase
 
 import "testing"
 
+func TestPerceptionMetricsRequireBrandCanonContext(t *testing.T) {
+	metrics := buildPerceptionResponseMetrics(AIResponse{
+		RawResponse:    "Fury est cite comme une option interessante avec une perception positive. Source: https://fury.example",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://fury.example"},
+		Sentiment:      "positive",
+	}, BrandCanon{BrandName: "Fury"}, nil)
+
+	if metrics.positioning > 35 {
+		t.Fatalf("expected positioning to be capped without category/positioning context, got %d", metrics.positioning)
+	}
+	if metrics.useCases != 0 {
+		t.Fatalf("expected missing use cases to score 0, got %d", metrics.useCases)
+	}
+	if metrics.features != 0 {
+		t.Fatalf("expected missing features to score 0, got %d", metrics.features)
+	}
+	if metrics.competitors != 0 {
+		t.Fatalf("expected missing competitors to score 0, got %d", metrics.competitors)
+	}
+}
+
+func TestPerceptionBrandReadinessCapturesMissingContext(t *testing.T) {
+	readiness := buildPerceptionBrandReadiness(BrandCanon{BrandName: "Fury"}, nil)
+
+	if readiness.score >= 40 {
+		t.Fatalf("expected low readiness for brand-name-only canon, got %d", readiness.score)
+	}
+	if readiness.cap != 35 {
+		t.Fatalf("expected low-readiness cap of 35, got %d", readiness.cap)
+	}
+	if readiness.axisStatus["competitors"] != "not_configured" {
+		t.Fatalf("expected competitors to be not_configured, got %q", readiness.axisStatus["competitors"])
+	}
+	if readiness.axisStatus["use_cases"] != "missing_context" {
+		t.Fatalf("expected use_cases to be missing_context, got %q", readiness.axisStatus["use_cases"])
+	}
+}
+
 func TestPerceptionCompetitorsScoreDifferentiatesMentionFromCompetitiveLoss(t *testing.T) {
 	canon := BrandCanon{
 		BrandName:   "Nike",

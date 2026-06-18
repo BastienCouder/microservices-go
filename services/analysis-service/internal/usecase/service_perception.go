@@ -69,6 +69,13 @@ func perceptionPositioningScore(response AIResponse, canon BrandCanon, normalize
 		score += 15
 	}
 
+	if strings.TrimSpace(canon.Category) == "" && strings.TrimSpace(canon.Positioning) == "" {
+		return min(clampToPercent(float64(score)), 35)
+	}
+	if strings.TrimSpace(canon.Category) == "" || strings.TrimSpace(canon.Positioning) == "" {
+		return min(clampToPercent(float64(score)), 70)
+	}
+
 	return clampToPercent(float64(score))
 }
 
@@ -90,14 +97,7 @@ func perceptionFactualScore(response AIResponse, canon BrandCanon, normalizedRes
 func perceptionCanonCoverageScore(normalizedResponse string, canonItems []string, brandMentioned bool, citationFound bool) int {
 	normalizedItems := normalizeCanonList(canonItems)
 	if len(normalizedItems) == 0 {
-		score := 15
-		if brandMentioned {
-			score = 65
-		}
-		if citationFound {
-			score += 15
-		}
-		return clampToPercent(float64(score))
+		return 0
 	}
 
 	matched := 0
@@ -138,6 +138,10 @@ func perceptionCompetitorsScore(
 	factual int,
 	sentiment int,
 ) int {
+	if len(normalizeCanonList(projectCompetitors)) == 0 {
+		return 0
+	}
+
 	base := clampToPercent(float64(positioning)*0.5 + float64(factual)*0.2 + float64(sentiment)*0.3)
 	matchedCompetitors := matchedPerceptionCompetitors(normalizedResponse, projectCompetitors)
 	hasComparison := containsCompetitiveComparisonSignal(normalizedResponse)
@@ -174,6 +178,74 @@ func perceptionCompetitorsScore(
 	}
 
 	return clampToPercent(float64(base - penalty))
+}
+
+type perceptionBrandReadiness struct {
+	score      int
+	cap        int
+	missing    []string
+	axisStatus map[string]string
+}
+
+func buildPerceptionBrandReadiness(canon BrandCanon, projectCompetitors []string) perceptionBrandReadiness {
+	checks := []struct {
+		key    string
+		ready  bool
+		axis   string
+		status string
+	}{
+		{key: "brandName", ready: strings.TrimSpace(canon.BrandName) != ""},
+		{key: "category", ready: strings.TrimSpace(canon.Category) != "", axis: "positioning", status: "missing_context"},
+		{key: "positioning", ready: strings.TrimSpace(canon.Positioning) != "", axis: "positioning", status: "missing_context"},
+		{key: "audience", ready: len(normalizeCanonList(canon.Audience)) > 0, axis: "use_cases", status: "missing_context"},
+		{key: "useCases", ready: len(normalizeCanonList(canon.UseCases)) > 0, axis: "use_cases", status: "missing_context"},
+		{key: "features", ready: len(normalizeCanonList(canon.Features)) > 0, axis: "features", status: "missing_context"},
+		{key: "competitors", ready: len(normalizeCanonList(projectCompetitors)) > 0, axis: "competitors", status: "not_configured"},
+	}
+
+	readyCount := 0
+	missing := make([]string, 0, len(checks))
+	axisStatus := map[string]string{
+		"positioning": "measurable",
+		"use_cases":   "measurable",
+		"features":    "measurable",
+		"sentiment":   "measurable",
+		"competitors": "measurable",
+	}
+	for _, check := range checks {
+		if check.ready {
+			readyCount++
+			continue
+		}
+		missing = append(missing, check.key)
+		if check.axis != "" {
+			axisStatus[check.axis] = check.status
+		}
+	}
+
+	score := clampToPercent(float64(readyCount) / float64(len(checks)) * 100)
+	cap := 100
+	if score < 40 {
+		cap = 35
+	} else if score < 70 {
+		cap = 65
+	}
+
+	return perceptionBrandReadiness{
+		score:      score,
+		cap:        cap,
+		missing:    missing,
+		axisStatus: axisStatus,
+	}
+}
+
+func perceptionReadinessMetadata(readiness perceptionBrandReadiness) map[string]any {
+	return map[string]any{
+		"score":      readiness.score,
+		"cap":        readiness.cap,
+		"missing":    append([]string(nil), readiness.missing...),
+		"axisStatus": readiness.axisStatus,
+	}
 }
 
 func matchedPerceptionCompetitors(normalizedResponse string, competitors []string) []string {

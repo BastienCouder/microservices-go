@@ -10,6 +10,7 @@ type ResponsesTabContentProps = {
   loading?: boolean;
   pendingResponse?: boolean;
   activeAnalysisRunId?: string | null;
+  activeAnalysisRunCount?: number;
   onStopAnalysis?: () => void;
   stoppingAnalysis?: boolean;
   analysisIssue?: {

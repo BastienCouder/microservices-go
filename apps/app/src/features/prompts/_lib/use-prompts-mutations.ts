@@ -2,10 +2,8 @@
 import type { Dispatch, SetStateAction } from "react";
 import { useMutation, type QueryClient } from "@tanstack/react-query";
 import {
-  dismissToast,
   pushErrorToast,
   pushInfoToast,
-  pushLoadingToast,
   pushSuccessToast,
   pushWarningToast,
 } from "@/components/ui/toast-actions";
@@ -325,6 +323,21 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         queryKey: ["analysis-runs", params.apiBaseURL, params.organizationId, params.activeProjectId],
       });
       await params.queryClient.invalidateQueries({
+        queryKey: appQueryKeys.promptQuota(
+          params.apiBaseURL,
+          params.organizationId,
+          params.activeProjectId,
+        ),
+      });
+      await params.queryClient.refetchQueries({
+        queryKey: appQueryKeys.promptQuota(
+          params.apiBaseURL,
+          params.organizationId,
+          params.activeProjectId,
+        ),
+        type: "active",
+      });
+      await params.queryClient.invalidateQueries({
         predicate: (query) =>
           isMonitoringQueryForProject(query.queryKey, params.apiBaseURL, params.activeProjectId),
       });
@@ -377,14 +390,9 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
         return [...retained, ...nextEntries];
       });
       params.setRunningPromptRowIds(nextEntries.map((prompt) => prompt.rowId));
-      const toastId = pushLoadingToast(
-        t("runPromptInProgressTitle"),
-        t("runPromptInProgressDescription", { count: promptsToRun.length }),
-      );
-      return { rowIds: nextEntries.map((prompt) => prompt.rowId), toastId };
+      return { rowIds: nextEntries.map((prompt) => prompt.rowId) };
     },
     onError: (error, promptsToRun, context) => {
-      dismissToast(context?.toastId);
       const failedRowIds = new Set(
         context?.rowIds ?? promptsToRun.map((prompt) => prompt.id),
       );
@@ -396,26 +404,15 @@ export function usePromptsMutations(params: UsePromptsMutationsParams) {
       );
       pushErrorToast(error, t("runPromptApiError"));
     },
-    onSuccess: async (data, promptsToRun, context) => {
-      dismissToast(context?.toastId);
-      pushInfoToast(
-        t("runPromptAcceptedTitle"),
-        t("runPromptAcceptedDescription", { count: promptsToRun.length }),
-        data.runIds.length > 0
-          ? {
-              label: t("stopAnalysisButton"),
-              onClick: () => {
-                for (const runId of data.runIds) {
-                  cancelAnalysisMutation.mutate(runId);
-                }
-              },
-            }
-          : undefined,
-      );
+    onSuccess: async () => {
       await params.queryClient.invalidateQueries({
         predicate: (query) =>
           isMonitoringQueryForProject(query.queryKey, params.apiBaseURL, params.activeProjectId),
       });
+      await params.queryClient.invalidateQueries({
+        queryKey: ["analysis-runs", params.apiBaseURL, params.organizationId, params.activeProjectId],
+      });
+      await params.refreshMonitoringData();
       await invalidateCatalog();
     },
     onSettled: async () => {
