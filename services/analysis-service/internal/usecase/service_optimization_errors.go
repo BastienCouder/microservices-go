@@ -17,7 +17,7 @@ var optimizationSeverityTitles = map[string]string{
 var optimizationSeverityOrder = []string{"high", "medium", "low"}
 
 func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, organizationID int64) (OptimizationErrorBoard, error) {
-	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
+	dashboard, err := s.getProjectDashboardData(ctx, projectID, organizationID)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}

@@ -214,8 +214,8 @@ func TestPreviewOnboardingBrandProfileCrawlsHomeAndAboutPages(t *testing.T) {
 	if preview.BrandName != "Acme" {
 		t.Fatalf("expected brand name Acme, got %q", preview.BrandName)
 	}
-	if preview.BrandShortDescription == "" || preview.BrandDescription == "" {
-		t.Fatalf("expected descriptions to be inferred, got %#v", preview)
+	if preview.BrandDescription == "" {
+		t.Fatalf("expected description to be inferred, got %#v", preview)
 	}
 	if preview.Industry != "SaaS / logiciel" {
 		t.Fatalf("expected SaaS industry, got %q", preview.Industry)

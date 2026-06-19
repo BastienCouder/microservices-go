@@ -8,6 +8,8 @@ service AnalysisService {
   rpc StartAnalysis(StartAnalysisRequest) returns (StartAnalysisResponse);
   rpc GetAnalysisRun(GetAnalysisRunRequest) returns (GetAnalysisRunResponse);
   rpc RecordResponse(RecordResponseRequest) returns (RecordResponseResponse);
+  rpc FailAnalysisRun(FailAnalysisRunRequest) returns (FailAnalysisRunResponse);
+  rpc ListMissingAnalysisPrompts(ListMissingAnalysisPromptsRequest) returns (ListMissingAnalysisPromptsResponse);
 }
 
 message PromptText {
@@ -63,4 +65,23 @@ message RecordResponseRequest {
 
 message RecordResponseResponse {
   bool recorded = 1;
+}
+
+message FailAnalysisRunRequest {
+  string run_id = 1;
+}
+
+message FailAnalysisRunResponse {
+  AnalysisRun analysis_run = 1;
+}
+
+message ListMissingAnalysisPromptsRequest {
+  string project_id = 1;
+  repeated string prompt_ids = 2;
+  repeated string model_ids = 3;
+  string run_type = 4;
+}
+
+message ListMissingAnalysisPromptsResponse {
+  repeated string prompt_ids = 1;
 }

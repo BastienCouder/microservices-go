@@ -95,6 +95,50 @@ func (s *Server) GetAnalysisRun(ctx context.Context, req *analysisv1.GetAnalysis
 	}, nil
 }
 
+func (s *Server) FailAnalysisRun(ctx context.Context, req *analysisv1.FailAnalysisRunRequest) (*analysisv1.FailAnalysisRunResponse, error) {
+	if strings.TrimSpace(req.GetRunId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "run_id is required")
+	}
+	claims, ok := internalauth.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claims")
+	}
+
+	run, err := s.svc.FailAnalysisRun(ctx, req.GetRunId(), claims.Organization)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &analysisv1.FailAnalysisRunResponse{
+		AnalysisRun: &analysisv1.AnalysisRun{
+			Id:     run.ID,
+			Status: run.Status,
+		},
+	}, nil
+}
+
+func (s *Server) ListMissingAnalysisPrompts(ctx context.Context, req *analysisv1.ListMissingAnalysisPromptsRequest) (*analysisv1.ListMissingAnalysisPromptsResponse, error) {
+	if strings.TrimSpace(req.GetProjectId()) == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+	claims, ok := internalauth.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claims")
+	}
+
+	promptIDs, err := s.svc.ListMissingAnalysisPromptIDs(
+		ctx,
+		req.GetProjectId(),
+		claims.Organization,
+		req.GetPromptIds(),
+		req.GetModelIds(),
+		req.GetRunType(),
+	)
+	if err != nil {
+		return nil, toStatus(err)
+	}
+	return &analysisv1.ListMissingAnalysisPromptsResponse{PromptIds: promptIDs}, nil
+}
+
 func forceAnalysisFromMetadata(ctx context.Context) bool {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {

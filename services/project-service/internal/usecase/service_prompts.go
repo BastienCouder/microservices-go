@@ -286,6 +286,13 @@ func normalizePromptPage(input ListPromptsInput) ListPromptsInput {
 		input.PageSize = 100
 	}
 	input.Search = strings.TrimSpace(input.Search)
+	input.Kind = strings.ToLower(strings.TrimSpace(input.Kind))
+	switch input.Kind {
+	case PromptKindPerception, "all":
+		// explicit filters
+	default:
+		input.Kind = PromptKindMonitoring
+	}
 	return input
 }
 
@@ -303,9 +310,14 @@ func (s *Service) ListPrompts(ctx context.Context, projectID string, organizatio
 
 	input = normalizePromptPage(input)
 	search := strings.ToLower(input.Search)
+	kind := input.Kind
 	prompts := make([]Prompt, 0)
 	for _, prompt := range s.prompts {
 		if prompt.ProjectID != projectID {
+			continue
+		}
+		promptKind := normalizePromptKind(prompt.Kind)
+		if kind != "all" && promptKind != kind {
 			continue
 		}
 		if search != "" && !strings.Contains(strings.ToLower(prompt.Text), search) {

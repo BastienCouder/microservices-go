@@ -8,9 +8,24 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 )
+
+func waitForHandlerCondition(t *testing.T, condition func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if condition() {
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	if !condition() {
+		t.Fatalf("condition was not met before deadline")
+	}
+}
 
 type handlerTestGA4OAuthProvider struct {
 	exchangeErr error
@@ -41,6 +56,14 @@ func (s *handlerAnalysisClientSpy) RecordResponse(_ context.Context, _ string, _
 
 func (s *handlerAnalysisClientSpy) IsAnalysisRunCancelled(_ context.Context, _ string, _ int64) (bool, error) {
 	return false, nil
+}
+
+func (s *handlerAnalysisClientSpy) FailAnalysisRun(_ context.Context, _ string, _ int64) error {
+	return nil
+}
+
+func (s *handlerAnalysisClientSpy) ListMissingAnalysisPromptIDs(_ context.Context, _ string, _ int64, promptIDs []string, _ []string, _ string) ([]string, error) {
+	return append([]string(nil), promptIDs...), nil
 }
 
 type handlerIAClientSpy struct {
@@ -234,6 +257,9 @@ func TestManualAnalysisRunRouteExecutesPrompt(t *testing.T) {
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected POST 201, got %d: %s", rec.Code, rec.Body.String())
 	}
+	waitForHandlerCondition(t, func() bool {
+		return analysisSpy.startCalls == 1 && iaSpy.execCalls == 1 && analysisSpy.recordCalls == 1
+	})
 	if analysisSpy.startCalls != 1 || iaSpy.execCalls != 1 || analysisSpy.recordCalls != 1 {
 		t.Fatalf("expected full manual pipeline, got start=%d ia=%d record=%d", analysisSpy.startCalls, iaSpy.execCalls, analysisSpy.recordCalls)
 	}

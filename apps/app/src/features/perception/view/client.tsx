@@ -20,7 +20,7 @@ import {
   usePerceptionViewModel,
 } from "../_lib";
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
-import { CheckCircle2, Download, Sparkles, Target } from "lucide-react";
+import { CheckCircle2, Download, Sparkles, Square, Target } from "lucide-react";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 import {
   readOrganizationIdFromSearch,
@@ -48,6 +48,9 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
   const organizationId =
     readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
   const emptyStateLabel = initialData.metadata.emptyStateLabel;
+  const perceptionEmptyStateLabel = viewModel.perceptionBrandContextReady
+    ? emptyStateLabel
+    : t("brandContextRequiredEmpty");
   const periodLabel = getPerceptionPeriodLabel(
     viewModel.selectedPeriod,
     locale,
@@ -58,16 +61,63 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
   );
   const heroActions = (
     <div className="flex flex-col md:flex-row items-center gap-2">
-      {permissions.canEdit ? (
+      {permissions.canEdit && viewModel.perceptionAnalysisPending ? (
+        <Button
+          size="sm"
+          variant="secondary"
+          className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+          disabled={viewModel.perceptionStopPending}
+          onClick={viewModel.handleStopPerceptionAnalysis}
+        >
+          <Square className="size-4 fill-current" />
+          {t("stopAnalysis")}
+        </Button>
+      ) : null}
+      {permissions.canEdit && viewModel.canResumePerceptionAnalysis ? (
+        <>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+            disabled={
+              !viewModel.perceptionBrandContextReady ||
+              viewModel.perceptionAnalysisPending ||
+              viewModel.perceptionQuotaLoading ||
+              !initialData.metadata.projectId
+            }
+            title={!viewModel.perceptionBrandContextReady ? t("brandContextRequiredEmpty") : undefined}
+            onClick={viewModel.handleResumePerceptionAnalysis}
+          >
+            {t("resumeAnalysis")}
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
+            disabled={
+              !viewModel.perceptionBrandContextReady ||
+              viewModel.perceptionAnalysisPending ||
+              viewModel.perceptionQuotaLoading ||
+              !initialData.metadata.projectId
+            }
+            title={!viewModel.perceptionBrandContextReady ? t("brandContextRequiredEmpty") : undefined}
+            onClick={viewModel.handleRestartPerceptionAnalysis}
+          >
+            {t("restartAnalysis")}
+          </Button>
+        </>
+      ) : permissions.canEdit ? (
         <Button
           size="sm"
           variant="secondary"
           className="bg-background/20 text-background/90 hover:bg-background/30 hover:text-background"
           disabled={
-            viewModel.analysisRunning ||
+            !viewModel.perceptionBrandContextReady ||
+            viewModel.perceptionAnalysisPending ||
             viewModel.perceptionQuotaLoading ||
             !initialData.metadata.projectId
           }
+          title={!viewModel.perceptionBrandContextReady ? t("brandContextRequiredEmpty") : undefined}
           onClick={() => setAnalysisDialogOpen(true)}
         >
           {t("analyzePerception")}
@@ -164,7 +214,8 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
               <PerceptionDonutVisual
                 points={viewModel.filteredRadar}
                 periodLabel={periodBadgeLabel}
-                emptyLabel={emptyStateLabel}
+                emptyLabel={perceptionEmptyStateLabel}
+                loadingNumbers={viewModel.perceptionDataLoading}
               />
             </CardContent>
           </Card>
@@ -173,14 +224,15 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
             axes={viewModel.modelAxisHeatmap.axes}
             rows={viewModel.modelAxisHeatmap.rows}
             periodLabel={periodBadgeLabel}
-            emptyLabel={emptyStateLabel}
+            emptyLabel={perceptionEmptyStateLabel}
+            loadingNumbers={viewModel.perceptionDataLoading}
           />
 
           <PerceptionTrendChart
             data={viewModel.perceptionTrend.data}
             periodLabel={periodLabel}
             badgeLabel={periodBadgeLabel}
-            emptyLabel={emptyStateLabel}
+            emptyLabel={perceptionEmptyStateLabel}
           />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -191,6 +243,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
                 icon={
                   SCORE_CARD_ICONS[card.id as keyof typeof SCORE_CARD_ICONS]
                 }
+                loadingNumber={viewModel.perceptionDataLoading}
               />
             ))}
           </div>
@@ -209,7 +262,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           category={initialData.brandCanon.category}
           modelOptions={viewModel.modelCatalog}
           primaryLanguage={initialData.metadata.primaryLanguage ?? "fr"}
-          running={viewModel.analysisRunning}
+          running={viewModel.perceptionAnalysisPending}
           quotaLoading={viewModel.perceptionQuotaLoading}
           monthlyCredits={viewModel.perceptionMonthlyCredits}
           remainingCredits={viewModel.perceptionRemainingCredits}

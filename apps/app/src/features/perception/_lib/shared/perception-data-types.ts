@@ -20,7 +20,6 @@ export type PerceptionSourceFilter = "perception" | "monitoring" | "all";
 
 export type BrandCanon = {
   brandName: string;
-  shortDescription: string;
   category: string;
   positioning: string;
   audience: string[];
@@ -104,6 +103,7 @@ export type PerceptionResponseRecord = {
   modelName: string;
   modelGroupName: string;
   createdAt: string | null;
+  rawResponse?: string;
   brandMentioned: boolean;
   citationFound: boolean;
   sentiment: "positive" | "neutral" | "negative";
@@ -175,7 +175,6 @@ export type PerceptionApiPayloadWithDashboard = PerceptionApiPayload & {
 
 const EMPTY_BRAND_CANON: BrandCanon = {
   brandName: "",
-  shortDescription: "",
   category: "",
   positioning: "",
   audience: [],

@@ -29,7 +29,6 @@ export type OnboardingBrandProfilePreview = {
   status: string;
   crawlJobId?: string;
   brandName: string;
-  brandShortDescription: string;
   brandDescription: string;
   industry: string;
   keyFeatures: string[];
@@ -192,7 +191,6 @@ export async function previewOnboardingBrandProfile(
     status: getString(record.status) || "completed",
     crawlJobId: getString(record.crawlJobId) || undefined,
     brandName: getString(record.brandName),
-    brandShortDescription: getString(record.brandShortDescription),
     brandDescription: getString(record.brandDescription),
     industry: getString(record.industry),
     keyFeatures: getStringArray(record.keyFeatures),

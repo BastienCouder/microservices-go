@@ -49,10 +49,7 @@ export async function saveBrandCanonProject(
     }),
   });
 
-  return {
-    ...savedCanon,
-    shortDescription: savedCanon.shortDescription ?? canon.shortDescription,
-  };
+  return savedCanon;
 }
 
 export async function syncCompetitors(

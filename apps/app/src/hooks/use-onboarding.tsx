@@ -28,7 +28,6 @@ export type OnboardingState = {
   websiteUrl: string;
   attributionSource: string;
   brandName: string;
-  brandShortDescription: string;
   brandDescription: string;
   industry: string;
   keyFeatures: string[];
@@ -46,7 +45,6 @@ type OnboardingContextValue = OnboardingState & {
   setWebsiteUrl: (url: string) => void;
   setAttributionSource: (source: string) => void;
   setBrandName: (name: string) => void;
-  setBrandShortDescription: (description: string) => void;
   setBrandDescription: (description: string) => void;
   setIndustry: (industry: string) => void;
   setKeyFeatures: (features: string[]) => void;
@@ -71,7 +69,6 @@ const DEFAULT_ONBOARDING_STATE: OnboardingState = {
   websiteUrl: "",
   attributionSource: "",
   brandName: "",
-  brandShortDescription: "",
   brandDescription: "",
   industry: "",
   keyFeatures: [],
@@ -145,10 +142,6 @@ export function sanitizePersistedOnboardingState(
         ? record.attributionSource
         : undefined,
     brandName: typeof record.brandName === "string" ? record.brandName : undefined,
-    brandShortDescription:
-      typeof record.brandShortDescription === "string"
-        ? record.brandShortDescription
-        : undefined,
     brandDescription:
       typeof record.brandDescription === "string"
         ? record.brandDescription
@@ -226,9 +219,6 @@ export function OnboardingProvider({
     mergedState.attributionSource,
   );
   const [brandName, setBrandName] = useState(mergedState.brandName);
-  const [brandShortDescription, setBrandShortDescription] = useState(
-    mergedState.brandShortDescription,
-  );
   const [brandDescription, setBrandDescription] = useState(
     mergedState.brandDescription,
   );
@@ -266,7 +256,6 @@ export function OnboardingProvider({
       websiteUrl,
       attributionSource,
       brandName,
-      brandShortDescription,
       brandDescription,
       industry,
       keyFeatures,
@@ -291,7 +280,6 @@ export function OnboardingProvider({
     brandName,
     brandPersonas,
     brandPreparationCompleted,
-    brandShortDescription,
     competitors,
     industry,
     keyFeatures,
@@ -309,7 +297,6 @@ export function OnboardingProvider({
       websiteUrl,
       attributionSource,
       brandName,
-      brandShortDescription,
       brandDescription,
       industry,
       keyFeatures,
@@ -324,7 +311,6 @@ export function OnboardingProvider({
       setWebsiteUrl,
       setAttributionSource,
       setBrandName,
-      setBrandShortDescription,
       setBrandDescription,
       setIndustry,
       setKeyFeatures,
@@ -341,7 +327,6 @@ export function OnboardingProvider({
       brandName,
       brandPersonas,
       brandPreparationCompleted,
-      brandShortDescription,
       competitors,
       organizationName,
       attributionSource,

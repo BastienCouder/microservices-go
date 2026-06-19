@@ -224,6 +224,55 @@ func (c *Client) RecordResponse(ctx context.Context, runID string, input usecase
 	})
 }
 
+func (c *Client) FailAnalysisRun(ctx context.Context, runID string, organizationID int64) error {
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", internalauth.Claims{
+		Organization: organizationID,
+	})
+	if err != nil {
+		return fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	return c.executeWithResilience(ctx, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
+		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		_, callErr := c.client.FailAnalysisRun(callCtx, &analysisv1.FailAnalysisRunRequest{
+			RunId: runID,
+		})
+		if callErr != nil {
+			return isTransientGRPCError(callErr), callErr
+		}
+		return false, nil
+	})
+}
+
+func (c *Client) ListMissingAnalysisPromptIDs(ctx context.Context, projectID string, organizationID int64, promptIDs []string, modelIDs []string, runType string) ([]string, error) {
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", internalauth.Claims{
+		Organization: organizationID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	var grpcResp *analysisv1.ListMissingAnalysisPromptsResponse
+	err = c.executeWithResilience(ctx, 3, 50*time.Millisecond, 800*time.Millisecond, func(attemptCtx context.Context) (bool, error) {
+		callCtx := metadata.AppendToOutgoingContext(attemptCtx, "authorization", "Bearer "+token)
+		resp, callErr := c.client.ListMissingAnalysisPrompts(callCtx, &analysisv1.ListMissingAnalysisPromptsRequest{
+			ProjectId: projectID,
+			PromptIds: promptIDs,
+			ModelIds:  modelIDs,
+			RunType:   runType,
+		})
+		if callErr != nil {
+			return isTransientGRPCError(callErr), callErr
+		}
+		grpcResp = resp
+		return false, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return append([]string(nil), grpcResp.GetPromptIds()...), nil
+}
+
 func (c *Client) IsAnalysisRunCancelled(ctx context.Context, runID string, organizationID int64) (bool, error) {
 	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "analysis-service", "project-service", internalauth.Claims{
 		Organization: organizationID,

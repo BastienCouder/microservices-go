@@ -28,7 +28,6 @@ import {
 } from "@/shared/selection";
 import { CompetitorEditor } from "./competitor-editor";
 import { EditableListField } from "./editable-list-field";
-import { deriveShortDescription } from "@/features/brands/_lib/overview/brand-overview-helpers";
 import {
   buildBrandsLocation,
   saveBrandCanonProject,
@@ -52,12 +51,7 @@ export function BrandCanonEditorPanel({
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
-  const [canonDraft, setCanonDraft] = useState<BrandCanon>(() => ({
-    ...initialData.brandCanon,
-    shortDescription:
-      initialData.brandCanon.shortDescription.trim() ||
-      deriveShortDescription(initialData.brandCanon),
-  }));
+  const [canonDraft, setCanonDraft] = useState<BrandCanon>(() => initialData.brandCanon);
   const [competitorsDraft, setCompetitorsDraft] = useState<BrandCompetitor[]>(() => initialData.competitors);
   const brandsLocation = buildBrandsLocation(location.search);
   const loadError = initialData.metadata.emptyStateLabel;
@@ -145,20 +139,20 @@ export function BrandCanonEditorPanel({
       const perceptionKeys: Array<ReturnType<typeof appQueryKeys.perception>> = [
         appQueryKeys.perception(
           apiBaseURL,
-          initialData.metadata.projectId ?? null,
+          routeProjectToken ?? null,
           organizationId,
           runtimeMode,
         ),
       ];
 
       if (
-        routeProjectToken &&
+        initialData.metadata.projectId &&
         routeProjectToken !== initialData.metadata.projectId
       ) {
         perceptionKeys.push(
           appQueryKeys.perception(
             apiBaseURL,
-            routeProjectToken,
+            initialData.metadata.projectId,
             organizationId,
             runtimeMode,
           ),
@@ -169,7 +163,11 @@ export function BrandCanonEditorPanel({
         patchPerceptionCache(queryKey, resolvedCanon, normalizedCompetitors);
       }
 
-      await invalidateQueryKeys(queryClient, perceptionKeys);
+      await invalidateQueryKeys(queryClient, [
+        ...perceptionKeys,
+        ["perception", apiBaseURL],
+        ["monitoring", apiBaseURL],
+      ]);
       pushSuccessToast(t("savedMessage"));
       navigate(brandsLocation);
     },
@@ -215,19 +213,6 @@ export function BrandCanonEditorPanel({
                     <Input disabled={!canEdit} value={canonDraft.category} onChange={(e) => update("category", e.target.value)} />
                   </Field>
                 </div>
-
-                <Field
-                  label={t("fieldShortDescription")}
-                  description={t("fieldShortDescriptionHint")}
-                >
-                  <Textarea
-                    value={canonDraft.shortDescription}
-                    disabled={!canEdit}
-                    onChange={(e) => update("shortDescription", e.target.value)}
-                    placeholder={t("fieldShortDescriptionPlaceholder")}
-                    className="min-h-[96px] text-sm"
-                  />
-                </Field>
 
                 <Field label={t("fieldLongDescription")}>
                   <Textarea

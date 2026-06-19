@@ -357,6 +357,7 @@ type UpdatePromptsStatusInput struct {
 
 type ListPromptsInput struct {
 	Search   string
+	Kind     string
 	Page     int
 	PageSize int
 }
@@ -463,6 +464,7 @@ type RunPerceptionAnalysisInput struct {
 	PromptIDs []string
 	ModelIDs  []string
 	Force     bool
+	Restart   bool
 }
 
 type AnalysisRecordResponseInput struct {
@@ -524,6 +526,8 @@ type OutboxEvent struct {
 type AnalysisClient interface {
 	StartAnalysis(ctx context.Context, req AnalysisStartRequest) (AnalysisStartResponse, error)
 	IsAnalysisRunCancelled(ctx context.Context, runID string, organizationID int64) (bool, error)
+	FailAnalysisRun(ctx context.Context, runID string, organizationID int64) error
+	ListMissingAnalysisPromptIDs(ctx context.Context, projectID string, organizationID int64, promptIDs []string, modelIDs []string, runType string) ([]string, error)
 	RecordResponse(ctx context.Context, runID string, input AnalysisRecordResponseInput) error
 }
 

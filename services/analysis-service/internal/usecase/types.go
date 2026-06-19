@@ -48,19 +48,29 @@ type PromptRun struct {
 }
 
 type AIResponse struct {
-	ID             string    `json:"id"`
-	RunID          string    `json:"runId"`
-	RunType        string    `json:"runType,omitempty"`
-	PromptKind     string    `json:"promptKind,omitempty"`
-	PromptRunID    string    `json:"promptRunId"`
-	ModelID        string    `json:"modelId"`
-	RawResponse    string    `json:"rawResponse"`
-	BrandMentioned bool      `json:"brandMentioned"`
-	BrandPosition  string    `json:"brandPosition"`
-	CitationFound  bool      `json:"citationFound"`
-	CitedURLs      []string  `json:"citedUrls"`
-	Sentiment      string    `json:"sentiment"`
-	CreatedAt      time.Time `json:"createdAt"`
+	ID             string                         `json:"id"`
+	RunID          string                         `json:"runId"`
+	RunType        string                         `json:"runType,omitempty"`
+	PromptKind     string                         `json:"promptKind,omitempty"`
+	PromptRunID    string                         `json:"promptRunId"`
+	ModelID        string                         `json:"modelId"`
+	RawResponse    string                         `json:"rawResponse"`
+	BrandMentioned bool                           `json:"brandMentioned"`
+	BrandPosition  string                         `json:"brandPosition"`
+	CitationFound  bool                           `json:"citationFound"`
+	CitedURLs      []string                       `json:"citedUrls"`
+	Sentiment      string                         `json:"sentiment"`
+	CreatedAt      time.Time                      `json:"createdAt"`
+	Metrics        *PerceptionResponseAxisMetrics `json:"metrics,omitempty"`
+}
+
+type PerceptionResponseAxisMetrics struct {
+	Positioning int `json:"positioning"`
+	Factual     int `json:"factual"`
+	UseCases    int `json:"use_cases"`
+	Features    int `json:"features"`
+	Sentiment   int `json:"sentiment"`
+	Competitors int `json:"competitors"`
 }
 
 type StartAnalysisInput struct {

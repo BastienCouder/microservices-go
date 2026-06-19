@@ -109,6 +109,93 @@ func TestStartAnalysisCreatesRun(t *testing.T) {
 	}
 }
 
+func TestListMissingAnalysisPromptIDsReturnsOnlyIncompletePerceptionPrompts(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	result, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Describe Acme positioning", Kind: promptKindPerception},
+			{ID: "prompt-2", Text: "Who is Acme for?", Kind: promptKindPerception},
+			{ID: "prompt-3", Text: "Compare Acme with competitors", Kind: promptKindPerception},
+		},
+		ModelIDs: []string{"model-1"},
+		RunType:  promptKindPerception,
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+	for _, promptRun := range result.PromptRuns[:2] {
+		if err := svc.RecordResponse(ctx, ResponseInput{
+			RunID:          result.AnalysisRun.ID,
+			PromptRunID:    promptRun.ID,
+			ModelID:        "model-1",
+			RawResponse:    "Acme response",
+			BrandMentioned: true,
+			Sentiment:      "positive",
+		}); err != nil {
+			t.Fatalf("record response: %v", err)
+		}
+	}
+	if _, err := svc.FailAnalysisRun(ctx, result.AnalysisRun.ID, 42); err != nil {
+		t.Fatalf("fail analysis run: %v", err)
+	}
+
+	missing, err := svc.ListMissingAnalysisPromptIDs(
+		ctx,
+		"project-1",
+		42,
+		[]string{"prompt-1", "prompt-2", "prompt-3"},
+		[]string{"model-1"},
+		promptKindPerception,
+	)
+	if err != nil {
+		t.Fatalf("list missing prompts: %v", err)
+	}
+	if len(missing) != 1 || missing[0] != "prompt-3" {
+		t.Fatalf("expected only prompt-3 missing, got %#v", missing)
+	}
+}
+
+func TestListAnalysisRunsMarksStalledRunningRunsFailed(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+	startedAt := time.Date(2026, 6, 19, 10, 0, 0, 0, time.UTC)
+	svc.now = func() time.Time { return startedAt }
+
+	result, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Describe Acme", Kind: promptKindPerception},
+		},
+		ModelIDs: []string{"model-1"},
+		RunType:  promptKindPerception,
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	svc.now = func() time.Time { return startedAt.Add(analysisRunStalledAfter + time.Minute) }
+	runs, err := svc.ListAnalysisRuns(ctx, "project-1", 42, 5)
+	if err != nil {
+		t.Fatalf("list analysis runs: %v", err)
+	}
+	if len(runs) == 0 {
+		t.Fatalf("expected analysis run")
+	}
+	if runs[0].ID != result.AnalysisRun.ID {
+		t.Fatalf("expected run %q, got %q", result.AnalysisRun.ID, runs[0].ID)
+	}
+	if runs[0].Status != "failed" {
+		t.Fatalf("expected stalled run to be failed, got %q", runs[0].Status)
+	}
+}
+
 func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()
@@ -123,7 +210,7 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 			{ID: "perception-1", Text: "What is Acme?", Kind: "perception"},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start perception: %v", err)
@@ -138,7 +225,7 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 			{ID: "perception-2", Text: "Who is Acme for?", Kind: "perception"},
 		},
 		ModelIDs: []string{"sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("reuse perception: %v", err)
@@ -156,7 +243,7 @@ func TestStartAnalysisReusesFreshPerceptionRunForAWeek(t *testing.T) {
 			{ID: "perception-3", Text: "How does Acme compare?", Kind: "perception"},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("new weekly perception: %v", err)
@@ -740,6 +827,108 @@ func TestGetDashboardAggregatesAllProjectRuns(t *testing.T) {
 	}
 }
 
+func TestGetDashboardExcludesPerceptionRuns(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	monitoring, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "monitoring-1", Text: "Best CRM for small teams", Kind: promptKindMonitoring},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start monitoring: %v", err)
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          monitoring.AnalysisRun.ID,
+		PromptRunID:    monitoring.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme is mentioned for small teams",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record monitoring response: %v", err)
+	}
+
+	perception, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-1", Text: "What is Acme?", Kind: promptKindPerception},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  promptKindPerception,
+	})
+	if err != nil {
+		t.Fatalf("start perception: %v", err)
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          perception.AnalysisRun.ID,
+		PromptRunID:    perception.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme has a clear positioning",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record perception response: %v", err)
+	}
+
+	dashboard, err := svc.GetDashboard(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get dashboard: %v", err)
+	}
+	if dashboard.LatestRun == nil || dashboard.LatestRun.ID != monitoring.AnalysisRun.ID {
+		t.Fatalf("expected latest monitoring run %q, got %+v", monitoring.AnalysisRun.ID, dashboard.LatestRun)
+	}
+	if len(dashboard.PromptRuns) != 1 || dashboard.PromptRuns[0].Kind != promptKindMonitoring {
+		t.Fatalf("expected only monitoring prompt runs, got %+v", dashboard.PromptRuns)
+	}
+	if len(dashboard.Responses) != 1 {
+		t.Fatalf("expected only monitoring responses, got %+v", dashboard.Responses)
+	}
+	if dashboard.Responses[0].RunID != monitoring.AnalysisRun.ID {
+		t.Fatalf("expected monitoring response, got %+v", dashboard.Responses[0])
+	}
+}
+
+func TestListAnalysisRunsDerivesPerceptionRunTypeFromPromptKind(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-1", Text: "What is Acme?", Kind: promptKindPerception},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start perception-like manual run: %v", err)
+	}
+
+	runs, err := svc.ListAnalysisRuns(ctx, "project-1", 42, 10)
+	if err != nil {
+		t.Fatalf("list analysis runs: %v", err)
+	}
+	if len(runs) == 0 || runs[0].ID != started.AnalysisRun.ID {
+		t.Fatalf("expected listed run %q, got %+v", started.AnalysisRun.ID, runs)
+	}
+	if runs[0].RunType != promptKindPerception {
+		t.Fatalf("expected perception run type to be derived from prompt kind, got %q", runs[0].RunType)
+	}
+}
+
 func TestUpdateBrandCanonPersistsAndNormalizesLists(t *testing.T) {
 	store := &mutableAnalysisStore{}
 	ctx := context.Background()
@@ -832,9 +1021,84 @@ func TestGetPerceptionIncludesBrandCanon(t *testing.T) {
 	}
 }
 
-func TestGetPerceptionWithDashboardReturnsDashboardFromSameLoad(t *testing.T) {
+func TestGetPerceptionDoesNotScoreWhenBrandCanonIsMissing(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "perception-1", Text: "What is Acme?", Kind: "perception"},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  promptKindPerception,
+	})
+	if err != nil {
+		t.Fatalf("start perception: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme is a strong option with positive sentiment and a citation. Source: https://example.com/acme",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		CitationFound:  true,
+		CitedURLs:      []string{"https://example.com/acme"},
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record perception response: %v", err)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception: %v", err)
+	}
+	if perception.Scores.PositioningAccuracy != 0 ||
+		perception.Scores.FactualAccuracy != 0 {
+		t.Fatalf("expected missing brand canon to keep context-dependent scores empty, got %+v", perception.Scores)
+	}
+	if perception.Scores.SentimentScore != 100 {
+		t.Fatalf("expected missing brand canon to keep sentiment measurable, got %+v", perception.Scores)
+	}
+	if len(perception.Responses) != 1 {
+		t.Fatalf("expected perception response to stay visible, got %+v", perception.Responses)
+	}
+	if perception.Responses[0].Metrics == nil {
+		t.Fatalf("expected response metrics")
+	}
+	if perception.Responses[0].Metrics.Positioning != 0 ||
+		perception.Responses[0].Metrics.Factual != 0 ||
+		perception.Responses[0].Metrics.UseCases != 0 ||
+		perception.Responses[0].Metrics.Features != 0 ||
+		perception.Responses[0].Metrics.Competitors != 0 {
+		t.Fatalf("expected only sentiment to be measurable, got %+v", perception.Responses[0].Metrics)
+	}
+	if perception.Responses[0].Metrics.Sentiment != 100 {
+		t.Fatalf("expected positive sentiment score 100, got %+v", perception.Responses[0].Metrics)
+	}
+	if perception.Metadata["sourceMode"] != "brand_context_missing" {
+		t.Fatalf("expected brand_context_missing source mode, got %#v", perception.Metadata["sourceMode"])
+	}
+}
+
+func TestGetPerceptionWithDashboardDoesNotUseMonitoringResponses(t *testing.T) {
+	ctx := context.Background()
+	svc := NewService()
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
 
 	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
 		OrganizationID: 42,
@@ -872,11 +1136,14 @@ func TestGetPerceptionWithDashboardReturnsDashboardFromSameLoad(t *testing.T) {
 	if len(perception.Dashboard.Responses) != 1 {
 		t.Fatalf("expected bundled dashboard responses, got %+v", perception.Dashboard.Responses)
 	}
-	if len(perception.Responses) != 1 {
-		t.Fatalf("expected perception responses to reuse the same filtered dataset, got %+v", perception.Responses)
+	if len(perception.Responses) != 0 {
+		t.Fatalf("expected perception responses to ignore monitoring data, got %+v", perception.Responses)
 	}
-	if got := perception.Metadata["responses"]; got != 1 {
-		t.Fatalf("expected perception metadata from the same data set, got %#v", got)
+	if got := perception.Metadata["responses"]; got != 0 {
+		t.Fatalf("expected perception metadata to stay empty, got %#v", got)
+	}
+	if got := perception.Metadata["sourceMode"]; got != "perception_empty" {
+		t.Fatalf("expected perception_empty source mode, got %#v", got)
 	}
 }
 
@@ -905,10 +1172,10 @@ func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"gpt-4o-mini", "sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1009,10 +1276,10 @@ func TestGetPerceptionUsesBackendPositioningTopErrorTitle(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1073,10 +1340,10 @@ func TestGetPerceptionReturnsReplacementTopErrors(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1134,10 +1401,10 @@ func TestGetPerceptionUsesProjectCompetitorsForCompetitiveAxis(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1219,10 +1486,10 @@ func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"gpt-4o-mini", "sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1304,10 +1571,10 @@ func TestGetOptimizationErrorsGroupsPerceptionAndCrawlerErrors(t *testing.T) {
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"gpt-4o-mini"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)
@@ -1430,10 +1697,10 @@ func TestGetOptimizationErrorsExcludesDerivedMonitoringDiagnostics(t *testing.T)
 		CreatedBy:      7,
 		ProjectID:      "project-1",
 		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?"},
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
 		},
 		ModelIDs: []string{"gpt-4o-mini", "sonar"},
-		RunType:  "manual",
+		RunType:  promptKindPerception,
 	})
 	if err != nil {
 		t.Fatalf("start analysis: %v", err)

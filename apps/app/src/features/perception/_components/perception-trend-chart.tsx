@@ -4,7 +4,9 @@ import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Line, LineChart, ResponsiveContainer, XAxis, YAxis } from "recharts";
+import { Info } from "lucide-react";
 import { APP_CHART_UI_COLORS, PERCEPTION_TREND_COLORS } from "@/lib/app-data";
 import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -203,9 +205,24 @@ function TrendDefinitionCard({
     <div className="rounded-xl border border-border/60 bg-muted/15 p-3">
       <div className="flex items-center gap-2 text-xs font-medium text-foreground">
         <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: color }} />
-        {title}
+        <span className="min-w-0 flex-1 truncate">{title}</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label={description}
+              >
+                <Info className="h-3.5 w-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-72 leading-relaxed">
+              {description}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
-      <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{description}</p>
     </div>
   );
 }

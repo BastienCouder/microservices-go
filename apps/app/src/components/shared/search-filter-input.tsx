@@ -38,7 +38,7 @@ export function SearchFilterInput({
           }
         }}
         placeholder={placeholder ?? t("search")}
-        className={cn("pl-9", inputClassName)}
+        className={cn("pl-9 h-8", inputClassName)}
       />
     </label>
   );

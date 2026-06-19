@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	promptKindMonitoring = "monitoring"
-	promptKindPerception = "perception"
+	promptKindMonitoring    = "monitoring"
+	promptKindPerception    = "perception"
+	analysisRunStalledAfter = 30 * time.Minute
 )
 
 func normalizePromptKind(raw string) string {
@@ -32,6 +33,23 @@ func allPromptsHaveKind(prompts []PromptText, kind string) bool {
 		}
 	}
 	return true
+}
+
+func normalizeStringIDs(values []string) []string {
+	normalized := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		if _, ok := seen[trimmed]; ok {
+			continue
+		}
+		seen[trimmed] = struct{}{}
+		normalized = append(normalized, trimmed)
+	}
+	return normalized
 }
 
 func analysisRunAcceptsResponses(status string) bool {
@@ -64,7 +82,7 @@ func (s *Service) StartAnalysis(ctx context.Context, input StartAnalysisInput) (
 	if runType == "" {
 		runType = "manual"
 	}
-	if runType != "manual" && runType != "scheduled" {
+	if runType != "manual" && runType != "scheduled" && runType != promptKindPerception {
 		return StartAnalysisResult{}, fmt.Errorf("%w: invalid runType", ErrValidation)
 	}
 
@@ -431,6 +449,32 @@ func (s *Service) CancelAnalysisRun(ctx context.Context, runID string, organizat
 	return copyAnalysisRun(run), nil
 }
 
+func (s *Service) FailAnalysisRun(ctx context.Context, runID string, organizationID int64) (AnalysisRun, error) {
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return AnalysisRun{}, fmt.Errorf("%w: runId is required", ErrValidation)
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return AnalysisRun{}, err
+	}
+	run, ok := s.runs[runID]
+	if !ok {
+		s.mu.Unlock()
+		return AnalysisRun{}, fmt.Errorf("%w: run", ErrNotFound)
+	}
+	projectID := run.ProjectID
+	s.mu.Unlock()
+
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return AnalysisRun{}, err
+	}
+
+	return s.ReleaseCreditUsage(ctx, runID)
+}
+
 func (s *Service) ListAnalysisRuns(ctx context.Context, projectID string, organizationID int64, limit int) ([]AnalysisRun, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
@@ -449,6 +493,11 @@ func (s *Service) ListAnalysisRuns(ctx context.Context, projectID string, organi
 	if err := s.reloadLocked(ctx); err != nil {
 		return nil, err
 	}
+	if s.failStalledAnalysisRunsLocked(s.now().UTC()) {
+		if err := s.persistLocked(ctx); err != nil {
+			return nil, err
+		}
+	}
 
 	ids := s.runsByProject[projectID]
 	if len(ids) == 0 {
@@ -461,9 +510,110 @@ func (s *Service) ListAnalysisRuns(ctx context.Context, projectID string, organi
 		if run == nil {
 			continue
 		}
-		out = append(out, copyAnalysisRun(run))
+		out = append(out, s.copyAnalysisRunWithDerivedKindLocked(run))
 	}
 	return out, nil
+}
+
+func (s *Service) copyAnalysisRunWithDerivedKindLocked(run *AnalysisRun) AnalysisRun {
+	out := copyAnalysisRun(run)
+	if s.runHasPromptKindLocked(out.ID, promptKindPerception) {
+		out.RunType = promptKindPerception
+	}
+	return out
+}
+
+func (s *Service) failStalledAnalysisRunsLocked(now time.Time) bool {
+	changed := false
+	for _, run := range s.runs {
+		if run == nil || strings.TrimSpace(strings.ToLower(run.Status)) != "running" {
+			continue
+		}
+		if run.UpdatedAt.IsZero() || now.Sub(run.UpdatedAt) < analysisRunStalledAfter {
+			continue
+		}
+		run.Status = "failed"
+		run.UpdatedAt = now
+		changed = true
+	}
+	return changed
+}
+
+func (s *Service) ListMissingAnalysisPromptIDs(ctx context.Context, projectID string, organizationID int64, promptIDs []string, modelIDs []string, runType string) ([]string, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return nil, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return nil, err
+	}
+
+	normalizedPrompts := normalizeStringIDs(promptIDs)
+	if len(normalizedPrompts) == 0 {
+		return []string{}, nil
+	}
+	normalizedModels := normalizeStringIDs(modelIDs)
+	normalizedRunType := strings.TrimSpace(runType)
+	if normalizedRunType == "" {
+		normalizedRunType = "manual"
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return nil, err
+	}
+
+	var candidate *AnalysisRun
+	ids := s.runsByProject[projectID]
+	for i := len(ids) - 1; i >= 0; i-- {
+		run := s.runs[ids[i]]
+		if run == nil || run.RunType != normalizedRunType {
+			continue
+		}
+		status := strings.ToLower(strings.TrimSpace(run.Status))
+		if status != "failed" && status != "errored" {
+			continue
+		}
+		if run.CompletedResponses <= 0 || (run.ExpectedResponses > 0 && run.CompletedResponses >= run.ExpectedResponses) {
+			continue
+		}
+		candidate = run
+		break
+	}
+	if candidate == nil {
+		return normalizedPrompts, nil
+	}
+
+	expectedModels := len(normalizedModels)
+	if expectedModels == 0 {
+		expectedModels = max(1, candidate.ModelsCount)
+	}
+	promptRunByPromptID := make(map[string]PromptRun)
+	for _, promptRun := range s.promptRunsForRunLocked(candidate.ID) {
+		promptRunByPromptID[promptRun.PromptID] = promptRun
+	}
+	responsesByPromptRunID := make(map[string]map[string]struct{})
+	for _, response := range s.responsesForRunLocked(candidate.ID) {
+		if responsesByPromptRunID[response.PromptRunID] == nil {
+			responsesByPromptRunID[response.PromptRunID] = make(map[string]struct{})
+		}
+		responsesByPromptRunID[response.PromptRunID][response.ModelID] = struct{}{}
+	}
+
+	missing := make([]string, 0, len(normalizedPrompts))
+	for _, promptID := range normalizedPrompts {
+		promptRun, ok := promptRunByPromptID[promptID]
+		if !ok {
+			missing = append(missing, promptID)
+			continue
+		}
+		if len(responsesByPromptRunID[promptRun.ID]) < expectedModels {
+			missing = append(missing, promptID)
+		}
+	}
+	return missing, nil
 }
 
 func (s *Service) GetAnalysisRun(ctx context.Context, runID string, organizationID int64) (AnalysisRunDetails, error) {
@@ -584,7 +734,7 @@ func (s *Service) GetPromptQuotaUsage(ctx context.Context, projectID string, org
 }
 
 func (s *Service) GetPerception(ctx context.Context, projectID string, organizationID int64) (PerceptionData, error) {
-	dashboard, err := s.GetDashboard(ctx, projectID, organizationID)
+	dashboard, err := s.getProjectDashboardData(ctx, projectID, organizationID)
 	if err != nil {
 		return PerceptionData{}, err
 	}
@@ -596,7 +746,11 @@ func (s *Service) GetPerceptionWithDashboard(ctx context.Context, projectID stri
 	if err != nil {
 		return PerceptionWithDashboardData{}, err
 	}
-	perception, err := s.buildPerceptionFromDashboard(ctx, projectID, organizationID, dashboard)
+	perceptionDashboard, err := s.getProjectDashboardData(ctx, projectID, organizationID)
+	if err != nil {
+		return PerceptionWithDashboardData{}, err
+	}
+	perception, err := s.buildPerceptionFromDashboard(ctx, projectID, organizationID, perceptionDashboard)
 	if err != nil {
 		return PerceptionWithDashboardData{}, err
 	}
@@ -604,6 +758,24 @@ func (s *Service) GetPerceptionWithDashboard(ctx context.Context, projectID stri
 		PerceptionData: perception,
 		Dashboard:      dashboard,
 	}, nil
+}
+
+func (s *Service) getProjectDashboardData(ctx context.Context, projectID string, organizationID int64) (DashboardData, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return DashboardData{}, fmt.Errorf("%w: projectId is required", ErrValidation)
+	}
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return DashboardData{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if err := s.reloadLocked(ctx); err != nil {
+		return DashboardData{}, err
+	}
+	return s.projectDashboardDataLocked(projectID), nil
 }
 
 func (s *Service) buildPerceptionFromDashboard(
@@ -645,13 +817,10 @@ func (s *Service) buildPerceptionFromDashboard(
 	}
 	perceptionResponses := filterResponsesByPromptKind(responses, promptKindPerception)
 	monitoringResponsesUsed := 0
-	sourceMode := "fallback_all"
-	if len(perceptionResponses) > 0 {
-		monitoringResponsesUsed = 0
-		responses = perceptionResponses
-		sourceMode = "perception_primary"
-	} else {
-		monitoringResponsesUsed = len(responses)
+	responses = perceptionResponses
+	sourceMode := "perception_primary"
+	if len(perceptionResponses) == 0 {
+		sourceMode = "perception_empty"
 	}
 	if !dashboard.HasData || len(responses) == 0 {
 		result.Responses = []AIResponse{}
@@ -662,13 +831,21 @@ func (s *Service) buildPerceptionFromDashboard(
 		result.Metadata["sourceMode"] = sourceMode
 		return result, nil
 	}
+	if !isPerceptionBrandContextReady(brandCanon) {
+		sourceMode = "brand_context_missing"
+	}
 
 	metrics := make([]perceptionResponseMetrics, 0, len(responses))
+	responsesWithMetrics := make([]AIResponse, 0, len(responses))
 	modelsSet := make(map[string]struct{}, len(responses))
 	metricsByModel := make(map[string][]perceptionResponseMetrics)
 	for _, response := range responses {
 		responseMetrics := buildPerceptionResponseMetrics(response, brandCanon, competitors)
+		responseMetrics = applyPerceptionReadinessToMetrics(responseMetrics, brandReadiness)
 		metrics = append(metrics, responseMetrics)
+		axisMetrics := perceptionResponseAxisMetrics(responseMetrics)
+		response.Metrics = &axisMetrics
+		responsesWithMetrics = append(responsesWithMetrics, response)
 		modelID := strings.TrimSpace(response.ModelID)
 		if modelID != "" {
 			modelsSet[modelID] = struct{}{}
@@ -682,15 +859,20 @@ func (s *Service) buildPerceptionFromDashboard(
 	}
 	sort.Strings(models)
 
-	result.Scores = derivePerceptionScoresFromMetrics(metrics)
-	result.Radar = derivePerceptionRadarFromMetrics(metrics)
-	result.TopErrors = derivePerceptionTopErrors(brandCanon, result.Scores, result.Radar, metricsByModel)
-	result.Responses = append([]AIResponse(nil), responses...)
-	result.Metadata["models"] = models
-	result.Metadata["latestRunId"] = ""
-	if dashboard.LatestRun != nil {
-		result.Metadata["latestRunId"] = dashboard.LatestRun.ID
+	result.Scores = capPerceptionScoresForBrandReadiness(
+		derivePerceptionScoresFromMetrics(metrics),
+		brandReadiness,
+	)
+	result.Radar = capPerceptionRadarForBrandReadiness(
+		derivePerceptionRadarFromMetrics(metrics),
+		brandReadiness,
+	)
+	if isPerceptionBrandContextReady(brandCanon) {
+		result.TopErrors = derivePerceptionTopErrors(brandCanon, result.Scores, result.Radar, metricsByModel)
 	}
+	result.Responses = responsesWithMetrics
+	result.Metadata["models"] = models
+	result.Metadata["latestRunId"] = latestResponseRunID(responses)
 	result.Metadata["windowLabel"] = derivePerceptionWindowLabel(responses, time.Now().UTC())
 	result.Metadata["responses"] = len(responses)
 	result.Metadata["analyzedResponses"] = len(responses)
@@ -702,6 +884,9 @@ func (s *Service) buildPerceptionFromDashboard(
 }
 
 func normalizeResponsePromptKind(response AIResponse) string {
+	if normalizePromptKind(response.RunType) == promptKindPerception {
+		return promptKindPerception
+	}
 	if normalizePromptKind(response.PromptKind) == promptKindPerception {
 		return promptKindPerception
 	}
@@ -716,4 +901,19 @@ func filterResponsesByPromptKind(responses []AIResponse, kind string) []AIRespon
 		}
 	}
 	return out
+}
+
+func latestResponseRunID(responses []AIResponse) string {
+	latestRunID := ""
+	var latestCreatedAt time.Time
+	for _, response := range responses {
+		if strings.TrimSpace(response.RunID) == "" {
+			continue
+		}
+		if latestRunID == "" || response.CreatedAt.After(latestCreatedAt) {
+			latestRunID = response.RunID
+			latestCreatedAt = response.CreatedAt
+		}
+	}
+	return latestRunID
 }

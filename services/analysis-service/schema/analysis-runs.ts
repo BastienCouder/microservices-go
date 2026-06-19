@@ -9,7 +9,7 @@ export const analysisRuns = pgTable("analysis_runs", {
     organizationId: integer("organization_id").notNull(),
     createdBy: integer("created_by").notNull(),
 
-    runType: text("run_type").default("manual").notNull(), // manual | scheduled
+    runType: text("run_type").default("manual").notNull(), // manual | scheduled | perception
     status: text("status").default("queued").notNull(), // queued | running | completed | failed
 
     startedAt: timestamp("started_at"),

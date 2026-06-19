@@ -561,6 +561,7 @@ type runPerceptionAnalysisRequest struct {
 	PromptIDs []string `json:"promptIds"`
 	ModelIDs  []string `json:"modelIds"`
 	Force     bool     `json:"force"`
+	Restart   bool     `json:"restart"`
 }
 
 func (h *Handler) runManualAnalysis(w http.ResponseWriter, r *http.Request, projectID string) {
@@ -617,6 +618,7 @@ func (h *Handler) runPerceptionAnalysis(w http.ResponseWriter, r *http.Request, 
 		PromptIDs: req.PromptIDs,
 		ModelIDs:  req.ModelIDs,
 		Force:     req.Force,
+		Restart:   req.Restart,
 	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
@@ -691,6 +693,7 @@ func (h *Handler) listPrompts(w http.ResponseWriter, r *http.Request, projectID 
 	pageSize, _ := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("page_size")))
 	prompts, err := h.svc.ListPrompts(r.Context(), projectID, organizationID, usecase.ListPromptsInput{
 		Search:   r.URL.Query().Get("search"),
+		Kind:     r.URL.Query().Get("kind"),
 		Page:     page,
 		PageSize: pageSize,
 	})

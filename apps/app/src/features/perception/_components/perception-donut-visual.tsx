@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { PerceptionViewData } from "../_lib/shared/perception-data";
 import { PERCEPTION_DONUT_COLORS, PERCEPTION_VISIBLE_AXES } from "@/lib/app-data";
 import { SectionTitle } from "@/components/shared/section-title";
@@ -18,10 +19,12 @@ export function PerceptionDonutVisual({
   points,
   periodLabel,
   emptyLabel,
+  loadingNumbers = false,
 }: {
   points: PerceptionViewData["radar"];
   periodLabel: string;
   emptyLabel?: string | null;
+  loadingNumbers?: boolean;
 }) {
   const { locale, t } = useScopedI18n("perception");
   const rankedPoints = useMemo<RankedPoint[]>(() => {
@@ -75,7 +78,13 @@ export function PerceptionDonutVisual({
       </div>
       <div className="mt-3 space-y-3">
         {rankedPoints.map((point, index) => (
-          <AxisProgressRow key={point.axis} point={point} rank={index + 1} locale={locale} />
+          <AxisProgressRow
+            key={point.axis}
+            point={point}
+            rank={index + 1}
+            locale={locale}
+            loadingNumber={loadingNumbers}
+          />
         ))}
       </div>
     </div>
@@ -86,13 +95,15 @@ function AxisProgressRow({
   point,
   rank,
   locale,
+  loadingNumber,
 }: {
   point: RankedPoint;
   rank: number;
   locale: string;
+  loadingNumber: boolean;
 }) {
   const { t } = useScopedI18n("perception");
-  const progressWidth = `${Math.max(6, Math.min(100, point.score))}%`;
+  const progressWidth = `${Math.max(0, Math.min(100, point.score))}%`;
   const targetOffset = `calc(${Math.max(0, Math.min(100, point.target))}% - 1px)`;
   const delta = point.score - point.target;
   const statusLabel = delta >= 0 ? t("donutAboveTarget") : t("donutBelowTarget");
@@ -120,9 +131,13 @@ function AxisProgressRow({
         </div>
 
         <div className="shrink-0 text-right">
-          <div className="text-xl font-semibold tabular-nums" style={{ color: point.color }}>
-            {point.score}
-          </div>
+          {loadingNumber ? (
+            <Skeleton className="ml-auto h-7 w-10 rounded-md" />
+          ) : (
+            <div className="text-xl font-semibold tabular-nums" style={{ color: point.color }}>
+              {point.score}
+            </div>
+          )}
           <div className="text-[11px] text-muted-foreground">/100</div>
         </div>
       </div>
@@ -130,7 +145,7 @@ function AxisProgressRow({
       <div className="mt-3">
         <div className="relative h-3.5 overflow-hidden rounded-full bg-muted/50">
           <div
-            className="absolute inset-y-0 left-0 rounded-full"
+            className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-out"
             style={{
               width: progressWidth,
               backgroundColor: point.color,

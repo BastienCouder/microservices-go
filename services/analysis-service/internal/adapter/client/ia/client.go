@@ -389,13 +389,12 @@ func parseContentIssueResponse(rawResponse string, pageURL string) ([]usecase.Co
 }
 
 type onboardingBrandProfileResponse struct {
-	BrandName             string                                     `json:"brandName"`
-	BrandShortDescription string                                     `json:"brandShortDescription"`
-	BrandDescription      string                                     `json:"brandDescription"`
-	Industry              string                                     `json:"industry"`
-	KeyFeatures           []string                                   `json:"keyFeatures"`
-	Competitors           []usecase.OnboardingBrandProfileCompetitor `json:"competitors"`
-	Prompts               []usecase.OnboardingBrandProfilePrompt     `json:"prompts"`
+	BrandName        string                                     `json:"brandName"`
+	BrandDescription string                                     `json:"brandDescription"`
+	Industry         string                                     `json:"industry"`
+	KeyFeatures      []string                                   `json:"keyFeatures"`
+	Competitors      []usecase.OnboardingBrandProfileCompetitor `json:"competitors"`
+	Prompts          []usecase.OnboardingBrandProfilePrompt     `json:"prompts"`
 }
 
 func buildOnboardingBrandProfilePrompt(input usecase.OnboardingBrandProfileAnalysisInput) string {
@@ -405,10 +404,9 @@ func buildOnboardingBrandProfilePrompt(input usecase.OnboardingBrandProfileAnaly
 Analyse le contenu crawle de la page d'accueil et de la page a propos, puis retourne uniquement du JSON valide, sans markdown.
 
 Schema exact:
-{"brandName":"...","brandShortDescription":"...","brandDescription":"...","industry":"...","keyFeatures":["..."],"competitors":[{"name":"...","website":"..."}],"prompts":[{"text":"...","language":"fr"}]}
+{"brandName":"...","brandDescription":"...","industry":"...","keyFeatures":["..."],"competitors":[{"name":"...","website":"..."}],"prompts":[{"text":"...","language":"fr"}]}
 
 Regles:
-- brandShortDescription: 1 phrase claire.
 - brandDescription: 1 a 2 paragraphes exploitables dans un formulaire.
 - keyFeatures: 3 a 5 propositions de valeur concretes.
 - competitors: 3 a 5 concurrents plausibles; website peut etre vide si incertain.
@@ -440,13 +438,12 @@ func parseOnboardingBrandProfileResponse(rawResponse string) (usecase.Onboarding
 	}
 
 	return usecase.OnboardingBrandProfilePreview{
-		BrandName:             strings.TrimSpace(parsed.BrandName),
-		BrandShortDescription: strings.TrimSpace(parsed.BrandShortDescription),
-		BrandDescription:      strings.TrimSpace(parsed.BrandDescription),
-		Industry:              strings.TrimSpace(parsed.Industry),
-		KeyFeatures:           cleanOnboardingFeatureList(parsed.KeyFeatures, 5),
-		Competitors:           cleanOnboardingCompetitors(parsed.Competitors, 5),
-		Prompts:               cleanOnboardingPrompts(parsed.Prompts, 6),
+		BrandName:        strings.TrimSpace(parsed.BrandName),
+		BrandDescription: strings.TrimSpace(parsed.BrandDescription),
+		Industry:         strings.TrimSpace(parsed.Industry),
+		KeyFeatures:      cleanOnboardingFeatureList(parsed.KeyFeatures, 5),
+		Competitors:      cleanOnboardingCompetitors(parsed.Competitors, 5),
+		Prompts:          cleanOnboardingPrompts(parsed.Prompts, 6),
 	}, nil
 }
 

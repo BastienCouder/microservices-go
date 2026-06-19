@@ -19,9 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AnalysisService_StartAnalysis_FullMethodName  = "/analysis.v1.AnalysisService/StartAnalysis"
-	AnalysisService_GetAnalysisRun_FullMethodName = "/analysis.v1.AnalysisService/GetAnalysisRun"
-	AnalysisService_RecordResponse_FullMethodName = "/analysis.v1.AnalysisService/RecordResponse"
+	AnalysisService_StartAnalysis_FullMethodName              = "/analysis.v1.AnalysisService/StartAnalysis"
+	AnalysisService_GetAnalysisRun_FullMethodName             = "/analysis.v1.AnalysisService/GetAnalysisRun"
+	AnalysisService_RecordResponse_FullMethodName             = "/analysis.v1.AnalysisService/RecordResponse"
+	AnalysisService_FailAnalysisRun_FullMethodName            = "/analysis.v1.AnalysisService/FailAnalysisRun"
+	AnalysisService_ListMissingAnalysisPrompts_FullMethodName = "/analysis.v1.AnalysisService/ListMissingAnalysisPrompts"
 )
 
 // AnalysisServiceClient is the client API for AnalysisService service.
@@ -31,6 +33,8 @@ type AnalysisServiceClient interface {
 	StartAnalysis(ctx context.Context, in *StartAnalysisRequest, opts ...grpc.CallOption) (*StartAnalysisResponse, error)
 	GetAnalysisRun(ctx context.Context, in *GetAnalysisRunRequest, opts ...grpc.CallOption) (*GetAnalysisRunResponse, error)
 	RecordResponse(ctx context.Context, in *RecordResponseRequest, opts ...grpc.CallOption) (*RecordResponseResponse, error)
+	FailAnalysisRun(ctx context.Context, in *FailAnalysisRunRequest, opts ...grpc.CallOption) (*FailAnalysisRunResponse, error)
+	ListMissingAnalysisPrompts(ctx context.Context, in *ListMissingAnalysisPromptsRequest, opts ...grpc.CallOption) (*ListMissingAnalysisPromptsResponse, error)
 }
 
 type analysisServiceClient struct {
@@ -71,6 +75,26 @@ func (c *analysisServiceClient) RecordResponse(ctx context.Context, in *RecordRe
 	return out, nil
 }
 
+func (c *analysisServiceClient) FailAnalysisRun(ctx context.Context, in *FailAnalysisRunRequest, opts ...grpc.CallOption) (*FailAnalysisRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FailAnalysisRunResponse)
+	err := c.cc.Invoke(ctx, AnalysisService_FailAnalysisRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *analysisServiceClient) ListMissingAnalysisPrompts(ctx context.Context, in *ListMissingAnalysisPromptsRequest, opts ...grpc.CallOption) (*ListMissingAnalysisPromptsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMissingAnalysisPromptsResponse)
+	err := c.cc.Invoke(ctx, AnalysisService_ListMissingAnalysisPrompts_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AnalysisServiceServer is the server API for AnalysisService service.
 // All implementations must embed UnimplementedAnalysisServiceServer
 // for forward compatibility.
@@ -78,6 +102,8 @@ type AnalysisServiceServer interface {
 	StartAnalysis(context.Context, *StartAnalysisRequest) (*StartAnalysisResponse, error)
 	GetAnalysisRun(context.Context, *GetAnalysisRunRequest) (*GetAnalysisRunResponse, error)
 	RecordResponse(context.Context, *RecordResponseRequest) (*RecordResponseResponse, error)
+	FailAnalysisRun(context.Context, *FailAnalysisRunRequest) (*FailAnalysisRunResponse, error)
+	ListMissingAnalysisPrompts(context.Context, *ListMissingAnalysisPromptsRequest) (*ListMissingAnalysisPromptsResponse, error)
 	mustEmbedUnimplementedAnalysisServiceServer()
 }
 
@@ -96,6 +122,12 @@ func (UnimplementedAnalysisServiceServer) GetAnalysisRun(context.Context, *GetAn
 }
 func (UnimplementedAnalysisServiceServer) RecordResponse(context.Context, *RecordResponseRequest) (*RecordResponseResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RecordResponse not implemented")
+}
+func (UnimplementedAnalysisServiceServer) FailAnalysisRun(context.Context, *FailAnalysisRunRequest) (*FailAnalysisRunResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method FailAnalysisRun not implemented")
+}
+func (UnimplementedAnalysisServiceServer) ListMissingAnalysisPrompts(context.Context, *ListMissingAnalysisPromptsRequest) (*ListMissingAnalysisPromptsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListMissingAnalysisPrompts not implemented")
 }
 func (UnimplementedAnalysisServiceServer) mustEmbedUnimplementedAnalysisServiceServer() {}
 func (UnimplementedAnalysisServiceServer) testEmbeddedByValue()                         {}
@@ -172,6 +204,42 @@ func _AnalysisService_RecordResponse_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AnalysisService_FailAnalysisRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailAnalysisRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnalysisServiceServer).FailAnalysisRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalysisService_FailAnalysisRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalysisServiceServer).FailAnalysisRun(ctx, req.(*FailAnalysisRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AnalysisService_ListMissingAnalysisPrompts_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMissingAnalysisPromptsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnalysisServiceServer).ListMissingAnalysisPrompts(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnalysisService_ListMissingAnalysisPrompts_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnalysisServiceServer).ListMissingAnalysisPrompts(ctx, req.(*ListMissingAnalysisPromptsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AnalysisService_ServiceDesc is the grpc.ServiceDesc for AnalysisService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -190,6 +258,14 @@ var AnalysisService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RecordResponse",
 			Handler:    _AnalysisService_RecordResponse_Handler,
+		},
+		{
+			MethodName: "FailAnalysisRun",
+			Handler:    _AnalysisService_FailAnalysisRun_Handler,
+		},
+		{
+			MethodName: "ListMissingAnalysisPrompts",
+			Handler:    _AnalysisService_ListMissingAnalysisPrompts_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

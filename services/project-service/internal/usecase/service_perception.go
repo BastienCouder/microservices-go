@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -257,5 +258,51 @@ func (s *Service) RunPerceptionAnalysis(ctx context.Context, projectID string, o
 	if requestID == "" {
 		requestID = fmt.Sprintf("%s-perception-%s", projectID, time.Now().UTC().Format("20060102"))
 	}
-	return s.runAnalysis(ctx, projectCopy, prompts, modelIDs, competitors, requestID, "manual", input.Force)
+	if !input.Restart {
+		prompts = s.filterPerceptionPromptsForResume(ctx, projectCopy.ID, projectCopy.OrganizationID, prompts, modelIDs)
+	}
+	return s.runAnalysis(ctx, projectCopy, prompts, modelIDs, competitors, requestID, PromptKindPerception, input.Force)
+}
+
+func (s *Service) filterPerceptionPromptsForResume(ctx context.Context, projectID string, organizationID int64, prompts []AnalysisPromptText, modelIDs []string) []AnalysisPromptText {
+	if len(prompts) <= 1 || s.analysisClient == nil {
+		return prompts
+	}
+	promptIDs := make([]string, 0, len(prompts))
+	for _, prompt := range prompts {
+		promptIDs = append(promptIDs, prompt.ID)
+	}
+	missingPromptIDs, err := s.analysisClient.ListMissingAnalysisPromptIDs(ctx, projectID, organizationID, promptIDs, modelIDs, PromptKindPerception)
+	if err != nil {
+		log.Printf(
+			"perception_analysis.resume_lookup_failed project_id=%s organization_id=%d error=%v",
+			projectID,
+			organizationID,
+			err,
+		)
+		return prompts
+	}
+	if len(missingPromptIDs) == 0 || len(missingPromptIDs) >= len(prompts) {
+		return prompts
+	}
+	missing := make(map[string]struct{}, len(missingPromptIDs))
+	for _, promptID := range missingPromptIDs {
+		missing[strings.TrimSpace(promptID)] = struct{}{}
+	}
+	filtered := make([]AnalysisPromptText, 0, len(missingPromptIDs))
+	for _, prompt := range prompts {
+		if _, ok := missing[prompt.ID]; ok {
+			filtered = append(filtered, prompt)
+		}
+	}
+	if len(filtered) == 0 {
+		return prompts
+	}
+	log.Printf(
+		"perception_analysis.resume_missing project_id=%s prompts=%d missing=%d",
+		projectID,
+		len(prompts),
+		len(filtered),
+	)
+	return filtered
 }

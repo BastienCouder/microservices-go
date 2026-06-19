@@ -11,7 +11,7 @@ func (s *Service) loadDashboardFromCache(ctx context.Context, projectID string, 
 	if err != nil || !ok {
 		return DashboardData{}, false
 	}
-	return dashboard, true
+	return filterDashboardForMonitoring(dashboard), true
 }
 
 func (s *Service) storeDashboardInCache(ctx context.Context, projectID string, organizationID int64, dashboard DashboardData) {
@@ -30,6 +30,21 @@ func (s *Service) deleteDashboardFromCache(ctx context.Context, projectID string
 }
 
 func (s *Service) dashboardDataLocked(projectID string) DashboardData {
+	dashboard := filterDashboardForMonitoring(s.projectDashboardDataLocked(projectID))
+	ids := s.runsByProject[projectID]
+	for i := len(ids) - 1; i >= 0; i-- {
+		run := s.runs[ids[i]]
+		if run == nil || !s.isMonitoringRunLocked(run) {
+			continue
+		}
+		latest := copyAnalysisRun(run)
+		dashboard.LatestRun = &latest
+		break
+	}
+	return dashboard
+}
+
+func (s *Service) projectDashboardDataLocked(projectID string) DashboardData {
 	ids := s.runsByProject[projectID]
 	if len(ids) == 0 {
 		return DashboardData{HasData: false, VisibilityScore: 0, PromptRuns: []PromptRun{}, Responses: []AIResponse{}}
@@ -51,4 +66,33 @@ func (s *Service) dashboardDataLocked(projectID string) DashboardData {
 		PromptRuns:      promptRuns,
 		Responses:       responses,
 	}
+}
+
+func filterDashboardForMonitoring(dashboard DashboardData) DashboardData {
+	dashboard.PromptRuns = filterPromptRunsByKind(dashboard.PromptRuns, promptKindMonitoring)
+	dashboard.Responses = filterResponsesByPromptKind(dashboard.Responses, promptKindMonitoring)
+	if dashboard.LatestRun != nil && normalizePromptKind(dashboard.LatestRun.RunType) == promptKindPerception {
+		dashboard.LatestRun = nil
+	}
+	dashboard.HasData = len(dashboard.PromptRuns) > 0 || len(dashboard.Responses) > 0
+	dashboard.VisibilityScore = calculateVisibilityScoreFromResponses(dashboard.Responses)
+	return dashboard
+}
+
+func (s *Service) isMonitoringRunLocked(run *AnalysisRun) bool {
+	if run == nil || normalizePromptKind(run.RunType) == promptKindPerception {
+		return false
+	}
+	return !s.runHasPromptKindLocked(run.ID, promptKindPerception)
+}
+
+func filterPromptRunsByKind(promptRuns []PromptRun, kind string) []PromptRun {
+	out := make([]PromptRun, 0, len(promptRuns))
+	for _, promptRun := range promptRuns {
+		if normalizePromptKind(promptRun.Kind) != normalizePromptKind(kind) {
+			continue
+		}
+		out = append(out, promptRun)
+	}
+	return out
 }

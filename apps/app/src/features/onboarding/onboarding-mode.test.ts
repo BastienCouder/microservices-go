@@ -21,7 +21,6 @@ describe("onboarding mode", () => {
       websiteUrl: "",
       attributionSource: "",
       brandName: "",
-      brandShortDescription: "",
       brandDescription: "",
       industry: "",
       keyFeatures: [],

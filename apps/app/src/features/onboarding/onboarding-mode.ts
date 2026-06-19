@@ -30,7 +30,6 @@ export function createFreshOnboardingInitialState(): OnboardingInitialState {
     websiteUrl: "",
     attributionSource: "",
     brandName: "",
-    brandShortDescription: "",
     brandDescription: "",
     industry: "",
     keyFeatures: [],

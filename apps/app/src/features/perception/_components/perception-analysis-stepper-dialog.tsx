@@ -450,6 +450,7 @@ export function PerceptionAnalysisStepperDialog({
 
   const handleRun = async () => {
     if (selectedPromptIds.length === 0 || selectedModelIds.length === 0) return;
+    onOpenChange(false);
     await onRun({
       promptIds: selectedPromptIds,
       modelIds: selectedModelIds,

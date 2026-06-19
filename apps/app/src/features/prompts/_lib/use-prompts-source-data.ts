@@ -205,7 +205,12 @@ export function usePromptsSourceData({
     ],
   );
   const persistedPromptIds = useMemo(
-    () => new Set((promptsCatalogQuery.data ?? []).map((item) => item.id)),
+    () =>
+      new Set(
+        (promptsCatalogQuery.data ?? [])
+          .filter((item) => item.kind === "monitoring")
+          .map((item) => item.id),
+      ),
     [promptsCatalogQuery.data],
   );
 

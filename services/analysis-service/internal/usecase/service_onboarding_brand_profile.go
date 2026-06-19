@@ -26,15 +26,14 @@ type OnboardingBrandProfilePrompt struct {
 }
 
 type OnboardingBrandProfilePreview struct {
-	Status                string                             `json:"status"`
-	CrawlJobID            string                             `json:"crawlJobId,omitempty"`
-	BrandName             string                             `json:"brandName"`
-	BrandShortDescription string                             `json:"brandShortDescription"`
-	BrandDescription      string                             `json:"brandDescription"`
-	Industry              string                             `json:"industry"`
-	KeyFeatures           []string                           `json:"keyFeatures"`
-	Competitors           []OnboardingBrandProfileCompetitor `json:"competitors"`
-	Prompts               []OnboardingBrandProfilePrompt     `json:"prompts"`
+	Status           string                             `json:"status"`
+	CrawlJobID       string                             `json:"crawlJobId,omitempty"`
+	BrandName        string                             `json:"brandName"`
+	BrandDescription string                             `json:"brandDescription"`
+	Industry         string                             `json:"industry"`
+	KeyFeatures      []string                           `json:"keyFeatures"`
+	Competitors      []OnboardingBrandProfileCompetitor `json:"competitors"`
+	Prompts          []OnboardingBrandProfilePrompt     `json:"prompts"`
 }
 
 func (s *Service) PreviewOnboardingBrandProfile(
@@ -163,20 +162,19 @@ func buildOnboardingBrandProfilePreview(
 	if resolvedBrand == "" {
 		resolvedBrand = inferBrandNameFromURL(websiteURL)
 	}
-	shortDescription := firstUsefulParagraph(content)
+	leadDescription := firstUsefulParagraph(content)
 	keyFeatures := inferKeyFeatures(content)
 	industry := inferIndustry(content)
 
 	return OnboardingBrandProfilePreview{
-		Status:                strings.TrimSpace(result.Status),
-		CrawlJobID:            strings.TrimSpace(jobID),
-		BrandName:             resolvedBrand,
-		BrandShortDescription: shortDescription,
-		BrandDescription:      longDescriptionFromContent(shortDescription, content),
-		Industry:              industry,
-		KeyFeatures:           keyFeatures,
-		Competitors:           []OnboardingBrandProfileCompetitor{},
-		Prompts:               onboardingPrompts(resolvedBrand, industry),
+		Status:           strings.TrimSpace(result.Status),
+		CrawlJobID:       strings.TrimSpace(jobID),
+		BrandName:        resolvedBrand,
+		BrandDescription: longDescriptionFromContent(leadDescription, content),
+		Industry:         industry,
+		KeyFeatures:      keyFeatures,
+		Competitors:      []OnboardingBrandProfileCompetitor{},
+		Prompts:          onboardingPrompts(resolvedBrand, industry),
 	}
 }
 
@@ -207,14 +205,14 @@ func firstUsefulParagraph(content string) string {
 	return ""
 }
 
-func longDescriptionFromContent(shortDescription, content string) string {
-	if shortDescription == "" {
+func longDescriptionFromContent(leadDescription, content string) string {
+	if leadDescription == "" {
 		return firstUsefulParagraph(content)
 	}
 	paragraphs := make([]string, 0, 2)
 	for _, line := range strings.Split(content, "\n") {
 		line = cleanMarkdownLine(line)
-		if len([]rune(line)) < 45 || line == shortDescription {
+		if len([]rune(line)) < 45 || line == leadDescription {
 			continue
 		}
 		paragraphs = append(paragraphs, line)
@@ -223,9 +221,9 @@ func longDescriptionFromContent(shortDescription, content string) string {
 		}
 	}
 	if len(paragraphs) == 0 {
-		return shortDescription
+		return leadDescription
 	}
-	return shortDescription + "\n\n" + strings.Join(paragraphs, "\n\n")
+	return leadDescription + "\n\n" + strings.Join(paragraphs, "\n\n")
 }
 
 func inferKeyFeatures(content string) []string {
@@ -323,9 +321,6 @@ func mergeOnboardingBrandProfilePreview(
 	}
 	if strings.TrimSpace(ai.BrandName) != "" {
 		merged.BrandName = strings.TrimSpace(ai.BrandName)
-	}
-	if strings.TrimSpace(ai.BrandShortDescription) != "" {
-		merged.BrandShortDescription = strings.TrimSpace(ai.BrandShortDescription)
 	}
 	if strings.TrimSpace(ai.BrandDescription) != "" {
 		merged.BrandDescription = strings.TrimSpace(ai.BrandDescription)

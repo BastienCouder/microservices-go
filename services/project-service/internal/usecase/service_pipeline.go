@@ -253,6 +253,10 @@ func (s *Service) RunManualAnalysis(ctx context.Context, projectID string, organ
 			s.mu.Unlock()
 			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt %s", ErrNotFound, promptID)
 		}
+		if normalizePromptKind(prompt.Kind) != PromptKindMonitoring {
+			s.mu.Unlock()
+			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt %s is not a monitoring prompt", ErrValidation, promptID)
+		}
 		if !prompt.IsActive {
 			s.mu.Unlock()
 			return AnalysisStartResponse{}, fmt.Errorf("%w: prompt %s is not active", ErrValidation, promptID)
@@ -394,10 +398,33 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		}
 	}
 
+	runCtx := context.WithoutCancel(ctx)
+	asyncStartResp := startResp
+	asyncProject := project
+	asyncPrompts := append([]AnalysisPromptText(nil), prompts...)
+	asyncModelIDs := append([]string(nil), effectiveModelIDs...)
+	asyncCompetitors := append([]string(nil), competitors...)
+	go func() {
+		if err := s.executeAnalysisRun(runCtx, asyncProject, asyncPrompts, asyncModelIDs, asyncCompetitors, asyncStartResp, runType); err != nil {
+			log.Printf(
+				"prompt_analysis.async_failed run_id=%s project_id=%s run_type=%s error=%v",
+				asyncStartResp.RunID,
+				asyncProject.ID,
+				runType,
+				err,
+			)
+		}
+	}()
+
+	return startResp, nil
+}
+
+func (s *Service) executeAnalysisRun(ctx context.Context, project Project, prompts []AnalysisPromptText, effectiveModelIDs []string, competitors []string, startResp AnalysisStartResponse, runType string) error {
 	for _, promptRun := range startResp.PromptRuns {
 		cancelled, err := s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
 		if err != nil {
-			return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+			s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+			return fmt.Errorf("check analysis cancellation: %w", err)
 		}
 		if cancelled {
 			log.Printf(
@@ -406,7 +433,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 				project.ID,
 				promptRun.PromptID,
 			)
-			return startResp, nil
+			return nil
 		}
 
 		promptModelIDs := effectiveModelIDs
@@ -422,7 +449,8 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		for _, modelID := range promptModelIDs {
 			cancelled, err := s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
 			if err != nil {
-				return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+				s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+				return fmt.Errorf("check analysis cancellation: %w", err)
 			}
 			if cancelled {
 				log.Printf(
@@ -432,7 +460,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					promptRun.PromptID,
 					modelID,
 				)
-				return startResp, nil
+				return nil
 			}
 
 			credential, err := s.resolveProviderCredentialForModel(ctx, project.ID, project.OrganizationID, modelID)
@@ -445,7 +473,8 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					modelID,
 					err,
 				)
-				return AnalysisStartResponse{}, fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
+				s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+				return fmt.Errorf("resolve ia provider credential for %s: %w", modelID, err)
 			}
 
 			execStart := time.Now()
@@ -488,11 +517,13 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					time.Since(execStart).Milliseconds(),
 					err,
 				)
-				return AnalysisStartResponse{}, fmt.Errorf("%w: execute ia prompt %s on %s: %v", ErrDependencyUnavailable, promptRun.PromptID, modelID, err)
+				s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+				return fmt.Errorf("%w: execute ia prompt %s on %s: %v", ErrDependencyUnavailable, promptRun.PromptID, modelID, err)
 			}
 			cancelled, err = s.analysisClient.IsAnalysisRunCancelled(ctx, startResp.RunID, project.OrganizationID)
 			if err != nil {
-				return AnalysisStartResponse{}, fmt.Errorf("check analysis cancellation: %w", err)
+				s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+				return fmt.Errorf("check analysis cancellation: %w", err)
 			}
 			if cancelled {
 				log.Printf(
@@ -502,7 +533,7 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					promptRun.PromptID,
 					modelID,
 				)
-				return startResp, nil
+				return nil
 			}
 			err = s.analysisClient.RecordResponse(ctx, startResp.RunID, AnalysisRecordResponseInput{
 				PromptRunID:    promptRun.ID,
@@ -525,7 +556,8 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 					time.Since(execStart).Milliseconds(),
 					err,
 				)
-				return AnalysisStartResponse{}, fmt.Errorf("record analysis response: %w", err)
+				s.failAnalysisRunAfterPipelineError(ctx, startResp.RunID, project.OrganizationID, err)
+				return fmt.Errorf("record analysis response: %w", err)
 			}
 			log.Printf(
 				"prompt_analysis.model_completed run_id=%s project_id=%s prompt_id=%s prompt_run_id=%s model_id=%s duration_ms=%d brand_mentioned=%t brand_position=%s citation_found=%t sentiment=%s response_chars=%d",
@@ -552,7 +584,22 @@ func (s *Service) runAnalysis(ctx context.Context, project Project, prompts []An
 		len(prompts),
 		effectiveModelIDs,
 	)
-	return startResp, nil
+	return nil
+}
+
+func (s *Service) failAnalysisRunAfterPipelineError(ctx context.Context, runID string, organizationID int64, cause error) {
+	if strings.TrimSpace(runID) == "" {
+		return
+	}
+	if err := s.analysisClient.FailAnalysisRun(ctx, runID, organizationID); err != nil {
+		log.Printf(
+			"prompt_analysis.fail_run_failed run_id=%s organization_id=%d cause=%v error=%v",
+			runID,
+			organizationID,
+			cause,
+			err,
+		)
+	}
 }
 
 func (s *Service) modelCreditCosts(ctx context.Context, modelIDs []string) (map[string]int, error) {

@@ -10,7 +10,6 @@ import { t } from "i18next";
 
 const EMPTY_BRAND_CANON: BrandCanon = {
   brandName: "",
-  shortDescription: "",
   category: "",
   positioning: "",
   audience: [],

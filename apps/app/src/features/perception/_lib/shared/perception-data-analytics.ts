@@ -36,6 +36,7 @@ type ParsedResponse = {
   modelName: string;
   modelGroupName: string;
   createdAt: Date | null;
+  rawResponse?: string;
   brandMentioned: boolean;
   citationFound: boolean;
   sentiment: "positive" | "neutral" | "negative";
@@ -190,6 +191,25 @@ function useCaseScore(brandMentioned: boolean): number {
   return brandMentioned ? 100 : 20;
 }
 
+function parseResponseMetrics(
+  response: JsonObject,
+  fallback: ParsedResponse["metrics"],
+): ParsedResponse["metrics"] {
+  const metrics = asObject(getField(response, ["metrics", "Metrics"]));
+  if (Object.keys(metrics).length === 0) {
+    return fallback;
+  }
+
+  return {
+    positioning: clampScore(asNumber(getField(metrics, ["positioning", "Positioning"]) ?? fallback.positioning)),
+    factual: clampScore(asNumber(getField(metrics, ["factual", "Factual"]) ?? fallback.factual)),
+    use_cases: clampScore(asNumber(getField(metrics, ["use_cases", "useCases", "UseCases"]) ?? fallback.use_cases)),
+    features: clampScore(asNumber(getField(metrics, ["features", "Features"]) ?? fallback.features)),
+    sentiment: clampScore(asNumber(getField(metrics, ["sentiment", "Sentiment"]) ?? fallback.sentiment)),
+    competitors: clampScore(asNumber(getField(metrics, ["competitors", "Competitors"]) ?? fallback.competitors)),
+  };
+}
+
 function extractResponseObjects(payload: unknown): JsonObject[] {
   if (Array.isArray(payload)) {
     return payload.map(asObject);
@@ -212,6 +232,14 @@ function parseResponses(
     const sentiment = normalizeSentiment(asString(getField(response, ["sentiment", "Sentiment"])));
     const brandPosition = asString(getField(response, ["brandPosition", "BrandPosition"]));
     const modelMeta = modelLookup.get(modelId.trim().toLowerCase()) || null;
+    const fallbackMetrics = {
+      positioning: positionScore(brandPosition, brandMentioned),
+      factual: factualScore(brandMentioned, citationFound),
+      use_cases: useCaseScore(brandMentioned),
+      features: featureScore(brandMentioned, citationFound),
+      sentiment: sentimentScore(sentiment),
+      competitors: positionScore(brandPosition, brandMentioned),
+    };
 
     return {
       id: asString(getField(response, ["id", "ID"])),
@@ -225,18 +253,12 @@ function parseResponses(
       modelName: modelMeta?.displayName || modelId,
       modelGroupName: modelMeta?.groupName || modelMeta?.displayName || modelId,
       createdAt: parseISODate(asString(getField(response, ["createdAt", "CreatedAt"]))),
+      rawResponse: asString(getField(response, ["rawResponse", "RawResponse"])),
       brandMentioned,
       citationFound,
       sentiment,
       brandPosition,
-      metrics: {
-        positioning: positionScore(brandPosition, brandMentioned),
-        factual: factualScore(brandMentioned, citationFound),
-        use_cases: useCaseScore(brandMentioned),
-        features: featureScore(brandMentioned, citationFound),
-        sentiment: sentimentScore(sentiment),
-        competitors: positionScore(brandPosition, brandMentioned),
-      },
+      metrics: parseResponseMetrics(response, fallbackMetrics),
     };
   });
 }
@@ -258,27 +280,6 @@ function filterResponsesToProjectModels(
   }
 
   return responses.filter((response) => projectModelFilter.has(response.modelId));
-}
-
-function mergeResponseSets(...responseSets: ParsedResponse[][]): ParsedResponse[] {
-  const merged = new Map<string, ParsedResponse>();
-
-  for (const responses of responseSets) {
-    for (const response of responses) {
-      const key =
-        response.id ||
-        [
-          response.runType,
-          response.runId,
-          response.promptRunId,
-          response.modelId,
-          response.createdAt?.toISOString() ?? "",
-        ].join(":");
-      merged.set(key, response);
-    }
-  }
-
-  return Array.from(merged.values());
 }
 
 function deriveScores(
@@ -358,21 +359,17 @@ function deriveBrandCanon(projectPayload: unknown): BrandCanon {
     asString(getField(nestedBrandCanon, ["brandName", "BrandName"])) ||
     asString(getField(project, ["brandName", "BrandName"])) ||
     asString(getField(project, ["name", "Name"]));
-  const shortDescription =
-    asString(getField(nestedBrandCanon, ["shortDescription", "ShortDescription", "positioning", "Positioning"])) ||
-    asString(getField(project, ["brandDescription", "BrandDescription"]));
   const category =
     asString(getField(nestedBrandCanon, ["category", "Category"])) ||
     asString(getField(project, ["industry", "Industry"]));
   const positioning =
     asString(getField(nestedBrandCanon, ["positioning", "Positioning"])) ||
-    shortDescription ||
+    asString(getField(project, ["brandDescription", "BrandDescription"])) ||
     asString(getField(project, ["websiteUrl", "WebsiteURL"])) ||
     asString(getField(project, ["domain", "Domain"]));
 
   return {
     brandName,
-    shortDescription,
     category,
     positioning,
     audience: asArray(getField(nestedBrandCanon, ["audience", "Audience"]))
@@ -834,32 +831,29 @@ export function derivePerceptionTrendSeries(
 export function buildPerceptionDerivedData({
   projectPayload,
   competitorsPayload,
-  monitoringPayload,
   perceptionPayload,
   modelLookup,
   modelCatalog,
 }: {
   projectPayload: unknown;
   competitorsPayload: unknown;
-  monitoringPayload: unknown;
   perceptionPayload: PerceptionApiPayload;
   modelLookup: Map<string, PerceptionModelOption>;
   modelCatalog: PerceptionModelOption[];
 }) {
   const projectModelFilter = parseProjectModelFilter(perceptionPayload.metadata?.projectModels);
   const usesBundledPerceptionResponses = hasOwn(perceptionPayload as JsonObject, "responses");
-  const monitoringResponses = parseResponses(monitoringPayload, modelLookup);
   const perceptionResponses = usesBundledPerceptionResponses
     ? parseResponses(perceptionPayload.responses, modelLookup)
     : [];
   const responses = filterResponsesToProjectModels(
-    mergeResponseSets(monitoringResponses, perceptionResponses),
+    perceptionResponses,
     projectModelFilter,
   );
-  const monitoringLatestRunId = asString(
-    getField(asObject(getField(asObject(monitoringPayload), ["latestRun", "LatestRun"])), ["id", "ID"]),
+  const latestRunId = deriveLatestRunIdFromResponses(
+    responses,
+    asString(perceptionPayload.metadata?.latestRunId),
   );
-  const latestRunId = deriveLatestRunIdFromResponses(responses, monitoringLatestRunId);
   const generatedAtValue = asString(perceptionPayload.metadata?.generatedAt);
   const generatedAt = parseISODate(generatedAtValue);
   const referenceDate =
@@ -884,9 +878,6 @@ export function buildPerceptionDerivedData({
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
   );
-  const monitoringResponseCount = responses.filter(
-    (response) => response.runType === "monitoring",
-  ).length;
   const perceptionResponseCount = responses.filter(
     (response) => response.runType === "perception",
   ).length;
@@ -897,7 +888,7 @@ export function buildPerceptionDerivedData({
     competitors,
     generatedAt: (generatedAt || referenceDate).toISOString(),
     latestRunId,
-    monitoringResponseCount,
+    monitoringResponseCount: 0,
     modelAxisHeatmap,
     models,
     perceptionResponseCount,

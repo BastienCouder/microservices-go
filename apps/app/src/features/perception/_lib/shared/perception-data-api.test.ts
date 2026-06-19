@@ -168,6 +168,44 @@ describe("loadPerceptionData", () => {
               },
             ],
           },
+          responses: [
+            {
+              id: "response-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est un CRM pour PME. Voir https://acme.test/pricing",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test/pricing"],
+              sentiment: "positive",
+              createdAt: "2026-03-04T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              promptRunId: "prompt-run-2",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme reste solide face a HubSpot.",
+              brandMentioned: true,
+              brandPosition: "mid",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "neutral",
+              createdAt: "2026-03-05T10:00:00Z",
+            },
+            {
+              id: "response-3",
+              promptRunId: "prompt-run-2",
+              modelId: "claude-3-7-sonnet",
+              rawResponse: "HubSpot ressort davantage dans cette comparaison.",
+              brandMentioned: false,
+              brandPosition: "low",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "negative",
+              createdAt: "2026-03-06T12:00:00Z",
+            },
+          ],
           scores: {
             positioningAccuracy: 67,
             factualAccuracy: 33,
@@ -183,7 +221,6 @@ describe("loadPerceptionData", () => {
     const result = await loadPerceptionData("http://api.test", "");
 
     expect(result.data.brandCanon.brandName).toBe("Acme");
-    expect(result.data.brandCanon.shortDescription).toBe("CRM IA pour PME et equipes sales.");
     expect(result.data.brandCanon.category).toBe("B2B CRM");
     expect(result.data.brandCanon.positioning).toBe("CRM IA pour PME et equipes sales.");
     expect(result.data.brandCanon.audience).toEqual([]);
@@ -210,7 +247,7 @@ describe("loadPerceptionData", () => {
     expect(JSON.stringify(result.data).includes("Nike")).toBe(false);
   });
 
-  test("loads perception with the bundled dashboard instead of issuing a second dashboard request", async () => {
+  test("ignores bundled monitoring dashboard data when loading perception", async () => {
     const requests = mockFetchSequenceWithRequests([
       jsonResponse(200, {
         success: true,
@@ -278,9 +315,10 @@ describe("loadPerceptionData", () => {
 
     const result = await loadPerceptionData("http://api.test", "?projectId=project-1");
 
-    expect(result.data.metadata.analyzedResponses).toBe(1);
+    expect(result.data.metadata.analyzedResponses).toBe(0);
+    expect(result.data.responses).toHaveLength(0);
     expect(requests.some((request) => request.url.includes("/dashboard"))).toBe(false);
-    expect(requests.some((request) => request.url.includes("/perception?includeDashboard=1"))).toBe(true);
+    expect(requests.some((request) => request.url.endsWith("/analysis/projects/project-1/perception"))).toBe(true);
     expect(requests.some((request) => request.url.includes("/projects/project-1/brand-canon"))).toBe(true);
     expect(requests).toHaveLength(5);
   });
@@ -384,14 +422,12 @@ describe("loadPerceptionData", () => {
 
     expect(result.data.metadata.sourceMode).toBe("perception_primary");
     expect(result.data.metadata.perceptionResponses).toBe(1);
-    expect(result.data.metadata.monitoringResponsesUsed).toBe(1);
-    expect(result.data.responses).toHaveLength(2);
+    expect(result.data.metadata.monitoringResponsesUsed).toBe(0);
+    expect(result.data.responses).toHaveLength(1);
     expect(result.data.responses.map((response) => response.id)).toEqual([
-      "monitoring-response-1",
       "perception-response-1",
     ]);
     expect(result.data.responses.map((response) => response.runType)).toEqual([
-      "monitoring",
       "perception",
     ]);
     expect(result.data.trend["last-run"].data).toHaveLength(1);
@@ -539,6 +575,32 @@ describe("loadPerceptionData", () => {
               },
             ],
           },
+          responses: [
+            {
+              id: "response-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est recommandee avec source.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test"],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              promptRunId: "prompt-run-1",
+              modelId: "sonar",
+              rawResponse: "HubSpot est devant Acme.",
+              brandMentioned: true,
+              brandPosition: "bottom",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "negative",
+              createdAt: "2026-03-10T09:00:00Z",
+            },
+          ],
           scores: {
             positioningAccuracy: 100,
             factualAccuracy: 100,
@@ -764,6 +826,34 @@ describe("loadPerceptionData", () => {
               },
             ],
           },
+          responses: [
+            {
+              id: "response-1",
+              runId: "run-enabled",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est recommandee avec source.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: true,
+              citedUrls: ["https://acme.test"],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              runId: "run-disabled",
+              promptRunId: "prompt-run-1",
+              modelId: "sonar",
+              rawResponse: "HubSpot est devant Acme.",
+              brandMentioned: true,
+              brandPosition: "bottom",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "negative",
+              createdAt: "2026-03-11T09:00:00Z",
+            },
+          ],
           scores: {
             positioningAccuracy: 100,
             factualAccuracy: 100,
@@ -870,6 +960,34 @@ describe("loadPerceptionData", () => {
               },
             ],
           },
+          responses: [
+            {
+              id: "response-1",
+              runId: "run-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4o-mini",
+              rawResponse: "Acme est un CRM pertinent.",
+              brandMentioned: true,
+              brandPosition: "top",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "positive",
+              createdAt: "2026-03-10T08:00:00Z",
+            },
+            {
+              id: "response-2",
+              runId: "run-1",
+              promptRunId: "prompt-run-1",
+              modelId: "gpt-4.1-mini",
+              rawResponse: "Acme convient bien aux PME.",
+              brandMentioned: true,
+              brandPosition: "mid",
+              citationFound: false,
+              citedUrls: [],
+              sentiment: "neutral",
+              createdAt: "2026-03-10T08:05:00Z",
+            },
+          ],
           metadata: {
             generatedAt: "2026-03-10T09:00:00Z",
             projectModels: ["gpt-4o-mini", "gpt-4.1-mini"],

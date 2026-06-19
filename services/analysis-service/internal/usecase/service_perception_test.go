@@ -43,6 +43,50 @@ func TestPerceptionBrandReadinessCapturesMissingContext(t *testing.T) {
 	}
 }
 
+func TestPerceptionScoresAreCappedWhenBrandCanonIsIncomplete(t *testing.T) {
+	readiness := buildPerceptionBrandReadiness(BrandCanon{BrandName: "Fury"}, nil)
+	scores := capPerceptionScoresForBrandReadiness(PerceptionScores{
+		PositioningAccuracy: 100,
+		FactualAccuracy:     100,
+		SentimentScore:      100,
+	}, readiness)
+	radar := capPerceptionRadarForBrandReadiness([]PerceptionRadarPoint{
+		{Axis: "positioning", Score: 100, Target: 100},
+		{Axis: "sentiment", Score: 100, Target: 100},
+	}, readiness)
+
+	if scores.PositioningAccuracy > readiness.cap ||
+		scores.FactualAccuracy > readiness.cap {
+		t.Fatalf("expected context-dependent scores to be capped at %d, got %+v", readiness.cap, scores)
+	}
+	if scores.SentimentScore != 100 {
+		t.Fatalf("expected sentiment to stay measurable without brand context, got %+v", scores)
+	}
+	for _, point := range radar {
+		if point.Axis == "sentiment" {
+			if point.Score != 100 {
+				t.Fatalf("expected sentiment radar to stay measurable, got %d", point.Score)
+			}
+			continue
+		}
+		if point.Score > readiness.cap {
+			t.Fatalf("expected radar point %s to be capped at %d, got %d", point.Axis, readiness.cap, point.Score)
+		}
+	}
+}
+
+func TestPerceptionBrandContextRequiresCoreFields(t *testing.T) {
+	if isPerceptionBrandContextReady(BrandCanon{BrandName: "Fury"}) {
+		t.Fatalf("expected brand context to require a category")
+	}
+	if !isPerceptionBrandContextReady(BrandCanon{
+		BrandName: "Fury",
+		Category:  "SEO",
+	}) {
+		t.Fatalf("expected brand context to be ready with brand and category")
+	}
+}
+
 func TestPerceptionCompetitorsScoreDifferentiatesMentionFromCompetitiveLoss(t *testing.T) {
 	canon := BrandCanon{
 		BrandName:   "Nike",

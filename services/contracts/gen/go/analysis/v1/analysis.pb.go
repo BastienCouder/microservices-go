@@ -569,6 +569,206 @@ func (x *RecordResponseResponse) GetRecorded() bool {
 	return false
 }
 
+type FailAnalysisRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RunId         string                 `protobuf:"bytes,1,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FailAnalysisRunRequest) Reset() {
+	*x = FailAnalysisRunRequest{}
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailAnalysisRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailAnalysisRunRequest) ProtoMessage() {}
+
+func (x *FailAnalysisRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailAnalysisRunRequest.ProtoReflect.Descriptor instead.
+func (*FailAnalysisRunRequest) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_v1_analysis_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *FailAnalysisRunRequest) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+type FailAnalysisRunResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AnalysisRun   *AnalysisRun           `protobuf:"bytes,1,opt,name=analysis_run,json=analysisRun,proto3" json:"analysis_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FailAnalysisRunResponse) Reset() {
+	*x = FailAnalysisRunResponse{}
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailAnalysisRunResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailAnalysisRunResponse) ProtoMessage() {}
+
+func (x *FailAnalysisRunResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailAnalysisRunResponse.ProtoReflect.Descriptor instead.
+func (*FailAnalysisRunResponse) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_v1_analysis_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *FailAnalysisRunResponse) GetAnalysisRun() *AnalysisRun {
+	if x != nil {
+		return x.AnalysisRun
+	}
+	return nil
+}
+
+type ListMissingAnalysisPromptsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	PromptIds     []string               `protobuf:"bytes,2,rep,name=prompt_ids,json=promptIds,proto3" json:"prompt_ids,omitempty"`
+	ModelIds      []string               `protobuf:"bytes,3,rep,name=model_ids,json=modelIds,proto3" json:"model_ids,omitempty"`
+	RunType       string                 `protobuf:"bytes,4,opt,name=run_type,json=runType,proto3" json:"run_type,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMissingAnalysisPromptsRequest) Reset() {
+	*x = ListMissingAnalysisPromptsRequest{}
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMissingAnalysisPromptsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMissingAnalysisPromptsRequest) ProtoMessage() {}
+
+func (x *ListMissingAnalysisPromptsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMissingAnalysisPromptsRequest.ProtoReflect.Descriptor instead.
+func (*ListMissingAnalysisPromptsRequest) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_v1_analysis_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListMissingAnalysisPromptsRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *ListMissingAnalysisPromptsRequest) GetPromptIds() []string {
+	if x != nil {
+		return x.PromptIds
+	}
+	return nil
+}
+
+func (x *ListMissingAnalysisPromptsRequest) GetModelIds() []string {
+	if x != nil {
+		return x.ModelIds
+	}
+	return nil
+}
+
+func (x *ListMissingAnalysisPromptsRequest) GetRunType() string {
+	if x != nil {
+		return x.RunType
+	}
+	return ""
+}
+
+type ListMissingAnalysisPromptsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PromptIds     []string               `protobuf:"bytes,1,rep,name=prompt_ids,json=promptIds,proto3" json:"prompt_ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMissingAnalysisPromptsResponse) Reset() {
+	*x = ListMissingAnalysisPromptsResponse{}
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMissingAnalysisPromptsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMissingAnalysisPromptsResponse) ProtoMessage() {}
+
+func (x *ListMissingAnalysisPromptsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_analysis_v1_analysis_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMissingAnalysisPromptsResponse.ProtoReflect.Descriptor instead.
+func (*ListMissingAnalysisPromptsResponse) Descriptor() ([]byte, []int) {
+	return file_proto_analysis_v1_analysis_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListMissingAnalysisPromptsResponse) GetPromptIds() []string {
+	if x != nil {
+		return x.PromptIds
+	}
+	return nil
+}
+
 var File_proto_analysis_v1_analysis_proto protoreflect.FileDescriptor
 
 const file_proto_analysis_v1_analysis_proto_rawDesc = "" +
@@ -616,11 +816,27 @@ const file_proto_analysis_v1_analysis_proto_rawDesc = "" +
 	"cited_urls\x18\b \x03(\tR\tcitedUrls\x12\x1c\n" +
 	"\tsentiment\x18\t \x01(\tR\tsentiment\"4\n" +
 	"\x16RecordResponseResponse\x12\x1a\n" +
-	"\brecorded\x18\x01 \x01(\bR\brecorded2\x9f\x02\n" +
+	"\brecorded\x18\x01 \x01(\bR\brecorded\"/\n" +
+	"\x16FailAnalysisRunRequest\x12\x15\n" +
+	"\x06run_id\x18\x01 \x01(\tR\x05runId\"V\n" +
+	"\x17FailAnalysisRunResponse\x12;\n" +
+	"\fanalysis_run\x18\x01 \x01(\v2\x18.analysis.v1.AnalysisRunR\vanalysisRun\"\x99\x01\n" +
+	"!ListMissingAnalysisPromptsRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x1d\n" +
+	"\n" +
+	"prompt_ids\x18\x02 \x03(\tR\tpromptIds\x12\x1b\n" +
+	"\tmodel_ids\x18\x03 \x03(\tR\bmodelIds\x12\x19\n" +
+	"\brun_type\x18\x04 \x01(\tR\arunType\"C\n" +
+	"\"ListMissingAnalysisPromptsResponse\x12\x1d\n" +
+	"\n" +
+	"prompt_ids\x18\x01 \x03(\tR\tpromptIds2\xfc\x03\n" +
 	"\x0fAnalysisService\x12V\n" +
 	"\rStartAnalysis\x12!.analysis.v1.StartAnalysisRequest\x1a\".analysis.v1.StartAnalysisResponse\x12Y\n" +
 	"\x0eGetAnalysisRun\x12\".analysis.v1.GetAnalysisRunRequest\x1a#.analysis.v1.GetAnalysisRunResponse\x12Y\n" +
-	"\x0eRecordResponse\x12\".analysis.v1.RecordResponseRequest\x1a#.analysis.v1.RecordResponseResponseBSZQgithub.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1;analysisv1b\x06proto3"
+	"\x0eRecordResponse\x12\".analysis.v1.RecordResponseRequest\x1a#.analysis.v1.RecordResponseResponse\x12\\\n" +
+	"\x0fFailAnalysisRun\x12#.analysis.v1.FailAnalysisRunRequest\x1a$.analysis.v1.FailAnalysisRunResponse\x12}\n" +
+	"\x1aListMissingAnalysisPrompts\x12..analysis.v1.ListMissingAnalysisPromptsRequest\x1a/.analysis.v1.ListMissingAnalysisPromptsResponseBSZQgithub.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1;analysisv1b\x06proto3"
 
 var (
 	file_proto_analysis_v1_analysis_proto_rawDescOnce sync.Once
@@ -634,34 +850,43 @@ func file_proto_analysis_v1_analysis_proto_rawDescGZIP() []byte {
 	return file_proto_analysis_v1_analysis_proto_rawDescData
 }
 
-var file_proto_analysis_v1_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_proto_analysis_v1_analysis_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_proto_analysis_v1_analysis_proto_goTypes = []any{
-	(*PromptText)(nil),             // 0: analysis.v1.PromptText
-	(*PromptRun)(nil),              // 1: analysis.v1.PromptRun
-	(*AnalysisRun)(nil),            // 2: analysis.v1.AnalysisRun
-	(*GetAnalysisRunRequest)(nil),  // 3: analysis.v1.GetAnalysisRunRequest
-	(*GetAnalysisRunResponse)(nil), // 4: analysis.v1.GetAnalysisRunResponse
-	(*StartAnalysisRequest)(nil),   // 5: analysis.v1.StartAnalysisRequest
-	(*StartAnalysisResponse)(nil),  // 6: analysis.v1.StartAnalysisResponse
-	(*RecordResponseRequest)(nil),  // 7: analysis.v1.RecordResponseRequest
-	(*RecordResponseResponse)(nil), // 8: analysis.v1.RecordResponseResponse
+	(*PromptText)(nil),                         // 0: analysis.v1.PromptText
+	(*PromptRun)(nil),                          // 1: analysis.v1.PromptRun
+	(*AnalysisRun)(nil),                        // 2: analysis.v1.AnalysisRun
+	(*GetAnalysisRunRequest)(nil),              // 3: analysis.v1.GetAnalysisRunRequest
+	(*GetAnalysisRunResponse)(nil),             // 4: analysis.v1.GetAnalysisRunResponse
+	(*StartAnalysisRequest)(nil),               // 5: analysis.v1.StartAnalysisRequest
+	(*StartAnalysisResponse)(nil),              // 6: analysis.v1.StartAnalysisResponse
+	(*RecordResponseRequest)(nil),              // 7: analysis.v1.RecordResponseRequest
+	(*RecordResponseResponse)(nil),             // 8: analysis.v1.RecordResponseResponse
+	(*FailAnalysisRunRequest)(nil),             // 9: analysis.v1.FailAnalysisRunRequest
+	(*FailAnalysisRunResponse)(nil),            // 10: analysis.v1.FailAnalysisRunResponse
+	(*ListMissingAnalysisPromptsRequest)(nil),  // 11: analysis.v1.ListMissingAnalysisPromptsRequest
+	(*ListMissingAnalysisPromptsResponse)(nil), // 12: analysis.v1.ListMissingAnalysisPromptsResponse
 }
 var file_proto_analysis_v1_analysis_proto_depIdxs = []int32{
-	2, // 0: analysis.v1.GetAnalysisRunResponse.analysis_run:type_name -> analysis.v1.AnalysisRun
-	0, // 1: analysis.v1.StartAnalysisRequest.prompt_texts:type_name -> analysis.v1.PromptText
-	2, // 2: analysis.v1.StartAnalysisResponse.analysis_run:type_name -> analysis.v1.AnalysisRun
-	1, // 3: analysis.v1.StartAnalysisResponse.prompt_runs:type_name -> analysis.v1.PromptRun
-	5, // 4: analysis.v1.AnalysisService.StartAnalysis:input_type -> analysis.v1.StartAnalysisRequest
-	3, // 5: analysis.v1.AnalysisService.GetAnalysisRun:input_type -> analysis.v1.GetAnalysisRunRequest
-	7, // 6: analysis.v1.AnalysisService.RecordResponse:input_type -> analysis.v1.RecordResponseRequest
-	6, // 7: analysis.v1.AnalysisService.StartAnalysis:output_type -> analysis.v1.StartAnalysisResponse
-	4, // 8: analysis.v1.AnalysisService.GetAnalysisRun:output_type -> analysis.v1.GetAnalysisRunResponse
-	8, // 9: analysis.v1.AnalysisService.RecordResponse:output_type -> analysis.v1.RecordResponseResponse
-	7, // [7:10] is the sub-list for method output_type
-	4, // [4:7] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	2,  // 0: analysis.v1.GetAnalysisRunResponse.analysis_run:type_name -> analysis.v1.AnalysisRun
+	0,  // 1: analysis.v1.StartAnalysisRequest.prompt_texts:type_name -> analysis.v1.PromptText
+	2,  // 2: analysis.v1.StartAnalysisResponse.analysis_run:type_name -> analysis.v1.AnalysisRun
+	1,  // 3: analysis.v1.StartAnalysisResponse.prompt_runs:type_name -> analysis.v1.PromptRun
+	2,  // 4: analysis.v1.FailAnalysisRunResponse.analysis_run:type_name -> analysis.v1.AnalysisRun
+	5,  // 5: analysis.v1.AnalysisService.StartAnalysis:input_type -> analysis.v1.StartAnalysisRequest
+	3,  // 6: analysis.v1.AnalysisService.GetAnalysisRun:input_type -> analysis.v1.GetAnalysisRunRequest
+	7,  // 7: analysis.v1.AnalysisService.RecordResponse:input_type -> analysis.v1.RecordResponseRequest
+	9,  // 8: analysis.v1.AnalysisService.FailAnalysisRun:input_type -> analysis.v1.FailAnalysisRunRequest
+	11, // 9: analysis.v1.AnalysisService.ListMissingAnalysisPrompts:input_type -> analysis.v1.ListMissingAnalysisPromptsRequest
+	6,  // 10: analysis.v1.AnalysisService.StartAnalysis:output_type -> analysis.v1.StartAnalysisResponse
+	4,  // 11: analysis.v1.AnalysisService.GetAnalysisRun:output_type -> analysis.v1.GetAnalysisRunResponse
+	8,  // 12: analysis.v1.AnalysisService.RecordResponse:output_type -> analysis.v1.RecordResponseResponse
+	10, // 13: analysis.v1.AnalysisService.FailAnalysisRun:output_type -> analysis.v1.FailAnalysisRunResponse
+	12, // 14: analysis.v1.AnalysisService.ListMissingAnalysisPrompts:output_type -> analysis.v1.ListMissingAnalysisPromptsResponse
+	10, // [10:15] is the sub-list for method output_type
+	5,  // [5:10] is the sub-list for method input_type
+	5,  // [5:5] is the sub-list for extension type_name
+	5,  // [5:5] is the sub-list for extension extendee
+	0,  // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_proto_analysis_v1_analysis_proto_init() }
@@ -675,7 +900,7 @@ func file_proto_analysis_v1_analysis_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_analysis_v1_analysis_proto_rawDesc), len(file_proto_analysis_v1_analysis_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

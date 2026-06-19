@@ -5,6 +5,7 @@ import type { AppRouterProps } from "./App";
 import { MonitoringPage } from "@/features/monitoring/index";
 import { ModelsPage } from "@/features/models/index";
 import { PerceptionPage } from "@/features/perception";
+import { PerceptionResponsesPage } from "@/features/perception/responses";
 import { PromptsPage } from "@/features/prompts/index";
 import {
   ADMIN_ROUTE_ROOT,
@@ -229,6 +230,17 @@ export function AppRouter({
         element={
           <Suspense fallback={null}>
             <PerceptionPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
+          </Suspense>
+        }
+      />
+      <Route
+        path="/perception/responses"
+        element={
+          <Suspense fallback={null}>
+            <PerceptionResponsesPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
           </Suspense>
         }
       />

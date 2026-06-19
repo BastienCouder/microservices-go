@@ -27,8 +27,6 @@ export function StepBrand({
     brandName,
     setBrandName,
     websiteUrl,
-    brandShortDescription,
-    setBrandShortDescription,
     brandDescription,
     setBrandDescription,
     industry,
@@ -84,9 +82,6 @@ export function StepBrand({
           if (!brandName.trim() && preview.brandName) {
             setBrandName(preview.brandName);
           }
-          if (!brandShortDescription.trim() && preview.brandShortDescription) {
-            setBrandShortDescription(preview.brandShortDescription);
-          }
           if (!brandDescription.trim() && preview.brandDescription) {
             setBrandDescription(preview.brandDescription);
           }
@@ -125,7 +120,6 @@ export function StepBrand({
     brandDescription,
     brandName,
     brandPreparationCompleted,
-    brandShortDescription,
     competitors,
     industry,
     keyFeatures,
@@ -133,7 +127,6 @@ export function StepBrand({
     setBrandDescription,
     setBrandName,
     setBrandPreparationCompleted,
-    setBrandShortDescription,
     setCompetitors,
     setIndustry,
     setKeyFeatures,
@@ -204,19 +197,6 @@ export function StepBrand({
           value={brandName}
           onChange={(event) => setBrandName(event.target.value)}
           placeholder={t("brandNamePlaceholder")}
-        />
-      </OnboardingField>
-
-      <OnboardingField
-        label={t("brandShortDescriptionLabel")}
-        htmlFor="brand-short-description"
-        description={t("brandShortDescriptionHint")}
-      >
-        <Textarea
-          id="brand-short-description"
-          className="min-h-[86px] text-sm"
-          value={brandShortDescription}
-          onChange={(event) => setBrandShortDescription(event.target.value)}
         />
       </OnboardingField>
 

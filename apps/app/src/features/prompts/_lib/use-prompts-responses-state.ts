@@ -62,6 +62,13 @@ type PromptsWorkspaceLoadingStateInput = {
 };
 
 const FAILED_RUN_STATUSES = new Set(["failed", "errored", "cancelled", "cancelled_due_to_timeout", "cancelled_due_to_limits"]);
+const RECENT_FAILED_RUN_WINDOW_MS = 10 * 60 * 1000;
+
+function getRunTimestamp(run: AnalysisRunRecord): number {
+  const updatedAt = new Date(run.updatedAt || run.createdAt).getTime();
+  if (Number.isFinite(updatedAt)) return updatedAt;
+  return 0;
+}
 
 export function getPromptsWorkspaceLoadingState({
   monitoringLoading,
@@ -128,6 +135,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const [runPromptToastId, setRunPromptToastId] = useState<ToastId | null>(null);
   const [hadPendingPromptResponse, setHadPendingPromptResponse] = useState(false);
   const [observedRunningAnalysisRunId, setObservedRunningAnalysisRunId] = useState<string | null>(null);
+  const [analysisAcceptedAt, setAnalysisAcceptedAt] = useState<number | null>(null);
 
   useEffect(() => {
     setOrganizationId(readOrganizationId(routeSearch));
@@ -183,23 +191,6 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   }, [source.responseAvailableModels]);
 
   useEffect(() => {
-    if (pendingPromptRuns.length === 0) {
-      setRunningPromptRowIds([]);
-      return;
-    }
-
-    const next = pendingPromptRuns.filter((entry) => {
-      if (isPromptRunProgressExpired(entry)) return false;
-      return !isPromptRunProgressComplete(entry, monitoringData.recent_prompts as never);
-    });
-
-    if (next.length !== pendingPromptRuns.length) {
-      setPendingPromptRuns(next);
-    }
-    setRunningPromptRowIds(next.map((entry) => entry.rowId));
-  }, [monitoringData.recent_prompts, pendingPromptRuns]);
-
-  useEffect(() => {
     if (pendingPromptRuns.length === 0) return undefined;
 
     const intervalId = window.setInterval(() => {
@@ -229,12 +220,18 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     queryFn: ({ signal }) =>
       loadAnalysisRuns(apiBaseURL, organizationId, source.activeProjectId, 5, signal),
     refetchInterval: (query) => {
-      const runs = (query.state.data ?? []) as AnalysisRunRecord[];
+      const runs = ((query.state.data ?? []) as AnalysisRunRecord[]).filter(
+        (run) => run.runType !== "perception",
+      );
       if (pendingPromptRuns.length > 0) return 1000;
       return runs.some((run) => run.status === "running") ? 4000 : false;
     },
   });
   const analysisRuns = analysisRunsQuery.data ?? [];
+  const promptAnalysisRuns = useMemo(
+    () => analysisRuns.filter((run) => run.runType !== "perception"),
+    [analysisRuns],
+  );
   const cancelledAnalysisRunIdsSet = useMemo(
     () => new Set(cancelledAnalysisRunIds),
     [cancelledAnalysisRunIds],
@@ -243,7 +240,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     () => new Set(locallyCompletedAnalysisRunIds),
     [locallyCompletedAnalysisRunIds],
   );
-  const serverRunningRuns = analysisRuns.filter(
+  const serverRunningRuns = promptAnalysisRuns.filter(
     (run) =>
       run.status === "running" &&
       !cancelledAnalysisRunIdsSet.has(run.id) &&
@@ -251,7 +248,17 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   );
   const serverRunningRun = serverRunningRuns[0] ?? null;
   const latestFailedRun =
-    analysisRuns.find((run) => FAILED_RUN_STATUSES.has(run.status)) ?? null;
+    promptAnalysisRuns.find((run) => {
+      if (!FAILED_RUN_STATUSES.has(run.status)) return false;
+      if (observedRunningAnalysisRunId) {
+        return run.id === observedRunningAnalysisRunId;
+      }
+      const runTimestamp = getRunTimestamp(run);
+      if (analysisAcceptedAt !== null) {
+        return runTimestamp >= analysisAcceptedAt;
+      }
+      return Date.now() - runTimestamp <= RECENT_FAILED_RUN_WINDOW_MS;
+    }) ?? null;
   const serverAnalysisInProgress = Boolean(serverRunningRun);
   const activePromptAnalysisCount = Math.max(
     pendingPromptRuns.length,
@@ -264,6 +271,26 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     [serverRunningRuns],
   );
   const activeAnalysisRunId = activeAnalysisRunIds[0] ?? null;
+
+  useEffect(() => {
+    if (pendingPromptRuns.length === 0) {
+      setRunningPromptRowIds([]);
+      return;
+    }
+
+    const next = serverAnalysisInProgress
+      ? pendingPromptRuns
+      : pendingPromptRuns.filter((entry) => {
+          if (isPromptRunProgressExpired(entry)) return false;
+          return !isPromptRunProgressComplete(entry, monitoringData.recent_prompts as never);
+        });
+
+    if (next.length !== pendingPromptRuns.length) {
+      setPendingPromptRuns(next);
+    }
+    setRunningPromptRowIds(next.map((entry) => entry.rowId));
+  }, [monitoringData.recent_prompts, pendingPromptRuns, serverAnalysisInProgress]);
+
   const analysisProgressLabel = serverRunningRun
     ? `${serverRunningRun.completedResponses}/${serverRunningRun.expectedResponses}`
     : "";
@@ -284,6 +311,19 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   }, [serverRunningRun?.id]);
 
   useEffect(() => {
+    if (!latestFailedRun) return;
+
+    setPendingPromptRuns([]);
+    setRunningPromptRowIds([]);
+    setObservedRunningAnalysisRunId(null);
+    setAnalysisAcceptedAt(null);
+    if (runPromptToastId) {
+      dismissToast(runPromptToastId);
+      setRunPromptToastId(null);
+    }
+  }, [latestFailedRun, runPromptToastId]);
+
+  useEffect(() => {
     if (
       !observedRunningAnalysisRunId ||
       serverAnalysisInProgress ||
@@ -292,18 +332,19 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       return;
     }
 
-    const observedRun = analysisRuns.find((run) => run.id === observedRunningAnalysisRunId);
+    const observedRun = promptAnalysisRuns.find((run) => run.id === observedRunningAnalysisRunId);
     if (!observedRun || observedRun.status === "running") return;
 
     setPendingPromptRuns([]);
     setRunningPromptRowIds([]);
     setObservedRunningAnalysisRunId(null);
+    setAnalysisAcceptedAt(null);
     if (runPromptToastId) {
       dismissToast(runPromptToastId);
       setRunPromptToastId(null);
     }
   }, [
-    analysisRuns,
+    promptAnalysisRuns,
     analysisRunsQuery.isFetching,
     observedRunningAnalysisRunId,
     runPromptToastId,
@@ -311,26 +352,26 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   ]);
 
   useEffect(() => {
-    if (cancelledAnalysisRunIds.length === 0 || analysisRuns.length === 0) return;
+    if (cancelledAnalysisRunIds.length === 0 || promptAnalysisRuns.length === 0) return;
     const stillRunning = new Set(
-      analysisRuns.filter((run) => run.status === "running").map((run) => run.id),
+      promptAnalysisRuns.filter((run) => run.status === "running").map((run) => run.id),
     );
     setCancelledAnalysisRunIds((current) => {
       const next = current.filter((runId) => stillRunning.has(runId));
       return next.length === current.length ? current : next;
     });
-  }, [analysisRuns, cancelledAnalysisRunIds.length]);
+  }, [promptAnalysisRuns, cancelledAnalysisRunIds.length]);
 
   useEffect(() => {
-    if (locallyCompletedAnalysisRunIds.length === 0 || analysisRuns.length === 0) return;
+    if (locallyCompletedAnalysisRunIds.length === 0 || promptAnalysisRuns.length === 0) return;
     const stillRunning = new Set(
-      analysisRuns.filter((run) => run.status === "running").map((run) => run.id),
+      promptAnalysisRuns.filter((run) => run.status === "running").map((run) => run.id),
     );
     setLocallyCompletedAnalysisRunIds((current) => {
       const next = current.filter((runId) => stillRunning.has(runId));
       return next.length === current.length ? current : next;
     });
-  }, [analysisRuns, locallyCompletedAnalysisRunIds.length]);
+  }, [promptAnalysisRuns, locallyCompletedAnalysisRunIds.length]);
 
   useEffect(() => {
     if (pendingPromptResponse) {
@@ -424,6 +465,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
 
   useEffect(() => {
     if (pendingPromptRuns.length === 0 || derived.visibleResponses.length === 0) return;
+    if (serverAnalysisInProgress) return;
 
     const completedPromptIds = new Set(
       derived.visibleResponses
@@ -477,6 +519,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     pendingPromptRuns,
     queryClient,
     runPromptToastId,
+    serverAnalysisInProgress,
     source.activeProjectId,
   ]);
 
@@ -578,6 +621,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       mutations.pushInsufficientCreditsToast(credits);
       return;
     }
+    setAnalysisAcceptedAt(Date.now());
     mutations.runPromptsMutation.mutate([prompt]);
   };
 
@@ -592,6 +636,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       mutations.pushInsufficientCreditsToast(selectedPromptCredits);
       return;
     }
+    setAnalysisAcceptedAt(Date.now());
     mutations.runPromptsMutation.mutate(runnableSelectedPrompts);
   };
 
@@ -604,6 +649,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
         result.data
           ?.filter(
             (run) =>
+              run.runType !== "perception" &&
               run.status === "running" &&
               !cancelledAnalysisRunIdsSet.has(run.id) &&
               !locallyCompletedAnalysisRunIdsSet.has(run.id),

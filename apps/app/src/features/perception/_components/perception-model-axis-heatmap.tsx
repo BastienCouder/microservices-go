@@ -3,6 +3,7 @@
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PERCEPTION_HEATMAP_AXIS_COLORS } from "@/lib/app-data";
 import { SectionTitle } from "@/components/shared/section-title";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -36,11 +37,13 @@ export function PerceptionModelAxisHeatmap({
   rows,
   periodLabel,
   emptyLabel,
+  loadingNumbers = false,
 }: {
   axes: HeatmapAxis[];
   rows: HeatmapRow[];
   periodLabel: string;
   emptyLabel?: string | null;
+  loadingNumbers?: boolean;
 }) {
   const { locale, t } = useScopedI18n("perception");
   return (
@@ -78,7 +81,11 @@ export function PerceptionModelAxisHeatmap({
                           style={scoreToCellStyle(score, axis.key)}
                         >
                           <div className="text-[10px] font-medium text-foreground/80">{axisLabel}</div>
-                          <div className="mt-1 text-sm font-semibold tabular-nums">{score}</div>
+                          {loadingNumbers ? (
+                            <Skeleton className="mt-1 h-5 w-8 rounded-md" />
+                          ) : (
+                            <div className="mt-1 text-sm font-semibold tabular-nums">{score}</div>
+                          )}
                           <div className="text-[10px] text-foreground/80">{textForScore(score, locale)}</div>
                         </div>
                       );
@@ -122,7 +129,11 @@ export function PerceptionModelAxisHeatmap({
                             style={scoreToCellStyle(score, axis.key)}
                             title={`${row.model} • ${axisLabel}: ${score}/100`}
                           >
-                            <div className="text-xs font-semibold tabular-nums text-foreground">{score}</div>
+                            {loadingNumbers ? (
+                              <Skeleton className="mx-auto h-4 w-7 rounded-md" />
+                            ) : (
+                              <div className="text-xs font-semibold tabular-nums text-foreground">{score}</div>
+                            )}
                             <div className="truncate text-[10px] text-foreground/80">{textForScore(score, locale)}</div>
                           </div>
                         );

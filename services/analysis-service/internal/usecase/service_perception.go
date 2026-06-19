@@ -43,6 +43,34 @@ func buildPerceptionResponseMetrics(response AIResponse, canon BrandCanon, proje
 	}
 }
 
+func perceptionResponseAxisMetrics(metrics perceptionResponseMetrics) PerceptionResponseAxisMetrics {
+	return PerceptionResponseAxisMetrics{
+		Positioning: metrics.positioning,
+		Factual:     metrics.factual,
+		UseCases:    metrics.useCases,
+		Features:    metrics.features,
+		Sentiment:   metrics.sentiment,
+		Competitors: metrics.competitors,
+	}
+}
+
+func applyPerceptionReadinessToMetrics(metrics perceptionResponseMetrics, readiness perceptionBrandReadiness) perceptionResponseMetrics {
+	if readiness.axisStatus["positioning"] != "measurable" {
+		metrics.positioning = 0
+		metrics.factual = 0
+	}
+	if readiness.axisStatus["use_cases"] != "measurable" {
+		metrics.useCases = 0
+	}
+	if readiness.axisStatus["features"] != "measurable" {
+		metrics.features = 0
+	}
+	if readiness.axisStatus["competitors"] != "measurable" {
+		metrics.competitors = 0
+	}
+	return metrics
+}
+
 func perceptionPositioningScore(response AIResponse, canon BrandCanon, normalizedResponse string) int {
 	score := 15
 
@@ -239,6 +267,11 @@ func buildPerceptionBrandReadiness(canon BrandCanon, projectCompetitors []string
 	}
 }
 
+func isPerceptionBrandContextReady(canon BrandCanon) bool {
+	return strings.TrimSpace(canon.BrandName) != "" &&
+		strings.TrimSpace(canon.Category) != ""
+}
+
 func perceptionReadinessMetadata(readiness perceptionBrandReadiness) map[string]any {
 	return map[string]any{
 		"score":      readiness.score,
@@ -325,6 +358,28 @@ func derivePerceptionRadarFromMetrics(metrics []perceptionResponseMetrics) []Per
 		{Axis: "sentiment", Label: perceptionAxisLabels["sentiment"], Score: averagePerceptionMetric(metrics, func(item perceptionResponseMetrics) int { return item.sentiment }), Target: 100},
 		{Axis: "competitors", Label: perceptionAxisLabels["competitors"], Score: averagePerceptionMetric(metrics, func(item perceptionResponseMetrics) int { return item.competitors }), Target: 100},
 	}
+}
+
+func capPerceptionScoresForBrandReadiness(scores PerceptionScores, readiness perceptionBrandReadiness) PerceptionScores {
+	cap := clampToPercent(float64(readiness.cap))
+	return PerceptionScores{
+		PositioningAccuracy: min(scores.PositioningAccuracy, cap),
+		FactualAccuracy:     min(scores.FactualAccuracy, cap),
+		SentimentScore:      scores.SentimentScore,
+	}
+}
+
+func capPerceptionRadarForBrandReadiness(radar []PerceptionRadarPoint, readiness perceptionBrandReadiness) []PerceptionRadarPoint {
+	cap := clampToPercent(float64(readiness.cap))
+	capped := make([]PerceptionRadarPoint, 0, len(radar))
+	for _, point := range radar {
+		next := point
+		if next.Axis != "sentiment" {
+			next.Score = min(next.Score, cap)
+		}
+		capped = append(capped, next)
+	}
+	return capped
 }
 
 func derivePerceptionTopErrors(

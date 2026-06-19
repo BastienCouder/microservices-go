@@ -44,10 +44,6 @@ export function BrandCanonSummary({
                   <div className="text-base font-semibold leading-tight">{canon.category}</div>
                 </div>
               </div>
-              <div className="mt-2 rounded-lg border border-border/60 bg-background/80 px-2.5 py-2">
-                <div className="text-[11px] text-muted-foreground">{t("summaryPositioning")}</div>
-                <p className="mt-0.5 text-[15px] leading-snug text-foreground">{canon.positioning}</p>
-              </div>
             </div>
           </div>
 

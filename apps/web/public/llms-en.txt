@@ -1,0 +1,45 @@
+# Fury Defendu
+
+> Fury Defendu is the public site served at `https://fury-defendu.fr/`.
+
+This file summarizes the public pages worth consulting and the technical paths that LLM-based assistants and crawlers should avoid prioritizing.
+
+## Public pages
+
+- [Home](https://fury-defendu.fr/) : main public page
+- [Login](https://fury-defendu.fr/login) : user access page
+- [Login error](https://fury-defendu.fr/login/error) : authentication error page
+
+## Secondary pages
+
+- [English home](https://fury-defendu.fr/en)
+- [English login](https://fury-defendu.fr/en/login)
+- [English login error](https://fury-defendu.fr/en/login/error)
+
+## Recommended indexing
+
+- Prioritize `/`
+- Index `/login` only if the login page should remain publicly discoverable
+- Treat `/login/error` as a support page rather than a primary landing page
+
+## Paths not to prioritize
+
+- `/admin`
+- `/admin/`
+- `/atelier-fury-porte-71b`
+- `/atelier-fury-porte-71b/`
+- `/api`
+- `/api/`
+- `/auth/*`
+- `/login/callback`
+- `/en/login/callback`
+- `/register`
+- `/en/register`
+
+## Sitemap
+
+- Primary sitemap: https://fury-defendu.fr/sitemap.xml
+
+## Short summary
+
+Fury Defendu exposes a public home page and login-related pages. Technical, admin, API, and callback paths should not be prioritized.

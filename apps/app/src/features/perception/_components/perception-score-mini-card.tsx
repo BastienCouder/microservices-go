@@ -1,7 +1,10 @@
 "use client";
 
 import type { ComponentType } from "react";
+import { Info } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { PERCEPTION_SCORE_CARD_COLORS } from "@/lib/app-data";
 
 export function PerceptionScoreMiniCard({
@@ -10,12 +13,14 @@ export function PerceptionScoreMiniCard({
   value,
   hint,
   icon: Icon,
+  loadingNumber = false,
 }: {
   id: string;
   title: string;
   value: number;
   hint: string;
   icon: ComponentType<{ className?: string }>;
+  loadingNumber?: boolean;
 }) {
   const safeValue = Math.max(0, Math.min(100, value));
   const radius = 28;
@@ -66,10 +71,31 @@ export function PerceptionScoreMiniCard({
           </div>
 
           <div className="min-w-0 w-full flex-1">
-            <div className="text-center text-sm font-semibold leading-tight">{title}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
+            <div className="flex items-center justify-center gap-1.5 text-center text-sm font-semibold leading-tight">
+              <span className="min-w-0 truncate">{title}</span>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                      aria-label={hint}
+                    >
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-72 leading-relaxed">
+                    {hint}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <div className="mt-2 flex items-end justify-center gap-1">
-              <span className="text-2xl font-semibold tabular-nums leading-none">{safeValue}</span>
+              {loadingNumber ? (
+                <Skeleton className="h-7 w-12 rounded-md" />
+              ) : (
+                <span className="text-2xl font-semibold tabular-nums leading-none">{safeValue}</span>
+              )}
               <span className="pb-0.5 text-xs text-muted-foreground">/100</span>
             </div>
           </div>

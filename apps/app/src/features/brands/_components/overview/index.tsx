@@ -10,7 +10,6 @@ import { usePerceptionData } from "@/features/perception/_lib/shared/use-percept
 import { PageHeader } from "@/components/shared/page-header";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { createEmptyPerceptionViewData } from "@/features/perception/_lib/shared/perception-data";
-import { deriveShortDescription } from "../../_lib/overview/brand-overview-helpers";
 import { buildBrandCanonLocation } from "../../brand-canon/_lib/brand-canon-utils";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 
@@ -30,7 +29,6 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
 
   const viewData = data ?? createEmptyPerceptionViewData(routeSearch);
   const emptyLabel = error || t("emptyLabel");
-  const shortDescription = deriveShortDescription(viewData.brandCanon);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
@@ -58,10 +56,9 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
               {t("quickSummaryDescription")}
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <CardContent className="grid gap-3 sm:gap-4 md:grid-cols-2">
             <BrandField label={t("brandNameLabel")} value={viewData.brandCanon.brandName} emptyLabel={emptyLabel} />
             <BrandField label={t("industryLabel")} value={viewData.brandCanon.category} emptyLabel={emptyLabel} />
-            <BrandField label={t("shortSummaryLabel")} value={shortDescription} emptyLabel={emptyLabel} />
           </CardContent>
         </Card>
 
@@ -75,12 +72,13 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <BrandField
-              label={t("fullDescriptionLabel")}
-              value={viewData.brandCanon.positioning}
-              emptyLabel={emptyLabel}
-              multiline
-            />
+            {viewData.brandCanon.positioning.trim() ? (
+              <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                {viewData.brandCanon.positioning.trim()}
+              </p>
+            ) : (
+              <EmptyStateCard label={emptyLabel} />
+            )}
           </CardContent>
         </Card>
 
