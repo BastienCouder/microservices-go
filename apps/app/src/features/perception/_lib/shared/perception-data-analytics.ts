@@ -32,6 +32,7 @@ type ParsedResponse = {
   runType: string;
   promptKind: string;
   promptRunId: string;
+  promptText: string;
   modelId: string;
   modelName: string;
   modelGroupName: string;
@@ -249,6 +250,7 @@ function parseResponses(
       }),
       promptKind: asString(getField(response, ["promptKind", "PromptKind"])),
       promptRunId: asString(getField(response, ["promptRunId", "PromptRunID"])),
+      promptText: asString(getField(response, ["promptText", "PromptText"])),
       modelId,
       modelName: modelMeta?.displayName || modelId,
       modelGroupName: modelMeta?.groupName || modelMeta?.displayName || modelId,
@@ -726,6 +728,7 @@ function parseResponseRecord(record: PerceptionResponseRecord): ParsedResponse {
   return {
     ...record,
     promptKind: record.promptKind ?? "",
+    promptText: record.promptText ?? "",
     createdAt: record.createdAt ? parseISODate(record.createdAt) : null,
   };
 }

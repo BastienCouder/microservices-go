@@ -68,14 +68,14 @@ export function FilterHeroInsightCard({
         </div>
       </div>
 
-      <div className="relative z-10 mb-2">
+        {/* <div className="relative z-10 mb-2">
         <div className="text-[30px] font-bold tracking-tight text-white md:text-xl">
           {insight.metricValue}
         </div>
         <p className="text-xs font-medium text-primary-foreground/78">
           {insight.metricLabel}
         </p>
-      </div>
+      </div> */}
 
       <div className="relative z-10 mt-3 flex items-center gap-2">
         <div

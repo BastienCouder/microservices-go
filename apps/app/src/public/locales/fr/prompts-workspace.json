@@ -85,7 +85,7 @@
   "allModels": "Tous les modèles",
   "selectedModels_one": "{{count}} modèle sélectionné",
   "selectedModels_other": "{{count}} modèles sélectionnés",
-  "aiCoverageTitle": "Couverture IA",
+  "aiCoverageTitle": "Modèles",
   "aiCoverageDescription": "Sélectionnez les modèles à inclure dans la vue.",
   "noCompetitor": "Aucun",
   "additionalCompetitors": "concurrents supplémentaires",

@@ -43,6 +43,7 @@ type MultiSelectFilterPopoverProps = {
   loadingItemCount?: number;
   onOpenChange?: (open: boolean) => void;
   open?: boolean;
+  renderOption?: (option: MultiSelectFilterOption, selected: boolean, onToggle: () => void) => ReactNode;
   showIconSlot?: boolean;
 };
 
@@ -170,6 +171,7 @@ export function MultiSelectFilterPopover({
   onToggle,
   open,
   options,
+  renderOption,
   selectedIds,
   showIconSlot = false,
   summaryLabel,
@@ -238,16 +240,22 @@ export function MultiSelectFilterPopover({
             </div>
           ) : (
             options.map((option) => (
-              <OptionCard
-                key={option.id}
-                label={option.label}
-                description={option.description}
-                iconSrc={option.iconSrc}
-                imageAlt={option.imageAlt}
-                selected={selectedIds.includes(option.id)}
-                onClick={() => onToggle(option.id)}
-                showIconSlot={showIconSlot}
-              />
+              renderOption ? (
+                <div key={option.id}>
+                  {renderOption(option, selectedIds.includes(option.id), () => onToggle(option.id))}
+                </div>
+              ) : (
+                <OptionCard
+                  key={option.id}
+                  label={option.label}
+                  description={option.description}
+                  iconSrc={option.iconSrc}
+                  imageAlt={option.imageAlt}
+                  selected={selectedIds.includes(option.id)}
+                  onClick={() => onToggle(option.id)}
+                  showIconSlot={showIconSlot}
+                />
+              )
             ))
           )}
         </div>

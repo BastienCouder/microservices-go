@@ -53,6 +53,7 @@ type AIResponse struct {
 	RunType        string                         `json:"runType,omitempty"`
 	PromptKind     string                         `json:"promptKind,omitempty"`
 	PromptRunID    string                         `json:"promptRunId"`
+	PromptText     string                         `json:"promptText,omitempty"`
 	ModelID        string                         `json:"modelId"`
 	RawResponse    string                         `json:"rawResponse"`
 	BrandMentioned bool                           `json:"brandMentioned"`

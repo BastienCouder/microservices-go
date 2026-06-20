@@ -122,22 +122,24 @@ export function PromptsFiltersToolbar({
         />
       ) : null}
 
-      <Button
-        type="button"
-        size="sm"
-        variant="outline"
-        aria-pressed={showArchived}
-        className={cn(
-          "h-8 shrink-0 rounded-lg px-4 text-sm font-medium transition-colors",
-          showArchived
-            ? "border-primary bg-primary/10 text-primary"
-            : "border-border/80 text-foreground hover:border-primary hover:bg-primary/10 hover:text-primary",
-        )}
-        onClick={() => setShowArchived(!showArchived)}
-        title={content.archivedPromptsHelp}
-      >
-        <span>{content.showArchivedPrompts}</span>
-      </Button>
+      {currentTab === "prompts" ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          aria-pressed={showArchived}
+          className={cn(
+            "h-8 shrink-0 rounded-lg px-4 text-sm font-medium transition-colors",
+            showArchived
+              ? "border-primary bg-primary/10 text-primary"
+              : "border-border/80 text-foreground hover:border-primary hover:bg-primary/10 hover:text-primary",
+          )}
+          onClick={() => setShowArchived(!showArchived)}
+          title={content.archivedPromptsHelp}
+        >
+          <span>{content.showArchivedPrompts}</span>
+        </Button>
+      ) : null}
 
       {hasActiveGlobalFilters && (
         <Button

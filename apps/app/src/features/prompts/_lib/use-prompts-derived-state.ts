@@ -299,16 +299,12 @@ export function usePromptsDerivedState({
   const selectedResponse = allResponses.find((item) => item.id === selectedResponseId) ?? null;
   const toolbarAvailableModels = tab === "responses" ? responseAvailableModels : promptAvailableModels;
   const toolbarSelectedModels = tab === "responses" ? selectedResponseModels : selectedPromptModels;
-  const allModelsSelected =
-    toolbarAvailableModels.length > 0 &&
-    toolbarSelectedModels.length === toolbarAvailableModels.length &&
-    toolbarAvailableModels.every((model) => toolbarSelectedModels.includes(model));
+  const allModelsSelected = toolbarSelectedModels.length === 0;
 
   const hasActiveGlobalFilters =
-    showArchived ||
+    (tab === "prompts" && showArchived) ||
     search.trim().length > 0 ||
-    toolbarSelectedModels.length !== toolbarAvailableModels.length ||
-    toolbarAvailableModels.some((model) => !toolbarSelectedModels.includes(model)) ||
+    toolbarSelectedModels.length > 0 ||
     (tab === "responses" &&
       (period !== DEFAULT_PROMPT_PERIOD || !showHistorical || selectedCompetitors.length > 0));
 

@@ -36,9 +36,9 @@ export function PerceptionHeroInsightCard({
   const MomentumIcon = getMomentumIcon(insight.momentumTone);
   const TrendArrow = getTrendArrow(insight.momentumTone);
   const maxTrend = Math.max(...insight.trend, 1);
-  const hasMetric =
-    insight.metricValue.trim() !== "" || insight.metricLabel.trim() !== "";
-  const hasSummary = insight.summary.trim() !== "";
+  // const hasMetric =
+  //   insight.metricValue.trim() !== "" || insight.metricLabel.trim() !== "";
+  // const hasSummary = insight.summary.trim() !== "";
   const hasMicroCopy = insight.microCopy.trim() !== "";
 
   return (
@@ -65,6 +65,7 @@ export function PerceptionHeroInsightCard({
         </div>
       </div>
 
+      {/*
       {hasMetric ? (
         <div className="relative z-10 mb-2">
           <div className="text-[30px] font-bold tracking-tight text-white md:text-3xl">
@@ -75,12 +76,15 @@ export function PerceptionHeroInsightCard({
           </p>
         </div>
       ) : null}
+      */}
 
+      {/*
       {hasSummary ? (
         <p className="relative z-10 text-xs leading-relaxed text-primary-foreground/84">
           {insight.summary}
         </p>
       ) : null}
+      */}
 
       <div className="relative z-10 mt-3 flex flex-wrap items-center gap-2">
         <div

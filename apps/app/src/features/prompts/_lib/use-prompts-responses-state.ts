@@ -177,16 +177,14 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   useEffect(() => {
     if (source.promptAvailableModels.length === 0) return;
     setSelectedPromptModels((current) => {
-      const kept = current.filter((model) => source.promptAvailableModels.includes(model));
-      return kept.length > 0 ? kept : source.promptAvailableModels;
+      return current.filter((model) => source.promptAvailableModels.includes(model));
     });
   }, [source.promptAvailableModels]);
 
   useEffect(() => {
     if (source.responseAvailableModels.length === 0) return;
     setSelectedResponseModels((current) => {
-      const kept = current.filter((model) => source.responseAvailableModels.includes(model));
-      return kept.length > 0 ? kept : source.responseAvailableModels;
+      return current.filter((model) => source.responseAvailableModels.includes(model));
     });
   }, [source.responseAvailableModels]);
 

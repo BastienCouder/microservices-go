@@ -41,8 +41,8 @@ export function buildPromptsDerivedActions(params: {
   const clearFilters = () => {
     params.setPeriod(DEFAULT_PROMPT_PERIOD);
     params.setDateRange(undefined);
-    params.setSelectedPromptModels(params.promptAvailableModels);
-    params.setSelectedResponseModels(params.responseAvailableModels);
+    params.setSelectedPromptModels([]);
+    params.setSelectedResponseModels([]);
     params.setPersona("all");
     params.setShowArchived(false);
     params.setSearch("");

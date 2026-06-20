@@ -1,9 +1,10 @@
 import { Square, Table2, Workflow } from "lucide-react";
-import { TableVirtuoso, Virtuoso } from "react-virtuoso";
+import { Virtuoso } from "react-virtuoso";
+import { AiResponsesTable, type AiResponsesTableColumn } from "@/components/shared/ai-responses-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TableCell, TableHead } from "@/components/ui/table";
+import { TableCell } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { PanelToolbar } from "../shared/panel-toolbar";
 import type { ModelVisual, PromptRunRow, ResponseView } from "../../_lib/types";
@@ -13,14 +14,7 @@ import {
   ResponseCompetitorsCell,
   ResponseFilterToggle,
   formatCompetitorSummary,
-  virtuosoTableComponents,
 } from "./responses-shared";
-
-type ResponseColumn = {
-  id: string;
-  label: string;
-  className?: string;
-};
 
 function mentionBadgeClassName(mentioned: boolean) {
   return mentioned ? "bg-emerald-50 text-emerald-700" : "bg-rose-50 text-rose-700";
@@ -194,7 +188,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
   const tableRows = props.pendingResponse
     ? [{ id: "__pending_response__", pending: true as const }, ...props.filteredResponses]
     : props.filteredResponses;
-  const responsesColumns: ResponseColumn[] = [
+  const responsesColumns: AiResponsesTableColumn[] = [
     { id: "time", label: content.time },
     { id: "ai", label: content.ai },
     { id: "prompt", label: content.prompt },
@@ -258,26 +252,15 @@ export function ResponsesContent(props: ResponsesViewProps) {
             <ResponseTimelineLoadingRows />
           )
         ) : props.viewMode === "table" ? (
-          props.filteredResponses.length === 0 && !props.pendingResponse ? (
-            <EmptyResponsesState />
-          ) : (
-            <TableVirtuoso
-              style={{ height: "100%" }}
-              data={tableRows}
-              computeItemKey={(_, item) => item.id}
-              defaultItemHeight={82}
-              endReached={handleEndReached}
-              increaseViewportBy={{ top: 96, bottom: 160 }}
-              fixedHeaderContent={() => (
-                <tr>
-                  {responsesColumns.map((column) => (
-                    <TableHead key={column.id} className={cn("h-12 bg-background px-3 text-sm font-semibold text-muted-foreground", column.className)}>
-                      {column.label}
-                    </TableHead>
-                  ))}
-                </tr>
-              )}
-              itemContent={(_, item) => {
+          <AiResponsesTable
+            columns={responsesColumns}
+            rows={tableRows}
+            getRowId={(item) => item.id}
+            loading={false}
+            loadingState={<ResponseTableLoadingRows />}
+            emptyState={<EmptyResponsesState />}
+            onEndReached={handleEndReached}
+            renderRow={(item) => {
                 if ("pending" in item) {
                   return (
                     <PendingResponseTableRow
@@ -342,10 +325,8 @@ export function ResponsesContent(props: ResponsesViewProps) {
                     </TableCell>
                   </>
                 );
-              }}
-              components={virtuosoTableComponents}
-            />
-          )
+            }}
+          />
         ) : props.filteredResponses.length === 0 ? (
           <EmptyResponsesState />
         ) : (

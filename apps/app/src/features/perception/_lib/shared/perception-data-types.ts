@@ -99,6 +99,7 @@ export type PerceptionResponseRecord = {
   runType: string;
   promptKind?: string;
   promptRunId: string;
+  promptText?: string;
   modelId: string;
   modelName: string;
   modelGroupName: string;

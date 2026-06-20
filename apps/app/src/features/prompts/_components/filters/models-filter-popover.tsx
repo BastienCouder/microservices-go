@@ -1,3 +1,4 @@
+import { ModelCard } from "@/components/shared/model-card";
 import { MultiSelectFilterPopover } from "@/components/shared/multi-select-filter-popover";
 import { useI18nScope, useScopedI18n } from "@/shared/hooks/use-i18n";
 
@@ -61,7 +62,23 @@ export function ModelsFilterPopover({
       selectedIds={selectedModels}
       onToggle={toggleModel}
       loading={loading}
-      showIconSlot
+      contentClassName="w-[640px]"
+      gridClassName="sm:grid-cols-2"
+      renderOption={(option, selected, onToggleOption) => {
+        const meta = getModelVisual(option.id);
+        return (
+          <ModelCard
+            name={meta.name}
+            description={meta.description || meta.name}
+            icon={meta.icon || meta.name || option.id}
+            selected={selected}
+            onClick={onToggleOption}
+            modelGroup={meta.label || meta.provider || meta.name}
+            size="small"
+            variant="monitoring"
+          />
+        );
+      }}
     />
   );
 }

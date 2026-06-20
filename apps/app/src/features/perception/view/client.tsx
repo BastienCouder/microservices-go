@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -9,10 +10,10 @@ import {
   PerceptionAnalysisStepperDialog,
   PerceptionLeftPanel,
   PerceptionModelAxisHeatmap,
+  PerceptionPromptsStream,
   PerceptionScoreMiniCard,
   PerceptionThreeColumnLayout,
   PerceptionTrendChart,
-  TopErrorsPanel,
 } from "../_components";
 import {
   getPerceptionPeriodBadgeLabel,
@@ -42,6 +43,7 @@ const SCORE_CARD_ICONS = {
 export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: PerceptionClientProps) {
   const { locale } = useLocale();
   const { t } = useScopedI18n("perception");
+  const navigate = useNavigate();
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const viewModel = usePerceptionViewModel(initialData, { apiBaseURL, routeSearch });
   const permissions = useSelectedOrganizationPermissions({ apiBaseURL, routeSearch });
@@ -138,6 +140,18 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
     </div>
   );
 
+  const openPerceptionResponses = (responseId?: string) => {
+    const params = new URLSearchParams(
+      routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
+    );
+    if (responseId) params.set("responseId", responseId);
+
+    navigate({
+      pathname: "/perception/responses",
+      search: params.toString() ? `?${params.toString()}` : "",
+    });
+  };
+
   const rightColumn = (
     <div className="space-y-3 px-1 pb-4">
       {viewModel.lastAnalysisCredits !== null ? (
@@ -152,16 +166,11 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           {viewModel.analysisError}
         </p>
       ) : null}
-      <TopErrorsPanel
-        emptyLabel={emptyStateLabel}
-        errors={viewModel.filteredTopErrors}
-        generatedIds={viewModel.generatedIds}
+      <PerceptionPromptsStream
+        responses={viewModel.filteredResponses}
         modelCatalog={viewModel.modelCatalog}
-        projectId={initialData.metadata.projectId}
-        savingErrorIds={viewModel.savingErrorIds}
-        totalErrorCount={viewModel.filteredTopErrorsTotalCount}
-        onCreateAction={permissions.canEdit ? viewModel.handleFix : undefined}
-        onRemoveAction={permissions.canEdit ? viewModel.handleRemoveAction : undefined}
+        onViewMore={() => openPerceptionResponses()}
+        onSelectResponse={(response) => openPerceptionResponses(response.id)}
       />
     </div>
   );
@@ -249,7 +258,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
           </div>
         </div>
       }
-     
+      right={rightColumn}
       />
       {initialData.metadata.projectId ? (
         <PerceptionAnalysisStepperDialog
@@ -275,5 +284,3 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
     </>
   );
 }
-
-{/* right={rightColumn}/ */}

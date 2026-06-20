@@ -57,6 +57,7 @@ func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 			}
 			if promptRun := s.promptRuns[response.PromptRunID]; promptRun != nil {
 				response.PromptKind = normalizePromptKind(promptRun.Kind)
+				response.PromptText = promptRun.PromptText
 			}
 			out = append(out, response)
 		}
@@ -84,6 +85,7 @@ func (s *Service) responsesForProjectLocked(projectID string) []AIResponse {
 				}
 				if promptRun := s.promptRuns[response.PromptRunID]; promptRun != nil {
 					response.PromptKind = normalizePromptKind(promptRun.Kind)
+					response.PromptText = promptRun.PromptText
 				}
 				out = append(out, response)
 			}
