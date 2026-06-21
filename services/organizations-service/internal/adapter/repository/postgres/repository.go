@@ -43,6 +43,43 @@ func (r *Repository) Create(ctx context.Context, organization *domain.Organizati
 	return nil
 }
 
+func (r *Repository) List(ctx context.Context) ([]domain.Organization, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, public_id, name, owner_user_id, created_at, deleted_at
+		FROM organizations
+		WHERE deleted_at IS NULL
+		ORDER BY name, id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	defer rows.Close()
+
+	organizations := make([]domain.Organization, 0)
+	for rows.Next() {
+		var org domain.Organization
+		var createdAt pgtype.Timestamptz
+		var deletedAt pgtype.Timestamptz
+		if err := rows.Scan(
+			&org.ID,
+			&org.PublicID,
+			&org.Name,
+			&org.OwnerIdentityID,
+			&createdAt,
+			&deletedAt,
+		); err != nil {
+			return nil, err
+		}
+		org.CreatedAt = fromPgTimestamptz(createdAt)
+		org.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+		organizations = append(organizations, org)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return organizations, nil
+}
+
 func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.Organization, error) {
 	var org domain.Organization
 	var createdAt pgtype.Timestamptz

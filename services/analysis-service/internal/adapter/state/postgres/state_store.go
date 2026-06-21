@@ -208,7 +208,7 @@ func (s *StateStore) loadPromptRuns(ctx context.Context, state *persistedState) 
 
 func (s *StateStore) loadResponses(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at
+		SELECT id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at, deleted_at
 		FROM ai_responses
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -234,6 +234,7 @@ func (s *StateStore) loadResponses(ctx context.Context, state *persistedState) e
 			&raw,
 			&item.Sentiment,
 			&item.CreatedAt,
+			&item.DeletedAt,
 		); err != nil {
 			return fmt.Errorf("scan ai response: %w", err)
 		}
@@ -398,9 +399,9 @@ func insertResponses(ctx context.Context, tx pgx.Tx, responses map[string]*useca
 			return fmt.Errorf("marshal cited urls for %s: %w", response.ID, err)
 		}
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO ai_responses (id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11)
-		`, response.ID, response.RunID, response.PromptRunID, response.ModelID, response.RawResponse, response.BrandMentioned, response.BrandPosition, response.CitationFound, rawCitedURLs, response.Sentiment, response.CreatedAt); err != nil {
+			INSERT INTO ai_responses (id, run_id, prompt_run_id, model_id, raw_response, brand_mentioned, brand_position, citation_found, cited_urls, sentiment, created_at, deleted_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12)
+		`, response.ID, response.RunID, response.PromptRunID, response.ModelID, response.RawResponse, response.BrandMentioned, response.BrandPosition, response.CitationFound, rawCitedURLs, response.Sentiment, response.CreatedAt, response.DeletedAt); err != nil {
 			return fmt.Errorf("insert ai response %s: %w", response.ID, err)
 		}
 	}

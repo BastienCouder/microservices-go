@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
+import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -45,12 +46,16 @@ type ActivityPromptsStreamProps = {
   filteredPrompts: PromptItem[];
   previewCount: number;
   onSelectPrompt: (prompt: PromptItem) => void;
+  onRequestDeletePrompt: (prompt: PromptItem) => void;
+  deletingResponseId?: string | null;
 };
 
 export const ActivityPromptsStream = memo(function ActivityPromptsStream({
   filteredPrompts,
   previewCount,
   onSelectPrompt,
+  onRequestDeletePrompt,
+  deletingResponseId = null,
 }: ActivityPromptsStreamProps) {
   const content = useI18nScope("monitoring-activity-panel");
   const totalPrompts = filteredPrompts.length;
@@ -154,13 +159,16 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({
             const modelName = prompt.modelDisplayName || "";
 
             return (
-              <button
-                type="button"
+              <div
                 key={`${prompt.modelId}-${prompt.time}-${index}`}
-                onClick={() => onSelectPrompt(prompt)}
-                className="group w-full cursor-pointer rounded-md bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
-                aria-label={`${content.promptsStream}: ${modelGroup}`}
+                className="group relative w-full rounded-md bg-background p-4 text-left transition-all hover:ring-2 hover:ring-primary/20"
               >
+                <button
+                  type="button"
+                  onClick={() => onSelectPrompt(prompt)}
+                  className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                  aria-label={`${content.promptsStream}: ${modelGroup}`}
+                />
                 <div className="mb-2.5 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     {promptIconSrc ? (
@@ -189,9 +197,25 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({
                     </div>
                   </div>
 
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {prompt.time}
-                  </span>
+                  <div className="relative z-10 flex items-center gap-1.5">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {prompt.time}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 rounded-full text-muted-foreground hover:text-destructive"
+                      disabled={deletingResponseId === prompt.responseId}
+                      aria-label={content.deleteResponse}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onRequestDeletePrompt(prompt);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 <p className="mb-3 line-clamp-3 text-xs font-medium leading-relaxed text-foreground/90 transition-colors group-hover:text-foreground md:text-sm">
@@ -240,7 +264,7 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({
                     {prompt.score}
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })
         )}

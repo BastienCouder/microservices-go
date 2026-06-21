@@ -161,9 +161,10 @@ export function AdminOrganizationsPage({
   const [planFilter, setPlanFilter] = useState<string>(PLAN_FILTER_ALL);
 
   const organizationsQuery = useQuery({
-    queryKey: appQueryKeys.organizations(apiBaseURL, null),
+    queryKey: appQueryKeys.organizations(apiBaseURL, null, "admin"),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
+    queryFn: ({ signal }) =>
+      loadOrganizationSummaries(apiBaseURL, signal, { adminScope: true }),
   });
 
   const manageableOrganizations = useMemo(
@@ -223,7 +224,6 @@ export function AdminOrganizationsPage({
         normalizedSearch === "" ||
         row.organization.name.toLowerCase().includes(normalizedSearch) ||
         row.organization.id.includes(normalizedSearch) ||
-        row.organization.role.toLowerCase().includes(normalizedSearch) ||
         row.projects.some((project) =>
           project.name.toLowerCase().includes(normalizedSearch),
         ) ||
@@ -342,7 +342,7 @@ export function AdminOrganizationsPage({
   const isFetching = organizationsQuery.isFetching || quotasQuery.isFetching;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
         title={t("pageTitle")}
         baseline={t("pageBaseline")}
@@ -370,7 +370,7 @@ export function AdminOrganizationsPage({
         }
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-tr-none bg-background md:rounded-md">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-md rounded-tr-none bg-background">
         <div className="border-b px-3 pb-3 md:px-4 md:pb-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
             <div className="min-w-0 flex-1">
@@ -429,11 +429,9 @@ export function AdminOrganizationsPage({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 md:px-4">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 md:px-6">
           {isLoading ? (
             <AdminOrganizationsLoading />
-          ) : manageableOrganizations.length === 0 ? (
-            <EmptyState label={t("noManageableOrganization")} />
           ) : rows.length === 0 ? (
             <EmptyState label={t("noQuotaLoaded")} />
           ) : filteredRows.length === 0 ? (
@@ -533,7 +531,6 @@ function AdminOrganizationTableRow({
             <span className="font-medium text-foreground">
               {row.organization.name}
             </span>
-            <Badge variant="outline">{row.organization.role}</Badge>
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {t("organizationIdStatus", {
@@ -605,7 +602,6 @@ function AdminOrganizationMobileCard({
             {t("organizationId", { id: row.organization.id })}
           </div>
         </div>
-        <Badge variant="outline">{row.organization.role}</Badge>
       </div>
       <div className="space-y-3">
         <div className="grid gap-3">

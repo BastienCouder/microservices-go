@@ -56,6 +56,10 @@
   "sourcesDetectedHint": "Sources détectées dans la réponse",
   "noSourceDetectedHint": "Aucune source détectée",
   "viewResponse": "Voir la réponse",
+  "deleteResponse": "Supprimer la réponse",
+  "deleteResponseTitle": "Supprimer cette réponse ?",
+  "deleteResponseConfirm": "Supprimer",
+  "deleteResponseError": "Impossible de supprimer la réponse.",
   "rankUnranked": "Non classé",
   "exportExcel": "Exporter"
 }

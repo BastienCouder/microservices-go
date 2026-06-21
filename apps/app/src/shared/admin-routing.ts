@@ -2,12 +2,14 @@ export const ADMIN_ROUTE_ROOT = "/gateway/kh7m2q";
 
 export const adminRoutePaths = {
   organizations: `${ADMIN_ROUTE_ROOT}/tenants`,
+  users: `${ADMIN_ROUTE_ROOT}/users`,
   pricing: `${ADMIN_ROUTE_ROOT}/catalog`,
   models: `${ADMIN_ROUTE_ROOT}/providers`,
 } as const;
 
 export const legacyAdminRoutePaths = {
   organizations: "/admin/organizations",
+  users: "/admin/users",
   pricing: "/admin/pricing",
   models: "/admin/models",
 } as const;
@@ -24,8 +26,11 @@ const legacyAdminRouteEntries = Object.entries(legacyAdminRoutePaths) as [
 ][];
 
 export function canAccessAdminRole(role: string | null | undefined): boolean {
-  const normalized = role?.trim().toLowerCase() ?? "";
-  return normalized === "editor" || normalized === "super_admin";
+  return isSuperAdminRole(role);
+}
+
+export function isSuperAdminRole(role: string | null | undefined): boolean {
+  return (role?.trim().toLowerCase() ?? "") === "super_admin";
 }
 
 export function findPrimaryAdminOrganization<T extends { role: string }>(

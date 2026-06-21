@@ -24,6 +24,7 @@ type Config struct {
 	PublicAPIKeyHeader          string
 	PublicAPIKeyPrefix          string
 	PublicAPIDefaultKeyScopes   []string
+	AdminBootstrapCode          string
 	InternalJWTSecret           string
 	InternalJWTIssuer           string
 	CORSAllowedOrigins          []string
@@ -100,6 +101,10 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	adminBootstrapCode, err := envcfg.OptionalValueFromEnv("ADMIN_BOOTSTRAP_CODE", "ADMIN_BOOTSTRAP_CODE_FILE")
+	if err != nil {
+		return Config{}, err
+	}
 	internalJWTSecret, err := envcfg.SecretFromEnv("INTERNAL_JWT_SECRET", "INTERNAL_JWT_SECRET_FILE")
 	if err != nil {
 		return Config{}, err
@@ -139,6 +144,7 @@ func Load() (Config, error) {
 		PublicAPIKeyHeader:          envcfg.OptionalEnv("PUBLIC_API_KEY_HEADER"),
 		PublicAPIKeyPrefix:          envcfg.OptionalEnv("PUBLIC_API_KEY_PREFIX"),
 		PublicAPIDefaultKeyScopes:   envcfg.OptionalCSVEnv("PUBLIC_API_DEFAULT_KEY_SCOPES"),
+		AdminBootstrapCode:          adminBootstrapCode,
 		InternalJWTSecret:           internalJWTSecret,
 		InternalJWTIssuer:           internalJWTIssuer,
 		CORSAllowedOrigins:          corsAllowedOrigins,

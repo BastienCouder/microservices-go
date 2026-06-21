@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -114,7 +115,6 @@ func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) 
 		SELECT organization_id, role
 		FROM member_roles
 		WHERE user_id = $1
-		  AND organization_id <> 0
 		ORDER BY organization_id, role
 	`, userID)
 	if err != nil {
@@ -148,6 +148,104 @@ func (r *Repository) ListOrganizationsByUser(ctx context.Context, userID int64) 
 		})
 	}
 	return memberships, nil
+}
+
+func (r *Repository) ClaimGlobalSuperAdmin(ctx context.Context, userID int64) (*domain.Member, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(727379360001)`); err != nil {
+		return nil, err
+	}
+
+	var existing int
+	if err := tx.QueryRow(ctx, `
+		SELECT 1
+		FROM member_roles
+		WHERE role = 'super_admin'
+		LIMIT 1
+	`).Scan(&existing); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	} else if existing == 1 {
+		return nil, domain.ErrSuperAdminAlreadyClaimed
+	}
+
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO member_roles (organization_id, user_id, role)
+		VALUES (0, $1, 'super_admin')
+		ON CONFLICT (organization_id, user_id, role) DO NOTHING
+	`, userID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return &domain.Member{
+		OrganizationID: 0,
+		UserID:         userID,
+		Roles:          []string{"super_admin"},
+	}, nil
+}
+
+func (r *Repository) GrantGlobalSuperAdmin(ctx context.Context, userID int64) (*domain.Member, error) {
+	if _, err := r.db.Exec(ctx, `
+		INSERT INTO member_roles (organization_id, user_id, role)
+		VALUES (0, $1, 'super_admin')
+		ON CONFLICT (organization_id, user_id, role) DO NOTHING
+	`, userID); err != nil {
+		return nil, err
+	}
+	return &domain.Member{
+		OrganizationID: 0,
+		UserID:         userID,
+		Roles:          []string{"super_admin"},
+	}, nil
+}
+
+func (r *Repository) ListGlobalSuperAdmins(ctx context.Context) ([]int64, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT user_id
+		FROM member_roles
+		WHERE organization_id = 0
+		  AND role = 'super_admin'
+		ORDER BY user_id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	userIDs := make([]int64, 0)
+	for rows.Next() {
+		var userID int64
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return userIDs, nil
+}
+
+func (r *Repository) HasGlobalSuperAdmin(ctx context.Context) (bool, error) {
+	var exists bool
+	if err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM member_roles
+			WHERE organization_id = 0
+			  AND role = 'super_admin'
+		)
+	`).Scan(&exists); err != nil {
+		return false, err
+	}
+	return exists, nil
 }
 
 func (r *Repository) ListMembers(ctx context.Context, organizationID int64) ([]domain.Member, error) {

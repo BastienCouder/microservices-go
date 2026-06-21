@@ -339,6 +339,7 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 		existing.CitationFound = input.CitationFound
 		existing.CitedURLs = append([]string(nil), input.CitedURLs...)
 		existing.Sentiment = normalizeSentiment(input.Sentiment)
+		existing.DeletedAt = nil
 	} else {
 		response := &AIResponse{
 			ID:             s.nextID("resp"),
@@ -399,6 +400,77 @@ func (s *Service) RecordResponse(ctx context.Context, input ResponseInput) error
 		len(strings.TrimSpace(input.RawResponse)),
 	)
 
+	return nil
+}
+
+func (s *Service) DeleteResponse(ctx context.Context, responseID string, organizationID int64) error {
+	responseID = strings.TrimSpace(responseID)
+	if responseID == "" {
+		return fmt.Errorf("%w: responseId is required", ErrValidation)
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	response, ok := s.responses[responseID]
+	if !ok {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: response", ErrNotFound)
+	}
+	run := s.runs[response.RunID]
+	if run == nil {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: run", ErrNotFound)
+	}
+	projectID := run.ProjectID
+	s.mu.Unlock()
+
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	if err := s.reloadLocked(ctx); err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	response, ok = s.responses[responseID]
+	if !ok {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: response", ErrNotFound)
+	}
+	run = s.runs[response.RunID]
+	if run == nil {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: run", ErrNotFound)
+	}
+	if run.ProjectID != projectID {
+		s.mu.Unlock()
+		return fmt.Errorf("%w: response project changed", ErrValidation)
+	}
+	if response.DeletedAt != nil {
+		s.mu.Unlock()
+		return nil
+	}
+
+	backup := s.snapshotLocked()
+	deletedAt := s.now().UTC()
+	response.DeletedAt = &deletedAt
+	run.VisibilityScore = s.calculateVisibilityScoreLocked(run.ID)
+	run.UpdatedAt = deletedAt
+	if err := s.persistLocked(ctx); err != nil {
+		s.restoreLocked(backup)
+		s.mu.Unlock()
+		return err
+	}
+
+	dashboard := s.dashboardDataLocked(projectID)
+	organizationID = run.OrganizationID
+	s.mu.Unlock()
+
+	s.storeDashboardInCache(ctx, projectID, organizationID, dashboard)
 	return nil
 }
 

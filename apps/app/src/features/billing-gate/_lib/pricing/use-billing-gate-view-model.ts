@@ -160,7 +160,7 @@ export function useBillingGateViewModel({
         organizationId = await createBillingOrganization(apiBaseURL, organizationName);
         setSelectedOrganizationId(organizationId);
         await invalidateQueryKeys(queryClient, [
-          appQueryKeys.organizations(apiBaseURL, null),
+          ["organizations", apiBaseURL],
           ["organizations", "project-context-hierarchies", apiBaseURL],
         ]);
       }

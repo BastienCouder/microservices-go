@@ -62,6 +62,7 @@ type AIResponse struct {
 	CitedURLs      []string                       `json:"citedUrls"`
 	Sentiment      string                         `json:"sentiment"`
 	CreatedAt      time.Time                      `json:"createdAt"`
+	DeletedAt      *time.Time                     `json:"deletedAt,omitempty"`
 	Metrics        *PerceptionResponseAxisMetrics `json:"metrics,omitempty"`
 }
 

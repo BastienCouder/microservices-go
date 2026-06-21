@@ -7,6 +7,7 @@ import (
 
 type Repository interface {
 	Create(ctx context.Context, organization *Organization) error
+	List(ctx context.Context) ([]Organization, error)
 	GetByID(ctx context.Context, id int64) (*Organization, error)
 	GetByPublicID(ctx context.Context, publicID string) (*Organization, error)
 	UpdateName(ctx context.Context, id int64, name string) (*Organization, error)

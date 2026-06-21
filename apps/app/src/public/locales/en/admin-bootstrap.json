@@ -1,0 +1,9 @@
+{
+  "title": "Activate the first super admin",
+  "description": "Enter the bootstrap code to grant this account the super admin role. This action can only succeed while no super admin exists.",
+  "codeLabel": "Admin code",
+  "submit": "Activate super admin",
+  "submitting": "Activating...",
+  "success": "Super admin role activated.",
+  "error": "Unable to activate super admin."
+}

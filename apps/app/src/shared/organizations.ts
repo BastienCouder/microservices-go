@@ -121,9 +121,13 @@ export function resolveNumericOrganizationIdFromSummaries(
 export async function loadUserOrganizationMemberships(
   apiBaseURL: string,
   signal?: AbortSignal,
+  options: { adminScope?: boolean } = {},
 ): Promise<UserOrganizationMembership[]> {
+  const path = options.adminScope
+    ? `${apiRoutes.organizations.me()}?scope=admin`
+    : apiRoutes.organizations.me();
   const membershipsPayload = await requireGatewayData(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
+    gatewayJSON<unknown>(apiBaseURL, path, {
       method: "GET",
       signal,
     }),
@@ -140,8 +144,9 @@ export async function loadUserOrganizationMemberships(
 export async function loadUserOrganizationSummaries(
   apiBaseURL: string,
   signal?: AbortSignal,
+  options: { adminScope?: boolean } = {},
 ): Promise<UserOrganizationSummary[]> {
-  const memberships = await loadUserOrganizationMemberships(apiBaseURL, signal);
+  const memberships = await loadUserOrganizationMemberships(apiBaseURL, signal, options);
 
   const organizations = await Promise.all(
     memberships.map(async (membership) => {

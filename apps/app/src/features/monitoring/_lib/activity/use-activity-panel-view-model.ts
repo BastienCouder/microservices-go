@@ -56,6 +56,9 @@ function buildAlertCreatedAt(prompts: MonitoringPrompt[]): string | undefined {
 
 type ActivityPanelViewModel = {
   loading: boolean;
+  apiBaseURL: string;
+  routeSearch: string;
+  refresh: () => Promise<void>;
   filteredAlerts: MonitoringAlert[];
   filteredPrompts: MonitoringPrompt[];
   canExport: boolean;
@@ -73,7 +76,13 @@ export function useActivityPanelViewModel(): ActivityPanelViewModel {
   const filters = useMonitoringFilters();
   const analyticsContent = useI18nScope("monitoring-analytics-panel");
   const { t } = useScopedI18n("monitoring-analytics-panel");
-  const { data: monitoringData, loading } = useMonitoringData();
+  const {
+    data: monitoringData,
+    loading,
+    apiBaseURL,
+    routeSearch,
+    refresh,
+  } = useMonitoringData();
   const exportAccess = useClientExportAccess();
   const { models, recent_prompts } = monitoringData;
   const [selectedPrompt, setSelectedPrompt] = useState<MonitoringPrompt | null>(null);
@@ -191,6 +200,9 @@ export function useActivityPanelViewModel(): ActivityPanelViewModel {
 
   return {
     loading,
+    apiBaseURL,
+    routeSearch,
+    refresh,
     filteredAlerts,
     filteredPrompts,
     canExport: exportAccess.canExport,

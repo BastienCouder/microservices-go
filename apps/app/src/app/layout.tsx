@@ -8,15 +8,16 @@ type AppLayoutProps = {
   busy: boolean;
   children: ReactNode;
   feedback: string;
+  userId?: string | number | null;
   onLogout: () => Promise<void>;
   onRefresh: () => Promise<void>;
 };
 
-export function AppLayout({ apiBaseURL, busy, children, feedback, onLogout, onRefresh }: AppLayoutProps) {
+export function AppLayout({ apiBaseURL, busy, children, feedback, userId, onLogout, onRefresh }: AppLayoutProps) {
   return (
         <div className="flex h-screen w-full">
             {/* Desktop Sidebar */}
-            <Sidebar apiBaseURL={apiBaseURL} busy={busy} className="hidden lg:flex" onLogout={onLogout} />
+            <Sidebar apiBaseURL={apiBaseURL} busy={busy} className="hidden lg:flex" userId={userId} onLogout={onLogout} />
 
 
             <div className="flex flex-col flex-1 overflow-hidden">

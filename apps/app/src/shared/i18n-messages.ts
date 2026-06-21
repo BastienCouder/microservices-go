@@ -2,8 +2,10 @@ import accountEn from "@/public/locales/en/account.json";
 import appShellEn from "@/public/locales/en/app-shell.json";
 import aiAgentReadyEn from "@/public/locales/en/ai-agent-ready.json";
 import adminModelsEn from "@/public/locales/en/admin-models.json";
+import adminBootstrapEn from "@/public/locales/en/admin-bootstrap.json";
 import adminOrganizationsEn from "@/public/locales/en/admin-organizations.json";
 import adminPricingEn from "@/public/locales/en/admin-pricing.json";
+import adminUsersEn from "@/public/locales/en/admin-users.json";
 import billingGateEn from "@/public/locales/en/billing-gate.json";
 import brandsOverviewEn from "@/public/locales/en/brands-overview.json";
 import contentOptimizerEn from "@/public/locales/en/content-optimizer.json";
@@ -31,8 +33,10 @@ import accountFr from "@/public/locales/fr/account.json";
 import appShellFr from "@/public/locales/fr/app-shell.json";
 import aiAgentReadyFr from "@/public/locales/fr/ai-agent-ready.json";
 import adminModelsFr from "@/public/locales/fr/admin-models.json";
+import adminBootstrapFr from "@/public/locales/fr/admin-bootstrap.json";
 import adminOrganizationsFr from "@/public/locales/fr/admin-organizations.json";
 import adminPricingFr from "@/public/locales/fr/admin-pricing.json";
+import adminUsersFr from "@/public/locales/fr/admin-users.json";
 import billingGateFr from "@/public/locales/fr/billing-gate.json";
 import brandsOverviewFr from "@/public/locales/fr/brands-overview.json";
 import contentOptimizerFr from "@/public/locales/fr/content-optimizer.json";
@@ -60,8 +64,10 @@ export const enMessages = {
   account: accountEn,
   "app-shell": appShellEn,
   "admin-models": adminModelsEn,
+  "admin-bootstrap": adminBootstrapEn,
   "admin-organizations": adminOrganizationsEn,
   "admin-pricing": adminPricingEn,
+  "admin-users": adminUsersEn,
   "shared-api": sharedApiEn,
   "shared-ui": sharedUiEn,
   invitations: invitationsEn,
@@ -91,8 +97,10 @@ export const frMessages = {
   account: accountFr,
   "app-shell": appShellFr,
   "admin-models": adminModelsFr,
+  "admin-bootstrap": adminBootstrapFr,
   "admin-organizations": adminOrganizationsFr,
   "admin-pricing": adminPricingFr,
+  "admin-users": adminUsersFr,
   "shared-api": sharedApiFr,
   "shared-ui": sharedUiFr,
   invitations: invitationsFr,

@@ -29,6 +29,8 @@ type MonitoringDataContextValue = {
   error: string | null;
   mode: RuntimeMode;
   projectId: string | null;
+  apiBaseURL: string;
+  routeSearch: string;
   refresh: () => Promise<void>;
 };
 
@@ -106,9 +108,11 @@ export function MonitoringDataProvider({
       error,
       mode,
       projectId,
+      apiBaseURL,
+      routeSearch,
       refresh,
     }),
-    [data, loading, error, mode, projectId, refresh],
+    [data, loading, error, mode, projectId, apiBaseURL, routeSearch, refresh],
   );
 
   return (

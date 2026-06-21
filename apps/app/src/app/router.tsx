@@ -40,6 +40,11 @@ const AdminOrganizationsPage = lazy(() =>
     default: module.AdminOrganizationsPage,
   })),
 );
+const AdminUsersPage = lazy(() =>
+  import("@/features/admin/admin-users").then((module) => ({
+    default: module.AdminUsersPage,
+  })),
+);
 const AdminPricingPage = lazy(() =>
   import("@/features/admin/admin-pricing").then((module) => ({
     default: module.AdminPricingPage,
@@ -188,6 +193,17 @@ export function AppRouter({
         }
       />
       <Route
+        path={adminRoutePaths.users}
+        element={
+          <Suspense fallback={null}>
+            <AdminUsersPage
+              apiBaseURL={apiBaseURL}
+              routeSearch={routeSearch}
+            />
+          </Suspense>
+        }
+      />
+      <Route
         path={adminRoutePaths.pricing}
         element={
           <Suspense fallback={null}>
@@ -213,6 +229,15 @@ export function AppRouter({
           <Navigate
             replace
             to={{ pathname: adminRoutePaths.organizations, search: routeSearch }}
+          />
+        }
+      />
+      <Route
+        path={legacyAdminRoutePaths.users}
+        element={
+          <Navigate
+            replace
+            to={{ pathname: adminRoutePaths.users, search: routeSearch }}
           />
         }
       />

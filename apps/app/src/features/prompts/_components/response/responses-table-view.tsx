@@ -1,6 +1,8 @@
-import { Square, Table2, Workflow } from "lucide-react";
+import { Square, Table2, Trash2, Workflow } from "lucide-react";
+import { useState } from "react";
 import { Virtuoso } from "react-virtuoso";
 import { AiResponsesTable, type AiResponsesTableColumn } from "@/components/shared/ai-responses-table";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -53,7 +55,7 @@ function ResponseTableLoadingRows() {
       {Array.from({ length: 7 }).map((_, index) => (
         <div
           key={index}
-          className="grid gap-3 rounded-md border bg-background p-3 lg:grid-cols-[110px_160px_minmax(220px,1fr)_90px_110px_70px_150px_80px]"
+          className="grid gap-3 rounded-md border bg-background p-3 lg:grid-cols-[110px_160px_minmax(220px,1fr)_90px_110px_70px_150px_80px_44px]"
         >
           <Skeleton className="h-6 w-full rounded-full" />
           <Skeleton className="h-6 w-full rounded-full" />
@@ -66,6 +68,7 @@ function ResponseTableLoadingRows() {
           <Skeleton className="h-6 w-12 rounded-full" />
           <Skeleton className="h-6 w-full rounded-full" />
           <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-8 w-8 rounded-full" />
         </div>
       ))}
     </div>
@@ -135,6 +138,9 @@ function PendingResponseTableRow({
         <Skeleton className="h-6 w-28 rounded-full" />
       </TableCell>
       <TableCell className="h-[70px] px-3">
+        <Skeleton className="h-5 w-16" />
+      </TableCell>
+      <TableCell className="h-[70px] px-3">
         <div className="flex justify-end">
           <Button
             type="button"
@@ -177,6 +183,7 @@ type ResponsesViewProps = {
   hasMoreResponses: boolean;
   loadMoreResponses: () => void;
   setSelectedResponseId: (id: string | null) => void;
+  deleteResponse: (responseId: string) => Promise<void>;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
   truncate: (value: string, max?: number) => string;
@@ -184,6 +191,9 @@ type ResponsesViewProps = {
 
 export function ResponsesContent(props: ResponsesViewProps) {
   const content = useI18nScope("prompts-workspace");
+  const [responseToDelete, setResponseToDelete] = useState<PromptRunRow | null>(null);
+  const [deletingResponseId, setDeletingResponseId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const handleEndReached = () => props.hasMoreResponses && props.loadMoreResponses();
   const tableRows = props.pendingResponse
     ? [{ id: "__pending_response__", pending: true as const }, ...props.filteredResponses]
@@ -197,11 +207,29 @@ export function ResponsesContent(props: ResponsesViewProps) {
     { id: "rank", label: content.rank },
     { id: "competitor", label: content.competitor },
     { id: "score", label: content.score },
+    { id: "actions", label: "", className: "w-14 text-right" },
   ] as const;
   const stopAnalysisLabel =
     (props.activeAnalysisRunCount ?? 0) > 1
       ? content.stopAnalysesButton
       : content.stopAnalysisButton;
+  const requestDeleteResponse = (response: PromptRunRow) => {
+    setDeleteError(null);
+    setResponseToDelete(response);
+  };
+  const confirmDeleteResponse = async () => {
+    if (!responseToDelete) return;
+    setDeletingResponseId(responseToDelete.id);
+    setDeleteError(null);
+    try {
+      await props.deleteResponse(responseToDelete.id);
+      setResponseToDelete(null);
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : content.deleteResponseError);
+    } finally {
+      setDeletingResponseId(null);
+    }
+  };
 
   return (
     <>
@@ -323,6 +351,19 @@ export function ResponsesContent(props: ResponsesViewProps) {
                         </div>
                       </div>
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+                        disabled={deletingResponseId === item.id}
+                        aria-label={content.deleteResponse}
+                        onClick={() => requestDeleteResponse(item)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </>
                 );
             }}
@@ -342,11 +383,13 @@ export function ResponsesContent(props: ResponsesViewProps) {
 
               return (
                 <div className="py-3">
-                  <button
-                    type="button"
-                    onClick={() => props.setSelectedResponseId(item.id)}
-                    className="w-full rounded-md border p-3 text-left transition-colors hover:bg-muted"
-                  >
+                  <div className="relative w-full rounded-md border p-3 text-left transition-colors hover:bg-muted">
+                    <button
+                      type="button"
+                      onClick={() => props.setSelectedResponseId(item.id)}
+                      className="absolute inset-0 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                      aria-label={content.view}
+                    />
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-2 font-medium">
                         <span>{item.time} ·</span>
@@ -358,7 +401,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
                           <span className="text-sm text-muted-foreground">{modelVisual.provider}</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="relative z-10 flex items-center gap-2">
                         {item.isHistorical ? (
                           <Badge variant="secondary" className={historicalBadgeClassName()}>
                             {content.history}
@@ -367,6 +410,17 @@ export function ResponsesContent(props: ResponsesViewProps) {
                         <Badge variant="secondary" className={resultBadgeClassName(Boolean(item.error))}>
                           {item.error ? content.error : content.ok}
                         </Badge>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+                          disabled={deletingResponseId === item.id}
+                          aria-label={content.deleteResponse}
+                          onClick={() => requestDeleteResponse(item)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                     <p className="mt-1 text-sm">{props.truncate(item.prompt, 80)}</p>
@@ -382,7 +436,7 @@ export function ResponsesContent(props: ResponsesViewProps) {
                         {formatCompetitorSummary(item.competitors, content.noCompetitor)}
                       </Badge>
                     </div>
-                  </button>
+                  </div>
                 </div>
               );
             }}
@@ -390,6 +444,26 @@ export function ResponsesContent(props: ResponsesViewProps) {
         )}
         </div>
       </div>
+      <ConfirmDialog
+        open={!!responseToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResponseToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        title={content.deleteResponseTitle}
+        confirmLabel={content.deleteResponseConfirm}
+        loading={deletingResponseId !== null}
+        onConfirm={() => {
+          void confirmDeleteResponse();
+        }}
+        previewItems={responseToDelete ? [responseToDelete.prompt || responseToDelete.id] : []}
+      >
+        {deleteError ? (
+          <p className="text-sm font-medium text-destructive">{deleteError}</p>
+        ) : null}
+      </ConfirmDialog>
     </>
   );
 }

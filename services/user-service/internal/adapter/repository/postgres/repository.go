@@ -38,6 +38,31 @@ func (r *Repository) Create(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
+func (r *Repository) List(ctx context.Context) ([]domain.User, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
+		FROM users
+		ORDER BY created_at DESC, id DESC
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("query users: %w", err)
+	}
+	defer rows.Close()
+
+	users := make([]domain.User, 0)
+	for rows.Next() {
+		user, err := scanUser(rows)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, *user)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.User, error) {
 	user, err := r.queries.GetUserByID(ctx, id)
 	if err != nil {
@@ -47,6 +72,34 @@ func (r *Repository) GetByID(ctx context.Context, id int64) (*domain.User, error
 		return nil, fmt.Errorf("query user by id: %w", err)
 	}
 	return toDomainUserFromGetByIDRow(user), nil
+}
+
+type userScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanUser(row userScanner) (*domain.User, error) {
+	var user domain.User
+	var bannedAt pgtype.Timestamptz
+	var createdAt pgtype.Timestamptz
+	var deletedAt pgtype.Timestamptz
+	if err := row.Scan(
+		&user.ID,
+		&user.AuthIdentityID,
+		&user.Email,
+		&user.FirstName,
+		&user.LastName,
+		&user.Banned,
+		&bannedAt,
+		&createdAt,
+		&deletedAt,
+	); err != nil {
+		return nil, err
+	}
+	user.BannedAt = fromPgNullableTimestamptz(bannedAt)
+	user.CreatedAt = fromPgTimestamptz(createdAt)
+	user.DeletedAt = fromPgNullableTimestamptz(deletedAt)
+	return &user, nil
 }
 
 func (r *Repository) GetByAuthIdentityID(ctx context.Context, authIdentityID string) (*domain.User, error) {

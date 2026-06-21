@@ -238,10 +238,16 @@ export const appQueryKeys = {
       direction,
     ] as const,
 
-  organizations: (apiBaseURL: string, _userId?: string | number | null) =>
+  organizations: (
+    apiBaseURL: string,
+    userId?: string | number | null,
+    scope = "user",
+  ) =>
     [
       "organizations",
       apiBaseURL,
+      userId ?? "__anonymous__",
+      scope,
     ] as const,
 
   organizationHierarchy: (

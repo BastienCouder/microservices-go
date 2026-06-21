@@ -88,6 +88,14 @@ func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organi
 	return org, nil
 }
 
+func (s *Service) ListOrganizations(ctx context.Context) ([]domain.Organization, error) {
+	organizations, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list organizations: %w", err)
+	}
+	return organizations, nil
+}
+
 func (s *Service) GetOrganizationByPublicID(ctx context.Context, publicID string) (*domain.Organization, error) {
 	normalizedPublicID := strings.TrimSpace(publicID)
 	if normalizedPublicID == "" {

@@ -156,6 +156,7 @@ services:
       IA_SERVICE_URL: http://ia-service:8091
       ATTRIBUTION_SERVICE_URL: http://attribution-service:8092
       RATE_LIMIT_RPM: "600"
+      ADMIN_BOOTSTRAP_CODE_FILE: /run/secrets/admin_bootstrap_code
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
@@ -163,6 +164,7 @@ services:
     secrets:
       - gateway_http_addr
       - gateway_metrics_addr
+      - admin_bootstrap_code
       - internal_jwt_secret
     ports:
       - "127.0.0.1:50000:8080"

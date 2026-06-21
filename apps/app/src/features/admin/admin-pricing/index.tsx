@@ -181,9 +181,10 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const [newPlanDraft, setNewPlanDraft] = useState<NewPlanDraft>(blankNewPlanDraft);
 
   const organizationsQuery = useQuery({
-    queryKey: appQueryKeys.organizations(apiBaseURL, null),
+    queryKey: appQueryKeys.organizations(apiBaseURL, null, "admin"),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
+    queryFn: ({ signal }) =>
+      loadOrganizationSummaries(apiBaseURL, signal, { adminScope: true }),
   });
 
   const adminOrganization = useMemo(
@@ -372,7 +373,7 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   const isFetching = organizationsQuery.isFetching || plansQuery.isFetching;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-2 md:p-4">
       <PageHeader
         title={t("pageTitle")}
         baseline={t("pageBaseline")}
@@ -392,51 +393,53 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
         }
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-tr-none bg-background md:rounded-md">
-        <div className="min-h-0 flex-1 overflow-hidden px-3 py-3 md:px-4">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-md rounded-tr-none bg-background">
+        <div className="min-h-0 flex-1 overflow-hidden px-4 py-4 md:px-6">
           {isLoading ? (
             <AdminPricingLoading />
           ) : !organizationId ? (
             <EmptyState label={t("noManageableOrganization")} />
           ) : (
-            <div className="grid h-full min-h-0 gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
-              <NewPlanCard
-                draft={newPlanDraft}
-                pending={updatePlanMutation.isPending && !plansByID.has(updatePlanMutation.variables?.plan ?? "")}
-                onUpdate={updateNewPlanDraft}
-                onSave={saveNewPlan}
-              />
-              {visiblePlanIds.map((plan, index) => {
-                const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
-                return (
-                  <PlanCard
-                    key={plan}
-                    index={index}
-                    plan={plan}
-                    settings={settings}
-                    planDraft={planDrafts[plan] ?? planDraftFromSettings(settings)}
-                    pending={
-                      updatePlanMutation.isPending &&
-                      updatePlanMutation.variables?.plan === plan
-                    }
-                    stripePending={
-                      syncStripeMutation.isPending &&
-                      syncStripeMutation.variables === plan
-                    }
-                    stripeDisabled={
-                      syncStripeMutation.isPending || updatePlanMutation.isPending
-                    }
-                    mostChosenPending={
-                      setMostChosenMutation.isPending &&
-                      setMostChosenMutation.variables?.plan === plan
-                    }
-                    onUpdatePlanDraft={updatePlanDraft}
-                    onSave={savePlan}
-                    onSyncStripe={(targetPlan) => syncStripeMutation.mutate(targetPlan)}
-                    onMarkMostChosen={markMostChosen}
-                  />
-                );
-              })}
+            <div className="flex h-full min-h-0 flex-col gap-3">
+              <div className="grid min-h-0 gap-3 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-3">
+                <NewPlanCard
+                  draft={newPlanDraft}
+                  pending={updatePlanMutation.isPending && !plansByID.has(updatePlanMutation.variables?.plan ?? "")}
+                  onUpdate={updateNewPlanDraft}
+                  onSave={saveNewPlan}
+                />
+                {visiblePlanIds.map((plan, index) => {
+                  const settings = plansByID.get(plan) ?? emptyPlanSettings(plan);
+                  return (
+                    <PlanCard
+                      key={plan}
+                      index={index}
+                      plan={plan}
+                      settings={settings}
+                      planDraft={planDrafts[plan] ?? planDraftFromSettings(settings)}
+                      pending={
+                        updatePlanMutation.isPending &&
+                        updatePlanMutation.variables?.plan === plan
+                      }
+                      stripePending={
+                        syncStripeMutation.isPending &&
+                        syncStripeMutation.variables === plan
+                      }
+                      stripeDisabled={
+                        syncStripeMutation.isPending || updatePlanMutation.isPending
+                      }
+                      mostChosenPending={
+                        setMostChosenMutation.isPending &&
+                        setMostChosenMutation.variables?.plan === plan
+                      }
+                      onUpdatePlanDraft={updatePlanDraft}
+                      onSave={savePlan}
+                      onSyncStripe={(targetPlan) => syncStripeMutation.mutate(targetPlan)}
+                      onMarkMostChosen={markMostChosen}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

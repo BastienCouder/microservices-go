@@ -55,6 +55,36 @@ func (s *Service) ListOrganizationsByUser(ctx context.Context, userID int64) ([]
 	return s.repo.ListOrganizationsByUser(ctx, userID)
 }
 
+func (s *Service) ClaimGlobalSuperAdmin(ctx context.Context, userID int64) (*domain.Member, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("%w: user id must be positive", domain.ErrInvalidPermissionCheck)
+	}
+	member, err := s.repo.ClaimGlobalSuperAdmin(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("claim global super admin: %w", err)
+	}
+	return member, nil
+}
+
+func (s *Service) GrantGlobalSuperAdmin(ctx context.Context, userID int64) (*domain.Member, error) {
+	if userID <= 0 {
+		return nil, fmt.Errorf("%w: user id must be positive", domain.ErrInvalidPermissionCheck)
+	}
+	member, err := s.repo.GrantGlobalSuperAdmin(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("grant global super admin: %w", err)
+	}
+	return member, nil
+}
+
+func (s *Service) ListGlobalSuperAdmins(ctx context.Context) ([]int64, error) {
+	return s.repo.ListGlobalSuperAdmins(ctx)
+}
+
+func (s *Service) HasGlobalSuperAdmin(ctx context.Context) (bool, error) {
+	return s.repo.HasGlobalSuperAdmin(ctx)
+}
+
 func (s *Service) ListMembers(ctx context.Context, organizationID int64) ([]domain.Member, error) {
 	if organizationID <= 0 {
 		return nil, fmt.Errorf("%w: organization id must be positive", domain.ErrInvalidPermissionCheck)

@@ -20,6 +20,10 @@ const ADMIN_ITEMS = [
     labelKey: "adminOrganizations",
   },
   {
+    href: adminRoutePaths.users,
+    labelKey: "adminUsers",
+  },
+  {
     href: adminRoutePaths.pricing,
     labelKey: "adminPricing",
   },

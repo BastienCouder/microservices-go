@@ -191,33 +191,76 @@ func (h *Handler) listMyOrganizations(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.URL.Query().Get("scope") == "admin" && hasGlobalSuperAdminMembership(memberships) {
+		organizations, err := h.svc.ListOrganizations(r.Context())
+		if err != nil {
+			h.writeDomainError(w, err)
+			return
+		}
+		response := make([]membershipResponse, 0, len(organizations))
+		for _, organization := range organizations {
+			response = append(response, membershipResponseForOrganization(&organization, domain.RoleSuperAdmin))
+		}
+		writeJSON(w, http.StatusOK, response)
+		return
+	}
+
 	response := make([]membershipResponse, 0, len(memberships))
 	for _, membership := range memberships {
-		role := domain.RoleViewer
-		for _, candidate := range membership.Roles {
-			if candidate == domain.RoleEditor {
-				role = candidate
-			}
+		if membership.OrganizationID == 0 {
+			continue
 		}
 		organization, getErr := h.svc.GetOrganization(r.Context(), membership.OrganizationID)
 		if getErr != nil {
 			h.writeDomainError(w, getErr)
 			return
 		}
-		organizationID := strings.TrimSpace(organization.PublicID)
-		if organizationID == "" {
-			organizationID = strconv.FormatInt(membership.OrganizationID, 10)
-		}
-		response = append(response, membershipResponse{
-			ID:             organizationID,
-			OrganizationID: organizationID,
-			InternalID:     strconv.FormatInt(membership.OrganizationID, 10),
-			PublicID:       organizationID,
-			Role:           role,
-		})
+		response = append(response, membershipResponseForOrganization(organization, primaryMembershipRole(membership.Roles)))
 	}
 
 	writeJSON(w, http.StatusOK, response)
+}
+
+func hasGlobalSuperAdminMembership(memberships []domain.Membership) bool {
+	for _, membership := range memberships {
+		if membership.OrganizationID != 0 {
+			continue
+		}
+		for _, role := range membership.Roles {
+			if strings.TrimSpace(strings.ToLower(role)) == domain.RoleSuperAdmin {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func primaryMembershipRole(roles []string) string {
+	role := domain.RoleViewer
+	for _, candidate := range roles {
+		normalized := strings.TrimSpace(strings.ToLower(candidate))
+		if normalized == domain.RoleSuperAdmin {
+			return domain.RoleSuperAdmin
+		}
+		if normalized == domain.RoleEditor {
+			role = domain.RoleEditor
+		}
+	}
+	return role
+}
+
+func membershipResponseForOrganization(organization *domain.Organization, role string) membershipResponse {
+	organizationID := strings.TrimSpace(organization.PublicID)
+	if organizationID == "" {
+		organizationID = strconv.FormatInt(organization.ID, 10)
+	}
+	return membershipResponse{
+		ID:             organizationID,
+		OrganizationID: organizationID,
+		InternalID:     strconv.FormatInt(organization.ID, 10),
+		PublicID:       organizationID,
+		Role:           role,
+	}
 }
 
 func (h *Handler) organizationRoutes(w http.ResponseWriter, r *http.Request) {

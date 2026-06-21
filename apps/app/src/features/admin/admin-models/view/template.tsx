@@ -99,9 +99,10 @@ export function AdminModelsTemplate({
   const [purgeMissingModels, setPurgeMissingModels] = useState(false);
   const [minContext, setMinContext] = useState("");
   const organizationsQuery = useQuery({
-    queryKey: appQueryKeys.organizations(apiBaseURL, "admin-models"),
+    queryKey: appQueryKeys.organizations(apiBaseURL, "admin-models", "admin"),
     enabled: apiBaseURL.trim() !== "",
-    queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
+    queryFn: ({ signal }) =>
+      loadOrganizationSummaries(apiBaseURL, signal, { adminScope: true }),
   });
 
   const requestedOrganizationId = useMemo(
@@ -116,7 +117,6 @@ export function AdminModelsTemplate({
       ),
     [organizationsQuery.data, requestedOrganizationId],
   );
-
   useEffect(() => {
     setOrganizationId(adminOrganization?.publicId || adminOrganization?.id || requestedOrganizationId);
   }, [adminOrganization?.id, adminOrganization?.publicId, requestedOrganizationId]);

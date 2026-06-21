@@ -51,6 +51,9 @@ func (s *Service) responsesForRunLocked(runID string) []AIResponse {
 	out := make([]AIResponse, 0, len(ids))
 	for _, id := range ids {
 		if item, ok := s.responses[id]; ok {
+			if item.DeletedAt != nil {
+				continue
+			}
 			response := copyResponse(item)
 			if run := s.runs[runID]; run != nil {
 				response.RunType = run.RunType
@@ -79,6 +82,9 @@ func (s *Service) responsesForProjectLocked(projectID string) []AIResponse {
 		ids := s.responsesByRun[runID]
 		for _, id := range ids {
 			if item, ok := s.responses[id]; ok {
+				if item.DeletedAt != nil {
+					continue
+				}
 				response := copyResponse(item)
 				if run := s.runs[runID]; run != nil {
 					response.RunType = run.RunType
@@ -237,6 +243,10 @@ func copyResponse(response *AIResponse) AIResponse {
 	}
 	out := *response
 	out.CitedURLs = append([]string(nil), response.CitedURLs...)
+	if response.DeletedAt != nil {
+		deletedAt := *response.DeletedAt
+		out.DeletedAt = &deletedAt
+	}
 	return out
 }
 

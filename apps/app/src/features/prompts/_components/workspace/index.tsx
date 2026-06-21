@@ -188,6 +188,7 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
               hasMoreResponses={state.hasMoreResponses}
               loadMoreResponses={state.loadMoreResponses}
               setSelectedResponseId={state.setSelectedResponseId}
+              deleteResponse={state.deleteResponse}
               getModelVisual={state.getModelVisual}
               rankTone={state.rankTone}
               truncate={state.truncate}

@@ -23,6 +23,14 @@ func (f *fakeRepo) Create(_ context.Context, user *domain.User) error {
 	return nil
 }
 
+func (f *fakeRepo) List(_ context.Context) ([]domain.User, error) {
+	if f.created == nil {
+		return nil, nil
+	}
+	clone := *f.created
+	return []domain.User{clone}, nil
+}
+
 func (f *fakeRepo) GetByID(_ context.Context, id int64) (*domain.User, error) {
 	if f.created != nil && f.created.ID == id {
 		clone := *f.created

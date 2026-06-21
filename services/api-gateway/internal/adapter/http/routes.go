@@ -40,6 +40,10 @@ func isOnboardingBootstrapRequest(r *http.Request) bool {
 	return r.Method == http.MethodPost && r.URL.Path == "/onboarding/bootstrap"
 }
 
+func isAdminBootstrapSuperAdminRequest(r *http.Request) bool {
+	return r.Method == http.MethodPost && r.URL.Path == "/admin/bootstrap-super-admin"
+}
+
 func isOnboardingProjectModelsRequest(r *http.Request) bool {
 	if r.Method != http.MethodPatch {
 		return false
@@ -124,6 +128,10 @@ func (h *Handler) buildRoutes() []routeEntry {
 		},
 		{match: isPublicAPIRequest, handler: http.HandlerFunc(h.handlePublicAPI), service: "public-api"},
 		{match: isAppEntryRequest, handler: http.HandlerFunc(h.handleAppEntry), service: "api-gateway"},
+		{match: isAdminBootstrapSuperAdminStatusRequest, handler: http.HandlerFunc(h.handleAdminBootstrapSuperAdminStatus), service: "api-gateway"},
+		{match: isAdminBootstrapSuperAdminRequest, handler: http.HandlerFunc(h.handleAdminBootstrapSuperAdmin), service: "api-gateway"},
+		{match: isAdminUsersListRequest, handler: http.HandlerFunc(h.handleAdminUsers), service: "api-gateway"},
+		{match: isAdminUserGrantSuperAdminRequest, handler: http.HandlerFunc(h.handleGrantAdminUserSuperAdmin), service: "api-gateway"},
 		{match: isOnboardingBootstrapRequest, handler: http.HandlerFunc(h.handleOnboardingBootstrap), service: "api-gateway"},
 		{match: isOnboardingModelCatalogRequest, handler: onboardingModelCatalogHandler, service: "ia-service"},
 		{match: isOnboardingProjectCreateRequest, handler: onboardingProjectCreateHandler, service: "project-service"},

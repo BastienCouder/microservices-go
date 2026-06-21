@@ -31,6 +31,7 @@ export const aiResponses = pgTable("ai_responses", {
     promptPersonaSnapshot: text("prompt_persona_snapshot"),
 
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    deletedAt: timestamp("deleted_at"),
 }, (table) => ({
     promptRunIdIdx: index("ai_responses_prompt_run_id_idx").on(table.promptRunId),
     modelIdIdx: index("ai_responses_model_id_idx").on(table.modelId),

@@ -108,8 +108,7 @@ func (s *Service) snapshotLocked() *persistedState {
 		state.PromptRunsByRun[key] = append([]string(nil), ids...)
 	}
 	for key, value := range s.responses {
-		clone := *value
-		clone.CitedURLs = append([]string(nil), value.CitedURLs...)
+		clone := copyResponse(value)
 		state.Responses[key] = &clone
 	}
 	for key, ids := range s.responsesByRun {

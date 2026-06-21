@@ -899,6 +899,68 @@ func TestGetDashboardExcludesPerceptionRuns(t *testing.T) {
 	}
 }
 
+func TestDeleteResponseSoftDeletesAndFiltersDashboardAndPerception(t *testing.T) {
+	svc := NewService()
+	ctx := context.Background()
+
+	monitoring, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "monitoring-1", Text: "Best CRM for small teams", Kind: promptKindMonitoring},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  "manual",
+	})
+	if err != nil {
+		t.Fatalf("start monitoring: %v", err)
+	}
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          monitoring.AnalysisRun.ID,
+		PromptRunID:    monitoring.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme is mentioned",
+		BrandMentioned: true,
+		BrandPosition:  "top",
+		Sentiment:      "positive",
+	}); err != nil {
+		t.Fatalf("record monitoring response: %v", err)
+	}
+
+	dashboard, err := svc.GetDashboard(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get dashboard: %v", err)
+	}
+	if len(dashboard.Responses) != 1 {
+		t.Fatalf("expected response before delete, got %+v", dashboard.Responses)
+	}
+	responseID := dashboard.Responses[0].ID
+
+	if err := svc.DeleteResponse(ctx, responseID, 42); err != nil {
+		t.Fatalf("delete response: %v", err)
+	}
+	if stored := svc.responses[responseID]; stored == nil || stored.DeletedAt == nil {
+		t.Fatalf("expected response to stay stored with deletedAt, got %+v", stored)
+	}
+
+	dashboard, err = svc.GetDashboard(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get dashboard after delete: %v", err)
+	}
+	if len(dashboard.Responses) != 0 {
+		t.Fatalf("expected deleted response to be filtered from dashboard, got %+v", dashboard.Responses)
+	}
+
+	perception, err := svc.GetPerception(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get perception after delete: %v", err)
+	}
+	if len(perception.Responses) != 0 {
+		t.Fatalf("expected deleted response to be filtered from perception, got %+v", perception.Responses)
+	}
+}
+
 func TestListAnalysisRunsDerivesPerceptionRunTypeFromPromptKind(t *testing.T) {
 	svc := NewService()
 	ctx := context.Background()

@@ -51,9 +51,13 @@ type LoadOrganizationResourcesOptions = {
 export async function loadOrganizationSummaries(
   apiBaseURL: string,
   signal?: AbortSignal,
+  options: { adminScope?: boolean } = {},
 ): Promise<OrganizationSummary[]> {
+  const path = options.adminScope
+    ? `${apiRoutes.organizations.me()}?scope=admin`
+    : apiRoutes.organizations.me();
   const membershipsPayload = await requireGatewayData(
-    gatewayJSON<unknown>(apiBaseURL, apiRoutes.organizations.me(), {
+    gatewayJSON<unknown>(apiBaseURL, path, {
       method: "GET",
       signal,
     }),

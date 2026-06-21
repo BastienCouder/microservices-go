@@ -6,6 +6,10 @@ type Repository interface {
 	CheckPolicy(ctx context.Context, in CheckInput) (CheckResult, error)
 	ListOrganizationRoles(ctx context.Context, organizationID, userID int64) ([]string, error)
 	ListOrganizationsByUser(ctx context.Context, userID int64) ([]Membership, error)
+	ClaimGlobalSuperAdmin(ctx context.Context, userID int64) (*Member, error)
+	GrantGlobalSuperAdmin(ctx context.Context, userID int64) (*Member, error)
+	ListGlobalSuperAdmins(ctx context.Context) ([]int64, error)
+	HasGlobalSuperAdmin(ctx context.Context) (bool, error)
 	ListMembers(ctx context.Context, organizationID int64) ([]Member, error)
 	UpsertMember(ctx context.Context, member *Member) error
 	UpdateMemberRoles(ctx context.Context, organizationID, userID int64, roles []string) (*Member, error)

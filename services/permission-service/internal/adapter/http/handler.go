@@ -28,6 +28,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("POST /permissions/check", h.check)
+	mux.HandleFunc("POST /internal/admin/bootstrap-super-admin", h.claimGlobalSuperAdmin)
+	mux.HandleFunc("GET /internal/admin/bootstrap-super-admin/status", h.globalSuperAdminStatus)
+	mux.HandleFunc("GET /internal/admin/super-admins", h.listGlobalSuperAdmins)
+	mux.HandleFunc("/internal/admin/users/", h.internalAdminUserRoutes)
 	mux.HandleFunc("/internal/users/", h.internalUserRoutes)
 	mux.HandleFunc("/internal/organizations/", h.internalOrganizationRoutes)
 }
@@ -108,6 +112,71 @@ func (h *Handler) internalUserRoutes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, memberships)
+}
+
+func (h *Handler) claimGlobalSuperAdmin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpjson.WriteMethodNotAllowed(w)
+		return
+	}
+	userID, ok := authenticatedUserID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated user")
+		return
+	}
+	member, err := h.svc.ClaimGlobalSuperAdmin(r.Context(), userID)
+	if err != nil {
+		if errors.Is(err, domain.ErrSuperAdminAlreadyClaimed) {
+			httpjson.WriteForbiddenError(w)
+			return
+		}
+		h.writePermissionError(w, err)
+		return
+	}
+	auditSecurityEvent("global_super_admin_claimed", map[string]any{
+		"user_id": userID,
+	})
+	writeJSON(w, http.StatusOK, member)
+}
+
+func (h *Handler) globalSuperAdminStatus(w http.ResponseWriter, r *http.Request) {
+	exists, err := h.svc.HasGlobalSuperAdmin(r.Context())
+	if err != nil {
+		h.writePermissionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]bool{"exists": exists})
+}
+
+func (h *Handler) listGlobalSuperAdmins(w http.ResponseWriter, r *http.Request) {
+	userIDs, err := h.svc.ListGlobalSuperAdmins(r.Context())
+	if err != nil {
+		h.writePermissionError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string][]int64{"user_ids": userIDs})
+}
+
+func (h *Handler) internalAdminUserRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := strings.Split(strings.Trim(strings.TrimPrefix(r.URL.Path, "/internal/admin/users/"), "/"), "/")
+	if len(parts) != 2 || parts[1] != "super-admin" || r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	userID, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil || userID <= 0 {
+		httpjson.WriteValidationError(w)
+		return
+	}
+	member, err := h.svc.GrantGlobalSuperAdmin(r.Context(), userID)
+	if err != nil {
+		h.writePermissionError(w, err)
+		return
+	}
+	auditSecurityEvent("global_super_admin_granted", map[string]any{
+		"user_id": userID,
+	})
+	writeJSON(w, http.StatusOK, member)
 }
 
 func (h *Handler) internalOrganizationRoutes(w http.ResponseWriter, r *http.Request) {

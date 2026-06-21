@@ -1,6 +1,7 @@
 import { memo, useMemo } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import { SectionTitle } from "@/components/shared/section-title";
 import { cn } from "@/lib/utils";
@@ -20,6 +21,7 @@ type PerceptionPromptsStreamProps = {
   responses: PerceptionResponseRecord[];
   modelCatalog: PerceptionModelOption[];
   previewCount?: number;
+  running?: boolean;
   onViewMore: () => void;
   onSelectResponse: (response: PerceptionResponseRecord) => void;
 };
@@ -30,10 +32,43 @@ function scoreClassName(score: number) {
   return "bg-destructive/10 text-destructive";
 }
 
+function PerceptionPromptStreamSkeletonCard() {
+  return (
+    <div className="w-full rounded-md bg-background p-4 text-left">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <Skeleton className="h-6 w-6 rounded-md" />
+          <div className="min-w-0 space-y-1.5">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-3 w-32" />
+          </div>
+        </div>
+        <Skeleton className="h-3 w-10" />
+      </div>
+
+      <div className="mb-3 space-y-2">
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+        <Skeleton className="h-4 w-2/3" />
+      </div>
+
+      <div className="flex items-center justify-between border-t border-border/40 pt-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Skeleton className="h-4 w-14" />
+          <div className="h-[12px] w-[1px] bg-border" />
+          <Skeleton className="h-4 w-28" />
+        </div>
+        <Skeleton className="h-6 w-12 rounded-sm" />
+      </div>
+    </div>
+  );
+}
+
 export const PerceptionPromptsStream = memo(function PerceptionPromptsStream({
   responses,
   modelCatalog,
   previewCount = 6,
+  running = false,
   onViewMore,
   onSelectResponse,
 }: PerceptionPromptsStreamProps) {
@@ -75,7 +110,9 @@ export const PerceptionPromptsStream = memo(function PerceptionPromptsStream({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col space-y-3 pb-4">
-        {totalResponses === 0 ? (
+        {running ? <PerceptionPromptStreamSkeletonCard /> : null}
+
+        {totalResponses === 0 && !running ? (
           <EmptyStateCard
             label={t("responsesStreamEmpty")}
             className="h-[140px] text-sm"

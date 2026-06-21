@@ -55,6 +55,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/analysis/agent-ready/scans/", h.handleAgentReadyScan)
 	mux.HandleFunc("/analysis/projects/", h.analysisProjectRoutes)
 	mux.HandleFunc("/analysis/runs/", h.analysisRunRoutes)
+	mux.HandleFunc("/analysis/responses/", h.analysisResponseRoutes)
 	mux.HandleFunc("/onboarding/brand-profile", h.previewOnboardingBrandProfile)
 
 	// Compatibility aliases for direct service calls without /analysis prefix.
@@ -80,6 +81,15 @@ func (h *Handler) analysisProjectRoutes(w http.ResponseWriter, r *http.Request) 
 
 func (h *Handler) analysisRunRoutes(w http.ResponseWriter, r *http.Request) {
 	h.runRoutesWithPrefix(w, r, "/analysis/runs/")
+}
+
+func (h *Handler) analysisResponseRoutes(w http.ResponseWriter, r *http.Request) {
+	parts := splitPathAfter(r.URL.Path, "/analysis/responses/")
+	if len(parts) == 1 && parts[0] != "" && r.Method == http.MethodDelete {
+		h.deleteResponse(w, r, parts[0])
+		return
+	}
+	http.NotFound(w, r)
 }
 
 func (h *Handler) projectRoutes(w http.ResponseWriter, r *http.Request) {
@@ -543,6 +553,20 @@ func (h *Handler) deleteOptimizeAction(w http.ResponseWriter, r *http.Request, p
 	}
 
 	if err := h.svc.DeleteOptimizeAction(r.Context(), projectID, organizationID, actionID); err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, map[string]bool{"deleted": true})
+}
+
+func (h *Handler) deleteResponse(w http.ResponseWriter, r *http.Request, responseID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	if err := h.svc.DeleteResponse(r.Context(), responseID, organizationID); err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}

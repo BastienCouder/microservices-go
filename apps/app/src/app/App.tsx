@@ -7,6 +7,7 @@ import {
   ACCOUNT_SETUP_SEARCH,
   getOnboardingSetupMode,
 } from "@/features/onboarding/onboarding-mode";
+import { AdminBootstrapClaim } from "@/features/admin/admin-bootstrap-claim";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { UserProfile } from "@/shared/models";
 import { useAuthSession } from "@/features/session/hooks/use-auth-session";
@@ -21,6 +22,7 @@ import {
   loadProjectContextHierarchies,
 } from "@/shared/project-context";
 import {
+  clearSelectedContext,
   clearSelectedProjectContext,
   clearProjectContextSearch,
   keepProjectOnlyContextSearch,
@@ -35,7 +37,7 @@ import {
   storeSelectedProjectContext,
   storeSelectedProjectID,
 } from "@/shared/selection";
-import { isAnyAdminRoutePath } from "@/shared/admin-routing";
+import { isAnyAdminRoutePath, isSuperAdminRole } from "@/shared/admin-routing";
 import {
   shouldRedirectAwayFromAccountOnboarding,
   type BillingAccessState,
@@ -68,6 +70,29 @@ async function loadProjectCount(
 
   const payload = unwrapGatewayPayload(response.data);
   return Array.isArray(payload) ? payload.length : 0;
+}
+
+async function loadAdminBootstrapStatus(
+  apiBaseURL: string,
+  signal?: AbortSignal,
+): Promise<{ exists: boolean }> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.admin.bootstrapSuperAdminStatus(),
+    {
+      method: "GET",
+      signal,
+    },
+  );
+  if (!response.ok) {
+    throw new Error(response.error);
+  }
+  const payload = unwrapGatewayPayload(response.data);
+  if (!payload || typeof payload !== "object") {
+    return { exists: false };
+  }
+  const exists = (payload as { exists?: unknown }).exists;
+  return { exists: exists === true };
 }
 
 export default function App() {
@@ -113,12 +138,36 @@ export default function App() {
   const { busy, user, feedback, refresh, logout } = useAuthSession(apiBaseURL);
   const shouldCheckBillingGuard =
     apiBaseURL.trim() !== "" && !busy && user !== null && !isInvitationRoute && !isAdminRoute;
+  const shouldCheckAdminBootstrapGate =
+    apiBaseURL.trim() !== "" && !busy && user !== null && isAdminRoute;
   const organizationsQuery = useQuery({
-    queryKey: appQueryKeys.organizations(apiBaseURL, user?.ID ?? null),
-    enabled: shouldCheckBillingGuard,
-    queryFn: ({ signal }) => loadUserOrganizationSummaries(apiBaseURL, signal),
+    queryKey: appQueryKeys.organizations(
+      apiBaseURL,
+      user?.ID ?? null,
+      shouldCheckAdminBootstrapGate ? "admin" : "user",
+    ),
+    enabled: shouldCheckBillingGuard || shouldCheckAdminBootstrapGate,
+    queryFn: ({ signal }) =>
+      loadUserOrganizationSummaries(apiBaseURL, signal, {
+        adminScope: shouldCheckAdminBootstrapGate,
+      }),
   });
   const organizations = organizationsQuery.data ?? [];
+  const hasSuperAdminRole = useMemo(
+    () => organizations.some((organization) => isSuperAdminRole(organization.role)),
+    [organizations],
+  );
+  const adminBootstrapStatusQuery = useQuery({
+    queryKey: ["admin-bootstrap-status", apiBaseURL, user?.ID ?? null],
+    enabled: shouldCheckAdminBootstrapGate,
+    queryFn: ({ signal }) => loadAdminBootstrapStatus(apiBaseURL, signal),
+  });
+  const isAdminGateInitialLoading =
+    shouldCheckAdminBootstrapGate &&
+    (
+      (organizationsQuery.isLoading && organizationsQuery.data === undefined) ||
+      (adminBootstrapStatusQuery.isLoading && adminBootstrapStatusQuery.data === undefined)
+    );
   const organizationIdsKey = useMemo(
     () => organizations.map((organization) => organization.id).sort().join(","),
     [organizations],
@@ -309,13 +358,18 @@ export default function App() {
           organization.publicId === selectedOrganizationPublicId,
       ) ?? null;
 
-    if (!selectedOrganization) return;
+    if (!selectedOrganization) {
+      if (!isAdminRoute && (selectedOrganizationId || selectedOrganizationPublicId)) {
+        clearSelectedContext();
+      }
+      return;
+    }
 
     storeSelectedOrganizationContext({
       organizationId: selectedOrganization.id,
       publicId: selectedOrganization.publicId || selectedOrganization.id,
     });
-  }, [organizations, routeOrganizationToken]);
+  }, [isAdminRoute, organizations, routeOrganizationToken]);
 
   useEffect(() => {
     if (!useCompactProjectContext && !hasUnresolvedRouteProjectContext) return;
@@ -351,6 +405,10 @@ export default function App() {
   }
 
   if (mustRedirectToAuth) {
+    return null;
+  }
+
+  if (isAdminGateInitialLoading) {
     return null;
   }
 
@@ -407,6 +465,24 @@ export default function App() {
   }
 
   if (isAdminRoute) {
+    if (!hasSuperAdminRole) {
+      if (
+        adminBootstrapStatusQuery.data?.exists === true ||
+        adminBootstrapStatusQuery.isError ||
+        organizationsQuery.isError
+      ) {
+        return <Navigate replace to="/monitoring" />;
+      }
+      return (
+        <>
+          <main className="flex min-h-screen items-center justify-center bg-background px-4 py-8">
+            <AdminBootstrapClaim apiBaseURL={apiBaseURL} />
+          </main>
+          <AppToaster />
+        </>
+      );
+    }
+
     return (
       <>
         <AdminLayout busy={busy} onLogout={logout}>
@@ -426,7 +502,14 @@ export default function App() {
 
   return (
     <>
-      <AppLayout apiBaseURL={apiBaseURL} busy={busy} feedback={feedback} onLogout={logout} onRefresh={refresh}>
+      <AppLayout
+        apiBaseURL={apiBaseURL}
+        busy={busy}
+        feedback={feedback}
+        userId={user?.ID ?? null}
+        onLogout={logout}
+        onRefresh={refresh}
+      >
         <AppRouter
           apiBaseURL={apiBaseURL}
           routeSearch={routeSearch}

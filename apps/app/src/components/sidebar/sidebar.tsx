@@ -62,6 +62,7 @@ type SidebarProps = {
   className?: string;
   activePath?: string;
   busy?: boolean;
+  userId?: string | number | null;
   onLogout?: () => Promise<void>;
 };
 
@@ -156,6 +157,7 @@ function SidebarComponent({
   className,
   activePath,
   busy = false,
+  userId = null,
   onLogout,
 }: SidebarProps) {
   const content = useI18nScope("sidebar");
@@ -198,7 +200,7 @@ function SidebarComponent({
   }, []);
 
   const { data: organizations = EMPTY_ORGANIZATIONS } = useQuery({
-    queryKey: appQueryKeys.organizations(apiBaseURL, null),
+    queryKey: appQueryKeys.organizations(apiBaseURL, userId),
     enabled: apiEnabled,
     queryFn: ({ signal }) => loadOrganizationSummaries(apiBaseURL, signal),
   });

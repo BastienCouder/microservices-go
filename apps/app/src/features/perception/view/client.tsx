@@ -169,6 +169,7 @@ export function PerceptionClient({ apiBaseURL, initialData, routeSearch }: Perce
       <PerceptionPromptsStream
         responses={viewModel.filteredResponses}
         modelCatalog={viewModel.modelCatalog}
+        running={viewModel.perceptionAnalysisPending}
         onViewMore={() => openPerceptionResponses()}
         onSelectResponse={(response) => openPerceptionResponses(response.id)}
       />

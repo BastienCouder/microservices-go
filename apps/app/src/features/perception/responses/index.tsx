@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Table2, Workflow } from "lucide-react";
+import { Table2, Trash2, Workflow } from "lucide-react";
 import { Virtuoso } from "react-virtuoso";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   type AiResponsesTableColumn,
 } from "@/components/shared/ai-responses-table";
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { ModelCard } from "@/components/shared/model-card";
 import { MultiSelectFilterPopover } from "@/components/shared/multi-select-filter-popover";
 import { PeriodFilterPicker } from "@/components/shared/period-filter-picker";
@@ -31,6 +32,7 @@ import {
 } from "../_lib/shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PageHeader } from "@/components/shared/page-header";
+import { deleteAIResponse } from "@/features/shared/ai-responses-api";
 
 type PerceptionResponsesPageProps = {
   apiBaseURL: string;
@@ -84,7 +86,7 @@ function MetricCell({ value }: { value: number }) {
 }
 
 function ResponseTableLoadingRows() {
-  return <AiResponsesTableLoadingRows columns={9} rows={8} />;
+  return <AiResponsesTableLoadingRows columns={10} rows={8} />;
 }
 
 function ResponseTimelineLoadingRows() {
@@ -112,7 +114,15 @@ function ResponseTimelineLoadingRows() {
   );
 }
 
-function renderTableRow(response: PerceptionResponseRecord, locale: string) {
+function renderTableRow(
+  response: PerceptionResponseRecord,
+  locale: string,
+  options: {
+    deleteLabel: string;
+    deleting: boolean;
+    onRequestDelete: (response: PerceptionResponseRecord) => void;
+  },
+) {
   return (
     <>
       <TableCell>
@@ -136,11 +146,32 @@ function renderTableRow(response: PerceptionResponseRecord, locale: string) {
       <TableCell><MetricCell value={response.metrics.features} /></TableCell>
       <TableCell><MetricCell value={response.metrics.sentiment} /></TableCell>
       <TableCell><MetricCell value={response.metrics.competitors} /></TableCell>
+      <TableCell className="text-right">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+          disabled={options.deleting}
+          aria-label={options.deleteLabel}
+          onClick={() => options.onRequestDelete(response)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+      </TableCell>
     </>
   );
 }
 
-function renderTimelineItem(response: PerceptionResponseRecord, locale: string) {
+function renderTimelineItem(
+  response: PerceptionResponseRecord,
+  locale: string,
+  options: {
+    deleteLabel: string;
+    deleting: boolean;
+    onRequestDelete: (response: PerceptionResponseRecord) => void;
+  },
+) {
   return (
     <div className="py-3">
       <div className="rounded-md border p-3 transition-colors hover:bg-muted/50">
@@ -151,6 +182,17 @@ function renderTimelineItem(response: PerceptionResponseRecord, locale: string) 
               {response.modelName || response.modelId || "-"}
             </span>
           </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive"
+            disabled={options.deleting}
+            aria-label={options.deleteLabel}
+            onClick={() => options.onRequestDelete(response)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
         <p className="mt-2 line-clamp-2 text-sm font-medium">
           {response.promptText || response.rawResponse || "-"}
@@ -181,6 +223,9 @@ export function PerceptionResponsesPage({
   const [competitorsOpen, setCompetitorsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<ResponseView>("table");
   const [visibleCount, setVisibleCount] = useState(RESPONSE_BATCH_SIZE);
+  const [responseToDelete, setResponseToDelete] = useState<PerceptionResponseRecord | null>(null);
+  const [deletingResponseId, setDeletingResponseId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const resultsQuery = useQuery({
     queryKey: ["perception-responses", apiBaseURL, routeSearch],
@@ -200,6 +245,7 @@ export function PerceptionResponsesPage({
       { id: "features", label: t("responsesColumnFeatures") },
       { id: "sentiment", label: t("responsesColumnSentiment") },
       { id: "competitors", label: t("responsesColumnCompetitors") },
+      { id: "actions", label: "", className: "w-14 text-right" },
     ],
     [t],
   );
@@ -303,6 +349,21 @@ export function PerceptionResponsesPage({
     setPeriod("all");
     setSelectedModels([]);
     setSelectedCompetitors([]);
+  };
+
+  const confirmDeleteResponse = async () => {
+    if (!responseToDelete?.id) return;
+    setDeletingResponseId(responseToDelete.id);
+    setDeleteError(null);
+    try {
+      await deleteAIResponse(apiBaseURL, routeSearch, responseToDelete.id);
+      setResponseToDelete(null);
+      await resultsQuery.refetch();
+    } catch (error) {
+      setDeleteError(error instanceof Error ? error.message : t("deleteResponseError"));
+    } finally {
+      setDeletingResponseId(null);
+    }
   };
 
   const renderFilters = () => (
@@ -467,7 +528,13 @@ export function PerceptionResponsesPage({
                 emptyState={<EmptyStateCard label={t("responsesEmpty")} className="my-4" />}
                 minWidthClassName="min-w-[1120px]"
                 onEndReached={loadMoreResponses}
-                renderRow={(response) => renderTableRow(response, locale)}
+                renderRow={(response) =>
+                  renderTableRow(response, locale, {
+                    deleteLabel: t("deleteResponse"),
+                    deleting: deletingResponseId === response.id,
+                    onRequestDelete: setResponseToDelete,
+                  })
+                }
               />
             ) : resultsQuery.isLoading ? (
               <ResponseTimelineLoadingRows />
@@ -481,12 +548,38 @@ export function PerceptionResponsesPage({
                 defaultItemHeight={112}
                 endReached={loadMoreResponses}
                 increaseViewportBy={{ top: 96, bottom: 160 }}
-                itemContent={(_, response) => renderTimelineItem(response, locale)}
+                itemContent={(_, response) =>
+                  renderTimelineItem(response, locale, {
+                    deleteLabel: t("deleteResponse"),
+                    deleting: deletingResponseId === response.id,
+                    onRequestDelete: setResponseToDelete,
+                  })
+                }
               />
             )}
           </div>
         </div>
       </div>
+      <ConfirmDialog
+        open={!!responseToDelete}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResponseToDelete(null);
+            setDeleteError(null);
+          }
+        }}
+        title={t("deleteResponseTitle")}
+        confirmLabel={t("deleteResponseConfirm")}
+        loading={deletingResponseId !== null}
+        onConfirm={() => {
+          void confirmDeleteResponse();
+        }}
+        previewItems={responseToDelete ? [responseToDelete.promptText || responseToDelete.rawResponse || responseToDelete.id] : []}
+      >
+        {deleteError ? (
+          <p className="text-sm font-medium text-destructive">{deleteError}</p>
+        ) : null}
+      </ConfirmDialog>
     </div>
   );
 }

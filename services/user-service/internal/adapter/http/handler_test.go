@@ -65,6 +65,15 @@ func (f *handlerFakeRepo) Create(_ context.Context, user *domain.User) error {
 	return nil
 }
 
+func (f *handlerFakeRepo) List(_ context.Context) ([]domain.User, error) {
+	users := make([]domain.User, 0, len(f.users))
+	for _, user := range f.users {
+		clone := *user
+		users = append(users, clone)
+	}
+	return users, nil
+}
+
 func (f *handlerFakeRepo) GetByID(_ context.Context, id int64) (*domain.User, error) {
 	user, ok := f.users[id]
 	if !ok || user.DeletedAt != nil {

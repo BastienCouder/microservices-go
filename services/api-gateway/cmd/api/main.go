@@ -62,6 +62,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("create gateway handler: %v", err)
 	}
+	h.SetAdminBootstrapCode(cfg.AdminBootstrapCode)
 	defer func() {
 		if err := h.Close(); err != nil {
 			log.Printf("close gateway dependencies: %v", err)

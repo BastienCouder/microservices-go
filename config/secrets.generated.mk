@@ -47,6 +47,7 @@ REQUIRED_SECRETS := \
 	redis_password.txt
 
 OPTIONAL_SECRETS := \
+	admin_bootstrap_code.txt \
 	r2_bucket.txt \
 	r2_account_id.txt \
 	r2_access_key_id.txt \

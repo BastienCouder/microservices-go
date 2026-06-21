@@ -31,6 +31,18 @@ func (stubRepo) Create(_ context.Context, organization *domain.Organization) err
 	return nil
 }
 
+func (stubRepo) List(_ context.Context) ([]domain.Organization, error) {
+	return []domain.Organization{
+		{
+			ID:              1,
+			PublicID:        "org_acme00000001",
+			Name:            "Acme",
+			OwnerIdentityID: 7,
+			CreatedAt:       time.Now().UTC(),
+		},
+	}, nil
+}
+
 func (stubRepo) GetByID(_ context.Context, id int64) (*domain.Organization, error) {
 	if id <= 0 {
 		return nil, domain.ErrOrganizationNotFound

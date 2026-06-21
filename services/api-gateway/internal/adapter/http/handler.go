@@ -28,6 +28,7 @@ type Handler struct {
 	authURL              string
 	userURL              string
 	organizationsURL     string
+	permissionURL        string
 	billingURL           string
 	projectURL           string
 	permissionGRPC       *permissionGRPCClient
@@ -45,6 +46,7 @@ type Handler struct {
 	permissionBulkhead   *bulkhead
 	internalJWTSecret    string
 	internalJWTIssuer    string
+	adminBootstrapCode   string
 	corsAllowedOrigins   map[string]struct{}
 	trustedProxyNets     []*net.IPNet
 }
@@ -245,6 +247,7 @@ func NewHandlerWithGRPCAndServicesAndPublicAPI(
 		authURL:            strings.TrimRight(authServiceURL, "/"),
 		userURL:            strings.TrimRight(userServiceURL, "/"),
 		organizationsURL:   strings.TrimRight(organizationsServiceURL, "/"),
+		permissionURL:      strings.TrimRight(permissionServiceURL, "/"),
 		billingURL:         strings.TrimRight(billingServiceURL, "/"),
 		projectURL:         strings.TrimRight(projectServiceURL, "/"),
 		permissionGRPC:     permissionGRPC,
@@ -270,6 +273,10 @@ func NewHandlerWithGRPCAndServicesAndPublicAPI(
 	h.onboardingService = onboardingapp.NewService(h.httpClient, organizationsServiceURL, projectServiceURL, internalJWTSecret, internalJWTIssuer)
 	h.routes = h.buildRoutes()
 	return h, nil
+}
+
+func (h *Handler) SetAdminBootstrapCode(code string) {
+	h.adminBootstrapCode = strings.TrimSpace(code)
 }
 
 func parseTrustedProxyCIDRs(cidrs []string) ([]*net.IPNet, error) {

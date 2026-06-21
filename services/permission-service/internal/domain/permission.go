@@ -7,7 +7,8 @@ import (
 )
 
 var (
-	ErrInvalidPermissionCheck = errors.New("invalid permission check")
+	ErrInvalidPermissionCheck   = errors.New("invalid permission check")
+	ErrSuperAdminAlreadyClaimed = errors.New("super admin already claimed")
 )
 
 type CheckInput struct {

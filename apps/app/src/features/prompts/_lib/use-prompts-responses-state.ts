@@ -35,6 +35,7 @@ import { usePromptsDerivedState } from "./use-prompts-derived-state";
 import { usePromptsMutations } from "./use-prompts-mutations";
 import { usePromptsSourceData } from "./use-prompts-source-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { deleteAIResponse } from "@/features/shared/ai-responses-api";
 import type {
   AIModel,
   PeriodKey,
@@ -665,6 +666,28 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     mutations.cancelAnalysisMutation,
   ]);
 
+  const deleteResponse = useCallback(
+    async (responseId: string) => {
+      await deleteAIResponse(apiBaseURL, routeSearch, responseId);
+      if (selectedResponseId === responseId) {
+        setSelectedResponseId(null);
+      }
+      await refreshMonitoringData();
+      await queryClient.invalidateQueries({
+        predicate: (query) =>
+          isMonitoringQueryForProject(query.queryKey, apiBaseURL, source.activeProjectId),
+      });
+    },
+    [
+      apiBaseURL,
+      queryClient,
+      refreshMonitoringData,
+      routeSearch,
+      selectedResponseId,
+      source.activeProjectId,
+    ],
+  );
+
   useEffect(() => {
     if (activePromptAnalysisCount <= 0) {
       if (runPromptToastId) {
@@ -768,6 +791,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     activeAnalysisRunId,
     activeAnalysisRunCount: activePromptAnalysisCount,
     stopActiveAnalyses,
+    deleteResponse,
     stoppingAnalysis: mutations.cancelAnalysisMutation.isPending,
     analysisIssue,
     isPromptRunning: (prompt: { id: string } | null | undefined) =>

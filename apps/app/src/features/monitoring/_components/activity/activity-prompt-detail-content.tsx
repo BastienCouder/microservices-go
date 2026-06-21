@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Link2 } from "lucide-react";
+import { Link2, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { MonitoringPrompt } from "../../_lib/shared/monitoring-data";
@@ -16,6 +16,8 @@ type ActivityPromptDetailContentProps = {
   copyState: "idle" | "done" | "error";
   handleCopyPrompt: () => void | Promise<void>;
   onViewResponse: (prompt: MonitoringPrompt) => void;
+  onRequestDelete: (prompt: MonitoringPrompt) => void;
+  deleteBusy?: boolean;
   selectedPrompt: MonitoringPrompt;
   mobile: boolean;
 };
@@ -25,6 +27,8 @@ export function ActivityPromptDetailContent({
   copyState,
   handleCopyPrompt,
   onViewResponse,
+  onRequestDelete,
+  deleteBusy = false,
   selectedPrompt,
   mobile,
 }: ActivityPromptDetailContentProps) {
@@ -96,6 +100,16 @@ export function ActivityPromptDetailContent({
                     ? content.copyUnavailable
                     : content.copyPrompt}
               </span>
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              className="min-w-0 rounded-full"
+              disabled={deleteBusy}
+              onClick={() => onRequestDelete(selectedPrompt)}
+            >
+              <Trash2 className="h-4 w-4" />
+              <span className="truncate">{content.deleteResponse}</span>
             </Button>
           </div>
         </div>

@@ -20,7 +20,7 @@ export function organizationScopeQueryKeys(
   return [
     appQueryKeys.organizationResources(apiBaseURL, organizationId),
     appQueryKeys.organizationHierarchy(apiBaseURL, organizationId),
-    appQueryKeys.organizations(apiBaseURL, null),
+    ["organizations", apiBaseURL],
     ["organizations", "project-context-hierarchies", apiBaseURL],
   ];
 }

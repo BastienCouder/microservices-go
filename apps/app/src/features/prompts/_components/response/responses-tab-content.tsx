@@ -26,6 +26,7 @@ type ResponsesTabContentProps = {
   hasMoreResponses: boolean;
   loadMoreResponses: () => void;
   setSelectedResponseId: (id: string | null) => void;
+  deleteResponse: (responseId: string) => Promise<void>;
   getModelVisual: (model: string) => ModelVisual;
   rankTone: (rank: number) => string;
   truncate: (value: string, max?: number) => string;

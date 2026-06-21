@@ -35,6 +35,14 @@ func (s *Service) CreateUser(ctx context.Context, authIdentityID, email, firstNa
 	return user, nil
 }
 
+func (s *Service) ListUsers(ctx context.Context) ([]domain.User, error) {
+	users, err := s.repo.List(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list users: %w", err)
+	}
+	return users, nil
+}
+
 func (s *Service) GetUser(ctx context.Context, id int64) (*domain.User, error) {
 	user, err := s.repo.GetByID(ctx, id)
 	if err != nil {

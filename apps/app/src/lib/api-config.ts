@@ -83,6 +83,12 @@ export const apiRoutes = {
     projectModels: (projectId: string) =>
       `/onboarding/projects/${encodeURIComponent(projectId)}/models`,
   },
+  admin: {
+    bootstrapSuperAdmin: () => "/admin/bootstrap-super-admin",
+    bootstrapSuperAdminStatus: () => "/admin/bootstrap-super-admin/status",
+    users: () => "/admin/users",
+    grantUserSuperAdmin: (userId: string) => `/admin/users/${encodeURIComponent(userId)}/super-admin`,
+  },
   llmProviderCredentials: {
     list: (projectId: string) =>
       `/projects/${encodeURIComponent(projectId)}/llm-provider-credentials`,
@@ -117,6 +123,7 @@ export const apiRoutes = {
       options?.includeDashboard
         ? `/analysis/projects/${projectId}/perception?includeDashboard=1`
         : `/analysis/projects/${projectId}/perception`,
+    response: (responseId: string) => `/analysis/responses/${encodeURIComponent(responseId)}`,
     optimizationErrors: (projectId: string) => `/analysis/projects/${projectId}/optimization-errors`,
     aiBriefSettings: (projectId: string) => `/analysis/projects/${projectId}/ai-brief-settings`,
     optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,

@@ -52,6 +52,14 @@ func (f *fakeRepo) Create(_ context.Context, organization *domain.Organization) 
 	return nil
 }
 
+func (f *fakeRepo) List(_ context.Context) ([]domain.Organization, error) {
+	organizations := make([]domain.Organization, 0, len(f.organizations))
+	for _, org := range f.organizations {
+		organizations = append(organizations, *org)
+	}
+	return organizations, nil
+}
+
 func (f *fakeRepo) GetByID(_ context.Context, id int64) (*domain.Organization, error) {
 	org, ok := f.organizations[id]
 	if !ok {

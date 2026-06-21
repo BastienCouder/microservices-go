@@ -24,17 +24,23 @@ type ActivityPromptDetailSheetProps = {
   selectedPrompt: MonitoringPrompt | null;
   onClose: () => void;
   onViewResponse: (prompt: MonitoringPrompt) => void;
+  onRequestDelete: (prompt: MonitoringPrompt) => void;
+  deletingResponseId?: string | null;
 };
 
 function ActivityPromptDetailPanel({
   selectedPrompt,
   content,
   onViewResponse,
+  onRequestDelete,
+  deletingResponseId,
   mobile,
 }: {
   selectedPrompt: MonitoringPrompt;
   content: Record<string, string>;
   onViewResponse: (prompt: MonitoringPrompt) => void;
+  onRequestDelete: (prompt: MonitoringPrompt) => void;
+  deletingResponseId?: string | null;
   mobile: boolean;
 }) {
   const [copyState, setCopyState] = useState<"idle" | "done" | "error">("idle");
@@ -63,6 +69,8 @@ function ActivityPromptDetailPanel({
       copyState={copyState}
       handleCopyPrompt={handleCopyPrompt}
       onViewResponse={onViewResponse}
+      onRequestDelete={onRequestDelete}
+      deleteBusy={deletingResponseId === selectedPrompt.responseId}
       selectedPrompt={selectedPrompt}
       mobile={mobile}
     />
@@ -73,6 +81,8 @@ export function ActivityPromptDetailSheet({
   selectedPrompt,
   onClose,
   onViewResponse,
+  onRequestDelete,
+  deletingResponseId,
 }: ActivityPromptDetailSheetProps) {
   const isMobile = useIsMobile();
   const content = useI18nScope("monitoring-activity-panel");
@@ -96,6 +106,8 @@ export function ActivityPromptDetailSheet({
               selectedPrompt={selectedPrompt}
               content={content}
               onViewResponse={onViewResponse}
+              onRequestDelete={onRequestDelete}
+              deletingResponseId={deletingResponseId}
               mobile
             />
           ) : null}
@@ -118,6 +130,8 @@ export function ActivityPromptDetailSheet({
             selectedPrompt={selectedPrompt}
             content={content}
             onViewResponse={onViewResponse}
+            onRequestDelete={onRequestDelete}
+            deletingResponseId={deletingResponseId}
             mobile={false}
           />
         ) : null}

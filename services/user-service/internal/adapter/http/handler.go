@@ -30,6 +30,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /users/me", h.deleteMe)
 	mux.HandleFunc("GET /users/", h.getUserByID)
 	mux.HandleFunc("GET /users/by-auth/", h.getUserByAuthIdentityID)
+	mux.HandleFunc("GET /admin/users", h.adminListUsers)
 	mux.HandleFunc("POST /admin/users/", h.adminUserAction)
 }
 
@@ -220,6 +221,15 @@ func (h *Handler) getUserByAuthIdentityID(w http.ResponseWriter, r *http.Request
 	}
 
 	writeJSON(w, http.StatusOK, user)
+}
+
+func (h *Handler) adminListUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.svc.ListUsers(r.Context())
+	if err != nil {
+		httpjson.WriteInternalError(w)
+		return
+	}
+	writeJSON(w, http.StatusOK, users)
 }
 
 func (h *Handler) adminUserAction(w http.ResponseWriter, r *http.Request) {

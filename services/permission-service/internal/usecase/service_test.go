@@ -9,7 +9,8 @@ import (
 )
 
 type fakeRepo struct {
-	result domain.CheckResult
+	result      domain.CheckResult
+	claimedUser int64
 }
 
 type fakeScopeResolver struct {
@@ -26,6 +27,23 @@ func (f *fakeRepo) ListOrganizationRoles(_ context.Context, _, _ int64) ([]strin
 
 func (f *fakeRepo) ListOrganizationsByUser(_ context.Context, _ int64) ([]domain.Membership, error) {
 	return nil, nil
+}
+
+func (f *fakeRepo) ClaimGlobalSuperAdmin(_ context.Context, userID int64) (*domain.Member, error) {
+	f.claimedUser = userID
+	return &domain.Member{OrganizationID: 0, UserID: userID, Roles: []string{"super_admin"}}, nil
+}
+
+func (f *fakeRepo) GrantGlobalSuperAdmin(_ context.Context, userID int64) (*domain.Member, error) {
+	return &domain.Member{OrganizationID: 0, UserID: userID, Roles: []string{"super_admin"}}, nil
+}
+
+func (f *fakeRepo) ListGlobalSuperAdmins(_ context.Context) ([]int64, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) HasGlobalSuperAdmin(_ context.Context) (bool, error) {
+	return false, nil
 }
 
 func (f *fakeRepo) ListMembers(_ context.Context, _ int64) ([]domain.Member, error) {
@@ -87,6 +105,27 @@ func TestCheck(t *testing.T) {
 	}
 
 	_, err = svc.Check(context.Background(), domain.CheckInput{})
+	if !errors.Is(err, domain.ErrInvalidPermissionCheck) {
+		t.Fatalf("expected invalid permission error, got %v", err)
+	}
+}
+
+func TestClaimGlobalSuperAdmin(t *testing.T) {
+	repo := &fakeRepo{}
+	svc := NewService(repo, nil)
+
+	member, err := svc.ClaimGlobalSuperAdmin(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repo.claimedUser != 42 {
+		t.Fatalf("expected claimed user 42, got %d", repo.claimedUser)
+	}
+	if member.OrganizationID != 0 || member.UserID != 42 || len(member.Roles) != 1 || member.Roles[0] != "super_admin" {
+		t.Fatalf("unexpected member: %+v", member)
+	}
+
+	_, err = svc.ClaimGlobalSuperAdmin(context.Background(), 0)
 	if !errors.Is(err, domain.ErrInvalidPermissionCheck) {
 		t.Fatalf("expected invalid permission error, got %v", err)
 	}
