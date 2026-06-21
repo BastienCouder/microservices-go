@@ -119,12 +119,11 @@ export function shouldRedirectToBillingGate({
   isInvitationRoute,
   billingAccess,
 }: ShouldRedirectToBillingGateInput): boolean {
- /*  if (apiBaseURL.trim() === "") {
+  if (apiBaseURL.trim() === "") {
     return false;
   }
   if (busy || user === null || isBillingRoute || isInvitationRoute) {
     return false;
   }
-  return billingAccess === "missing_organization" || billingAccess === "unpaid"; */
-  return false
+  return billingAccess === "missing_organization" || billingAccess === "unpaid";
 }

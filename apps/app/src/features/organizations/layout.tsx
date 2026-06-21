@@ -8,12 +8,12 @@ import { ApiKeysPanel } from "./_components/api-keys";
 import { MembersPanel } from "./_components/members";
 import { ProjectsPanel } from "./_components/projects";
 import { SettingsPanel } from "./_components/settings";
-import { PricingPanel } from "@/features/billing-gate/_components/pricing-panel";
 import { LoadingState } from "./_components/shared/template";
 import { EmptyBlock } from "./_components/shared/empty-block";
 import { OrganizationSummaryPanel } from "./_components/summary";
 import type { OrganizationsPageViewModel } from "./_lib/page/use-organizations-page-view-model";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { redirectToWebPricing } from "@/shared/auth/web-auth";
 
 export function OrganizationsLayout({
   activeTab,
@@ -67,8 +67,6 @@ export function OrganizationsLayout({
   onClearCreatedAPIKey,
   onSelectOrganization,
   onRefetchOrganizations,
-  apiBaseURL,
-  routeSearch,
 }: OrganizationsPageViewModel) {
   const { t } = useScopedI18n("organizations");
 
@@ -83,6 +81,12 @@ export function OrganizationsLayout({
       pushSuccessToast(notice);
     }
   }, [notice]);
+
+  useEffect(() => {
+    if (activeTab === "billing") {
+      redirectToWebPricing();
+    }
+  }, [activeTab]);
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden p-2 md:p-4">
@@ -155,13 +159,9 @@ export function OrganizationsLayout({
               ) : null}
 
             {activeTab === "billing" ? (
-                <PricingPanel
-                  apiBaseURL={apiBaseURL}
-                  routeSearch={routeSearch}
-                  organizationId={selectedOrganization.id}
-                  showOrganizationPicker={false}
-                  embedded
-                />
+                <div className="flex min-h-[320px] items-center justify-center rounded-lg border bg-background p-6 text-sm text-muted-foreground">
+                  Redirection vers les tarifs...
+                </div>
               ) : null}
 
             {activeTab === "settings" ? (

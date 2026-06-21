@@ -17,8 +17,19 @@ function getAppURL(): string {
   return "http://localhost:30004";
 }
 
+function getWebURL(): string {
+  const webURL = process.env.NEXT_PUBLIC_WEB_URL;
+  if (typeof webURL === "string" && webURL.trim() !== "") {
+    return webURL.trim();
+  }
+
+  return "http://localhost:30000";
+}
+
 export default async function AuthCallbackPage({ searchParams }: AuthCallbackPageProps) {
   const resolvedSearchParams = searchParams instanceof Promise ? await searchParams : searchParams;
-  const returnTo = normalizeAppReturnTo(pickFirst(resolvedSearchParams?.return_to), getAppURL());
+  const returnTo = normalizeAppReturnTo(pickFirst(resolvedSearchParams?.return_to), getAppURL(), {
+    allowedURLs: [getWebURL()],
+  });
   redirect(returnTo);
 }

@@ -40,7 +40,6 @@ REQUIRED_SECRETS := \
 	stripe_price_growth_yearly.txt \
 	stripe_price_pro_monthly.txt \
 	stripe_price_pro_yearly.txt \
-	stripe_price_correction_credits.txt \
 	rabbitmq_url.txt \
 	ga4_oauth_client_id.txt \
 	ga4_oauth_client_secret.txt \
@@ -66,6 +65,7 @@ OPTIONAL_SECRETS := \
 	billing_metrics_addr.txt \
 	notification_http_addr.txt \
 	notification_metrics_addr.txt \
+	stripe_price_correction_credits.txt \
 	project_http_addr.txt \
 	project_metrics_addr.txt \
 	analysis_http_addr.txt \

@@ -94,13 +94,25 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
   const { appURL, gatewayURL } = config;
   const isLogin = mode === "login";
 
+  function getDefaultReturnTo(): string {
+    if (typeof window === "undefined") {
+      return appURL;
+    }
+
+    return `${window.location.origin}/${locale === "fr" ? "" : `${locale}/`}#pricing`;
+  }
+
   function getReturnTo(): string {
     if (typeof window === "undefined") {
       return normalizeAppReturnTo("", appURL);
     }
 
     const params = new URLSearchParams(window.location.search);
-    const resolved = normalizeAppReturnTo(params.get("return_to"), appURL);
+    const resolved = normalizeAppReturnTo(
+      params.get("return_to"),
+      getDefaultReturnTo(),
+      { allowedURLs: [appURL, window.location.origin] },
+    );
 
     window.sessionStorage.setItem("auth:return_to", resolved);
 
@@ -186,6 +198,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       }
 
       setResult(data.message ?? t("messages.otpVerified"));
+      window.location.href = getReturnTo();
     } catch (error) {
       setResult(t("messages.otpVerifyError", { error: parseError(error, t("messages.unexpectedError")) }));
     } finally {

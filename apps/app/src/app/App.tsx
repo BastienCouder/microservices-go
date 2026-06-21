@@ -15,6 +15,7 @@ import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { redirectToWebAuth } from "@/shared/auth/web-auth";
+import { loadBillingEntitlements } from "@/shared/billing";
 import { loadUserOrganizationSummaries } from "@/shared/organizations";
 import {
   applyResolvedProjectContextSearch,
@@ -108,6 +109,10 @@ export default function App() {
     () => getOnboardingSetupMode(location.search),
     [location.search],
   );
+  const isCheckoutSuccessRoute = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("checkout") === "success";
+  }, [location.search]);
   const useCompactProjectContext =
     location.pathname === "/organizations" ||
     location.pathname === "/account" ||
@@ -172,6 +177,13 @@ export default function App() {
     () => organizations.map((organization) => organization.id).sort().join(","),
     [organizations],
   );
+  const billingOrganizationId = organizations[0]?.id ?? "";
+  const billingEntitlementsQuery = useQuery({
+    queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganizationId),
+    enabled: shouldCheckBillingGuard && billingOrganizationId !== "",
+    queryFn: ({ signal }) =>
+      loadBillingEntitlements(apiBaseURL, billingOrganizationId, { signal }),
+  });
   const shouldResolveRouteProjectContext =
     apiBaseURL.trim() !== "" &&
     !busy &&
@@ -245,7 +257,13 @@ export default function App() {
       ? "loading"
     : organizations.length === 0
       ? "missing_organization"
-      : "paid";
+    : billingEntitlementsQuery.isError
+      ? "unknown"
+    : billingEntitlementsQuery.isLoading || billingEntitlementsQuery.isFetching
+      ? "loading"
+    : billingEntitlementsQuery.data?.isPaid === true
+      ? "paid"
+      : "unpaid";
   const shouldCheckAccountOnboardingProjectGuard =
     apiBaseURL.trim() !== "" &&
     !busy &&
@@ -303,7 +321,8 @@ export default function App() {
     user,
     isBillingRoute,
     isInvitationRoute,
-    billingAccess,
+    billingAccess:
+      isOnboardingRoute && isCheckoutSuccessRoute ? "paid" : billingAccess,
   });
 
   useEffect(() => {
@@ -412,7 +431,11 @@ export default function App() {
     return null;
   }
 
-  if (shouldCheckBillingGuard && billingAccess === "loading") {
+  if (
+    shouldCheckBillingGuard &&
+    billingAccess === "loading" &&
+    !(isOnboardingRoute && isCheckoutSuccessRoute)
+  ) {
     return null;
   }
 

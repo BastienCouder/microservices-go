@@ -110,8 +110,11 @@ export function normalizePriceMap(value: unknown): Record<string, PriceValue> {
 }
 
 export function normalizePricingTier(
-  tier: MarketingPricingTier,
+  value: unknown,
 ): PricingTier {
+  const tier: Partial<MarketingPricingTier> = isRecord(value)
+    ? (value as MarketingPricingTier)
+    : {};
   const prices = normalizePriceMap(tier.prices);
 
   const assignLegacyPrice = (
@@ -130,7 +133,7 @@ export function normalizePricingTier(
 
   return {
     credits: tier.credit_volume ?? tier.prompt_volume ?? 0,
-    label: tier.label,
+    label: typeof tier.label === "string" ? tier.label : "",
     prices,
   };
 }

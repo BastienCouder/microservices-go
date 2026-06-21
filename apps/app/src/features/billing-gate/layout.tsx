@@ -1,4 +1,6 @@
-import { PricingPanel } from "./_components/pricing-panel";
+import { useEffect } from "react";
+
+import { redirectToWebPricing } from "@/shared/auth/web-auth";
 
 type BillingGateLayoutProps = {
   apiBaseURL: string;
@@ -7,15 +9,17 @@ type BillingGateLayoutProps = {
 };
 
 export function BillingGateLayout({
-  apiBaseURL,
-  routeSearch,
-  userEmail,
+  apiBaseURL: _apiBaseURL,
+  routeSearch: _routeSearch,
+  userEmail: _userEmail,
 }: BillingGateLayoutProps) {
+  useEffect(() => {
+    redirectToWebPricing();
+  }, []);
+
   return (
-    <PricingPanel
-      apiBaseURL={apiBaseURL}
-      routeSearch={routeSearch}
-      userEmail={userEmail}
-    />
+    <div className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
+      Redirection vers les tarifs...
+    </div>
   );
 }

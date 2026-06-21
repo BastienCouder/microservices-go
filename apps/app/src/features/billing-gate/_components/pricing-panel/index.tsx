@@ -1,12 +1,5 @@
-import {
-  ArrowRight,
-  Building2,
-  Check,
-  Code,
-  Loader2,
-  Zap,
-} from "lucide-react";
-import { useEffect, type ReactNode } from "react";
+import { ArrowRight, Check, Loader2 } from "lucide-react";
+import { useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,13 +20,6 @@ type PricingPanelProps = {
   routeSearch: string;
   showOrganizationPicker?: boolean;
   userEmail?: string;
-};
-
-const planIcons: Record<string, ReactNode> = {
-  starter: <Code className="h-4 w-4" />,
-  growth: <Zap className="h-4 w-4" />,
-  pro: <Building2 className="h-4 w-4" />,
-  enterprise: <Building2 className="h-4 w-4" />,
 };
 
 export function PricingPanel({
@@ -85,28 +71,39 @@ export function PricingPanel({
     <div className={cn("text-foreground", embedded ? "" : "min-h-screen bg-background")}>
       <main className={cn("mx-auto w-full", embedded ? "py-1" : "max-w-[1400px] px-6 py-16 lg:px-12 lg:py-20")}>
         <section className="relative">
-          <div className="mb-8 max-w-3xl lg:mb-10">
-            <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-              {embedded ? t("organizationTitle") : t("title")}
-            </h1>
-            <p className="mt-5 text-base leading-7 text-muted-foreground sm:text-lg">
-              {t("description")}
-            </p>
-          </div>
-
-          <div className="mb-8 flex flex-col gap-4 rounded-2xl border border-foreground/10 bg-background p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:mb-10">
-            <div>
-              <p className="text-sm font-medium text-foreground">
-                {viewModel.billingCycle === "yearly"
-                  ? t("annualHelper")
-                  : t("monthlyHelper")}
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {viewModel.billingStatus
-                  ? t("billingStatus", { status: viewModel.billingStatus })
-                  : t("pricingSource")}
+          {!embedded ? (
+            <div className="mb-8 max-w-3xl lg:mb-10">
+              <h1 className="font-display text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                {t("title")}
+              </h1>
+              <p className="mt-5 text-base leading-7 text-muted-foreground sm:text-lg">
+                {t("description")}
               </p>
             </div>
+          ) : null}
+
+          <div
+            className={cn(
+              "mb-8 flex",
+              embedded
+                ? "justify-end"
+                : "flex-col gap-4 rounded-2xl border border-foreground/10 bg-background p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:mb-10",
+            )}
+          >
+            {!embedded ? (
+              <div>
+                <p className="text-sm font-medium text-foreground">
+                  {viewModel.billingCycle === "yearly"
+                    ? t("annualHelper")
+                    : t("monthlyHelper")}
+                </p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {viewModel.billingStatus
+                    ? t("billingStatus", { status: viewModel.billingStatus })
+                    : t("pricingSource")}
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid grid-cols-2 rounded-full border border-foreground/10 bg-muted/40 p-1">
               <button
@@ -192,10 +189,6 @@ export function PricingPanel({
                   {plan.highlighted ? (
                     <Badge className="absolute right-5 top-5">{t("popular")}</Badge>
                   ) : null}
-
-                  <div className="mb-6 flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-primary">
-                    {planIcons[plan.id]}
-                  </div>
 
                   <h2 className="text-2xl font-semibold text-foreground">{plan.name}</h2>
                   <p className="mt-3 min-h-[72px] text-sm leading-6 text-muted-foreground">

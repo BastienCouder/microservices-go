@@ -265,6 +265,11 @@ services:
     image: microservices-go/user-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       USER_DB_HOST: postgres
       USER_DB_PORT: "5432"
@@ -346,6 +351,11 @@ services:
     image: microservices-go/organizations-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       ORG_DB_HOST: postgres
       ORG_DB_PORT: "5432"
@@ -413,6 +423,11 @@ services:
     image: microservices-go/permission-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       PERMISSION_DB_HOST: postgres
       PERMISSION_DB_PORT: "5432"
@@ -501,6 +516,11 @@ services:
     image: microservices-go/billing-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       BILLING_DB_HOST: postgres
       BILLING_DB_PORT: "5432"
@@ -834,6 +854,11 @@ services:
     image: microservices-go/project-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       PROJECT_DB_HOST: postgres
       PROJECT_DB_PORT: "5432"
@@ -853,6 +878,11 @@ services:
     image: microservices-go/analysis-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       ANALYSIS_DB_HOST: postgres
       ANALYSIS_DB_PORT: "5432"
@@ -872,6 +902,11 @@ services:
     image: microservices-go/ia-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       IA_DB_HOST: postgres
       IA_DB_PORT: "5432"
@@ -891,6 +926,11 @@ services:
     image: microservices-go/notification-migrate:prod
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     environment:
       NOTIFICATION_DB_HOST: postgres
       NOTIFICATION_DB_PORT: "5432"
@@ -1109,6 +1149,11 @@ services:
     entrypoint: ["sh", "/etc/config/kratos/migrate.sh"]
     networks:
       - infra-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      postgres-bootstrap:
+        condition: service_completed_successfully
     dns:
       - 1.1.1.1
       - 8.8.8.8

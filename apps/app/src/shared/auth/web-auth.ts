@@ -6,6 +6,18 @@ function getWebAuthURL(): string {
   return "http://localhost:30000/login";
 }
 
+function getWebPricingURL(): string {
+  try {
+    const url = new URL(getWebAuthURL());
+    url.pathname = "/";
+    url.search = "";
+    url.hash = "pricing";
+    return url.toString();
+  } catch {
+    return "http://localhost:30000/#pricing";
+  }
+}
+
 export function navigateToWebAuth(): void {
   if (typeof window === "undefined") {
     return;
@@ -24,4 +36,12 @@ export function redirectToWebAuth(returnTo?: string): void {
   const separator = target.includes("?") ? "&" : "?";
   const destination = `${target}${separator}return_to=${encodeURIComponent(nextReturnTo)}`;
   window.location.replace(destination);
+}
+
+export function redirectToWebPricing(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.location.replace(getWebPricingURL());
 }

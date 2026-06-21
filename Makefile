@@ -15,6 +15,8 @@ ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
 
 SECRETS_DIR := secrets
+STRIPE_FORWARD_TO ?= http://localhost:50000/billing/stripe/webhook
+STRIPE_TRIGGER_EVENT ?= checkout.session.completed
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -61,7 +63,6 @@ REQUIRED_SECRETS := \
 	stripe_price_growth_yearly.txt \
 	stripe_price_pro_monthly.txt \
 	stripe_price_pro_yearly.txt \
-	stripe_price_correction_credits.txt \
 	rabbitmq_url.txt \
 	ga4_oauth_client_id.txt \
 	ga4_oauth_client_secret.txt \
@@ -86,6 +87,7 @@ OPTIONAL_SECRETS := \
 	billing_metrics_addr.txt \
 	notification_http_addr.txt \
 	notification_metrics_addr.txt \
+	stripe_price_correction_credits.txt \
 	project_http_addr.txt \
 	project_metrics_addr.txt \
 	analysis_http_addr.txt \
@@ -103,6 +105,7 @@ OPTIONAL_SECRETS := \
 	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service \
 	prod-doc prod-email prod-mcp prod-monitoring \
 	db-generate db-migrate \
+	stripe-listen stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
 	test lint lint-fix fmt ci \
 	seed-nike seed-nike-live \
@@ -128,6 +131,11 @@ help:
 	@echo "  Database"
 	@echo "    make db-generate      Run sqlc for all configured services"
 	@echo "    make db-migrate       Alias for dev migrations"
+	@echo ""
+	@echo "  Stripe"
+	@echo "    make stripe-listen    Forward Stripe webhooks to local gateway ($(STRIPE_FORWARD_TO))"
+	@echo "    make stripe-trigger   Trigger a Stripe event (STRIPE_TRIGGER_EVENT=name)"
+	@echo "    make stripe-trigger-checkout Trigger checkout.session.completed"
 	@echo ""
 	@echo "  Production"
 	@echo "    make prod             Start web + app + backend + infra in production"
@@ -209,6 +217,15 @@ db-generate:
 
 db-migrate: dev-migrate
 
+stripe-listen:
+	stripe listen --forward-to "$(STRIPE_FORWARD_TO)"
+
+stripe-trigger:
+	stripe trigger "$(STRIPE_TRIGGER_EVENT)"
+
+stripe-trigger-checkout:
+	stripe trigger checkout.session.completed
+
 prod: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) $(PROFILES_PROD) up -d
 
@@ -237,14 +254,22 @@ prod-web: secrets-check
 	$(COMPOSE_PROD_LOCAL) up -d --build web
 
 prod-services: prod-migrate
-	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend up -d --build
-
-prod-services: prod-migrate
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend build --no-cache
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend up -d --force-recreate
 
 prod-migrate: secrets-check
-	$(COMPOSE_PROD_LOCAL_SERIAL) --profile migrations up --build
+	$(COMPOSE_PROD_LOCAL_SERIAL) up -d postgres
+	$(COMPOSE_PROD_LOCAL_SERIAL) up postgres-bootstrap
+	$(COMPOSE_PROD_LOCAL_SERIAL) up --build --no-deps \
+		kratos-migrate \
+		user-migrate \
+		organizations-migrate \
+		permission-migrate \
+		billing-migrate \
+		project-migrate \
+		analysis-migrate \
+		ia-migrate \
+		notification-migrate
 
 prod-doc: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile doc up -d

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowRight,
@@ -15,7 +15,9 @@ import type {
   PlanTemplate,
   PricingData,
 } from "./pricing-types";
+import { startPricingCheckout } from "./pricing-checkout";
 import { formatCredits } from "./pricing-utils";
+import type { Locale } from "@/src/i18n/config";
 
 const sectionHeadingClass =
   "font-display text-4xl font-semibold tracking-tight sm:text-5xl lg:text-6xl";
@@ -38,6 +40,8 @@ const billingCopy = {
     annualBillingSuffix: "par an",
     creditsSuffix: "crédits / mois",
     custom: "Sur devis",
+    checkoutLoading: "Préparation du paiement...",
+    checkoutError: "Impossible de démarrer le paiement. Connectez-vous puis réessayez.",
   },
   en: {
     monthly: "Monthly",
@@ -51,6 +55,8 @@ const billingCopy = {
     annualBillingSuffix: "per year",
     creditsSuffix: "credits / month",
     custom: "Custom",
+    checkoutLoading: "Preparing payment...",
+    checkoutError: "Unable to start payment. Sign in and try again.",
   },
 };
 
@@ -70,11 +76,57 @@ export function PricingSectionClient({
   pricing,
 }: PricingSectionClientProps) {
   const t = useTranslations("pricing");
-  const locale = useLocale();
+  const locale = useLocale() as Locale;
   const copy = locale.startsWith("fr") ? billingCopy.fr : billingCopy.en;
 
   const [billingCycle, setBillingCycle] =
     useState<BillingCycle>("monthly");
+  const [busyPlan, setBusyPlan] = useState("");
+  const [checkoutError, setCheckoutError] = useState("");
+  const didAutoStartCheckout = useRef(false);
+
+  const gatewayURL =
+    process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000";
+  const appURL =
+    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004";
+
+  async function handlePlanAction(plan: string, cycle: BillingCycle = billingCycle) {
+    if (busyPlan) return;
+
+    setBusyPlan(plan);
+    setCheckoutError("");
+
+    try {
+      await startPricingCheckout({
+        appURL,
+        gatewayURL,
+        locale,
+        origin: window.location.origin,
+        plan,
+        billingCycle: cycle,
+      });
+    } catch (error) {
+      console.error("[Pricing] checkout failed", error);
+      setCheckoutError(copy.checkoutError);
+      setBusyPlan("");
+    }
+  }
+
+  useEffect(() => {
+    if (didAutoStartCheckout.current || typeof window === "undefined") return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout") === "cancel") return;
+
+    const requestedPlan = params.get("checkout_plan")?.trim() ?? "";
+    const requestedCycle = params.get("billing_cycle") === "annual" ? "annual" : "monthly";
+    const isAvailablePlan = pricing.plans.some((plan) => plan.id === requestedPlan);
+    if (!requestedPlan || !isAvailablePlan) return;
+
+    didAutoStartCheckout.current = true;
+    setBillingCycle(requestedCycle);
+    void handlePlanAction(requestedPlan, requestedCycle);
+  }, [pricing.plans]);
 
   const planTemplates = useMemo<Record<string, PlanTemplate>>(
     () => ({
@@ -191,6 +243,12 @@ export function PricingSectionClient({
                 ? "Tarifs synchronisés avec la configuration active."
                 : "Tarifs par défaut affichés temporairement."}
             </p>
+
+            {busyPlan ? (
+              <p className="mt-1 text-sm text-primary">{copy.checkoutLoading}</p>
+            ) : checkoutError ? (
+              <p className="mt-1 text-sm text-destructive">{checkoutError}</p>
+            ) : null}
           </div>
 
           <div className="grid grid-cols-2 rounded-full border border-foreground/10 bg-muted/40 p-1">
@@ -335,6 +393,9 @@ export function PricingSectionClient({
                       ? "bg-primary text-primary-foreground hover:bg-primary/90"
                       : "border border-foreground/20 bg-transparent text-foreground hover:border-primary hover:bg-primary/5"
                   }`}
+                  disabled={busyPlan !== ""}
+                  onClick={() => void handlePlanAction(plan.id)}
+                  type="button"
                 >
                   {template?.cta ?? t("dynamic.cta", { plan: name })}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
