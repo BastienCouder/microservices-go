@@ -82,7 +82,7 @@ export function ActivityPromptDetailContent({
             <Button
               type="button"
               variant="default"
-              className="min-w-0 rounded-full"
+              className="min-w-0"
               onClick={() => onViewResponse(selectedPrompt)}
             >
               <span className="truncate">{content.viewResponse}</span>
@@ -90,7 +90,7 @@ export function ActivityPromptDetailContent({
             <Button
               type="button"
               variant="outline"
-              className="min-w-0 rounded-full"
+              className="min-w-0"
               onClick={() => void handleCopyPrompt()}
             >
               <span className="truncate">
@@ -104,7 +104,7 @@ export function ActivityPromptDetailContent({
             <Button
               type="button"
               variant="destructive"
-              className="min-w-0 rounded-full"
+              className="min-w-0"
               disabled={deleteBusy}
               onClick={() => onRequestDelete(selectedPrompt)}
             >

@@ -1,8 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { buildBrowserCallbackURL, normalizeAppReturnTo } from "@/src/auth/routing";
+import {
+  clearAuthReturnTo,
+  readAuthReturnTo,
+  storeAuthReturnTo,
+} from "@/src/auth/browser-intent";
 import { type Locale } from "@/src/i18n/config";
 import { AnimatedWave } from "./animated-wave";
 import { Button } from "@/components/ui/button";
@@ -94,6 +99,25 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
   const { appURL, gatewayURL } = config;
   const isLogin = mode === "login";
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const currentURL = new URL(window.location.href);
+    const rawReturnTo = currentURL.searchParams.get("return_to");
+    if (!rawReturnTo) {
+      return;
+    }
+
+    const resolved = normalizeAppReturnTo(rawReturnTo, getDefaultReturnTo(), {
+      allowedURLs: [appURL, window.location.origin],
+    });
+    storeAuthReturnTo(resolved);
+    currentURL.searchParams.delete("return_to");
+    window.history.replaceState({}, "", currentURL.toString());
+  }, [appURL, locale]);
+
   function getDefaultReturnTo(): string {
     if (typeof window === "undefined") {
       return appURL;
@@ -107,6 +131,11 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       return normalizeAppReturnTo("", appURL);
     }
 
+    const storedReturnTo = readAuthReturnTo();
+    if (storedReturnTo) {
+      return storedReturnTo;
+    }
+
     const params = new URLSearchParams(window.location.search);
     const resolved = normalizeAppReturnTo(
       params.get("return_to"),
@@ -114,7 +143,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       { allowedURLs: [appURL, window.location.origin] },
     );
 
-    window.sessionStorage.setItem("auth:return_to", resolved);
+    storeAuthReturnTo(resolved);
 
     return resolved;
   }
@@ -198,7 +227,9 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       }
 
       setResult(data.message ?? t("messages.otpVerified"));
-      window.location.href = getReturnTo();
+      const returnTo = getReturnTo();
+      clearAuthReturnTo();
+      window.location.replace(returnTo);
     } catch (error) {
       setResult(t("messages.otpVerifyError", { error: parseError(error, t("messages.unexpectedError")) }));
     } finally {
@@ -217,7 +248,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
         credentials: "include",
         body: JSON.stringify({
           mode,
-          returnTo: buildBrowserCallbackURL(window.location.origin, getReturnTo()),
+          returnTo: buildBrowserCallbackURL(window.location.origin),
         }),
       });
 
@@ -230,120 +261,121 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
         throw new Error(readAPIErrorMessage(payload) ?? t("messages.googleFallback"));
       }
 
-      window.location.href = data.redirectTo;
+      window.location.replace(data.redirectTo);
     } catch (error) {
       setResult(t("messages.googleError", { error: parseError(error, t("messages.unexpectedError")) }));
       setBusy(false);
     }
   }
-return (
-  <main className="relative grid h-[calc(100vh-5rem)] place-items-center overflow-hidden bg-background p-6 text-foreground">
-    <div className="pointer-events-none absolute inset-0 opacity-30">
-      <AnimatedWave />
-    </div>
 
-    <section className="relative z-10 w-full max-w-md rounded-xl border bg-background/90 p-8">
-      <header className="mb-8 space-y-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Connexion
-        </h1>
-
-        <p className="text-sm leading-6 text-muted-foreground">
-          Connectez-vous ou créez votre compte.
-        </p>
-      </header>
-
-      <div className="space-y-6">
-        <Button
-          className="flex w-full items-center justify-center gap-3"
-          disabled={busy}
-          onClick={loginGoogle}
-          type="button"
-          variant="outline"
-        >
-          <GoogleLogo />
-          <span>Continuer avec Google</span>
-        </Button>
-
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <div className="h-px flex-1 bg-border" />
-          <span>{t("or")}</span>
-          <div className="h-px flex-1 bg-border" />
-        </div>
-
-        {!otpFlowID ? (
-          <form className="space-y-5" onSubmit={startOTP}>
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium leading-none"
-                htmlFor="email"
-              >
-                {t("emailLabel")}
-              </label>
-
-              <Input
-                id="email"
-                autoComplete="email"
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
-                type="email"
-                value={email}
-              />
-            </div>
-
-            <Button className="w-full" disabled={busy} type="submit">
-              Continuer par email
-            </Button>
-          </form>
-        ) : (
-          <form className="space-y-5" onSubmit={verifyOTP}>
-            <div className="space-y-2">
-              <label
-                className="text-sm font-medium leading-none"
-                htmlFor="otp"
-              >
-                {t("otpCodeLabel")}
-              </label>
-
-              <Input
-                id="otp"
-                autoComplete="one-time-code"
-                inputMode="numeric"
-                onChange={(event) => setOTPCode(event.target.value)}
-                placeholder="000000"
-                value={otpCode}
-              />
-            </div>
-
-            <div className="space-y-3">
-              <Button className="w-full" disabled={busy} type="submit">
-                {t("otpVerify")}
-              </Button>
-
-              <Button
-                className="w-full"
-                disabled={busy}
-                onClick={() => {
-                  setOTPFlowID("");
-                  setOTPCSRF("");
-                  setOTPCode("");
-                }}
-                type="button"
-                variant="ghost"
-              >
-                {t("changeEmail")}
-              </Button>
-            </div>
-          </form>
-        )}
-
-        {result ? (
-          <p className="whitespace-pre-wrap rounded-lg border bg-muted px-3 py-2 text-sm text-muted-foreground">
-            {result}
-          </p>
-        ) : null}
+  return (
+    <main className="relative grid h-[calc(100vh-5rem)] place-items-center overflow-hidden bg-background p-6 text-foreground">
+      <div className="pointer-events-none absolute inset-0 opacity-30">
+        <AnimatedWave />
       </div>
-    </section>
-  </main>
-);
+
+      <section className="relative z-10 w-full max-w-md rounded-xl border bg-background/90 p-8">
+        <header className="mb-8 space-y-2 text-center">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Connexion
+          </h1>
+
+          <p className="text-sm leading-6 text-muted-foreground">
+            Connectez-vous ou créez votre compte.
+          </p>
+        </header>
+
+        <div className="space-y-6">
+          <Button
+            className="flex w-full items-center justify-center gap-3"
+            disabled={busy}
+            onClick={loginGoogle}
+            type="button"
+            variant="outline"
+          >
+            <GoogleLogo />
+            <span>Continuer avec Google</span>
+          </Button>
+
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="h-px flex-1 bg-border" />
+            <span>{t("or")}</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+
+          {!otpFlowID ? (
+            <form className="space-y-5" onSubmit={startOTP}>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium leading-none"
+                  htmlFor="email"
+                >
+                  {t("emailLabel")}
+                </label>
+
+                <Input
+                  id="email"
+                  autoComplete="email"
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="you@example.com"
+                  type="email"
+                  value={email}
+                />
+              </div>
+
+              <Button className="w-full" disabled={busy} type="submit">
+                Continuer par email
+              </Button>
+            </form>
+          ) : (
+            <form className="space-y-5" onSubmit={verifyOTP}>
+              <div className="space-y-2">
+                <label
+                  className="text-sm font-medium leading-none"
+                  htmlFor="otp"
+                >
+                  {t("otpCodeLabel")}
+                </label>
+
+                <Input
+                  id="otp"
+                  autoComplete="one-time-code"
+                  inputMode="numeric"
+                  onChange={(event) => setOTPCode(event.target.value)}
+                  placeholder="000000"
+                  value={otpCode}
+                />
+              </div>
+
+              <div className="space-y-3">
+                <Button className="w-full" disabled={busy} type="submit">
+                  {t("otpVerify")}
+                </Button>
+
+                <Button
+                  className="w-full"
+                  disabled={busy}
+                  onClick={() => {
+                    setOTPFlowID("");
+                    setOTPCSRF("");
+                    setOTPCode("");
+                  }}
+                  type="button"
+                  variant="ghost"
+                >
+                  {t("changeEmail")}
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {result ? (
+            <p className="whitespace-pre-wrap rounded-lg border bg-muted px-3 py-2 text-sm text-muted-foreground">
+              {result}
+            </p>
+          ) : null}
+        </div>
+      </section>
+    </main>
+  );
 }

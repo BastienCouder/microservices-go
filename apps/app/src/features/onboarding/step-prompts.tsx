@@ -142,7 +142,6 @@ export function StepPrompts({ hideBack = false, nextLabel }: StepPromptsProps) {
   return (
     <OnboardingStep
       title={t("promptsTitle")}
-      description={t("promptsDescription")}
       headerAction={
         <Button type="button" variant="outline" onClick={generatePromptsWithAI}>
           {t("generateWithAI")}

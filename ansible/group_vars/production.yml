@@ -10,3 +10,11 @@ repo_version: main
 nginx_site_path: /etc/nginx/sites-available/visia.conf
 nginx_site_link_path: /etc/nginx/sites-enabled/visia.conf
 letsencrypt_email: sarl.konstrikthor@gmail.com
+postgres_backup_r2_postgres_host: postgres
+postgres_backup_r2_postgres_port: "5432"
+postgres_backup_r2_postgres_user: postgres
+postgres_backup_r2_prefix: postgres
+postgres_backup_r2_region: auto
+postgres_backup_r2_cron_minute: "0"
+postgres_backup_r2_cron_hour: "0"
+postgres_backup_r2_log_file: "{{ deploy_path }}/log/postgres-r2-backup.log"

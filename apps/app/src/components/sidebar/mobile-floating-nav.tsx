@@ -41,30 +41,59 @@ type MobileFloatingNavProps = {
   onLogout?: () => Promise<void>;
 };
 
+type MobileNavigationItem = {
+  href: string;
+  label: string;
+  promptTab?: "prompts" | "responses";
+};
+
 export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavProps) {
   const content = useI18nScope("sidebar");
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const activeProjectToken =
     readProjectTokenFromSearch(location.search) || readSelectedProjectID();
+  const activeTab = new URLSearchParams(
+    location.search.startsWith("?") ? location.search.slice(1) : location.search,
+  ).get("tab");
 
-  const navigationItems = useMemo(
+  const navigationItems = useMemo<MobileNavigationItem[]>(
     () => [
-      ...MONITORING_ITEMS.map((item) => ({
+      ...MONITORING_ITEMS.map<MobileNavigationItem>((item) => ({
+        href: buildScopedHref(item.href, {
+          project: activeProjectToken,
+          tab:
+            item.labelKey === "responses"
+              ? "responses"
+              : item.labelKey === "prompts"
+                ? "prompts"
+                : null,
+        }),
+        label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
+        promptTab:
+          item.labelKey === "responses"
+            ? "responses"
+            : item.labelKey === "prompts"
+              ? "prompts"
+              : undefined,
+      })),
+      {
+        href: buildScopedHref("/perception", { project: activeProjectToken }),
+        label: content.perception,
+      },
+      ...OPTIMIZATION_ITEMS.map<MobileNavigationItem>((item) => ({
         href: buildScopedHref(item.href, { project: activeProjectToken }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      { href: buildScopedHref("/perception", { project: activeProjectToken }), label: content.perception },
-      ...OPTIMIZATION_ITEMS.map((item) => ({
+      {
+        href: buildScopedHref("/traffic", { project: activeProjectToken }),
+        label: content.traffic,
+      },
+      ...BRAND_CONTEXT_ITEMS.map<MobileNavigationItem>((item) => ({
         href: buildScopedHref(item.href, { project: activeProjectToken }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
-      { href: buildScopedHref("/traffic", { project: activeProjectToken }), label: content.traffic },
-      ...BRAND_CONTEXT_ITEMS.map((item) => ({
-        href: buildScopedHref(item.href, { project: activeProjectToken }),
-        label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
-      })),
-      ...SETTINGS_ITEMS.map((item) => ({
+      ...SETTINGS_ITEMS.map<MobileNavigationItem>((item) => ({
         href: buildScopedHref(item.href, {
           project: activeProjectToken,
         }),
@@ -123,7 +152,11 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
                     <nav className="flex-1 overflow-y-auto px-3 pb-4 pt-10">
                       <div className="mx-auto flex w-full max-w-sm flex-col items-center gap-2">
                         {navigationItems.map((item) => {
-                          const active = location.pathname === item.href.split("?", 1)[0];
+                          const pathname = item.href.split("?", 1)[0];
+                          const active =
+                            location.pathname === pathname &&
+                            (pathname !== "/prompts" ||
+                              (item.promptTab ?? "prompts") === (activeTab || "prompts"));
 
                           return (
                             <SheetClose asChild key={item.href}>

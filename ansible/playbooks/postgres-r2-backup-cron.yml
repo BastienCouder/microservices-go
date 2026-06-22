@@ -1,0 +1,48 @@
+---
+- name: Configure PostgreSQL R2 backup cron
+  hosts: production
+  become: true
+  vars_files:
+    - ../group_vars/production.yml
+    - ../group_vars/generated_secrets.yml
+  tasks:
+    - name: Check repository was deployed
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/.git"
+      register: deployed_repo
+
+    - name: Stop if repository is missing
+      ansible.builtin.fail:
+        msg: "Repository is missing at {{ deploy_path }}. Run deploy first."
+      when: not deployed_repo.stat.exists
+
+    - name: Check R2 backup secrets exist on server
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/secrets/{{ item }}"
+      register: r2_backup_secret_files
+      loop:
+        - r2_bucket.txt
+        - r2_account_id.txt
+        - r2_access_key_id.txt
+        - r2_secret_access_key.txt
+
+    - name: Determine whether R2 backup cron can be enabled
+      ansible.builtin.set_fact:
+        postgres_backup_r2_enabled: "{{ r2_backup_secret_files.results | map(attribute='stat.exists') | list | min }}"
+
+    - name: Create backup log directory
+      ansible.builtin.file:
+        path: "{{ postgres_backup_r2_log_file | dirname }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0755"
+
+    - name: Install daily PostgreSQL to R2 backup cron
+      ansible.builtin.cron:
+        name: "visia postgres backup to r2"
+        user: "{{ deploy_user }}"
+        minute: "{{ postgres_backup_r2_cron_minute }}"
+        hour: "{{ postgres_backup_r2_cron_hour }}"
+        job: "{{ lookup('template', '../templates/postgres-r2-backup.cron.j2') }}"
+        state: "{{ 'present' if postgres_backup_r2_enabled else 'absent' }}"

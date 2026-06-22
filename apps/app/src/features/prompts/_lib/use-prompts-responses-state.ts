@@ -85,6 +85,13 @@ export function getPromptsWorkspaceLoadingState({
   };
 }
 
+export function readPromptsWorkspaceTab(routeSearch: string): "prompts" | "responses" {
+  const tabFromUrl = readRouteQueryParam(routeSearch, "tab");
+  return tabFromUrl === "responses" || tabFromUrl === "prompts"
+    ? tabFromUrl
+    : "prompts";
+}
+
 export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   const { t } = useScopedI18n("prompts-workspace");
   const queryClient = useQueryClient();
@@ -100,7 +107,9 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   );
   const [period, setPeriod] = useState<PeriodKey>(DEFAULT_PROMPT_PERIOD);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
-  const [tab, setTab] = useState<"prompts" | "responses">("prompts");
+  const [tab, setTab] = useState<"prompts" | "responses">(() =>
+    readPromptsWorkspaceTab(routeSearch),
+  );
   const [persona, setPersona] = useState<"all" | Persona>("all");
   const [search, setSearch] = useState("");
   const deferredSearch = useDeferredValue(search.trim());
@@ -143,12 +152,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
   }, [routeSearch]);
 
   useEffect(() => {
-    const tabFromUrl = readRouteQueryParam(routeSearch, "tab");
-    if (tabFromUrl === "responses" || tabFromUrl === "prompts") {
-      setTab(tabFromUrl);
-    } else {
-      setTab("prompts");
-    }
+    setTab(readPromptsWorkspaceTab(routeSearch));
   }, [routeSearch]);
 
   useEffect(() => {

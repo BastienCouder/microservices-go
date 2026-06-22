@@ -39,6 +39,6 @@ export function normalizeAppReturnTo(
   }
 }
 
-export function buildBrowserCallbackURL(origin: string, returnTo: string): string {
-  return `${origin}/login/callback?return_to=${encodeURIComponent(returnTo)}`;
+export function buildBrowserCallbackURL(origin: string): string {
+  return `${origin}/login/callback`;
 }

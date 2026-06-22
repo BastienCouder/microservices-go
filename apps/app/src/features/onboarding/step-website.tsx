@@ -1,19 +1,23 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOnboarding } from "@/hooks/use-onboarding";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import { loadOnboardingOrganizationName } from "./onboarding-api";
 import {
   OnboardingField,
   OnboardingStep,
 } from "./step-shell";
 
 type StepWebsiteProps = {
-  askOrganizationName?: boolean;
+  apiBaseURL: string;
+  organizationId?: string;
   isDemo?: boolean;
 };
 
 export function StepWebsite({
-  askOrganizationName = false,
+  apiBaseURL,
+  organizationId = "",
   isDemo = false,
 }: StepWebsiteProps) {
   const {
@@ -27,32 +31,52 @@ export function StepWebsite({
   } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
   const canContinue =
+    organizationName.trim() !== "" &&
     brandName.trim() !== "" &&
-    websiteUrl.trim() !== "" &&
-    (!askOrganizationName || organizationName.trim() !== "");
+    websiteUrl.trim() !== "";
+
+  useEffect(() => {
+    if (organizationName.trim() !== "" || organizationId.trim() === "") {
+      return;
+    }
+
+    let cancelled = false;
+
+    void loadOnboardingOrganizationName(apiBaseURL, organizationId)
+      .then((name) => {
+        if (cancelled || name.trim() === "") {
+          return;
+        }
+        setOrganizationName(name);
+      })
+      .catch(() => {
+        // Keep the field editable even if the preload fails.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseURL, organizationId, organizationName, setOrganizationName]);
 
   return (
     <OnboardingStep
       title={t("websiteTitle")}
-      description={t("websiteDescription")}
       footer={
         <div className="flex w-full justify-end">
           <Button onClick={nextStep} disabled={!canContinue}>
-            {t("continue")}
+            {t("next")}
           </Button>
         </div>
       }
     >
-      {askOrganizationName ? (
-        <OnboardingField label={t("organizationNameLabel")} htmlFor="organizationName">
-          <Input
-            id="organizationName"
-            value={organizationName}
-            onChange={(event) => setOrganizationName(event.target.value)}
-            placeholder={t("organizationNamePlaceholder")}
-          />
-        </OnboardingField>
-      ) : null}
+      <OnboardingField label={t("organizationNameLabel")} htmlFor="organizationName">
+        <Input
+          id="organizationName"
+          value={organizationName}
+          onChange={(event) => setOrganizationName(event.target.value)}
+          placeholder={t("organizationNamePlaceholder")}
+        />
+      </OnboardingField>
 
       <OnboardingField label={t("brandNameLabel")} htmlFor="brandName">
         <Input

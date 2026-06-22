@@ -29,58 +29,24 @@ import {
   derivePerceptionScoresFromResponses,
   derivePerceptionTrendSeries,
   filterPerceptionResponses,
-  type OptimizePriority,
-  type PerceptionError,
   type PerceptionResponseRecord,
   type PerceptionSourceFilter,
   type PerceptionTrendPeriodKey,
   type PerceptionViewData,
 } from "./shared/perception-data";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
-import { deletePerceptionClientJSON, getPerceptionClientJSON, postPerceptionClientJSON } from "./client-api";
-import {
-  getOptimizationActionMatchIds,
-  toCanonicalPerceptionSourceErrorId,
-} from "./optimization-action-ids";
+import { postPerceptionClientJSON } from "./client-api";
 import { exportPerceptionWorkbook } from "./perception-export";
 import {
   getDefaultPerceptionFilters,
   readPersistedPerceptionFilters,
   writePersistedPerceptionFilters,
 } from "./perception-filters-storage";
-import {
-  resolvePerceptionGeneratedContent,
-  resolvePerceptionLocalizedText,
-} from "./perception-i18n";
 
 const DISABLE_GATEWAY_TIMEOUT_MS = 0;
 const FAILED_RUN_STATUSES = new Set(["failed", "cancelled", "cancelled_by_user"]);
 const PERCEPTION_ANALYSIS_TOAST_ID = "perception-analysis-in-progress";
 const DEFAULT_PERCEPTION_PROMPT_COUNT = 3;
-
-type OptimizeDraft = {
-  id: string;
-  persistedId?: string;
-  priority: OptimizePriority;
-  type: PerceptionError["fixType"];
-  title: string;
-  issue: string;
-  impact: string;
-  generatedContent: string;
-  status: string;
-};
-
-type PersistedOptimizeAction = {
-  id: string;
-  priority: OptimizePriority;
-  type: PerceptionError["fixType"] | string;
-  title: string;
-  issue: string;
-  impact?: string | null;
-  generatedContent: string;
-  status?: string | null;
-  sourceErrorId?: string | null;
-};
 
 function buildFallbackModelCatalog(initialData: PerceptionViewData) {
   return initialData.metadata.models.map((modelName) => ({
@@ -96,35 +62,7 @@ function buildFallbackModelCatalog(initialData: PerceptionViewData) {
   }));
 }
 
-function mergeDrafts(
-  current: OptimizeDraft[],
-  actions: PersistedOptimizeAction[],
-): OptimizeDraft[] {
-  const merged = new Map(current.map((draft) => [draft.id, draft] as const));
-
-  for (const action of actions) {
-    const matchIds = getOptimizationActionMatchIds(action.sourceErrorId || action.id);
-    const uiId = matchIds.find((id) => !id.includes(":")) || action.sourceErrorId || action.id;
-    if (merged.has(uiId)) continue;
-    merged.set(uiId, {
-      id: uiId,
-      persistedId: action.id,
-      priority: (action.priority ?? "medium") as OptimizePriority,
-      type: (action.type as PerceptionError["fixType"]) ?? "prompt_patch",
-      title: action.title,
-      issue: action.issue,
-      impact: action.impact ?? "",
-      generatedContent: action.generatedContent,
-      status: action.status || "draft",
-    });
-  }
-
-  return Array.from(merged.values());
-}
-
-function getDefaultSourceFilter(
-  initialData: PerceptionViewData,
-): PerceptionSourceFilter {
+function getDefaultSourceFilter(): PerceptionSourceFilter {
   return "perception";
 }
 
@@ -152,20 +90,6 @@ function getLatestRunIdForResponses(
   }
 
   return latestRunId || fallbackLatestRunId || "";
-}
-
-function getPerceptionErrorSource(error: PerceptionError): Exclude<PerceptionSourceFilter, "all"> {
-  const normalizedType = error.type.trim().toLowerCase();
-  const normalizedId = error.id.trim().toLowerCase();
-
-  if (
-    normalizedType.startsWith("monitoring_") ||
-    normalizedId.startsWith("monitoring_")
-  ) {
-    return "monitoring";
-  }
-
-  return "perception";
 }
 
 function hasMinimumPerceptionBrandContext(data: PerceptionViewData): boolean {
@@ -196,7 +120,7 @@ export function usePerceptionViewModel(
   initialData: PerceptionViewData,
   options: { apiBaseURL?: string; routeSearch?: string } = {},
 ) {
-  const { locale, t } = useScopedI18n("perception");
+  const { t } = useScopedI18n("perception");
   const queryClient = useQueryClient();
   const modelCatalog = useMemo(
     () =>
@@ -214,15 +138,12 @@ export function usePerceptionViewModel(
     apiBaseURL: options.apiBaseURL,
     routeSearch: options.routeSearch,
   });
-  const [optimizeDrafts, setOptimizeDrafts] = useState<OptimizeDraft[]>([]);
-  const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
-  const [persistError, setPersistError] = useState<string | null>(null);
   const [selectedModels, setSelectedModels] = useState<string[]>(
     () => persistedFilters.selectedModels ?? defaultFilters.selectedModels,
   );
   const [selectedSourceFilter, setSelectedSourceFilter] =
     useState<PerceptionSourceFilter>(
-      () => getDefaultSourceFilter(initialData),
+      () => getDefaultSourceFilter(),
     );
   const [selectedPeriod, setSelectedPeriod] =
     useState<PerceptionTrendPeriodKey>(
@@ -253,25 +174,6 @@ export function usePerceptionViewModel(
       readSelectedOrganizationPublicID(),
     [options.routeSearch],
   );
-
-  useEffect(() => {
-    const projectId = initialData.metadata.projectId;
-    if (!projectId) return;
-
-    let isMounted = true;
-    void getPerceptionClientJSON<PersistedOptimizeAction[]>(
-      apiRoutes.analysis.optimizeActions(projectId),
-    )
-      .then((actions) => {
-        if (!isMounted) return;
-        setOptimizeDrafts((current) => mergeDrafts(current, actions));
-      })
-      .catch(() => undefined);
-
-    return () => {
-      isMounted = false;
-    };
-  }, [initialData.metadata.projectId]);
 
   useEffect(() => {
     writePersistedPerceptionFilters({
@@ -357,61 +259,9 @@ export function usePerceptionViewModel(
       ),
     [initialData.metadata.generatedAt, modelScopedResponses, sourceLatestRunId],
   );
-
-  const actionStatusesByErrorId = useMemo(() => {
-    const statuses = new Map<string, string>();
-    for (const draft of optimizeDrafts) {
-      for (const id of getOptimizationActionMatchIds(draft.id)) {
-        statuses.set(id, draft.status);
-      }
-    }
-    return statuses;
-  }, [optimizeDrafts]);
   const filteredRadar = useMemo(
     () => derivePerceptionRadarFromResponses(filteredResponses),
     [filteredResponses],
-  );
-  const filteredTopErrors = useMemo(
-    () => {
-      if (selectedSourceFilter === "perception" && sourceScopedResponses.length === 0) {
-        return [];
-      }
-
-      return initialData.topErrors
-        .filter(
-          (error) =>
-            selectedSourceFilter === "all" ||
-            getPerceptionErrorSource(error) === selectedSourceFilter,
-        )
-        .filter((error) => actionStatusesByErrorId.get(error.id) !== "done")
-        .slice(0, 3);
-    },
-    [
-      actionStatusesByErrorId,
-      initialData.topErrors,
-      selectedSourceFilter,
-      sourceScopedResponses.length,
-    ],
-  );
-  const filteredTopErrorsTotalCount = useMemo(
-    () => {
-      if (selectedSourceFilter === "perception" && sourceScopedResponses.length === 0) {
-        return 0;
-      }
-
-      return initialData.topErrors.filter(
-        (error) =>
-          (selectedSourceFilter === "all" ||
-            getPerceptionErrorSource(error) === selectedSourceFilter) &&
-          actionStatusesByErrorId.get(error.id) !== "done",
-      ).length;
-    },
-    [
-      actionStatusesByErrorId,
-      initialData.topErrors,
-      selectedSourceFilter,
-      sourceScopedResponses.length,
-    ],
   );
   const modelAxisHeatmap = useMemo(
     () =>
@@ -433,14 +283,6 @@ export function usePerceptionViewModel(
       selectedPeriod,
       sourceLatestRunId,
     ],
-  );
-  const generatedIds = useMemo(
-    () => new Set(optimizeDrafts.flatMap((draft) => getOptimizationActionMatchIds(draft.id))),
-    [optimizeDrafts],
-  );
-  const visibleOptimizeDrafts = useMemo(
-    () => optimizeDrafts.filter((draft) => draft.status !== "done"),
-    [optimizeDrafts],
   );
   const scoreCards = useMemo(
     () => [
@@ -465,155 +307,6 @@ export function usePerceptionViewModel(
     ],
     [lastRunScores, t],
   );
-
-  const findDraftForError = (error: PerceptionError) =>
-    optimizeDrafts.find((draft) => getOptimizationActionMatchIds(draft.id).includes(error.id));
-
-  const handleRemoveAction = async (error: PerceptionError) => {
-    setPersistError(null);
-    const draft = findDraftForError(error);
-    if (!draft || savingErrorIds.has(error.id)) return;
-
-    if (!initialData.metadata.projectId || !draft.persistedId) {
-      setOptimizeDrafts((current) =>
-        current.filter((item) => !getOptimizationActionMatchIds(item.id).includes(error.id)),
-      );
-      return;
-    }
-
-    setSavingErrorIds((current) => new Set(current).add(error.id));
-    try {
-      await deletePerceptionClientJSON<{ deleted: boolean }>(
-        apiRoutes.analysis.optimizeAction(initialData.metadata.projectId, draft.persistedId),
-      );
-      setOptimizeDrafts((current) =>
-        current.filter((item) => !getOptimizationActionMatchIds(item.id).includes(error.id)),
-      );
-    } catch (err) {
-      setPersistError(
-        err instanceof Error ? err.message : t("optimizeActionsCreateError"),
-      );
-    } finally {
-      setSavingErrorIds((current) => {
-        const next = new Set(current);
-        next.delete(error.id);
-        return next;
-      });
-    }
-  };
-
-  const handleFix = async (error: PerceptionError) => {
-    setPersistError(null);
-    if (savingErrorIds.has(error.id)) return;
-    if (generatedIds.has(error.id)) {
-      await handleRemoveAction(error);
-      return;
-    }
-
-    const localizedGeneratedContent = resolvePerceptionGeneratedContent(
-      error.generatedContent,
-      error.generatedContentKey,
-      locale,
-      error.translationParams,
-    );
-    const localizedTitle = resolvePerceptionLocalizedText(
-      error.title,
-      error.titleKey,
-      locale,
-      error.translationParams,
-    );
-    const localizedIssue = resolvePerceptionLocalizedText(
-      error.issue,
-      error.issueKey,
-      locale,
-      error.translationParams,
-    );
-    const localizedImpact = resolvePerceptionLocalizedText(
-      error.impact,
-      error.impactKey,
-      locale,
-      error.translationParams,
-    );
-
-    if (!initialData.metadata.projectId) {
-      setOptimizeDrafts((current) =>
-        current.some((draft) => draft.id === error.id)
-          ? current
-          : [
-              {
-                id: error.id,
-                priority: error.optimizePriority,
-                type: error.fixType,
-                title: localizedTitle,
-                issue: localizedIssue,
-                impact: localizedImpact,
-                generatedContent: localizedGeneratedContent,
-                status: "processing",
-              },
-              ...current,
-            ],
-      );
-      return;
-    }
-
-    setSavingErrorIds((current) => new Set(current).add(error.id));
-    try {
-      const result = await postPerceptionClientJSON<{
-        id: string;
-        generatedContent?: string;
-        status: string;
-      }>(
-        apiRoutes.analysis.optimizeActions(initialData.metadata.projectId),
-        {
-          priority: error.optimizePriority,
-          type: error.fixType,
-          title: localizedTitle,
-          issue: localizedIssue,
-          impact: localizedImpact,
-          generatedContent: localizedGeneratedContent,
-          status: "processing",
-          sourceErrorId: toCanonicalPerceptionSourceErrorId(error.id),
-          metadata: {
-            detectedInModels: error.detectedInModels,
-            aiModels: error.detectedInModels,
-            createdBy: "ai",
-            workflow: "perception_fix",
-            promptsCount: 0,
-          },
-        },
-        { timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS },
-      );
-
-      setOptimizeDrafts((current) =>
-        current.some((draft) => draft.id === error.id)
-          ? current
-          : [
-              {
-                id: error.id,
-                persistedId: result.id,
-                priority: error.optimizePriority,
-                type: error.fixType,
-                title: localizedTitle,
-                issue: localizedIssue,
-                impact: localizedImpact,
-                generatedContent: result.generatedContent || localizedGeneratedContent,
-                status: result.status || "processing",
-              },
-              ...current,
-            ],
-      );
-    } catch (err) {
-      setPersistError(
-        err instanceof Error ? err.message : t("optimizeActionsCreateError"),
-      );
-    } finally {
-      setSavingErrorIds((current) => {
-        const next = new Set(current);
-        next.delete(error.id);
-        return next;
-      });
-    }
-  };
 
   const estimatedPerceptionCredits = useMemo(() => {
     const modelCreditCostSum = Math.max(
@@ -1027,17 +720,9 @@ export function usePerceptionViewModel(
     setShowUniqueModelFilters,
     filteredResponses,
     filteredRadar,
-    filteredTopErrors,
-    filteredTopErrorsTotalCount,
     modelAxisHeatmap,
     perceptionTrend,
     scoreCards,
-    optimizeDrafts,
-    persistError,
-    generatedIds,
-    visibleOptimizeDrafts,
-    actionStatusesByErrorId,
-    savingErrorIds,
     analysisRunning,
     perceptionAnalysisPending,
     perceptionDataLoading,
@@ -1055,11 +740,7 @@ export function usePerceptionViewModel(
     canExport: exportAccess.canExport,
     exportDisabled:
       filteredResponses.length === 0 &&
-      filteredRadar.length === 0 &&
-      filteredTopErrors.length === 0 &&
-      visibleOptimizeDrafts.length === 0,
-    handleFix,
-    handleRemoveAction,
+      filteredRadar.length === 0,
     handleRunPerceptionAnalysis,
     handleResumePerceptionAnalysis,
     handleRestartPerceptionAnalysis,

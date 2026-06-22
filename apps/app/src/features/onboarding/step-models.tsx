@@ -536,7 +536,7 @@ export function StepModels({
           onBack={prevStep}
           onNext={nextStep}
           nextDisabled={!canContinue}
-          nextLabel={nextLabel ?? t("startAudit")}
+          nextLabel={nextLabel ?? t("next")}
         />
       }
     >

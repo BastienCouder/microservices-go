@@ -108,11 +108,16 @@ func (s *Service) Bootstrap(ctx context.Context, actor Identity, req Request) (R
 }
 
 func (s *Service) bootstrapOrganization(ctx context.Context, actor Identity, req Request) (int64, error) {
+	organizationName := strings.TrimSpace(req.OrganizationName)
 	if organizationID, err := strconv.ParseInt(strings.TrimSpace(req.OrganizationID), 10, 64); err == nil && organizationID > 0 {
+		if organizationName != "" {
+			if err := s.updateOrganizationName(ctx, actor, organizationID, organizationName); err != nil {
+				return 0, err
+			}
+		}
 		return organizationID, nil
 	}
 
-	organizationName := strings.TrimSpace(req.OrganizationName)
 	if organizationName == "" {
 		return 0, validationError("organizationName is required")
 	}
@@ -122,6 +127,15 @@ func (s *Service) bootstrapOrganization(ctx context.Context, actor Identity, req
 		UserID:     actor.UserID,
 	}, map[string]string{"name": organizationName}, false)
 	if err != nil {
+		if isHTTPStatusError(err, http.StatusConflict) {
+			existingOrganizationID, resolveErr := s.resolveExistingOwnedOrganizationID(ctx, actor)
+			if resolveErr == nil && existingOrganizationID > 0 {
+				if updateErr := s.updateOrganizationName(ctx, actor, existingOrganizationID, organizationName); updateErr != nil {
+					return 0, updateErr
+				}
+				return existingOrganizationID, nil
+			}
+		}
 		return 0, fmt.Errorf("create organization: %w", err)
 	}
 
@@ -131,6 +145,73 @@ func (s *Service) bootstrapOrganization(ctx context.Context, actor Identity, req
 		return 0, fmt.Errorf("create organization: missing organization id")
 	}
 	return organizationID, nil
+}
+
+func (s *Service) updateOrganizationName(ctx context.Context, actor Identity, organizationID int64, organizationName string) error {
+	_, err := s.call(ctx, s.organizationsURL, "organizations-service", "/organizations/"+strconv.FormatInt(organizationID, 10), http.MethodPatch, tokenClaims{
+		IdentityID:   actor.IdentityID,
+		UserID:       actor.UserID,
+		Organization: organizationID,
+	}, map[string]string{"name": organizationName}, false)
+	if err != nil {
+		return fmt.Errorf("update organization: %w", err)
+	}
+	return nil
+}
+
+func (s *Service) resolveExistingOwnedOrganizationID(ctx context.Context, actor Identity) (int64, error) {
+	payload, err := s.call(ctx, s.organizationsURL, "organizations-service", "/organizations/me", http.MethodGet, tokenClaims{
+		IdentityID: actor.IdentityID,
+		UserID:     actor.UserID,
+	}, map[string]any{}, false)
+	if err != nil {
+		return 0, fmt.Errorf("load organizations: %w", err)
+	}
+
+	memberships := extractItems(payload)
+	if len(memberships) == 0 {
+		return 0, fmt.Errorf("load organizations: empty membership list")
+	}
+
+	var editorFallback int64
+	for _, membership := range memberships {
+		internalID := extractID(membership, "internalId", "internalID")
+		publicID := extractString(membership, "publicId", "publicID", "organizationId", "id")
+		role := strings.ToLower(extractString(membership, "role", "Role"))
+
+		organizationRef := publicID
+		if organizationRef == "" && internalID > 0 {
+			organizationRef = strconv.FormatInt(internalID, 10)
+		}
+		if organizationRef == "" {
+			continue
+		}
+
+		organizationPayload, getErr := s.call(ctx, s.organizationsURL, "organizations-service", "/organizations/"+url.PathEscape(organizationRef), http.MethodGet, tokenClaims{
+			IdentityID: actor.IdentityID,
+			UserID:     actor.UserID,
+		}, map[string]any{}, false)
+		if getErr != nil {
+			continue
+		}
+
+		organization := unwrapData(organizationPayload)
+		organizationID := extractID(organization, "id", "ID", "organizationId", "organization_id")
+		ownerIdentityID := extractID(organization, "ownerIdentityId", "OwnerIdentityID", "owner_identity_id")
+
+		if organizationID > 0 && ownerIdentityID == actor.UserID {
+			return organizationID, nil
+		}
+		if editorFallback == 0 && organizationID > 0 && role == "editor" {
+			editorFallback = organizationID
+		}
+	}
+
+	if editorFallback > 0 {
+		return editorFallback, nil
+	}
+
+	return 0, fmt.Errorf("load organizations: no reusable organization found")
 }
 
 func (s *Service) bootstrapProject(ctx context.Context, actor Identity, organizationID int64, req Request) (string, error) {
@@ -316,6 +397,28 @@ func unwrapData(value map[string]any) map[string]any {
 		}
 	}
 	return value
+}
+
+func extractItems(value map[string]any) []map[string]any {
+	if value == nil {
+		return nil
+	}
+	rawItems, ok := value["data"].([]any)
+	if !ok {
+		return nil
+	}
+	items := make([]map[string]any, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		item, ok := rawItem.(map[string]any)
+		if ok {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
+func isHTTPStatusError(err error, statusCode int) bool {
+	return strings.Contains(err.Error(), fmt.Sprintf("status %d:", statusCode))
 }
 
 func extractID(value map[string]any, keys ...string) int64 {

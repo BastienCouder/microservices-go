@@ -28,5 +28,8 @@ describe("sidebar navigation", () => {
     expect(mobileSource.includes("content[item.labelKey]")).toBe(true);
     expect(mobileSource.includes('"/traffic"')).toBe(true);
     expect(mobileSource.includes('"/ai-agent-ready"')).toBe(false);
+    expect(mobileSource.includes('item.labelKey === "responses"')).toBe(true);
+    expect(mobileSource.includes('? location.search.slice(1) : location.search')).toBe(true);
+    expect(mobileSource.includes('(item.promptTab ?? "prompts") === (activeTab || "prompts")')).toBe(true);
   });
 });

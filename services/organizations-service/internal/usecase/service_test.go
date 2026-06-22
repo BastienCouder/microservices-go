@@ -529,6 +529,35 @@ func TestCreateOrganization(t *testing.T) {
 			t.Fatalf("expected ErrInvalidOrganization, got %v", err)
 		}
 	})
+
+	t.Run("rejects second owned organization for same user", func(t *testing.T) {
+		repo := newFakeRepo()
+		svc := newTestService(repo)
+		if _, err := svc.CreateOrganization(context.Background(), "Acme", 7); err != nil {
+			t.Fatalf("create first org: %v", err)
+		}
+
+		_, err := svc.CreateOrganization(context.Background(), "Acme 2", 7)
+		if !errors.Is(err, domain.ErrOwnerAlreadyHasOrganization) {
+			t.Fatalf("expected ErrOwnerAlreadyHasOrganization, got %v", err)
+		}
+	})
+
+	t.Run("allows invited user to own one organization while belonging to another", func(t *testing.T) {
+		repo := newFakeRepo()
+		svc := newTestService(repo)
+		org, err := svc.CreateOrganization(context.Background(), "Acme", 1)
+		if err != nil {
+			t.Fatalf("create first org: %v", err)
+		}
+		if _, err := svc.AddMember(context.Background(), org.ID, 7); err != nil {
+			t.Fatalf("invite user into existing org: %v", err)
+		}
+
+		if _, err := svc.CreateOrganization(context.Background(), "Workspace", 7); err != nil {
+			t.Fatalf("expected invited user to still create their own org, got %v", err)
+		}
+	})
 }
 
 func TestUpdateOrganizationName(t *testing.T) {

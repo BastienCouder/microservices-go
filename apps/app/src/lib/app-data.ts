@@ -235,7 +235,7 @@ export const PERCEPTION_TEXT = {
     statusPrefix: "Statut",
     createActionError: "Impossible de générer le brief IA",
   },
-  topErrors: {
+  optimizationErrors: {
     title: "Principales erreurs détectées",
     emptyTitle: "Aucune erreur détectée",
     seeMore: "Voir plus",

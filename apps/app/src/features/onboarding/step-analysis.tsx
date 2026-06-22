@@ -48,7 +48,9 @@ export function StepAnalysis({
   const [creationError, setCreationError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const startedAttemptRef = useRef<number | null>(null);
+  const attemptStartedAtRef = useRef<number>(0);
   const analysisRetryErrorMessage = t("analysisRetryError");
+  const minimumCompletionDelayMs = 3_000;
 
   useEffect(() => {
     if (creationError) {
@@ -74,6 +76,7 @@ export function StepAnalysis({
       return;
     }
     startedAttemptRef.current = attempt;
+    attemptStartedAtRef.current = Date.now();
 
     setCreationError(null);
 
@@ -109,6 +112,8 @@ export function StepAnalysis({
           apiBaseURL,
           projectOrganizationId,
         );
+        const elapsedMs = Date.now() - attemptStartedAtRef.current;
+        const remainingDelayMs = Math.max(0, minimumCompletionDelayMs - elapsedMs);
         window.setTimeout(() => {
           queryClient.removeQueries({
             queryKey: ["route-project-guard", apiBaseURL],
@@ -116,10 +121,12 @@ export function StepAnalysis({
           navigate(
             buildScopedHref("/monitoring", {
               project: projectSlug,
-              organizationId: projectOrganizationId,
+              organizationId: null,
+              projectId: null,
+              org: null,
             }),
           );
-        }, 250);
+        }, remainingDelayMs);
       })
       .catch((error) => {
         const nextMessage =

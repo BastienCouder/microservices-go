@@ -1,9 +1,5 @@
 import { useEffect, useRef } from "react";
 import {
-  readOrganizationIdFromSearch,
-  readSelectedOrganizationPublicID,
-} from "@/shared/selection";
-import {
   OnboardingProvider,
   useOnboarding,
 } from "@/hooks/use-onboarding";
@@ -22,6 +18,7 @@ import { OnboardingLanguageSwitcher } from "./language-switcher";
 import {
   createFreshOnboardingInitialState,
   getOnboardingSetupMode,
+  resolveOnboardingOrganizationId,
   shouldStartFreshOnboarding,
 } from "./onboarding-mode";
 import { Button } from "@/components/ui/button";
@@ -37,17 +34,18 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
   const { step } = useOnboarding();
   const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const setupMode = getOnboardingSetupMode(routeSearch);
-  const selectedOrganizationId =
-    setupMode === "account"
-      ? ""
-      : readOrganizationIdFromSearch(routeSearch) || readSelectedOrganizationPublicID();
+  const selectedOrganizationId = resolveOnboardingOrganizationId(routeSearch);
   const hasOrganizationContext = selectedOrganizationId !== "";
 
   const steps = [
     /* ...(!hasOrganizationContext ? [{ component: <StepAccountType />, id: 1 }] : []),*/
     {
-      component: <StepWebsite askOrganizationName={!hasOrganizationContext} />,
+      component: (
+        <StepWebsite
+          apiBaseURL={apiBaseURL}
+          organizationId={selectedOrganizationId}
+        />
+      ),
       id: hasOrganizationContext ? 1 : 2,
     },
     ...(!hasOrganizationContext ? [{ component: <StepAttribution />, id: 3 }] : []),
@@ -87,9 +85,10 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
         <AnimatedWave />
       </div>
 
-      <div className="hidden xl:block">
+     {/* <div className="hidden xl:block">
         <OnboardingLeftPanel />
       </div>
+     */}
       <section className="relative z-10 min-w-0 flex-1">
         <div className="absolute left-4 top-4 z-30 sm:right-6 lg:right-10">
           <Button
@@ -125,11 +124,7 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
 export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps) {
   const normalizedRouteSearch = routeSearch ?? "";
   const setupMode = getOnboardingSetupMode(normalizedRouteSearch);
-  const selectedOrganizationId =
-    setupMode === "account"
-      ? ""
-      : readOrganizationIdFromSearch(normalizedRouteSearch) ||
-        readSelectedOrganizationPublicID();
+  const selectedOrganizationId = resolveOnboardingOrganizationId(normalizedRouteSearch);
   const totalSteps = selectedOrganizationId ? 6 : 8;
   const providerKey =
     setupMode === "resume"

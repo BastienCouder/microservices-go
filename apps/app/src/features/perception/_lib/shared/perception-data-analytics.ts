@@ -7,16 +7,13 @@ import {
 import type {
   BrandCanon,
   BrandCompetitor,
-  OptimizePriority,
   PerceptionApiPayload,
-  PerceptionError,
   PerceptionHeatmapAxis,
   PerceptionHeatmapRow,
   PerceptionModelOption,
   PerceptionRadarPoint,
   PerceptionResponseRecord,
   PerceptionScores,
-  PerceptionSeverity,
   PerceptionSourceFilter,
   PerceptionTrendPeriodKey,
   PerceptionTrendPoint,
@@ -663,58 +660,8 @@ function deriveTrend(
   return buildTrendSeriesByPeriod(responses, referenceDate, latestRunId);
 }
 
-function normalizePerceptionSeverity(value: unknown): PerceptionSeverity {
-  if (value === "high" || value === "medium" || value === "low") return value;
-  return "low";
-}
-
-function normalizeOptimizePriority(value: unknown, severity: PerceptionSeverity): OptimizePriority {
-  if (value === "high" || value === "medium" || value === "low") return value;
-  return severity;
-}
-
-function normalizeFixType(value: unknown): PerceptionError["fixType"] {
-  if (
-    value === "prompt_patch" ||
-    value === "website_copy" ||
-    value === "schema_update" ||
-    value === "faq_snippet"
-  ) {
-    return value;
-  }
-  return "website_copy";
-}
-
 function normalizeStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item !== "") : [];
-}
-
-function normalizeBackendTopErrors(payload: PerceptionApiPayload): PerceptionError[] {
-  return (payload.topErrors ?? []).map((error, index) => {
-    const severity = normalizePerceptionSeverity(error.severity);
-    return {
-      id: error.id || `backend-perception-error-${index + 1}`,
-      type: error.type || error.id || `backend-perception-error-${index + 1}`,
-      severity,
-      title: error.title || "",
-      titleKey: error.titleKey || undefined,
-      issue: error.issue || "",
-      issueKey: error.issueKey || undefined,
-      impact: error.impact || "",
-      impactKey: error.impactKey || undefined,
-      detectedInModels: normalizeStringList(error.detectedInModels),
-      fixType: normalizeFixType(error.fixType),
-      optimizePriority: normalizeOptimizePriority(error.optimizePriority, severity),
-      generatedContent: error.generatedContent || "",
-      generatedContentKey: error.generatedContentKey || undefined,
-      translationParams:
-        error.translationParams &&
-        typeof error.translationParams === "object" &&
-        !Array.isArray(error.translationParams)
-          ? (error.translationParams as Record<string, unknown>)
-          : undefined,
-    };
-  });
 }
 
 function serializeResponses(responses: ParsedResponse[]): PerceptionResponseRecord[] {
@@ -877,7 +824,6 @@ export function buildPerceptionDerivedData({
   const visibleModelCatalog = activeModelCatalog.length > 0 ? activeModelCatalog : modelCatalog;
   const modelAxisHeatmap = deriveModelAxisHeatmap(responses, visibleModelCatalog);
   const trend = deriveTrend(responses, latestRunId, referenceDate);
-  const topErrors = normalizeBackendTopErrors(perceptionPayload);
   const models = uniqueStrings(
     responses.map((response) => response.modelName || response.modelId).filter(Boolean),
   );
@@ -898,7 +844,6 @@ export function buildPerceptionDerivedData({
     radar,
     responses: serializeResponses(responses),
     scores,
-    topErrors,
     trend,
     visibleModelCatalog,
     windowLabel: deriveWindowLabel(responses, referenceDate),

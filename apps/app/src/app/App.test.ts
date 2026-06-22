@@ -35,4 +35,9 @@ describe("app onboarding guard", () => {
     expect(source.includes("storeSelectedProjectID(routeProjectId);")).toBe(true);
     expect(source.includes("storeLastSelectedProjectToken(")).toBe(false);
   });
+
+  test("keeps slug-only project urls clean when the route is already readable", () => {
+    expect(source.includes('routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === ""')).toBe(true);
+    expect(source.includes("applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext)")).toBe(true);
+  });
 });

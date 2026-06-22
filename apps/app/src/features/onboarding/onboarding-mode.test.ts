@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test";
 import {
   createFreshOnboardingInitialState,
   getOnboardingSetupMode,
+  resolveOnboardingOrganizationId,
   shouldStartFreshOnboarding,
 } from "./onboarding-mode";
 
@@ -37,5 +38,34 @@ describe("onboarding mode", () => {
     expect(getOnboardingSetupMode("?setup=account")).toBe("account");
     expect(getOnboardingSetupMode("?setup=project")).toBe("project");
     expect(getOnboardingSetupMode("?setup=other")).toBe("resume");
+  });
+
+  test("reuses the selected organization during account onboarding when checkout already created it", () => {
+    const storage = new Map<string, string>([
+      ["selected-organization-id", "5"],
+    ]);
+    const originalWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          setItem: (_key: string, _value: string) => {},
+          removeItem: (_key: string) => {},
+        },
+      },
+    });
+
+    expect(resolveOnboardingOrganizationId("?setup=account")).toBe("5");
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  });
+
+  test("prefers the organization from the route when onboarding is explicitly scoped", () => {
+    expect(resolveOnboardingOrganizationId("?setup=account&organizationId=42")).toBe("42");
   });
 });

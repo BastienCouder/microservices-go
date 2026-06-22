@@ -201,7 +201,7 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({
                     <span className="font-mono text-xs text-muted-foreground">
                       {prompt.time}
                     </span>
-                    <Button
+               {/*     <Button
                       type="button"
                       variant="ghost"
                       size="icon"
@@ -214,7 +214,7 @@ export const ActivityPromptsStream = memo(function ActivityPromptsStream({
                       }}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    </Button> */}
                   </div>
                 </div>
 

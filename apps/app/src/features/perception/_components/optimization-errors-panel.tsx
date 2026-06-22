@@ -55,7 +55,7 @@ type ErrorMetaRow = {
   value: string;
 };
 
-export function TopErrorsPanel({
+export function OptimizationErrorsPanel({
   emptyLabel,
   errors,
   generatedIds,
@@ -116,7 +116,7 @@ export function TopErrorsPanel({
       <div className="flex items-center justify-between">
         <div className="min-w-0">
           <h4>
-            <SectionTitle>{t("topErrorsTitle")}</SectionTitle>
+            <SectionTitle>{t("optimizationErrorsTitle")}</SectionTitle>
           </h4>
         </div>
         <Badge
@@ -130,12 +130,12 @@ export function TopErrorsPanel({
       <div className="space-y-3">
         {errors.length === 0 ? (
           <EmptyStateCard
-            label={emptyLabel || `${t("topErrorsEmptyTitle")}.`}
+            label={emptyLabel || `${t("optimizationErrorsEmptyTitle")}.`}
             className="h-[120px] text-sm"
           />
         ) : (
           errors.map((error, index) => (
-            <PerceptionTopErrorCard
+            <OptimizationErrorCard
               key={error.id}
               error={error}
               index={index}
@@ -159,7 +159,7 @@ export function TopErrorsPanel({
 
         {showSeeMore ? (
           <Button asChild variant="ghost" size="sm" className="w-full text-xs">
-            <Link to={seeMoreHref}>{t("topErrorsSeeMore")}</Link>
+            <Link to={seeMoreHref}>{t("optimizationErrorsSeeMore")}</Link>
           </Button>
         ) : null}
       </div>
@@ -174,7 +174,7 @@ export function TopErrorsPanel({
               <DrawerHeader className="sr-only">
                 <DrawerTitle>{selectedErrorTitle}</DrawerTitle>
                 <DrawerDescription>
-                  {t("topErrorsSheetDescription")}
+                  {t("optimizationErrorsSheetDescription")}
                 </DrawerDescription>
               </DrawerHeader>
               <ErrorDetailsContent
@@ -206,7 +206,7 @@ export function TopErrorsPanel({
               <SheetHeader className="sr-only">
                 <SheetTitle>{selectedErrorTitle}</SheetTitle>
                 <SheetDescription>
-                  {t("topErrorsSheetDescription")}
+                  {t("optimizationErrorsSheetDescription")}
                 </SheetDescription>
               </SheetHeader>
               <ErrorDetailsContent
@@ -335,12 +335,12 @@ export function ErrorDetailsContent({
         : onCreateAction;
   const actionButtonLabel =
     canRemoveAction && !canMarkDone
-      ? t("topErrorsRemove")
+      ? t("optimizationErrorsRemove")
       : canMarkDone
-        ? t("topErrorsMarkDone")
+        ? t("optimizationErrorsMarkDone")
         : actionGenerated
-          ? t("topErrorsAdded")
-          : t("topErrorsFix");
+          ? t("optimizationErrorsAdded")
+          : t("optimizationErrorsFix");
 
   return (
     <div
@@ -421,7 +421,7 @@ export function ErrorDetailsContent({
         <div className="grid grid-cols-1 gap-y-10 pb-8">
           <div className="flex items-baseline justify-between">
             <span className="text-xs font-bold tracking-widest text-primary">
-              {t("topErrorsImpact")}
+              {t("optimizationErrorsImpact")}
             </span>
             <span
               className={cn(
@@ -438,20 +438,20 @@ export function ErrorDetailsContent({
               <ErrorDataRow label={contextMeta.label} value={contextMeta.value} />
             ) : null}
             <ErrorDataRow
-              label={t("topErrorsGeneratedFix")}
+              label={t("optimizationErrorsGeneratedFix")}
               value={formatPerceptionErrorTypeLabelI18n(error.type, locale)}
             />
           </div>
 
-          <ErrorTextBlock label={t("topErrorsAiClaim")}>
+          <ErrorTextBlock label={t("optimizationErrorsAiClaim")}>
             <p>{resolvedIssue}</p>
           </ErrorTextBlock>
 
-          <ErrorTextBlock label={t("topErrorsImpact")}>
+          <ErrorTextBlock label={t("optimizationErrorsImpact")}>
             <p>{resolvedImpact}</p>
           </ErrorTextBlock>
 
-          <ErrorTextBlock label={t("topErrorsGeneratedFix")}>
+          <ErrorTextBlock label={t("optimizationErrorsGeneratedFix")}>
             <p>{resolvedGeneratedContent}</p>
           </ErrorTextBlock>
         </div>
@@ -614,7 +614,7 @@ function ModelBadgeIcon({
   );
 }
 
-export function PerceptionTopErrorCard({
+export function OptimizationErrorCard({
   actionGenerated = false,
   actionSaving = false,
   actionStatus,
@@ -673,12 +673,12 @@ export function PerceptionTopErrorCard({
         : onCreateAction;
   const actionButtonLabel =
     canRemoveAction && !canMarkDone
-      ? t("topErrorsRemove")
+      ? t("optimizationErrorsRemove")
       : canMarkDone
-        ? t("topErrorsMarkDone")
+        ? t("optimizationErrorsMarkDone")
         : actionGenerated
-          ? t("topErrorsAdded")
-          : t("topErrorsFix");
+          ? t("optimizationErrorsAdded")
+          : t("optimizationErrorsFix");
   const resolvedGeneratedContent = resolvePerceptionGeneratedContent(
     error.generatedContent,
     error.generatedContentKey,
@@ -710,7 +710,7 @@ export function PerceptionTopErrorCard({
         type="button"
         className="block w-full cursor-pointer text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
         onClick={onOpenDetails}
-        aria-label={`${t("topErrorsTitle")}: ${resolvedTitle}`}
+        aria-label={``}
       >
         <div className="mb-2.5 flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">

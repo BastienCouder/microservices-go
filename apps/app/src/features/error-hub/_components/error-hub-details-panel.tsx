@@ -17,7 +17,7 @@ import type { OptimizationError } from "@/features/perception/_lib/shared/optimi
 import {
   ErrorDetailsContent,
   buildPerceptionModelLookup,
-} from "../../perception/_components/top-errors-panel";
+} from "../../perception/_components/optimization-errors-panel";
 import { resolvePerceptionLocalizedText } from "../../perception/_lib";
 import { canCreateActionFromError } from "../_lib/error-hub-utils";
 type ErrorHubDetailsPanelProps = {

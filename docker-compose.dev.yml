@@ -288,12 +288,6 @@ services:
   kratos:
     entrypoint: ["sh", "/etc/config/kratos/start.sh"]
 
-  prometheus:
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=7d"
-
 volumes:
   go-mod-cache:
   go-build-cache:

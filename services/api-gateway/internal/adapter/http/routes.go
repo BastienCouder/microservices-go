@@ -77,6 +77,14 @@ func isProjectMembersRequest(r *http.Request) bool {
 		parts[2] == "members"
 }
 
+func isOrganizationDeleteRequest(r *http.Request) bool {
+	if r.Method != http.MethodDelete {
+		return false
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	return len(parts) == 2 && parts[0] == "organizations" && parts[1] != ""
+}
+
 func (h *Handler) buildRoutes() []routeEntry {
 	authHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h.serveProxyWithInternalAuth(w, r, h.authProxy, "auth-service", internalTokenClaims{})
@@ -116,6 +124,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		r2.URL.RawPath = ""
 		h.projectProxy.ServeHTTP(w, r2)
 	}), "project-service", "projects")
+	deleteOrganizationHandler := h.withAuth(http.HandlerFunc(h.handleDeleteOrganizationCascade), "api-gateway", "organizations")
 	projectAnalysisRunHandler := h.withAuth(h.projectProxy, "project-service", "projects")
 
 	routes := []routeEntry{
@@ -138,6 +147,7 @@ func (h *Handler) buildRoutes() []routeEntry {
 		{match: isOnboardingProjectModelsRequest, handler: onboardingProjectModelsHandler, service: "project-service"},
 		{match: isCanonicalProjectAnalysisRunRequest, handler: projectAnalysisRunHandler, service: "project-service"},
 		{match: isProjectMembersRequest, handler: h.withAuth(h.organizationsProxy, "organizations-service", "organizations"), service: "organizations-service"},
+		{match: isOrganizationDeleteRequest, handler: deleteOrganizationHandler, service: "api-gateway"},
 		{match: matchPathPrefix("/auth"), handler: authHandler, service: "auth-service"},
 		{match: matchPathPrefix("/users"), handler: userHandler, service: "user-service"},
 		{match: matchPathPrefix("/admin/users"), handler: userHandler, service: "user-service"},

@@ -1,4 +1,8 @@
-import { readRouteQueryParam } from "@/shared/selection";
+import {
+  readOrganizationIdFromSearch,
+  readRouteQueryParam,
+  readSelectedOrganizationPublicID,
+} from "@/shared/selection";
 import type { OnboardingInitialState } from "@/hooks/use-onboarding";
 
 export type OnboardingSetupMode = "account" | "project" | "resume";
@@ -21,6 +25,13 @@ export function getOnboardingSetupMode(routeSearch: string): OnboardingSetupMode
 
 export function shouldStartFreshOnboarding(routeSearch: string): boolean {
   return getOnboardingSetupMode(routeSearch) !== "resume";
+}
+
+export function resolveOnboardingOrganizationId(routeSearch: string): string {
+  return (
+    readOrganizationIdFromSearch(routeSearch) ||
+    readSelectedOrganizationPublicID()
+  ).trim();
 }
 
 export function createFreshOnboardingInitialState(): OnboardingInitialState {

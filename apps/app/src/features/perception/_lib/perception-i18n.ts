@@ -71,9 +71,9 @@ const ERROR_TYPE_TRANSLATION_KEYS = {
 } as const;
 
 const SEVERITY_TRANSLATION_KEYS: Record<PerceptionSeverity, string> = {
-  high: "topErrorsSeverityHigh",
-  medium: "topErrorsSeverityMedium",
-  low: "topErrorsSeverityLow",
+  high: "errorSeverityHigh",
+  medium: "errorSeverityMedium",
+  low: "errorSeverityLow",
 };
 
 function normalizeLocale(locale: string): SupportedLocale {

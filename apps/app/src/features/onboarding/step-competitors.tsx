@@ -64,7 +64,6 @@ export function StepCompetitors({ hideBack = false, nextLabel }: StepCompetitors
   return (
     <OnboardingStep
       title={t("competitorsTitle")}
-      description={t("competitorsDescription")}
       footer={
         <OnboardingStepFooter
           hideBack={hideBack}
@@ -75,10 +74,7 @@ export function StepCompetitors({ hideBack = false, nextLabel }: StepCompetitors
         />
       }
     >
-      <OnboardingField
-        label={t("competitorsFieldLabel")}
-        description={t("competitorsFieldHint")}
-      >
+      <OnboardingField label={t("competitorsFieldLabel")}>
         <div className="space-y-3">
           {competitors.map((competitor, index) => (
             <div

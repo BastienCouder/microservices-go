@@ -6,9 +6,9 @@ import { cn } from "@/lib/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 
 import {
-  PerceptionTopErrorCard,
+  OptimizationErrorCard,
   buildPerceptionModelLookup,
-} from "../../perception/_components/top-errors-panel";
+} from "../../perception/_components/optimization-errors-panel";
 import { canCreateActionFromError } from "../_lib/error-hub-utils";
 import { ErrorHubColumnLoading } from "./template";
 
@@ -84,7 +84,7 @@ export function ErrorHubColumn({
           <ErrorHubColumnLoading />
         ) : errors.length > 0 ? (
           errors.map((error, index) => (
-            <PerceptionTopErrorCard
+            <OptimizationErrorCard
               key={error.id}
               error={error}
               footerAlign="end"

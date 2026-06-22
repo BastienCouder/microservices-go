@@ -35,6 +35,22 @@ type CreateStripeCheckoutSessionOutput struct {
 	CheckoutURL string `json:"checkout_url"`
 }
 
+type ConfirmStripeCheckoutSessionInput struct {
+	OrganizationID int64
+	SessionID      string
+}
+
+type ConfirmStripeCheckoutSessionOutput struct {
+	OrganizationID       int64  `json:"organization_id"`
+	Plan                 string `json:"plan"`
+	BillingCycle         string `json:"billing_cycle"`
+	SubscriptionStatus   string `json:"subscription_status"`
+	MonthlyQuota         int    `json:"monthly_quota"`
+	Seats                int    `json:"seats"`
+	StripeCustomerID     string `json:"stripe_customer_id"`
+	StripeSubscriptionID string `json:"stripe_subscription_id"`
+}
+
 type CreateStripeCustomerPortalSessionInput struct {
 	OrganizationID int64
 	ReturnURL      string
@@ -68,6 +84,36 @@ type StripeCheckoutSession struct {
 	SubscriptionID string
 }
 
+type StripeCheckoutSessionDetails struct {
+	ID                   string
+	OrganizationID       int64
+	ProjectID            string
+	AttributionSource    string
+	Plan                 string
+	BillingCycle         string
+	Seats                int
+	MonthlyQuota         int
+	Paid                 bool
+	StripeCustomerID     string
+	StripeSubscriptionID string
+}
+
+type StripeSubscriptionDetails struct {
+	OrganizationID       int64
+	ProjectID            string
+	AttributionSource    string
+	Plan                 string
+	BillingCycle         string
+	Seats                int
+	MonthlyQuota         int
+	StripeCustomerID     string
+	StripeSubscriptionID string
+	StripePriceID        string
+	Status               string
+	CancelAtPeriodEnd    bool
+	CurrentPeriodEnd     *time.Time
+}
+
 type StripeWebhookEvent struct {
 	ID                     string
 	Type                   string
@@ -91,6 +137,9 @@ type StripeWebhookEvent struct {
 
 type StripeProvider interface {
 	CreateSubscriptionCheckoutSession(ctx context.Context, req StripeCheckoutSessionRequest) (StripeCheckoutSession, error)
+	GetCheckoutSession(ctx context.Context, sessionID string) (StripeCheckoutSessionDetails, error)
+	GetSubscription(ctx context.Context, subscriptionID string) (StripeSubscriptionDetails, error)
+	CancelSubscription(ctx context.Context, subscriptionID, requestID string) (StripeSubscriptionDetails, error)
 	FindPriceIDByLookupKey(ctx context.Context, lookupKey string) (string, error)
 	SyncPricingCatalog(ctx context.Context, req StripePricingCatalogSyncRequest) (StripePricingCatalogSyncResult, error)
 	CreateCustomerPortalSession(ctx context.Context, customerID, returnURL, requestID string) (string, error)

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import { RefreshCw } from "lucide-react";
 import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
@@ -82,7 +82,7 @@ export function OrganizationsLayout({
     }
   }, [notice]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (activeTab === "billing") {
       redirectToWebPricing();
     }
@@ -159,9 +159,7 @@ export function OrganizationsLayout({
               ) : null}
 
             {activeTab === "billing" ? (
-                <div className="flex min-h-[320px] items-center justify-center rounded-lg border bg-background p-6 text-sm text-muted-foreground">
-                  Redirection vers les tarifs...
-                </div>
+                <div className="min-h-[320px] rounded-lg border bg-background p-6" aria-hidden="true" />
               ) : null}
 
             {activeTab === "settings" ? (

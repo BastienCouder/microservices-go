@@ -1,0 +1,121 @@
+name: deploy-production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      service:
+        description: "Service Docker Compose a deployer (all, app, web, api-gateway, ...)"
+        required: false
+        default: "all"
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  validate-ansible:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: python -m pip install ansible-core
+
+      - name: Ansible syntax check
+        run: ansible-playbook -i ansible/inventory/production.ini ansible/playbooks/deploy.yml --syntax-check
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: validate-ansible
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Ansible
+        run: python -m pip install ansible-core
+
+      - name: Start SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.PRODUCTION_SSH_PRIVATE_KEY }}
+
+      - name: Trust production host key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.PRODUCTION_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Compute deploy scope
+        id: scope
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            SERVICE="${{ github.event.inputs.service || 'all' }}"
+          else
+            mapfile -t CHANGED_FILES < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+
+            if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
+              SERVICE="all"
+            else
+              SERVICE="all"
+
+              if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/billing-service/'; then
+                :
+              else
+                SERVICE="billing-service"
+              fi
+
+              if [ "$SERVICE" = "all" ]; then
+                if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/app/'; then
+                  :
+                else
+                  SERVICE="app"
+                fi
+              fi
+
+              if [ "$SERVICE" = "all" ]; then
+                if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/web/'; then
+                  :
+                else
+                  SERVICE="web"
+                fi
+              fi
+            fi
+          fi
+
+          echo "service=$SERVICE" >> "$GITHUB_OUTPUT"
+          echo "Deploy scope: $SERVICE"
+
+      - name: Deploy production stack
+        run: |
+          SERVICE="${{ steps.scope.outputs.service }}"
+
+          if [ "$SERVICE" = "all" ]; then
+            ansible-playbook \
+              -i ansible/inventory/production.ini \
+              ansible/playbooks/deploy.yml \
+              -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}"
+          else
+            ansible-playbook \
+              -i ansible/inventory/production.ini \
+              ansible/playbooks/deploy.yml \
+              -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}" \
+              -e "{\"deploy_services\":[\"$SERVICE\"]}"
+          fi

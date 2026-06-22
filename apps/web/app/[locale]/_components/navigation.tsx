@@ -8,16 +8,22 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LocaleSwitcher } from "@/app/[locale]/_components/locale-switcher";
+import {
+  clearAuthReturnTo,
+  clearCheckoutIntent,
+} from "@/src/auth/browser-intent";
 import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
 
 export function Navigation() {
   const t = useTranslations("navigation");
+  const authT = useTranslations("auth");
   const locale = useLocale() as Locale;
   const pathname = usePathname();
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const gatewayURL =
     process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000";
@@ -84,6 +90,27 @@ export function Navigation() {
     setIsMobileMenuOpen(false);
   }
 
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      await fetch(`${gatewayURL}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+      });
+    } finally {
+      setIsAuthenticated(false);
+      clearAuthReturnTo();
+      clearCheckoutIntent();
+      closeMobileMenu();
+      window.location.href = homePath;
+    }
+  }
+
   return (
     <header
       className={`fixed left-0 right-0 top-0 z-50 transition-all duration-500 ${
@@ -134,15 +161,29 @@ export function Navigation() {
             <LocaleSwitcher />
 
             {isAuthenticated ? (
-              <Button
-                asChild
-                size="sm"
-                className={`rounded-full bg-primary text-primary-foreground transition-all duration-500 hover:bg-primary/90 ${
-                  isScrolled ? "h-8 px-4 text-xs" : "h-9 px-5 text-sm"
-                }`}
-              >
-                <a href={appURL}>{t("accessApp")}</a>
-              </Button>
+              <>
+                <Button
+                  asChild
+                  size="sm"
+                  className={`rounded-full bg-primary text-primary-foreground transition-all duration-500 hover:bg-primary/90 ${
+                    isScrolled ? "h-8 px-4 text-xs" : "h-9 px-5 text-sm"
+                  }`}
+                >
+                  <a href={appURL}>{t("accessApp")}</a>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`rounded-full transition-all duration-500 ${
+                    isScrolled ? "h-8 px-4 text-xs" : "h-9 px-5 text-sm"
+                  }`}
+                  disabled={isLoggingOut}
+                  onClick={() => void handleLogout()}
+                  type="button"
+                >
+                  {authT("logout")}
+                </Button>
+              </>
             ) : !isLoginPage ? (
               <Button
                 asChild
@@ -151,7 +192,7 @@ export function Navigation() {
                   isScrolled ? "h-8 px-4 text-xs" : "h-9 px-5 text-sm"
                 }`}
               >
-                <Link href={loginPath}>Connexion</Link>
+                <Link href={loginPath}>{t("signIn")}</Link>
               </Button>
             ) : null}
           </div>
@@ -218,20 +259,31 @@ export function Navigation() {
             }}
           >
             {isAuthenticated ? (
-              <Button
-                asChild
-                className="h-14 flex-1 rounded-full bg-primary text-base text-primary-foreground hover:bg-primary/90"
-                onClick={closeMobileMenu}
-              >
-                <a href={appURL}>{t("accessApp")}</a>
-              </Button>
+              <>
+                <Button
+                  asChild
+                  className="h-14 flex-1 rounded-full bg-primary text-base text-primary-foreground hover:bg-primary/90"
+                  onClick={closeMobileMenu}
+                >
+                  <a href={appURL}>{t("accessApp")}</a>
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-14 flex-1 rounded-full text-base"
+                  disabled={isLoggingOut}
+                  onClick={() => void handleLogout()}
+                  type="button"
+                >
+                  {authT("logout")}
+                </Button>
+              </>
             ) : !isLoginPage ? (
               <Button
                 asChild
                 className="h-14 flex-1 rounded-full bg-primary text-base text-primary-foreground hover:bg-primary/90"
                 onClick={closeMobileMenu}
               >
-                <Link href={loginPath}>Connexion</Link>
+                <Link href={loginPath}>{t("signIn")}</Link>
               </Button>
             ) : null}
           </div>

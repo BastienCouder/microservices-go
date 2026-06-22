@@ -15,8 +15,9 @@ import type {
   PlanTemplate,
   PricingData,
 } from "./pricing-types";
-import { startPricingCheckout } from "./pricing-checkout";
-import { formatCredits } from "./pricing-utils";
+import { startCustomerPortal, startPricingCheckout } from "./pricing-checkout";
+import { formatCredits, normalizePlanCode } from "./pricing-utils";
+import { consumeCheckoutIntent } from "@/src/auth/browser-intent";
 import type { Locale } from "@/src/i18n/config";
 
 const sectionHeadingClass =
@@ -40,8 +41,13 @@ const billingCopy = {
     annualBillingSuffix: "par an",
     creditsSuffix: "crédits / mois",
     custom: "Sur devis",
+    currentPlan: "Plan actuel",
+    currentPlanPrefix: "Plan actif :",
+    switchPlanPrefix: "Passer à",
+    manageSubscription: "Gérer l’abonnement",
     checkoutLoading: "Préparation du paiement...",
     checkoutError: "Impossible de démarrer le paiement. Connectez-vous puis réessayez.",
+    portalError: "Impossible d’ouvrir la gestion d’abonnement. Réessayez.",
   },
   en: {
     monthly: "Monthly",
@@ -55,10 +61,125 @@ const billingCopy = {
     annualBillingSuffix: "per year",
     creditsSuffix: "credits / month",
     custom: "Custom",
+    currentPlan: "Current plan",
+    currentPlanPrefix: "Active plan:",
+    switchPlanPrefix: "Switch to",
+    manageSubscription: "Manage subscription",
     checkoutLoading: "Preparing payment...",
     checkoutError: "Unable to start payment. Sign in and try again.",
+    portalError: "Unable to open subscription management. Try again.",
   },
 };
+
+type JsonRecord = Record<string, unknown>;
+
+type ActiveBillingState = {
+  organizationId: string;
+  plan: string;
+  isPaid: boolean;
+  subscriptionStatus: string;
+};
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null;
+}
+
+function getString(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "";
+}
+
+function unwrapGatewayPayload(value: unknown): unknown {
+  if (!isRecord(value) || !("data" in value)) {
+    return value;
+  }
+
+  return value.data;
+}
+
+async function parseJSON(response: Response): Promise<unknown> {
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    return null;
+  }
+
+  return response.json() as Promise<unknown>;
+}
+
+function readOrganizationId(value: unknown): string {
+  if (!isRecord(value)) return "";
+  return getString(
+    value.internalId ??
+      value.InternalID ??
+      value.id ??
+      value.ID ??
+      value.organizationId ??
+      value.OrganizationID ??
+      value.organization_id,
+  );
+}
+
+async function loadActiveBillingState(
+  gatewayURL: string,
+  signal: AbortSignal,
+): Promise<ActiveBillingState | null> {
+  const baseURL = gatewayURL.replace(/\/$/, "");
+
+  const authResponse = await fetch(`${baseURL}/auth/me`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    signal,
+  });
+  if (authResponse.status === 401) {
+    return null;
+  }
+  if (!authResponse.ok) {
+    throw new Error("auth unavailable");
+  }
+
+  const membershipsResponse = await fetch(`${baseURL}/organizations/me`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    signal,
+  });
+  if (!membershipsResponse.ok) {
+    throw new Error("organizations unavailable");
+  }
+
+  const membershipsPayload = unwrapGatewayPayload(await parseJSON(membershipsResponse));
+  const memberships = Array.isArray(membershipsPayload) ? membershipsPayload : [];
+  const organizationId = memberships.map(readOrganizationId).find(Boolean) ?? "";
+  if (!organizationId) {
+    return null;
+  }
+
+  const quotaResponse = await fetch(`${baseURL}/billing/quotas/${organizationId}`, {
+    method: "GET",
+    credentials: "include",
+    cache: "no-store",
+    headers: {
+      Accept: "application/json",
+      "X-Organization-ID": organizationId,
+    },
+    signal,
+  });
+  if (!quotaResponse.ok) {
+    throw new Error("billing unavailable");
+  }
+
+  const quotaPayload = unwrapGatewayPayload(await parseJSON(quotaResponse));
+  const payload = isRecord(quotaPayload) ? quotaPayload : {};
+
+  return {
+    organizationId,
+    plan: normalizePlanCode(payload.plan),
+    isPaid: payload.is_paid === true,
+    subscriptionStatus: getString(payload.subscription_status),
+  };
+}
 
 function formatPlanLabel(plan: string) {
   return plan
@@ -83,12 +204,35 @@ export function PricingSectionClient({
     useState<BillingCycle>("monthly");
   const [busyPlan, setBusyPlan] = useState("");
   const [checkoutError, setCheckoutError] = useState("");
+  const [activeBilling, setActiveBilling] = useState<ActiveBillingState | null>(null);
   const didAutoStartCheckout = useRef(false);
 
   const gatewayURL =
     process.env.NEXT_PUBLIC_API_GATEWAY_URL ?? "http://localhost:50000";
   const appURL =
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004";
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+
+    void loadActiveBillingState(gatewayURL, controller.signal)
+      .then((value) => {
+        if (active) {
+          setActiveBilling(value);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setActiveBilling(null);
+        }
+      });
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [gatewayURL]);
 
   async function handlePlanAction(plan: string, cycle: BillingCycle = billingCycle) {
     if (busyPlan) return;
@@ -112,21 +256,76 @@ export function PricingSectionClient({
     }
   }
 
+  async function handleManageSubscription() {
+    if (busyPlan || !activeBilling?.organizationId) return;
+
+    setBusyPlan(activeBilling.organizationId);
+    setCheckoutError("");
+
+    try {
+      await startCustomerPortal({
+        gatewayURL,
+        locale,
+        origin: window.location.origin,
+        organizationId: activeBilling.organizationId,
+      });
+    } catch (error) {
+      console.error("[Pricing] customer portal failed", error);
+      setCheckoutError(copy.portalError);
+      setBusyPlan("");
+    }
+  }
+
   useEffect(() => {
     if (didAutoStartCheckout.current || typeof window === "undefined") return;
 
     const params = new URLSearchParams(window.location.search);
-    if (params.get("checkout") === "cancel") return;
+    const cleanURL = new URL(window.location.href);
+    let shouldCleanURL = false;
+
+    if (params.get("checkout") === "cancel") {
+      cleanURL.searchParams.delete("checkout");
+      cleanURL.searchParams.delete("checkout_plan");
+      cleanURL.searchParams.delete("billing_cycle");
+      cleanURL.hash = "pricing";
+      window.history.replaceState({}, "", cleanURL.toString());
+      return;
+    }
 
     const requestedPlan = params.get("checkout_plan")?.trim() ?? "";
     const requestedCycle = params.get("billing_cycle") === "annual" ? "annual" : "monthly";
     const isAvailablePlan = pricing.plans.some((plan) => plan.id === requestedPlan);
-    if (!requestedPlan || !isAvailablePlan) return;
+    if (requestedPlan && isAvailablePlan) {
+      didAutoStartCheckout.current = true;
+      setBillingCycle(requestedCycle);
+      cleanURL.searchParams.delete("checkout_plan");
+      cleanURL.searchParams.delete("billing_cycle");
+      cleanURL.hash = "pricing";
+      shouldCleanURL = true;
+      if (shouldCleanURL) {
+        window.history.replaceState({}, "", cleanURL.toString());
+      }
+      void handlePlanAction(requestedPlan, requestedCycle);
+      return;
+    }
+
+    const storedIntent = consumeCheckoutIntent();
+    const isStoredPlanAvailable = storedIntent
+      ? pricing.plans.some((plan) => plan.id === storedIntent.plan)
+      : false;
+    if (!storedIntent || !isStoredPlanAvailable) return;
 
     didAutoStartCheckout.current = true;
-    setBillingCycle(requestedCycle);
-    void handlePlanAction(requestedPlan, requestedCycle);
+    setBillingCycle(storedIntent.billingCycle);
+    void handlePlanAction(storedIntent.plan, storedIntent.billingCycle);
   }, [pricing.plans]);
+
+  const activePlanId =
+    activeBilling?.isPaid === true ? normalizePlanCode(activeBilling.plan) : "";
+  const activePlanName =
+    pricing.plans.find((plan) => plan.id === activePlanId)?.publicName ??
+    (activePlanId ? formatPlanLabel(activePlanId) : "");
+  const hasActivePaidPlan = activePlanId !== "";
 
   const planTemplates = useMemo<Record<string, PlanTemplate>>(
     () => ({
@@ -244,6 +443,12 @@ export function PricingSectionClient({
                 : "Tarifs par défaut affichés temporairement."}
             </p>
 
+            {hasActivePaidPlan ? (
+              <p className="mt-1 text-sm text-foreground">
+                {copy.currentPlanPrefix} {activePlanName}
+              </p>
+            ) : null}
+
             {busyPlan ? (
               <p className="mt-1 text-sm text-primary">{copy.checkoutLoading}</p>
             ) : checkoutError ? (
@@ -286,6 +491,7 @@ export function PricingSectionClient({
             const template = planTemplates[plan.id];
             const isCustom = plan.monthlyPrice === null;
             const popular = plan.popular || template?.popular;
+            const isCurrentPlan = hasActivePaidPlan && plan.id === activePlanId;
             const name =
               template?.name ?? plan.publicName ?? formatPlanLabel(plan.id);
 
@@ -307,6 +513,13 @@ export function PricingSectionClient({
             const annualBillingText = getAnnualBillingText(
               plan.annualMonthlyPrice,
             );
+            const ctaLabel = isCurrentPlan
+              ? copy.manageSubscription
+              : plan.id === "enterprise"
+                ? (template?.cta ?? t("dynamic.cta", { plan: name }))
+                : hasActivePaidPlan
+                  ? `${copy.switchPlanPrefix} ${name}`
+                  : (template?.cta ?? t("dynamic.cta", { plan: name }));
 
             return (
               <div
@@ -320,6 +533,12 @@ export function PricingSectionClient({
                 {popular ? (
                   <span className="absolute -top-3 left-8 bg-primary px-3 py-1 font-mono text-xs uppercase text-primary-foreground">
                     {t("mostPopular")}
+                  </span>
+                ) : null}
+
+                {isCurrentPlan ? (
+                  <span className="absolute right-8 top-8 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                    {copy.currentPlan}
                   </span>
                 ) : null}
 
@@ -389,15 +608,21 @@ export function PricingSectionClient({
 
                 <Button
                   className={`group flex w-full items-center justify-center gap-2 rounded-full py-4 text-sm font-medium transition-all ${
-                    popular
+                    isCurrentPlan
+                      ? "border border-primary/20 bg-primary/10 text-primary hover:bg-primary/15"
+                      : popular
                       ? "bg-primary text-primary-foreground hover:bg-primary/90"
                       : "border border-foreground/20 bg-transparent text-foreground hover:border-primary hover:bg-primary/5"
                   }`}
                   disabled={busyPlan !== ""}
-                  onClick={() => void handlePlanAction(plan.id)}
+                  onClick={() =>
+                    void (isCurrentPlan
+                      ? handleManageSubscription()
+                      : handlePlanAction(plan.id))
+                  }
                   type="button"
                 >
-                  {template?.cta ?? t("dynamic.cta", { plan: name })}
+                  {ctaLabel}
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </Button>
               </div>

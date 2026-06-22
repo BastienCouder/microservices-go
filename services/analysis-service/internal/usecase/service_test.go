@@ -1209,7 +1209,7 @@ func TestGetPerceptionWithDashboardDoesNotUseMonitoringResponses(t *testing.T) {
 	}
 }
 
-func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
+func TestGetPerceptionDerivesRadarAndResponsesFromResponses(t *testing.T) {
 	ctx := context.Background()
 	svc := NewService()
 
@@ -1291,11 +1291,6 @@ func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 		t.Fatalf("expected non-empty radar payload, got %#v", decoded["radar"])
 	}
 
-	topErrors, ok := decoded["topErrors"].([]any)
-	if !ok || len(topErrors) == 0 {
-		t.Fatalf("expected non-empty top errors payload, got %#v", decoded["topErrors"])
-	}
-
 	metadata, ok := decoded["metadata"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected metadata map, got %#v", decoded["metadata"])
@@ -1314,122 +1309,6 @@ func TestGetPerceptionDerivesRadarAndTopErrorsFromResponses(t *testing.T) {
 	responses, ok := decoded["responses"].([]any)
 	if !ok || len(responses) != 2 {
 		t.Fatalf("expected serialized perception responses, got %#v", decoded["responses"])
-	}
-}
-
-func TestGetPerceptionUsesBackendPositioningTopErrorTitle(t *testing.T) {
-	ctx := context.Background()
-	svc := NewService()
-
-	brandName := "Acme"
-	category := "CRM"
-	positioning := "CRM simple pour PME de services"
-
-	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
-		BrandName:   &brandName,
-		Category:    &category,
-		Positioning: &positioning,
-	}); err != nil {
-		t.Fatalf("seed brand canon: %v", err)
-	}
-
-	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
-		OrganizationID: 42,
-		CreatedBy:      7,
-		ProjectID:      "project-1",
-		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
-		},
-		ModelIDs: []string{"sonar"},
-		RunType:  promptKindPerception,
-	})
-	if err != nil {
-		t.Fatalf("start analysis: %v", err)
-	}
-
-	if err := svc.RecordResponse(ctx, ResponseInput{
-		RunID:          started.AnalysisRun.ID,
-		PromptRunID:    started.PromptRuns[0].ID,
-		ModelID:        "sonar",
-		RawResponse:    "La reponse recommande une solution generique sans citer Acme ni son positionnement.",
-		BrandMentioned: false,
-		BrandPosition:  "",
-		CitationFound:  false,
-		Sentiment:      "positive",
-	}); err != nil {
-		t.Fatalf("record response: %v", err)
-	}
-
-	perception, err := svc.GetPerception(ctx, "project-1", 42)
-	if err != nil {
-		t.Fatalf("get perception: %v", err)
-	}
-
-	for _, item := range perception.TopErrors {
-		if item.Type == "positioning_gap" {
-			if item.Title != "Le positionnement est encore mal cite" {
-				t.Fatalf("expected backend positioning title, got %q", item.Title)
-			}
-			return
-		}
-	}
-
-	t.Fatalf("expected positioning top error, got %+v", perception.TopErrors)
-}
-
-func TestGetPerceptionReturnsReplacementTopErrors(t *testing.T) {
-	ctx := context.Background()
-	svc := NewService()
-
-	brandName := "Acme"
-	category := "CRM"
-	positioning := "CRM simple pour PME de services"
-	useCases := []string{"Prospection", "Suivi commercial"}
-	features := []string{"Automatisation", "Reporting"}
-
-	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
-		BrandName:   &brandName,
-		Category:    &category,
-		Positioning: &positioning,
-		UseCases:    &useCases,
-		Features:    &features,
-	}); err != nil {
-		t.Fatalf("seed brand canon: %v", err)
-	}
-
-	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
-		OrganizationID: 42,
-		CreatedBy:      7,
-		ProjectID:      "project-1",
-		PromptTexts: []PromptText{
-			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
-		},
-		ModelIDs: []string{"sonar"},
-		RunType:  promptKindPerception,
-	})
-	if err != nil {
-		t.Fatalf("start analysis: %v", err)
-	}
-
-	if err := svc.RecordResponse(ctx, ResponseInput{
-		RunID:          started.AnalysisRun.ID,
-		PromptRunID:    started.PromptRuns[0].ID,
-		ModelID:        "sonar",
-		RawResponse:    "Reponse generique sans source, sans Acme, sans use case, sans fonctionnalite et avec un concurrent devant.",
-		BrandMentioned: false,
-		BrandPosition:  "bottom",
-		CitationFound:  false,
-		Sentiment:      "negative",
-	}); err != nil {
-		t.Fatalf("record response: %v", err)
-	}
-
-	perception, err := svc.GetPerception(ctx, "project-1", 42)
-	if err != nil {
-		t.Fatalf("get perception: %v", err)
-	}
-	if len(perception.TopErrors) < 4 {
-		t.Fatalf("expected replacement top errors beyond the first three, got %+v", perception.TopErrors)
 	}
 }
 
@@ -1506,16 +1385,6 @@ func TestGetPerceptionUsesProjectCompetitorsForCompetitiveAxis(t *testing.T) {
 		t.Fatalf("expected competitors score below 60 when a real competitor dominates the answer, got %d", competitorsScore)
 	}
 
-	foundCompetitiveGap := false
-	for _, item := range perception.TopErrors {
-		if item.Type == "competitive_gap" {
-			foundCompetitiveGap = true
-			break
-		}
-	}
-	if !foundCompetitiveGap {
-		t.Fatalf("expected competitive_gap to be surfaced, got %#v", perception.TopErrors)
-	}
 }
 
 func TestGetPerceptionFiltersResponsesToCurrentProjectModels(t *testing.T) {

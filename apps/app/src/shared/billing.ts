@@ -33,6 +33,11 @@ export type BillingSubscriptionUpdateInput = {
   seats: number;
 };
 
+export type ConfirmStripeCheckoutSessionInput = {
+  organizationId: string;
+  sessionId: string;
+};
+
 export type BillingPlanSettings = {
   plan: BillingPlanCode;
   monthlyPriceCents: number;
@@ -305,6 +310,41 @@ export async function updateBillingSubscription(
 
   if (!result.ok) {
     throw toGatewayError(result, "Impossible de mettre a jour l'abonnement.");
+  }
+}
+
+export async function confirmStripeCheckoutSession(
+  apiBaseURL: string,
+  input: ConfirmStripeCheckoutSessionInput,
+): Promise<void> {
+  const resolvedOrganizationId = await resolveBillingOrganizationId(
+    apiBaseURL,
+    input.organizationId,
+  );
+  const organizationID = Number.parseInt(resolvedOrganizationId, 10);
+  if (!Number.isFinite(organizationID) || organizationID <= 0) {
+    throw new Error("Organisation invalide.");
+  }
+  const sessionID = input.sessionId.trim();
+  if (sessionID === "") {
+    throw new Error("Session Stripe invalide.");
+  }
+
+  const result = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.billing.stripeCheckoutSessionConfirm(),
+    {
+      method: "POST",
+      organizationId: resolvedOrganizationId,
+      body: JSON.stringify({
+        organization_id: organizationID,
+        session_id: sessionID,
+      }),
+    },
+  );
+
+  if (!result.ok) {
+    throw toGatewayError(result, "Impossible de confirmer le paiement Stripe.");
   }
 }
 

@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { getPromptsWorkspaceLoadingState } from "./use-prompts-responses-state";
+import {
+  getPromptsWorkspaceLoadingState,
+  readPromptsWorkspaceTab,
+} from "./use-prompts-responses-state";
 
 describe("getPromptsWorkspaceLoadingState", () => {
   test("uses data skeletons for initial monitoring or prompt catalog loading", () => {
@@ -41,5 +44,11 @@ describe("getPromptsWorkspaceLoadingState", () => {
       responsesDataLoading: false,
       promptsBusy: true,
     });
+  });
+
+  test("reads the prompts workspace tab from the route search", () => {
+    expect(readPromptsWorkspaceTab("?project=fury-defendu&tab=responses")).toBe("responses");
+    expect(readPromptsWorkspaceTab("?project=fury-defendu&tab=prompts")).toBe("prompts");
+    expect(readPromptsWorkspaceTab("?project=fury-defendu")).toBe("prompts");
   });
 });

@@ -25,39 +25,15 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
+	perceptionErrors := derivePerceptionOptimizationErrors(perception)
 
 	crawlerErrors, err := s.listCrawlerOptimizationErrors(ctx, projectID, organizationID)
 	if err != nil {
 		return OptimizationErrorBoard{}, err
 	}
 
-	errors := make([]OptimizationError, 0, len(perception.TopErrors)+len(crawlerErrors))
-	perceptionCount := 0
-	for _, item := range perception.TopErrors {
-		perceptionCount++
-		severity := normalizeOptimizationSeverity(item.Severity)
-		if severity == "low" && item.OptimizePriority != "" {
-			severity = normalizeOptimizationSeverity(item.OptimizePriority)
-		}
-		errors = append(errors, OptimizationError{
-			ID:                  "perception:" + item.ID,
-			Source:              "perception",
-			Severity:            severity,
-			Title:               strings.TrimSpace(item.Title),
-			TitleKey:            strings.TrimSpace(item.TitleKey),
-			Issue:               strings.TrimSpace(item.Issue),
-			IssueKey:            strings.TrimSpace(item.IssueKey),
-			Impact:              strings.TrimSpace(item.Impact),
-			ImpactKey:           strings.TrimSpace(item.ImpactKey),
-			Type:                strings.TrimSpace(item.Type),
-			FixType:             strings.TrimSpace(item.FixType),
-			OptimizePriority:    strings.TrimSpace(item.OptimizePriority),
-			DetectedInModels:    append([]string(nil), item.DetectedInModels...),
-			GeneratedContent:    strings.TrimSpace(item.GeneratedContent),
-			GeneratedContentKey: strings.TrimSpace(item.GeneratedContentKey),
-			TranslationParams:   copyMetadata(item.TranslationParams),
-		})
-	}
+	errors := make([]OptimizationError, 0, len(perceptionErrors)+len(crawlerErrors))
+	errors = append(errors, perceptionErrors...)
 	errors = append(errors, crawlerErrors...)
 
 	sort.SliceStable(errors, func(i, j int) bool {
@@ -81,11 +57,196 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			"totalErrors":             len(errors),
 			"monitoringErrors":        0,
 			"monitoringDerivedErrors": 0,
-			"perceptionErrors":        perceptionCount,
+			"perceptionErrors":        len(perceptionErrors),
 			"crawlerErrors":           len(crawlerErrors),
 			"analyzedResponses":       perception.Metadata["analyzedResponses"],
 		},
 	}, nil
+}
+
+func derivePerceptionOptimizationErrors(perception PerceptionData) []OptimizationError {
+	if !isPerceptionBrandContextReady(perception.BrandCanon) {
+		return nil
+	}
+
+	type candidate struct {
+		errorType           string
+		score               int
+		axis                string
+		title               string
+		titleKey            string
+		issue               string
+		issueKey            string
+		impact              string
+		impactKey           string
+		fixType             string
+		generatedContent    string
+		generatedContentKey string
+		translationParams   map[string]any
+	}
+
+	brandLabel := strings.TrimSpace(perception.BrandCanon.BrandName)
+	if brandLabel == "" {
+		brandLabel = "la marque"
+	}
+
+	radarByAxis := make(map[string]int, len(perception.Radar))
+	for _, point := range perception.Radar {
+		radarByAxis[point.Axis] = point.Score
+	}
+
+	metricsByModel := make(map[string][]perceptionResponseMetrics)
+	for _, response := range perception.Responses {
+		if response.Metrics == nil {
+			continue
+		}
+		modelID := strings.TrimSpace(response.ModelID)
+		if modelID == "" {
+			continue
+		}
+		metricsByModel[modelID] = append(metricsByModel[modelID], perceptionResponseMetrics{
+			positioning: response.Metrics.Positioning,
+			factual:     response.Metrics.Factual,
+			useCases:    response.Metrics.UseCases,
+			features:    response.Metrics.Features,
+			sentiment:   response.Metrics.Sentiment,
+			competitors: response.Metrics.Competitors,
+		})
+	}
+
+	candidates := []candidate{
+		{
+			errorType:           "positioning_gap",
+			score:               perception.Scores.PositioningAccuracy,
+			axis:                "positioning",
+			title:               "Le positionnement est encore mal cite",
+			titleKey:            "perceptionGeneratedPositioningTitle",
+			issue:               brandLabel + " n'est pas encore rattache de maniere fiable a son positionnement dans toutes les reponses.",
+			issueKey:            "perceptionGeneratedPositioningIssue",
+			impact:              "La marque peut etre oubliee ou mal classee sur les requetes de consideration.",
+			impactKey:           "perceptionGeneratedPositioningImpact",
+			fixType:             "website_copy",
+			generatedContent:    "Clarifier la proposition de valeur, la categorie et les scenarios cibles dans les pages d'entree et les FAQ.",
+			generatedContentKey: "generatedContentPerceptionPositioningGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": perception.Scores.PositioningAccuracy,
+			},
+		},
+		{
+			errorType:           "citation_gap",
+			score:               perception.Scores.FactualAccuracy,
+			axis:                "features",
+			title:               "Factualite encore fragile",
+			titleKey:            "perceptionGeneratedCitationTitle",
+			issue:               "Les reponses s'appuient encore trop peu sur des sources citees ou des preuves facilement reutilisables.",
+			issueKey:            "perceptionGeneratedCitationIssue",
+			impact:              "La fiabilite percue de la marque baisse dans les syntheses IA.",
+			impactKey:           "perceptionGeneratedCitationImpact",
+			fixType:             "faq_snippet",
+			generatedContent:    "Ajouter des preuves, chiffres, FAQ et contenus de reference directement citables sur les points cles.",
+			generatedContentKey: "generatedContentPerceptionCitationGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": perception.Scores.FactualAccuracy,
+			},
+		},
+		{
+			errorType:           "use_case_gap",
+			score:               radarByAxis["use_cases"],
+			axis:                "use_cases",
+			title:               "Cas d'usage encore incomplets",
+			titleKey:            "perceptionGeneratedUseCaseTitle",
+			issue:               "Les cas d'usage definis dans le brand canon ne ressortent pas assez souvent dans les reponses.",
+			issueKey:            "perceptionGeneratedUseCaseIssue",
+			impact:              "Les IA ne relient pas encore assez la marque aux besoins cibles.",
+			impactKey:           "perceptionGeneratedUseCaseImpact",
+			fixType:             "website_copy",
+			generatedContent:    "Rendre les use cases prioritaires plus visibles dans la navigation, les hero sections et les pages de comparaison.",
+			generatedContentKey: "generatedContentPerceptionUseCaseGap",
+			translationParams: map[string]any{
+				"brand": brandLabel,
+				"score": radarByAxis["use_cases"],
+			},
+		},
+		{
+			errorType:           "sentiment_gap",
+			score:               perception.Scores.SentimentScore,
+			axis:                "sentiment",
+			title:               "Tonalite encore trop neutre",
+			titleKey:            "perceptionGeneratedSentimentTitle",
+			issue:               "Les reponses restent encore trop neutres ou mitigees quand elles parlent de la marque.",
+			issueKey:            "perceptionGeneratedSentimentIssue",
+			impact:              "La desirabilite de la marque baisse dans les recommandations IA.",
+			impactKey:           "perceptionGeneratedSentimentImpact",
+			fixType:             "prompt_patch",
+			generatedContent:    "Renforcer les preuves de valeur, resultats clients et differentiants dans les contenus sources.",
+			generatedContentKey: "generatedContentPerceptionSentimentGap",
+			translationParams: map[string]any{
+				"score": perception.Scores.SentimentScore,
+			},
+		},
+		{
+			errorType:           "competitive_gap",
+			score:               radarByAxis["competitors"],
+			axis:                "competitors",
+			title:               "Lecture concurrentielle encore faible",
+			titleKey:            "perceptionGeneratedCompetitiveTitle",
+			issue:               "Le positionnement competitif reste variable selon les modeles et les prompts.",
+			issueKey:            "perceptionGeneratedCompetitiveIssue",
+			impact:              "La marque peut perdre des comparatifs ou apparaitre derriere des alternatives.",
+			impactKey:           "perceptionGeneratedCompetitiveImpact",
+			fixType:             "schema_update",
+			generatedContent:    "Ajouter des comparatifs, tableaux de differenciation et contenus de preuve contre les alternatives majeures.",
+			generatedContentKey: "generatedContentPerceptionCompetitiveGap",
+			translationParams: map[string]any{
+				"score": radarByAxis["competitors"],
+			},
+		},
+	}
+
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].score < candidates[j].score
+	})
+
+	errors := make([]OptimizationError, 0, len(candidates))
+	for _, item := range candidates {
+		if item.score >= 90 {
+			continue
+		}
+
+		severity := "low"
+		priority := "low"
+		switch {
+		case item.score < 50:
+			severity = "high"
+			priority = "high"
+		case item.score < 75:
+			severity = "medium"
+			priority = "medium"
+		}
+
+		errors = append(errors, OptimizationError{
+			ID:                  "perception:" + item.errorType,
+			Source:              "perception",
+			Severity:            severity,
+			Title:               item.title,
+			TitleKey:            item.titleKey,
+			Issue:               item.issue,
+			IssueKey:            item.issueKey,
+			Impact:              item.impact,
+			ImpactKey:           item.impactKey,
+			Type:                item.errorType,
+			FixType:             item.fixType,
+			OptimizePriority:    priority,
+			DetectedInModels:    lowScoringPerceptionModels(metricsByModel, item.axis),
+			GeneratedContent:    item.generatedContent,
+			GeneratedContentKey: item.generatedContentKey,
+			TranslationParams:   item.translationParams,
+		})
+	}
+
+	return errors
 }
 
 func filterNonPerceptionResponses(responses []AIResponse) []AIResponse {
@@ -109,7 +270,7 @@ type monitoringModelStats struct {
 	negative  int
 }
 
-func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
+func deriveMonitoringOptimizationErrors(responses []AIResponse) []OptimizationError {
 	if len(responses) == 0 {
 		return nil
 	}
@@ -175,9 +336,9 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Title:               "La marque ressort trop peu dans les prompts suivis",
 			TitleKey:            "errorTypeMonitoringVisibilityGap",
 			Issue:               "Le taux de mention reste insuffisant sur les requetes monitoring prioritaires.",
-			IssueKey:            "topErrorsMonitoringVisibilityIssue",
+			IssueKey:            "monitoringVisibilityIssue",
 			Impact:              "La marque risque d'etre absente des recommandations IA sur les moments d'intention cle.",
-			ImpactKey:           "topErrorsMonitoringVisibilityImpact",
+			ImpactKey:           "monitoringVisibilityImpact",
 			Type:                "monitoring_visibility_gap",
 			FixType:             "prompt_patch",
 			OptimizePriority:    severity,
@@ -200,9 +361,9 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Title:               "La marque est mentionnee mais manque de sources citees",
 			TitleKey:            "errorTypeMonitoringCitationGap",
 			Issue:               "Les IA citent encore trop rarement des preuves ou URLs fiables quand elles parlent de la marque.",
-			IssueKey:            "topErrorsMonitoringCitationIssue",
+			IssueKey:            "monitoringCitationIssue",
 			Impact:              "La credibilite de la marque reste fragile dans les reponses et comparatifs IA.",
-			ImpactKey:           "topErrorsMonitoringCitationImpact",
+			ImpactKey:           "monitoringCitationImpact",
 			Type:                "monitoring_citation_gap",
 			FixType:             "faq_snippet",
 			OptimizePriority:    severity,
@@ -225,9 +386,9 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Title:               "La marque perd les positions hautes sur les prompts suivis",
 			TitleKey:            "errorTypeMonitoringRankingGap",
 			Issue:               "Les reponses mentionnent la marque mais la placent trop rarement en tete et trop souvent en bas de classement.",
-			IssueKey:            "topErrorsMonitoringRankingIssue",
+			IssueKey:            "monitoringRankingIssue",
 			Impact:              "La visibilite IA devient moins competitive sur les prompts a forte intention.",
-			ImpactKey:           "topErrorsMonitoringRankingImpact",
+			ImpactKey:           "monitoringRankingImpact",
 			Type:                "monitoring_ranking_gap",
 			FixType:             "website_copy",
 			OptimizePriority:    severity,
@@ -250,9 +411,9 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Title:               "La tonalite des reponses devient trop negative",
 			TitleKey:            "errorTypeMonitoringNegativeShift",
 			Issue:               "Une part trop importante des reponses monitoring parle de la marque avec une tonalite negative.",
-			IssueKey:            "topErrorsMonitoringNegativeShiftIssue",
+			IssueKey:            "monitoringNegativeShiftIssue",
 			Impact:              "La desirabilite et la confiance baissent dans les recommandations et comparatifs IA.",
-			ImpactKey:           "topErrorsMonitoringNegativeShiftImpact",
+			ImpactKey:           "monitoringNegativeShiftImpact",
 			Type:                "monitoring_negative_shift",
 			FixType:             "website_copy",
 			OptimizePriority:    severity,
@@ -271,9 +432,9 @@ func deriveMonitoringTopErrors(responses []AIResponse) []OptimizationError {
 			Title:               "Les modeles racontent des histoires trop differentes sur la marque",
 			TitleKey:            "errorTypeMonitoringModelVolatility",
 			Issue:               "Les performances monitoring varient fortement d'un modele a l'autre, signe d'un positionnement encore instable.",
-			IssueKey:            "topErrorsMonitoringModelVolatilityIssue",
+			IssueKey:            "monitoringModelVolatilityIssue",
 			Impact:              "La marque peut sembler forte sur certains assistants et faible sur d'autres, ce qui reduit la coherence globale.",
-			ImpactKey:           "topErrorsMonitoringModelVolatilityImpact",
+			ImpactKey:           "monitoringModelVolatilityImpact",
 			Type:                "monitoring_model_volatility",
 			FixType:             "prompt_patch",
 			OptimizePriority:    "medium",

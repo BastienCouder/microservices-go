@@ -108,6 +108,7 @@ export const apiRoutes = {
     publicPricingTiers: () => "/billing/public/pricing-tiers",
     subscriptions: () => "/billing/subscriptions",
     stripeCheckoutSession: () => "/billing/stripe/checkout-session",
+    stripeCheckoutSessionConfirm: () => "/billing/stripe/checkout-session/confirm",
     stripePricingCatalogSync: (plan: string) =>
       `/billing/stripe/pricing-catalog/plans/${encodeURIComponent(plan)}/sync`,
   },

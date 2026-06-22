@@ -52,13 +52,7 @@ func (s *Service) EnableInvitationUserEmailValidation(resolver UserEmailResolver
 }
 
 func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIdentityID int64) (*domain.Organization, error) {
-	publicID, err := generateOrganizationPublicID()
-	if err != nil {
-		return nil, fmt.Errorf("generate organization public id: %w", err)
-	}
-
 	org := &domain.Organization{
-		PublicID:        publicID,
 		Name:            strings.TrimSpace(name),
 		OwnerIdentityID: ownerIdentityID,
 		CreatedAt:       s.now().UTC(),
@@ -66,6 +60,15 @@ func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIden
 	if err := org.Validate(); err != nil {
 		return nil, err
 	}
+	if err := s.ensureOwnerCanCreateOrganization(ctx, ownerIdentityID); err != nil {
+		return nil, err
+	}
+
+	publicID, err := generateOrganizationPublicID()
+	if err != nil {
+		return nil, fmt.Errorf("generate organization public id: %w", err)
+	}
+	org.PublicID = publicID
 
 	if err := s.repo.Create(ctx, org); err != nil {
 		return nil, fmt.Errorf("create organization: %w", err)
@@ -78,6 +81,24 @@ func (s *Service) CreateOrganization(ctx context.Context, name string, ownerIden
 	}
 
 	return org, nil
+}
+
+func (s *Service) ensureOwnerCanCreateOrganization(ctx context.Context, ownerIdentityID int64) error {
+	organizations, err := s.repo.List(ctx)
+	if err != nil {
+		return fmt.Errorf("list organizations: %w", err)
+	}
+
+	for _, organization := range organizations {
+		if organization.DeletedAt != nil {
+			continue
+		}
+		if organization.OwnerIdentityID == ownerIdentityID {
+			return domain.ErrOwnerAlreadyHasOrganization
+		}
+	}
+
+	return nil
 }
 
 func (s *Service) GetOrganization(ctx context.Context, id int64) (*domain.Organization, error) {

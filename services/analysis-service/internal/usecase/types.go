@@ -138,28 +138,9 @@ type PerceptionRadarPoint struct {
 	Target int    `json:"target"`
 }
 
-type PerceptionError struct {
-	ID                  string         `json:"id"`
-	Severity            string         `json:"severity"`
-	Title               string         `json:"title"`
-	TitleKey            string         `json:"titleKey,omitempty"`
-	Issue               string         `json:"issue"`
-	IssueKey            string         `json:"issueKey,omitempty"`
-	Impact              string         `json:"impact"`
-	ImpactKey           string         `json:"impactKey,omitempty"`
-	DetectedInModels    []string       `json:"detectedInModels"`
-	FixType             string         `json:"fixType"`
-	GeneratedContent    string         `json:"generatedContent"`
-	GeneratedContentKey string         `json:"generatedContentKey,omitempty"`
-	TranslationParams   map[string]any `json:"translationParams,omitempty"`
-	OptimizePriority    string         `json:"optimizePriority"`
-	Type                string         `json:"type"`
-}
-
 type PerceptionData struct {
 	Scores     PerceptionScores       `json:"scores"`
 	Radar      []PerceptionRadarPoint `json:"radar"`
-	TopErrors  []PerceptionError      `json:"topErrors"`
 	BrandCanon BrandCanon             `json:"brandCanon"`
 	Responses  []AIResponse           `json:"responses"`
 	Metadata   map[string]any         `json:"metadata"`

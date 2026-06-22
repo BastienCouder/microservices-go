@@ -35,8 +35,10 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /billing/credit-cost-settings", h.updateCreditCostSettings)
 	mux.HandleFunc("DELETE /billing/pricing-tiers/{prompt_volume}", h.deletePricingTier)
 	mux.HandleFunc("POST /billing/subscriptions", h.upsertSubscription)
+	mux.HandleFunc("POST /billing/subscriptions/cancel", h.cancelSubscription)
 	mux.HandleFunc("GET /billing/quotas/", h.getQuota)
 	mux.HandleFunc("POST /billing/stripe/checkout-session", h.createStripeCheckoutSession)
+	mux.HandleFunc("POST /billing/stripe/checkout-session/confirm", h.confirmStripeCheckoutSession)
 	mux.HandleFunc("POST /billing/stripe/customer-portal", h.createStripeCustomerPortalSession)
 	mux.HandleFunc("POST /billing/stripe/pricing-catalog/plans/{plan}/sync", h.syncStripePricingCatalog)
 	mux.HandleFunc("POST /billing/stripe/webhook", h.handleStripeWebhook)
@@ -112,6 +114,11 @@ type createStripeCustomerPortalSessionRequest struct {
 	OrganizationID int64  `json:"organization_id"`
 	ReturnURL      string `json:"return_url"`
 	RequestID      string `json:"request_id"`
+}
+
+type confirmStripeCheckoutSessionRequest struct {
+	OrganizationID int64  `json:"organization_id"`
+	SessionID      string `json:"session_id"`
 }
 
 var (
@@ -298,6 +305,36 @@ func (h *Handler) upsertSubscription(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, sub)
 }
 
+func (h *Handler) cancelSubscription(w http.ResponseWriter, r *http.Request) {
+	organizationID, err := scopedOrganizationID(r, 0)
+	if err != nil {
+		switch {
+		case errors.Is(err, errMissingOrganizationScope):
+			httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		case errors.Is(err, errInvalidOrganizationScope):
+			httpjson.WriteValidationError(w)
+		default:
+			httpjson.WriteForbiddenError(w)
+		}
+		return
+	}
+
+	if err := h.svc.CancelOrganizationSubscription(r.Context(), organizationID); err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrStripeDisabled):
+			httpjson.WriteError(w, http.StatusServiceUnavailable, "stripe unavailable")
+		case errors.Is(err, usecase.ErrStripeInvalidRequest),
+			errors.Is(err, domain.ErrInvalidSubscription):
+			httpjson.WriteValidationError(w)
+		default:
+			httpjson.WriteError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) getQuota(w http.ResponseWriter, r *http.Request) {
 	orgIDStr := strings.TrimPrefix(r.URL.Path, "/billing/quotas/")
 	orgID, err := strconv.ParseInt(orgIDStr, 10, 64)
@@ -407,6 +444,45 @@ func (h *Handler) createStripeCustomerPortalSession(w http.ResponseWriter, r *ht
 		case errors.Is(err, usecase.ErrStripeInvalidRequest),
 			errors.Is(err, usecase.ErrStripeCustomerMissing),
 			errors.Is(err, domain.ErrSubscriptionMissing):
+			httpjson.WriteValidationError(w)
+		default:
+			httpjson.WriteError(w, http.StatusInternalServerError, "internal server error")
+		}
+		return
+	}
+
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) confirmStripeCheckoutSession(w http.ResponseWriter, r *http.Request) {
+	var req confirmStripeCheckoutSessionRequest
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
+		return
+	}
+	organizationID, err := scopedOrganizationID(r, req.OrganizationID)
+	if err != nil {
+		switch {
+		case errors.Is(err, errMissingOrganizationScope), errors.Is(err, errInvalidOrganizationScope):
+			httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		case errors.Is(err, errMismatchedOrganizationScope):
+			httpjson.WriteError(w, http.StatusForbidden, "forbidden")
+		default:
+			httpjson.WriteValidationError(w)
+		}
+		return
+	}
+
+	out, err := h.svc.ConfirmStripeCheckoutSession(r.Context(), usecase.ConfirmStripeCheckoutSessionInput{
+		OrganizationID: organizationID,
+		SessionID:      req.SessionID,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, usecase.ErrStripeDisabled):
+			httpjson.WriteError(w, http.StatusServiceUnavailable, "stripe integration is disabled")
+		case errors.Is(err, usecase.ErrStripeInvalidRequest),
+			errors.Is(err, domain.ErrInvalidSubscription):
 			httpjson.WriteValidationError(w)
 		default:
 			httpjson.WriteError(w, http.StatusInternalServerError, "internal server error")

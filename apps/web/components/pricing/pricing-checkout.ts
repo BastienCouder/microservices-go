@@ -1,4 +1,5 @@
 import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
+import { storeAuthReturnTo, storeCheckoutIntent } from "@/src/auth/browser-intent";
 import type { BillingCycle } from "./pricing-types";
 
 type JsonRecord = Record<string, unknown>;
@@ -10,6 +11,13 @@ type CheckoutInput = {
   origin: string;
   plan: string;
   billingCycle: BillingCycle;
+};
+
+type CustomerPortalInput = {
+  gatewayURL: string;
+  locale: Locale;
+  origin: string;
+  organizationId: string;
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -84,19 +92,24 @@ function readGatewayError(payload: unknown, status: number): string {
 function readOrganizationId(value: unknown): string {
   if (!isRecord(value)) return "";
   return getString(
-    value.organizationId ??
-      value.OrganizationID ??
-      value.organization_id ??
-      value.internalId ??
+    value.internalId ??
       value.InternalID ??
       value.id ??
-      value.ID,
+      value.ID ??
+      value.organizationId ??
+      value.OrganizationID ??
+      value.organization_id,
   );
 }
 
 function readCheckoutURL(value: unknown): string {
   if (!isRecord(value)) return "";
   return getString(value.checkout_url ?? value.checkoutURL ?? value.url);
+}
+
+function readPortalURL(value: unknown): string {
+  if (!isRecord(value)) return "";
+  return getString(value.portal_url ?? value.portalURL ?? value.url);
 }
 
 function readUserWorkspaceName(value: unknown): string {
@@ -122,10 +135,10 @@ function getRequestId(): string {
 function buildLoginURL(input: CheckoutInput): string {
   const loginPath = getLocalizedPathname(input.locale, "/login");
   const pricingURL = new URL(getLocalizedPathname(input.locale, "/"), input.origin);
-  pricingURL.searchParams.set("checkout_plan", input.plan);
-  pricingURL.searchParams.set("billing_cycle", input.billingCycle);
   pricingURL.hash = "pricing";
-  return `${input.origin}${loginPath}?return_to=${encodeURIComponent(pricingURL.toString())}`;
+  storeCheckoutIntent(input.plan, input.billingCycle);
+  storeAuthReturnTo(pricingURL.toString());
+  return `${input.origin}${loginPath}`;
 }
 
 async function resolveOrganizationId(input: CheckoutInput, userPayload: unknown): Promise<string> {
@@ -145,6 +158,12 @@ async function resolveOrganizationId(input: CheckoutInput, userPayload: unknown)
     throw new Error("organization missing");
   }
   return createdOrganizationId;
+}
+
+function buildPricingReturnURL(locale: Locale, origin: string): string {
+  const pricingURL = new URL(getLocalizedPathname(locale, "/"), origin);
+  pricingURL.hash = "pricing";
+  return pricingURL.toString();
 }
 
 export async function startPricingCheckout(input: CheckoutInput): Promise<void> {
@@ -167,10 +186,9 @@ export async function startPricingCheckout(input: CheckoutInput): Promise<void> 
   }
 
   const organizationId = await resolveOrganizationId(input, userPayload);
-  const appURL = (input.appURL.trim() || "http://localhost:30004").replace(/\/$/, "");
-  const successURL = new URL("/onboarding", appURL);
-  successURL.searchParams.set("setup", "account");
-  successURL.searchParams.set("checkout", "success");
+  const successURL = new URL(getLocalizedPathname(input.locale, "/checkout/complete"), input.origin);
+  successURL.searchParams.set("organization_id", organizationId);
+  const successURLWithSessionId = `${successURL.toString()}&session_id={CHECKOUT_SESSION_ID}`;
 
   const cancelURL = new URL(getLocalizedPathname(input.locale, "/"), input.origin);
   cancelURL.searchParams.set("checkout", "cancel");
@@ -190,7 +208,7 @@ export async function startPricingCheckout(input: CheckoutInput): Promise<void> 
         billing_cycle: toBackendBillingCycle(input.billingCycle),
         prompt_volume: 0,
         seats: 1,
-        success_url: successURL.toString(),
+        success_url: successURLWithSessionId,
         cancel_url: cancelURL.toString(),
         request_id: getRequestId(),
       }),
@@ -201,4 +219,32 @@ export async function startPricingCheckout(input: CheckoutInput): Promise<void> 
     throw new Error("Stripe checkout URL missing");
   }
   window.location.assign(checkoutURL);
+}
+
+export async function startCustomerPortal(input: CustomerPortalInput): Promise<void> {
+  const organizationId = input.organizationId.trim();
+  if (!organizationId) {
+    throw new Error("organization missing");
+  }
+
+  const portalPayload = await fetchGatewayJSON(
+    input.gatewayURL,
+    "/billing/stripe/customer-portal",
+    {
+      method: "POST",
+      organizationId,
+      body: JSON.stringify({
+        organization_id: Number.parseInt(organizationId, 10),
+        return_url: buildPricingReturnURL(input.locale, input.origin),
+        request_id: getRequestId(),
+      }),
+    },
+  );
+
+  const portalURL = readPortalURL(portalPayload);
+  if (!portalURL) {
+    throw new Error("Stripe portal URL missing");
+  }
+
+  window.location.assign(portalURL);
 }

@@ -14,7 +14,7 @@ import { toSafeImageAssetPath } from "@/lib/safe-asset-path";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import { useLocale, useScopedI18n } from "@/shared/hooks/use-i18n";
 
-import { buildPerceptionModelLookup } from "../../perception/_components/top-errors-panel";
+import { buildPerceptionModelLookup } from "../../perception/_components/optimization-errors-panel";
 import { ErrorHubColumn } from "./error-hub-column";
 import {
   ErrorHubAIBriefModelDialog,
@@ -367,7 +367,7 @@ export function ErrorHubKanban({
         onOpenChange={handleDetailsOpenChange}
         savingErrorIds={savingErrorIds}
         selectedError={selectedError}
-        sheetDescription={t("topErrorsSheetDescription")}
+        sheetDescription={t("optimizationErrorsSheetDescription")}
       />
 
       <ErrorHubAIBriefModelDialog

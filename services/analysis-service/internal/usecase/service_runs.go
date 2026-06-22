@@ -872,7 +872,6 @@ func (s *Service) buildPerceptionFromDashboard(
 	var result PerceptionData
 	result.BrandCanon = brandCanon
 	result.Radar = []PerceptionRadarPoint{}
-	result.TopErrors = []PerceptionError{}
 	result.Responses = []AIResponse{}
 	result.Metadata = map[string]any{
 		"projectId":     projectID,
@@ -910,7 +909,6 @@ func (s *Service) buildPerceptionFromDashboard(
 	metrics := make([]perceptionResponseMetrics, 0, len(responses))
 	responsesWithMetrics := make([]AIResponse, 0, len(responses))
 	modelsSet := make(map[string]struct{}, len(responses))
-	metricsByModel := make(map[string][]perceptionResponseMetrics)
 	for _, response := range responses {
 		responseMetrics := buildPerceptionResponseMetrics(response, brandCanon, competitors)
 		responseMetrics = applyPerceptionReadinessToMetrics(responseMetrics, brandReadiness)
@@ -921,7 +919,6 @@ func (s *Service) buildPerceptionFromDashboard(
 		modelID := strings.TrimSpace(response.ModelID)
 		if modelID != "" {
 			modelsSet[modelID] = struct{}{}
-			metricsByModel[modelID] = append(metricsByModel[modelID], responseMetrics)
 		}
 	}
 
@@ -939,9 +936,6 @@ func (s *Service) buildPerceptionFromDashboard(
 		derivePerceptionRadarFromMetrics(metrics),
 		brandReadiness,
 	)
-	if isPerceptionBrandContextReady(brandCanon) {
-		result.TopErrors = derivePerceptionTopErrors(brandCanon, result.Scores, result.Radar, metricsByModel)
-	}
 	result.Responses = responsesWithMetrics
 	result.Metadata["models"] = models
 	result.Metadata["latestRunId"] = latestResponseRunID(responses)

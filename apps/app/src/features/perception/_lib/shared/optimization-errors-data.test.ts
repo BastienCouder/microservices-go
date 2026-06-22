@@ -5,8 +5,8 @@ const source = await Bun.file(new URL("./optimization-errors-data.ts", import.me
 describe("optimization errors data loader", () => {
   test("uses the backend optimization errors response as the only error source", () => {
     expect(source.includes("loadPerceptionData")).toBe(false);
-    expect(source.includes("derivePerceptionTopErrorsFromResponses")).toBe(false);
-    expect(source.includes("mergePerceptionTopErrorsIntoOptimizationBoard")).toBe(false);
+    expect(source.includes("derivePerceptionOptimizationErrors")).toBe(false);
+    expect(source.includes("mergePerceptionOptimizationErrorsIntoOptimizationBoard")).toBe(false);
     expect(source.includes('"crawler"')).toBe(true);
     expect(source.includes('"alert"')).toBe(true);
     expect(source.includes('"derived"')).toBe(true);

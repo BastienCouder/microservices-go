@@ -982,7 +982,8 @@ func (h *Handler) writeDomainError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrInvitationNotFound):
 		httpjson.WriteNotFoundError(w)
 	case errors.Is(err, domain.ErrInvitationExpired),
-		errors.Is(err, domain.ErrInvitationAlreadyHandled):
+		errors.Is(err, domain.ErrInvitationAlreadyHandled),
+		errors.Is(err, domain.ErrOwnerAlreadyHasOrganization):
 		httpjson.WriteConflictError(w)
 	case errors.Is(err, domain.ErrInvitationEmailMismatch):
 		httpjson.WriteForbiddenError(w)

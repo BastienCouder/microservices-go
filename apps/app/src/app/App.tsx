@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
@@ -14,9 +14,13 @@ import { useAuthSession } from "@/features/session/hooks/use-auth-session";
 import { apiRoutes } from "@/lib/api-config";
 import { appQueryKeys } from "@/lib/query-keys";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
-import { redirectToWebAuth } from "@/shared/auth/web-auth";
-import { loadBillingEntitlements } from "@/shared/billing";
-import { loadUserOrganizationSummaries } from "@/shared/organizations";
+import { redirectToWebAuth, redirectToWebPricing } from "@/shared/auth/web-auth";
+import { confirmStripeCheckoutSession, loadBillingEntitlements } from "@/shared/billing";
+import {
+  isNumericOrganizationId,
+  loadUserOrganizationSummaries,
+  resolveNumericOrganizationIdFromSummaries,
+} from "@/shared/organizations";
 import {
   applyResolvedProjectContextSearch,
   findResolvedProjectContext,
@@ -26,6 +30,7 @@ import {
   clearSelectedContext,
   clearSelectedProjectContext,
   clearProjectContextSearch,
+  buildScopedHref,
   keepProjectOnlyContextSearch,
   readOrganizationIdFromSearch,
   readProjectIdFromSearch,
@@ -40,6 +45,7 @@ import {
 } from "@/shared/selection";
 import { isAnyAdminRoutePath, isSuperAdminRole } from "@/shared/admin-routing";
 import {
+  shouldRedirectAccountOnboardingToBilling,
   shouldRedirectAwayFromAccountOnboarding,
   type BillingAccessState,
   shouldRedirectToBillingGate,
@@ -96,6 +102,24 @@ async function loadAdminBootstrapStatus(
   return { exists: exists === true };
 }
 
+async function findFirstPaidOrganizationId(
+  apiBaseURL: string,
+  organizationIds: string[],
+  signal?: AbortSignal,
+): Promise<string> {
+  for (const organizationId of organizationIds) {
+    try {
+      const entitlements = await loadBillingEntitlements(apiBaseURL, organizationId, { signal });
+      if (entitlements.isPaid) {
+        return organizationId;
+      }
+    } catch {
+      // Keep scanning the user's organizations until we find an active paid org.
+    }
+  }
+  return "";
+}
+
 export default function App() {
   const { t } = useScopedI18n("app-shell");
   const location = useLocation();
@@ -113,6 +137,14 @@ export default function App() {
     const params = new URLSearchParams(location.search);
     return params.get("checkout") === "success";
   }, [location.search]);
+  const checkoutSuccessSessionId = useMemo(() => {
+    if (!isCheckoutSuccessRoute) return "";
+    return new URLSearchParams(location.search).get("session_id")?.trim() ?? "";
+  }, [isCheckoutSuccessRoute, location.search]);
+  const checkoutSuccessOrganizationId = useMemo(() => {
+    if (!isCheckoutSuccessRoute) return "";
+    return new URLSearchParams(location.search).get("organization_id")?.trim() ?? "";
+  }, [isCheckoutSuccessRoute, location.search]);
   const useCompactProjectContext =
     location.pathname === "/organizations" ||
     location.pathname === "/account" ||
@@ -177,12 +209,105 @@ export default function App() {
     () => organizations.map((organization) => organization.id).sort().join(","),
     [organizations],
   );
-  const billingOrganizationId = organizations[0]?.id ?? "";
+  const selectedOrganizationToken = useMemo(
+    () => readSelectedOrganizationPublicID(),
+    [selectionVersion],
+  );
+  const hasHardBillingOrganizationOverride = useMemo(
+    () =>
+      checkoutSuccessOrganizationId.trim() !== "" ||
+      routeOrganizationToken.trim() !== "",
+    [
+      checkoutSuccessOrganizationId,
+      routeOrganizationToken,
+    ],
+  );
+  const hasStoredBillingOrganizationPreference =
+    !hasHardBillingOrganizationOverride && selectedOrganizationToken.trim() !== "";
+  const paidOrganizationFallbackQuery = useQuery({
+    queryKey: ["billing", "paid-organization", apiBaseURL, organizationIdsKey],
+    enabled:
+      shouldCheckBillingGuard &&
+      !hasHardBillingOrganizationOverride &&
+      organizations.length > 1,
+    queryFn: ({ signal }) =>
+      findFirstPaidOrganizationId(
+        apiBaseURL,
+        organizations.map((organization) => organization.id),
+        signal,
+      ),
+    staleTime: 30_000,
+  });
+  const billingOrganizationId = useMemo(() => {
+    const candidates = [
+      checkoutSuccessOrganizationId,
+      routeOrganizationToken,
+      selectedOrganizationToken,
+      paidOrganizationFallbackQuery.data ?? "",
+      !hasHardBillingOrganizationOverride &&
+      (paidOrganizationFallbackQuery.isLoading || paidOrganizationFallbackQuery.isFetching)
+        ? ""
+        : organizations[0]?.id ?? "",
+    ];
+
+    for (const candidate of candidates) {
+      const normalized = candidate.trim();
+      if (!normalized) {
+        continue;
+      }
+      if (isNumericOrganizationId(normalized)) {
+        return normalized;
+      }
+
+      const resolved = resolveNumericOrganizationIdFromSummaries(
+        organizations,
+        normalized,
+      );
+      if (resolved) {
+        return resolved;
+      }
+    }
+
+    return "";
+  }, [
+    checkoutSuccessOrganizationId,
+    hasHardBillingOrganizationOverride,
+    organizations,
+    paidOrganizationFallbackQuery.data,
+    paidOrganizationFallbackQuery.isFetching,
+    paidOrganizationFallbackQuery.isLoading,
+    routeOrganizationToken,
+    selectedOrganizationToken,
+  ]);
+  const checkoutConfirmationOrganizationId =
+    checkoutSuccessOrganizationId || billingOrganizationId;
   const billingEntitlementsQuery = useQuery({
     queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganizationId),
     enabled: shouldCheckBillingGuard && billingOrganizationId !== "",
     queryFn: ({ signal }) =>
       loadBillingEntitlements(apiBaseURL, billingOrganizationId, { signal }),
+  });
+  const stripeCheckoutConfirmationQuery = useQuery({
+    queryKey: [
+      "stripe-checkout-confirmation",
+      apiBaseURL,
+      checkoutConfirmationOrganizationId,
+      checkoutSuccessSessionId,
+    ],
+    enabled:
+      apiBaseURL.trim() !== "" &&
+      !busy &&
+      user !== null &&
+      isCheckoutSuccessRoute &&
+      checkoutSuccessSessionId !== "" &&
+      checkoutConfirmationOrganizationId !== "",
+    queryFn: () =>
+      confirmStripeCheckoutSession(apiBaseURL, {
+        organizationId: checkoutConfirmationOrganizationId,
+        sessionId: checkoutSuccessSessionId,
+      }),
+    retry: 2,
+    staleTime: Infinity,
   });
   const shouldResolveRouteProjectContext =
     apiBaseURL.trim() !== "" &&
@@ -228,6 +353,11 @@ export default function App() {
         return baseRouteSearch;
       }
       if (resolvedProjectContext) {
+        if (routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === "") {
+          return buildScopedHref(location.pathname, {
+            project: resolvedProjectContext.projectSlug || resolvedProjectContext.projectId,
+          }).replace(`${location.pathname}`, "") || `?project=${encodeURIComponent(resolvedProjectContext.projectSlug || resolvedProjectContext.projectId)}`;
+        }
         return applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext);
       }
       if (hasUnresolvedRouteProjectContext) {
@@ -239,7 +369,11 @@ export default function App() {
       baseRouteSearch,
       bypassResolvedContext,
       hasUnresolvedRouteProjectContext,
+      location.pathname,
       resolvedProjectContext,
+      routeOrganizationToken,
+      routeProjectId,
+      routeProjectToken,
     ],
   );
   const routeSearch = useMemo(
@@ -255,8 +389,14 @@ export default function App() {
       ? "unknown"
     : organizationsQuery.isLoading || organizationsQuery.isFetching
       ? "loading"
+    : !hasHardBillingOrganizationOverride &&
+        organizations.length > 1 &&
+        (paidOrganizationFallbackQuery.isLoading || paidOrganizationFallbackQuery.isFetching)
+      ? "loading"
     : organizations.length === 0
       ? "missing_organization"
+    : billingOrganizationId === ""
+      ? "loading"
     : billingEntitlementsQuery.isError
       ? "unknown"
     : billingEntitlementsQuery.isLoading || billingEntitlementsQuery.isFetching
@@ -264,6 +404,13 @@ export default function App() {
     : billingEntitlementsQuery.data?.isPaid === true
       ? "paid"
       : "unpaid";
+  const shouldAutoSelectPaidOrganization =
+    shouldCheckBillingGuard &&
+    !hasHardBillingOrganizationOverride &&
+    hasStoredBillingOrganizationPreference &&
+    billingAccess === "unpaid" &&
+    (paidOrganizationFallbackQuery.data ?? "") !== "" &&
+    (paidOrganizationFallbackQuery.data ?? "") !== billingOrganizationId;
   const shouldCheckAccountOnboardingProjectGuard =
     apiBaseURL.trim() !== "" &&
     !busy &&
@@ -315,6 +462,16 @@ export default function App() {
           ? null
           : projectGuardQuery.data ?? null,
     });
+  const mustRedirectAccountOnboardingToBilling =
+    shouldRedirectAccountOnboardingToBilling({
+      apiBaseURL,
+      busy,
+      user,
+      isOnboardingRoute,
+      onboardingSetupMode,
+      billingAccess,
+      isCheckoutSuccessRoute,
+    });
   const mustRedirectToBillingGate = shouldRedirectToBillingGate({
     apiBaseURL,
     busy,
@@ -325,12 +482,37 @@ export default function App() {
       isOnboardingRoute && isCheckoutSuccessRoute ? "paid" : billingAccess,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!mustRedirectToAuth) {
       return;
     }
     redirectToWebAuth(window.location.href);
   }, [mustRedirectToAuth]);
+
+  useLayoutEffect(() => {
+    if (!mustRedirectAccountOnboardingToBilling) {
+      return;
+    }
+    redirectToWebPricing();
+  }, [mustRedirectAccountOnboardingToBilling]);
+
+  useLayoutEffect(() => {
+    if (!mustRedirectToBillingGate) {
+      return;
+    }
+    redirectToWebPricing();
+  }, [mustRedirectToBillingGate]);
+
+  useEffect(() => {
+    if (!shouldAutoSelectPaidOrganization) {
+      return;
+    }
+
+    storeSelectedOrganizationContext({
+      organizationId: paidOrganizationFallbackQuery.data ?? "",
+      publicId: paidOrganizationFallbackQuery.data ?? "",
+    });
+  }, [paidOrganizationFallbackQuery.data, shouldAutoSelectPaidOrganization]);
 
   useEffect(() => {
     const refreshSelection = () => setSelectionVersion((current) => current + 1);
@@ -341,6 +523,21 @@ export default function App() {
       window.removeEventListener("storage", refreshSelection);
     };
   }, []);
+
+  useEffect(() => {
+    if (!stripeCheckoutConfirmationQuery.isSuccess) {
+      return;
+    }
+    if (billingOrganizationId === "" || billingOrganizationId !== checkoutConfirmationOrganizationId) {
+      return;
+    }
+    void billingEntitlementsQuery.refetch();
+  }, [
+    billingEntitlementsQuery.refetch,
+    billingOrganizationId,
+    checkoutConfirmationOrganizationId,
+    stripeCheckoutConfirmationQuery.isSuccess,
+  ]);
 
   useEffect(() => {
     if (isOnboardingRoute || isInvitationRoute) return;
@@ -440,7 +637,11 @@ export default function App() {
   }
 
   if (mustRedirectToBillingGate) {
-    return <Navigate replace to="/billing" />;
+    return null;
+  }
+
+  if (mustRedirectAccountOnboardingToBilling) {
+    return null;
   }
 
   if (isBillingRoute && billingAccess === "paid") {

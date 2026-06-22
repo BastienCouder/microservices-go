@@ -91,6 +91,32 @@ function normalizePreviewPrompts(value: unknown): OnboardingPrompt[] {
     : [];
 }
 
+export async function loadOnboardingOrganizationName(
+  apiBaseURL: string,
+  organizationId: string,
+): Promise<string> {
+  const normalizedOrganizationId = organizationId.trim();
+  if (!normalizedOrganizationId) {
+    return "";
+  }
+
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    apiRoutes.organizations.get(normalizedOrganizationId),
+    {
+      method: "GET",
+      organizationId: normalizedOrganizationId,
+    },
+  );
+
+  if (!response.ok) {
+    return "";
+  }
+
+  const payload = isRecord(response.data) ? response.data : {};
+  return getString(payload.name ?? payload.Name);
+}
+
 export async function createOnboardingProject(
   apiBaseURL: string,
   input: CreateOnboardingProjectInput,

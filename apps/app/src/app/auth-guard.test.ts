@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 
 import type { UserProfile } from "@/shared/models";
 import {
+  shouldRedirectAccountOnboardingToBilling,
   shouldRedirectAwayFromAccountOnboarding,
   shouldRedirectToBillingGate,
   shouldRedirectToOnboarding,
@@ -98,6 +99,44 @@ describe("auth route guards", () => {
         isOnboardingRoute: true,
         onboardingSetupMode: "project",
         projectCount: 1,
+      }),
+    ).toBe(false);
+  });
+
+  test("allows account onboarding only after checkout success when unpaid", () => {
+    expect(
+      shouldRedirectAccountOnboardingToBilling({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "account",
+        billingAccess: "unpaid",
+        isCheckoutSuccessRoute: false,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRedirectAccountOnboardingToBilling({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "account",
+        billingAccess: "unpaid",
+        isCheckoutSuccessRoute: true,
+      }),
+    ).toBe(false);
+
+    expect(
+      shouldRedirectAccountOnboardingToBilling({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "project",
+        billingAccess: "unpaid",
+        isCheckoutSuccessRoute: false,
       }),
     ).toBe(false);
   });

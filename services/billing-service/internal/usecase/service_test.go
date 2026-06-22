@@ -184,6 +184,16 @@ type fakeStripeProvider struct {
 	checkoutResp StripeCheckoutSession
 	checkoutErr  error
 	lastRequest  StripeCheckoutSessionRequest
+	sessionResp  StripeCheckoutSessionDetails
+	sessionErr   error
+	subResp      StripeSubscriptionDetails
+	subErr       error
+	subLookupID  string
+	subCalls     int
+	cancelResp   StripeSubscriptionDetails
+	cancelErr    error
+	cancelID     string
+	cancelCalls  int
 	priceIDs     map[string]string
 	priceLookup  string
 
@@ -204,6 +214,22 @@ type fakeStripeProvider struct {
 func (f *fakeStripeProvider) CreateSubscriptionCheckoutSession(_ context.Context, req StripeCheckoutSessionRequest) (StripeCheckoutSession, error) {
 	f.lastRequest = req
 	return f.checkoutResp, f.checkoutErr
+}
+
+func (f *fakeStripeProvider) GetCheckoutSession(_ context.Context, _ string) (StripeCheckoutSessionDetails, error) {
+	return f.sessionResp, f.sessionErr
+}
+
+func (f *fakeStripeProvider) GetSubscription(_ context.Context, subscriptionID string) (StripeSubscriptionDetails, error) {
+	f.subLookupID = subscriptionID
+	f.subCalls++
+	return f.subResp, f.subErr
+}
+
+func (f *fakeStripeProvider) CancelSubscription(_ context.Context, subscriptionID, _ string) (StripeSubscriptionDetails, error) {
+	f.cancelID = subscriptionID
+	f.cancelCalls++
+	return f.cancelResp, f.cancelErr
 }
 
 func (f *fakeStripeProvider) FindPriceIDByLookupKey(_ context.Context, lookupKey string) (string, error) {
@@ -244,6 +270,54 @@ func TestUpsertSubscription(t *testing.T) {
 	_, err = svc.UpsertSubscription(context.Background(), 0, "", 0, 0)
 	if !errors.Is(err, domain.ErrInvalidSubscription) {
 		t.Fatalf("expected invalid subscription error, got %v", err)
+	}
+}
+
+func TestCancelOrganizationSubscriptionCancelsStripeAndPersistsCanceledStatus(t *testing.T) {
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID:       7,
+				Plan:                 domain.PlanGrowth,
+				Seats:                3,
+				MonthlyQuota:         750,
+				StripeCustomerID:     "cus_7",
+				StripeSubscriptionID: "sub_7",
+				StripePriceID:        "price_growth_m",
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				UpdatedAt:            time.Now().UTC(),
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		cancelResp: StripeSubscriptionDetails{
+			OrganizationID:       7,
+			Plan:                 domain.PlanGrowth,
+			BillingCycle:         domain.BillingCycleMonthly,
+			Seats:                3,
+			MonthlyQuota:         750,
+			StripeCustomerID:     "cus_7",
+			StripeSubscriptionID: "sub_7",
+			StripePriceID:        "price_growth_m",
+			Status:               domain.SubscriptionStatusCanceled,
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "", "", "")
+
+	if err := svc.CancelOrganizationSubscription(context.Background(), 7); err != nil {
+		t.Fatalf("cancel organization subscription: %v", err)
+	}
+	if stripe.cancelCalls != 1 || stripe.cancelID != "sub_7" {
+		t.Fatalf("expected stripe cancel on sub_7, got calls=%d id=%q", stripe.cancelCalls, stripe.cancelID)
+	}
+	stored := repo.subs[7]
+	if stored == nil || stored.Status != domain.SubscriptionStatusCanceled {
+		t.Fatalf("expected canceled subscription persisted, got %+v", stored)
+	}
+	if stored.CancelAtPeriodEnd {
+		t.Fatalf("expected immediate cancellation, got cancel_at_period_end=true")
 	}
 }
 
@@ -446,6 +520,251 @@ func TestCreateStripeCheckoutSession_Success(t *testing.T) {
 	}
 	if stored.StripeCustomerID != "cus_abc" || stored.StripeSubscriptionID != "sub_abc" {
 		t.Fatalf("expected stripe ids to be saved: %+v", stored)
+	}
+}
+
+func TestCreateStripeCheckoutSession_PreservesActiveSubscriptionUntilConfirmation(t *testing.T) {
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			42: {
+				OrganizationID:       42,
+				Plan:                 domain.PlanStarter,
+				Seats:                1,
+				MonthlyQuota:         100,
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				StripeCustomerID:     "cus_existing",
+				StripeSubscriptionID: "sub_existing",
+				StripePriceID:        "price_starter_m",
+				UpdatedAt:            time.Now().UTC(),
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		checkoutResp: StripeCheckoutSession{
+			ID:             "cs_upgrade",
+			URL:            "https://checkout.stripe.com/c/pay/cs_upgrade",
+			CustomerID:     "cus_existing",
+			SubscriptionID: "sub_existing",
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{
+		StarterMonthlyPriceID: "price_starter_m",
+		GrowthMonthlyPriceID:  "price_growth_m",
+		ProMonthlyPriceID:     "price_pro_m",
+	}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	_, err := svc.CreateStripeCheckoutSession(context.Background(), CreateStripeCheckoutSessionInput{
+		OrganizationID: 42,
+		Plan:           domain.PlanGrowth,
+		BillingCycle:   domain.BillingCycleMonthly,
+		Seats:          3,
+		RequestID:      "req_upgrade",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	stored := repo.subs[42]
+	if stored == nil {
+		t.Fatalf("expected subscription persisted")
+	}
+	if stored.Status != domain.SubscriptionStatusActive {
+		t.Fatalf("expected active status to remain until confirmation, got %s", stored.Status)
+	}
+	if stored.Plan != domain.PlanStarter {
+		t.Fatalf("expected current plan to remain starter until confirmation, got %s", stored.Plan)
+	}
+	if stored.MonthlyQuota != 100 {
+		t.Fatalf("expected current quota to remain 100 until confirmation, got %d", stored.MonthlyQuota)
+	}
+
+	entitlements, err := svc.GetOrganizationEntitlements(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("load entitlements: %v", err)
+	}
+	if !entitlements.IsPaid {
+		t.Fatalf("expected entitlements to stay paid during pending checkout")
+	}
+	if entitlements.Plan != domain.PlanStarter {
+		t.Fatalf("expected entitlements plan starter during pending checkout, got %s", entitlements.Plan)
+	}
+}
+
+func TestGetOrganizationEntitlements_ReconcilesExpiredCanceledSubscriptionWhenWebhookMissed(t *testing.T) {
+	expiredAt := time.Now().UTC().Add(-2 * time.Hour)
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			42: {
+				OrganizationID:       42,
+				Plan:                 domain.PlanGrowth,
+				Seats:                3,
+				MonthlyQuota:         750,
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				StripeCustomerID:     "cus_42",
+				StripeSubscriptionID: "sub_42",
+				StripePriceID:        "price_growth_m",
+				CancelAtPeriodEnd:    true,
+				CurrentPeriodEnd:     &expiredAt,
+				UpdatedAt:            expiredAt,
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		subResp: StripeSubscriptionDetails{
+			OrganizationID:       42,
+			Plan:                 domain.PlanGrowth,
+			BillingCycle:         domain.BillingCycleMonthly,
+			Seats:                3,
+			MonthlyQuota:         750,
+			StripeCustomerID:     "cus_42",
+			StripeSubscriptionID: "sub_42",
+			StripePriceID:        "price_growth_m",
+			Status:               domain.SubscriptionStatusCanceled,
+			CancelAtPeriodEnd:    true,
+			CurrentPeriodEnd:     &expiredAt,
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	entitlements, err := svc.GetOrganizationEntitlements(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("load entitlements: %v", err)
+	}
+	if entitlements.IsPaid {
+		t.Fatalf("expected expired canceled subscription to lose paid access")
+	}
+	if entitlements.SubscriptionStatus != domain.SubscriptionStatusCanceled {
+		t.Fatalf("expected canceled status, got %s", entitlements.SubscriptionStatus)
+	}
+	if stripe.subCalls != 1 || stripe.subLookupID != "sub_42" {
+		t.Fatalf("expected one stripe subscription refresh for sub_42, got calls=%d id=%s", stripe.subCalls, stripe.subLookupID)
+	}
+
+	stored := repo.subs[42]
+	if stored == nil || stored.Status != domain.SubscriptionStatusCanceled {
+		t.Fatalf("expected canceled subscription persisted, got %+v", stored)
+	}
+}
+
+func TestGetOrganizationEntitlements_RestoresPaidAccessFromStripeWhenLocalStateIsStale(t *testing.T) {
+	staleAt := time.Now().UTC().Add(-inactiveSubscriptionRefreshInterval - time.Minute)
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			42: {
+				OrganizationID:       42,
+				Plan:                 domain.PlanGrowth,
+				Seats:                3,
+				MonthlyQuota:         750,
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusUnpaid,
+				StripeCustomerID:     "cus_42",
+				StripeSubscriptionID: "sub_42",
+				StripePriceID:        "price_growth_m",
+				UpdatedAt:            staleAt,
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		subResp: StripeSubscriptionDetails{
+			OrganizationID:       42,
+			Plan:                 domain.PlanGrowth,
+			BillingCycle:         domain.BillingCycleMonthly,
+			Seats:                3,
+			MonthlyQuota:         750,
+			StripeCustomerID:     "cus_42",
+			StripeSubscriptionID: "sub_42",
+			StripePriceID:        "price_growth_m",
+			Status:               domain.SubscriptionStatusActive,
+		},
+	}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	entitlements, err := svc.GetOrganizationEntitlements(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("load entitlements: %v", err)
+	}
+	if !entitlements.IsPaid {
+		t.Fatalf("expected stale unpaid subscription to recover paid access from stripe")
+	}
+	if entitlements.SubscriptionStatus != domain.SubscriptionStatusActive {
+		t.Fatalf("expected active status, got %s", entitlements.SubscriptionStatus)
+	}
+
+	stored := repo.subs[42]
+	if stored == nil || stored.Status != domain.SubscriptionStatusActive {
+		t.Fatalf("expected active subscription persisted, got %+v", stored)
+	}
+}
+
+func TestGetOrganizationEntitlements_FallsBackToLocalStateWhenStripeRefreshFails(t *testing.T) {
+	expiredAt := time.Now().UTC().Add(-2 * time.Hour)
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			42: {
+				OrganizationID:       42,
+				Plan:                 domain.PlanGrowth,
+				Seats:                3,
+				MonthlyQuota:         750,
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				StripeCustomerID:     "cus_42",
+				StripeSubscriptionID: "sub_42",
+				CancelAtPeriodEnd:    true,
+				CurrentPeriodEnd:     &expiredAt,
+				UpdatedAt:            expiredAt,
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{subErr: errors.New("stripe unavailable")}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	entitlements, err := svc.GetOrganizationEntitlements(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("load entitlements: %v", err)
+	}
+	if !entitlements.IsPaid {
+		t.Fatalf("expected local active access to be preserved when stripe refresh fails")
+	}
+	if stripe.subCalls != 1 {
+		t.Fatalf("expected one stripe refresh attempt, got %d", stripe.subCalls)
+	}
+}
+
+func TestGetOrganizationEntitlements_SkipsStripeRefreshForFreshActiveSubscription(t *testing.T) {
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			42: {
+				OrganizationID:       42,
+				Plan:                 domain.PlanGrowth,
+				Seats:                3,
+				MonthlyQuota:         750,
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				StripeCustomerID:     "cus_42",
+				StripeSubscriptionID: "sub_42",
+				UpdatedAt:            time.Now().UTC(),
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{}
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	entitlements, err := svc.GetOrganizationEntitlements(context.Background(), 42)
+	if err != nil {
+		t.Fatalf("load entitlements: %v", err)
+	}
+	if !entitlements.IsPaid {
+		t.Fatalf("expected fresh active subscription to stay paid")
+	}
+	if stripe.subCalls != 0 {
+		t.Fatalf("expected no stripe refresh for fresh active subscription, got %d", stripe.subCalls)
 	}
 }
 
@@ -652,6 +971,88 @@ func TestCreateStripeCheckoutSession_RejectsUntrustedReturnURL(t *testing.T) {
 		BillingCycle:   domain.BillingCycleMonthly,
 		Seats:          3,
 		SuccessURL:     "https://evil.example/success",
+	})
+	if !errors.Is(err, ErrStripeInvalidRequest) {
+		t.Fatalf("expected ErrStripeInvalidRequest, got %v", err)
+	}
+}
+
+func TestConfirmStripeCheckoutSession_ActivatesPendingSubscription(t *testing.T) {
+	repo := &fakeRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID: 7,
+				Plan:           domain.PlanGrowth,
+				Seats:          1,
+				MonthlyQuota:   750,
+				BillingCycle:   domain.BillingCycleMonthly,
+				Status:         domain.SubscriptionStatusCheckoutPending,
+			},
+		},
+	}
+	stripe := &fakeStripeProvider{
+		sessionResp: StripeCheckoutSessionDetails{
+			ID:                   "cs_test_123",
+			OrganizationID:       7,
+			Plan:                 domain.PlanGrowth,
+			BillingCycle:         domain.BillingCycleYearly,
+			Seats:                3,
+			MonthlyQuota:         750,
+			Paid:                 true,
+			StripeCustomerID:     "cus_123",
+			StripeSubscriptionID: "sub_123",
+		},
+	}
+
+	svc := NewService(repo)
+	svc.EnableStripe(stripe, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	out, err := svc.ConfirmStripeCheckoutSession(context.Background(), ConfirmStripeCheckoutSessionInput{
+		OrganizationID: 7,
+		SessionID:      "cs_test_123",
+	})
+	if err != nil {
+		t.Fatalf("confirm stripe checkout session: %v", err)
+	}
+	if out.SubscriptionStatus != domain.SubscriptionStatusActive {
+		t.Fatalf("expected active subscription, got %s", out.SubscriptionStatus)
+	}
+	if out.StripeSubscriptionID != "sub_123" {
+		t.Fatalf("expected stripe subscription id to be persisted, got %s", out.StripeSubscriptionID)
+	}
+
+	stored := repo.subs[7]
+	if stored == nil {
+		t.Fatalf("expected subscription to be stored")
+	}
+	if stored.Status != domain.SubscriptionStatusActive {
+		t.Fatalf("expected stored status active, got %s", stored.Status)
+	}
+	if stored.BillingCycle != domain.BillingCycleYearly {
+		t.Fatalf("expected yearly cycle, got %s", stored.BillingCycle)
+	}
+	if stored.Seats != 3 {
+		t.Fatalf("expected 3 seats, got %d", stored.Seats)
+	}
+}
+
+func TestConfirmStripeCheckoutSession_RejectsOrganizationMismatch(t *testing.T) {
+	svc := NewService(&fakeRepo{})
+	svc.EnableStripe(&fakeStripeProvider{
+		sessionResp: StripeCheckoutSessionDetails{
+			ID:             "cs_test_123",
+			OrganizationID: 8,
+			Plan:           domain.PlanStarter,
+			BillingCycle:   domain.BillingCycleMonthly,
+			Seats:          1,
+			MonthlyQuota:   100,
+			Paid:           true,
+		},
+	}, StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	_, err := svc.ConfirmStripeCheckoutSession(context.Background(), ConfirmStripeCheckoutSessionInput{
+		OrganizationID: 7,
+		SessionID:      "cs_test_123",
 	})
 	if !errors.Is(err, ErrStripeInvalidRequest) {
 		t.Fatalf("expected ErrStripeInvalidRequest, got %v", err)

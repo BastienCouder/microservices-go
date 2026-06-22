@@ -10,7 +10,7 @@ describe("perception i18n resolvers", () => {
     expect(
       resolvePerceptionLocalizedText(
         "Raw fallback",
-        "topErrorsGeneratedPositioningTitle",
+        "perceptionGeneratedPositioningTitle",
         "en",
       ),
     ).toBe("Positioning is still not cited clearly enough");

@@ -18,6 +18,11 @@ const PRESET_SOURCES = [
   "google",
   "linkedin",
   "x",
+  "youtube",
+  "newsletter",
+  "producthunt",
+  "chatgpt",
+  "community",
   "friend",
   "agency",
 ] as const;
@@ -41,7 +46,6 @@ export function StepAttribution({
   return (
     <OnboardingStep
       title={t("attributionTitle")}
-      description={t("attributionDescription")}
       footer={
         <OnboardingStepFooter
           hideBack={hideBack}
@@ -110,7 +114,6 @@ export function StepAttribution({
                 : attributionSource
             }
             onChange={(event) => setAttributionSource(event.target.value)}
-            placeholder={t("attributionOtherPlaceholder")}
           />
         </OnboardingField>
       ) : null}

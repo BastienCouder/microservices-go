@@ -181,7 +181,6 @@ export function StepBrand({
   return (
     <OnboardingStep
       title={t("brandTitle")}
-      description={t("brandDescription")}
       footer={
         <OnboardingStepFooter
           hideBack={hideBack}
@@ -203,19 +202,18 @@ export function StepBrand({
       <OnboardingField
         label={t("brandIndustryLabel")}
         htmlFor="brand-industry"
-        description={t("brandIndustryHint")}
       >
         <Input
           id="brand-industry"
           value={industry}
           onChange={(event) => setIndustry(event.target.value)}
+          placeholder={t("brandIndustryPlaceholder")}
         />
       </OnboardingField>
 
       <OnboardingField
         label={t("brandLongDescriptionLabel")}
         htmlFor="brand-description"
-        description={t("brandLongDescriptionHint")}
       >
         <Textarea
           id="brand-description"

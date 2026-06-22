@@ -80,6 +80,7 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 	}
 
 	sub, err := s.repo.GetByOrganizationID(ctx, input.OrganizationID)
+	subscriptionExists := err == nil
 	if err != nil {
 		if !errors.Is(err, domain.ErrSubscriptionMissing) {
 			return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("load subscription before stripe checkout: %w", err)
@@ -89,24 +90,46 @@ func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateS
 		}
 	}
 
-	sub.Plan = plan
-	sub.Seats = seats
-	sub.MonthlyQuota = monthlyQuota
-	sub.BillingCycle = cycle
-	sub.StripePriceID = priceID
-	sub.Status = domain.SubscriptionStatusCheckoutPending
-	sub.UpdatedAt = s.now().UTC()
-	if session.CustomerID != "" {
-		sub.StripeCustomerID = session.CustomerID
+	existingStatus := ""
+	if subscriptionExists {
+		existingStatus = domain.NormalizeSubscriptionStatus(sub.Status)
 	}
-	if session.SubscriptionID != "" {
-		sub.StripeSubscriptionID = session.SubscriptionID
-	}
-	if err := sub.Validate(); err != nil {
-		return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("%w: %v", ErrStripeInvalidRequest, err)
-	}
-	if err := s.repo.Upsert(ctx, sub); err != nil {
-		return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("persist checkout pending subscription: %w", err)
+	switch existingStatus {
+	case domain.SubscriptionStatusActive:
+		// Keep active entitlements in place until Stripe confirms the new checkout.
+		// This prevents a cancelled upgrade/downgrade flow from temporarily removing access.
+		if session.CustomerID != "" && strings.TrimSpace(sub.StripeCustomerID) == "" {
+			sub.StripeCustomerID = session.CustomerID
+		}
+		if session.SubscriptionID != "" && strings.TrimSpace(sub.StripeSubscriptionID) == "" {
+			sub.StripeSubscriptionID = session.SubscriptionID
+		}
+		if err := sub.Validate(); err != nil {
+			return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("%w: %v", ErrStripeInvalidRequest, err)
+		}
+		if err := s.repo.Upsert(ctx, sub); err != nil {
+			return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("persist active subscription during stripe checkout: %w", err)
+		}
+	default:
+		sub.Plan = plan
+		sub.Seats = seats
+		sub.MonthlyQuota = monthlyQuota
+		sub.BillingCycle = cycle
+		sub.StripePriceID = priceID
+		sub.Status = domain.SubscriptionStatusCheckoutPending
+		sub.UpdatedAt = s.now().UTC()
+		if session.CustomerID != "" {
+			sub.StripeCustomerID = session.CustomerID
+		}
+		if session.SubscriptionID != "" {
+			sub.StripeSubscriptionID = session.SubscriptionID
+		}
+		if err := sub.Validate(); err != nil {
+			return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("%w: %v", ErrStripeInvalidRequest, err)
+		}
+		if err := s.repo.Upsert(ctx, sub); err != nil {
+			return CreateStripeCheckoutSessionOutput{}, fmt.Errorf("persist checkout pending subscription: %w", err)
+		}
 	}
 
 	return CreateStripeCheckoutSessionOutput{
@@ -146,6 +169,136 @@ func (s *Service) CreateStripeCustomerPortalSession(ctx context.Context, input C
 		return CreateStripeCustomerPortalSessionOutput{}, fmt.Errorf("create stripe customer portal session: %w", err)
 	}
 	return CreateStripeCustomerPortalSessionOutput{PortalURL: url}, nil
+}
+
+func (s *Service) ConfirmStripeCheckoutSession(ctx context.Context, input ConfirmStripeCheckoutSessionInput) (ConfirmStripeCheckoutSessionOutput, error) {
+	if !s.stripeEnabled() {
+		return ConfirmStripeCheckoutSessionOutput{}, ErrStripeDisabled
+	}
+	if input.OrganizationID <= 0 {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("%w: organization_id must be positive", ErrStripeInvalidRequest)
+	}
+	if strings.TrimSpace(input.SessionID) == "" {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("%w: session_id is required", ErrStripeInvalidRequest)
+	}
+
+	session, err := s.stripe.GetCheckoutSession(ctx, input.SessionID)
+	if err != nil {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("load stripe checkout session: %w", err)
+	}
+	if session.OrganizationID <= 0 {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("%w: stripe checkout session is missing organization metadata", ErrStripeInvalidRequest)
+	}
+	if session.OrganizationID != input.OrganizationID {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("%w: checkout session organization mismatch", ErrStripeInvalidRequest)
+	}
+
+	sub, err := s.repo.GetByOrganizationID(ctx, input.OrganizationID)
+	if err != nil {
+		if !errors.Is(err, domain.ErrSubscriptionMissing) {
+			return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("load subscription before stripe checkout confirmation: %w", err)
+		}
+		sub = &domain.Subscription{
+			OrganizationID: input.OrganizationID,
+		}
+	}
+
+	mergeWebhookIntoSubscription(sub, StripeWebhookEvent{
+		OrganizationID:       session.OrganizationID,
+		ProjectID:            session.ProjectID,
+		AttributionSource:    session.AttributionSource,
+		Plan:                 session.Plan,
+		BillingCycle:         session.BillingCycle,
+		Seats:                session.Seats,
+		MonthlyQuota:         session.MonthlyQuota,
+		StripeCustomerID:     session.StripeCustomerID,
+		StripeSubscriptionID: session.StripeSubscriptionID,
+		Status: func() string {
+			if session.Paid {
+				return domain.SubscriptionStatusActive
+			}
+			return domain.SubscriptionStatusCheckoutPending
+		}(),
+	})
+	sub.UpdatedAt = s.now().UTC()
+	if err := sub.Validate(); err != nil {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("%w: %v", ErrStripeInvalidRequest, err)
+	}
+	if err := s.repo.Upsert(ctx, sub); err != nil {
+		return ConfirmStripeCheckoutSessionOutput{}, fmt.Errorf("persist confirmed stripe checkout subscription: %w", err)
+	}
+
+	return ConfirmStripeCheckoutSessionOutput{
+		OrganizationID:       sub.OrganizationID,
+		Plan:                 sub.Plan,
+		BillingCycle:         sub.BillingCycle,
+		SubscriptionStatus:   sub.Status,
+		MonthlyQuota:         sub.MonthlyQuota,
+		Seats:                sub.Seats,
+		StripeCustomerID:     sub.StripeCustomerID,
+		StripeSubscriptionID: sub.StripeSubscriptionID,
+	}, nil
+}
+
+func (s *Service) CancelOrganizationSubscription(ctx context.Context, organizationID int64) error {
+	if organizationID <= 0 {
+		return fmt.Errorf("%w: organization_id must be positive", ErrStripeInvalidRequest)
+	}
+
+	sub, err := s.repo.GetByOrganizationID(ctx, organizationID)
+	if err != nil {
+		if errors.Is(err, domain.ErrSubscriptionMissing) {
+			return nil
+		}
+		return fmt.Errorf("load subscription before cancellation: %w", err)
+	}
+
+	nowTime := s.now().UTC()
+	stripeSubscriptionID := strings.TrimSpace(sub.StripeSubscriptionID)
+	if stripeSubscriptionID != "" {
+		if !s.stripeEnabled() {
+			return ErrStripeDisabled
+		}
+
+		details, cancelErr := s.stripe.CancelSubscription(
+			ctx,
+			stripeSubscriptionID,
+			buildStripeIdempotencyKey("cancel", organizationID, ""),
+		)
+		if cancelErr != nil {
+			return fmt.Errorf("cancel stripe subscription: %w", cancelErr)
+		}
+
+		mergeWebhookIntoSubscription(sub, StripeWebhookEvent{
+			OrganizationID:       organizationID,
+			ProjectID:            details.ProjectID,
+			AttributionSource:    details.AttributionSource,
+			Plan:                 details.Plan,
+			BillingCycle:         details.BillingCycle,
+			Seats:                details.Seats,
+			MonthlyQuota:         details.MonthlyQuota,
+			StripeCustomerID:     details.StripeCustomerID,
+			StripeSubscriptionID: details.StripeSubscriptionID,
+			StripePriceID:        details.StripePriceID,
+			Status:               details.Status,
+			CancelAtPeriodEnd:    details.CancelAtPeriodEnd,
+			CurrentPeriodEnd:     details.CurrentPeriodEnd,
+		})
+	}
+
+	sub.Status = domain.SubscriptionStatusCanceled
+	sub.CancelAtPeriodEnd = false
+	currentPeriodEnd := nowTime
+	sub.CurrentPeriodEnd = &currentPeriodEnd
+	sub.UpdatedAt = nowTime
+
+	if err := sub.Validate(); err != nil {
+		return fmt.Errorf("%w: %v", ErrStripeInvalidRequest, err)
+	}
+	if err := s.repo.Upsert(ctx, sub); err != nil {
+		return fmt.Errorf("persist canceled subscription: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) HandleStripeWebhook(ctx context.Context, payload []byte, signature string) error {

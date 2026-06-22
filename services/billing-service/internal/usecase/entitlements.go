@@ -74,6 +74,7 @@ func (s *Service) GetOrganizationEntitlements(ctx context.Context, organizationI
 		}
 		return entitlements, err
 	}
+	sub = s.refreshSubscriptionForEntitlements(ctx, sub)
 
 	entitlements = EntitlementsFromSubscription(sub)
 	settings, err := s.planSettingsForPlan(ctx, sub.Plan)

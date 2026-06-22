@@ -13,10 +13,12 @@ COMPOSE_PROD_LOCAL_SERIAL := $(COMPOSE_PROD_LOCAL)
 
 ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
+ANSIBLE_BACKUP_CRON_PLAYBOOK := ansible/playbooks/postgres-r2-backup-cron.yml
 
 SECRETS_DIR := secrets
 STRIPE_FORWARD_TO ?= http://localhost:50000/billing/stripe/webhook
 STRIPE_TRIGGER_EVENT ?= checkout.session.completed
+STRIPE_CLI_DOCKER_IMAGE ?= stripe/stripe-cli:latest
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -73,8 +75,6 @@ OPTIONAL_SECRETS := \
 	r2_account_id.txt \
 	r2_access_key_id.txt \
 	r2_secret_access_key.txt \
-	grafana_admin_user.txt \
-	grafana_admin_password.txt \
 	auth_http_addr.txt \
 	auth_metrics_addr.txt \
 	user_http_addr.txt \
@@ -99,11 +99,11 @@ OPTIONAL_SECRETS := \
 
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
-	dev-doc dev-email dev-mcp dev-monitoring \
+	dev-doc dev-email dev-mcp \
 	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate \
 	prod-front prod-app prod-web prod-services prod-service \
-	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service \
-	prod-doc prod-email prod-mcp prod-monitoring \
+	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service deploy-prod-backup-cron \
+	prod-doc prod-email prod-mcp \
 	db-generate db-migrate \
 	stripe-listen stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
@@ -126,7 +126,6 @@ help:
 	@echo "    make dev-doc          Start docs only"
 	@echo "    make dev-email        Start email renderer only"
 	@echo "    make dev-mcp          Start MCP server only"
-	@echo "    make dev-monitoring   Start monitoring only"
 	@echo ""
 	@echo "  Database"
 	@echo "    make db-generate      Run sqlc for all configured services"
@@ -134,6 +133,7 @@ help:
 	@echo ""
 	@echo "  Stripe"
 	@echo "    make stripe-listen    Forward Stripe webhooks to local gateway ($(STRIPE_FORWARD_TO))"
+	@echo "    make stripe-listen-docker Forward Stripe webhooks with Docker (requires STRIPE_API_KEY env)"
 	@echo "    make stripe-trigger   Trigger a Stripe event (STRIPE_TRIGGER_EVENT=name)"
 	@echo "    make stripe-trigger-checkout Trigger checkout.session.completed"
 	@echo ""
@@ -153,7 +153,6 @@ help:
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
 	@echo "    make prod-mcp         Start MCP server only, sequentially"
-	@echo "    make prod-monitoring  Start monitoring only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
 	@echo "    make prod-check       Ansible syntax check"
 	@echo "    make deploy-prod      Deploy full production stack with Ansible"
@@ -162,6 +161,7 @@ help:
 	@echo "    make deploy-prod-web  Deploy only web with Ansible"
 	@echo "    make deploy-prod-services Deploy backend services with Ansible"
 	@echo "    make deploy-prod-service SERVICE=name  Deploy one service with Ansible"
+	@echo "    make deploy-prod-backup-cron Configure daily PostgreSQL R2 backup cron with Ansible"
 	@echo ""
 	@echo "  Secrets"
 	@echo "    make secrets-generate Regenerate Makefile/Compose/Ansible secrets files"
@@ -206,9 +206,6 @@ dev-email: secrets-check
 dev-mcp: secrets-check
 	$(COMPOSE_DEV) --profile mcp up
 
-dev-monitoring: secrets-check
-	$(COMPOSE_DEV) --profile monitoring up
-
 db-generate:
 	@for service in $(SQLC_SERVICES); do \
 		echo "Generating SQLC for $$service"; \
@@ -218,13 +215,38 @@ db-generate:
 db-migrate: dev-migrate
 
 stripe-listen:
-	stripe listen --forward-to "$(STRIPE_FORWARD_TO)"
+	@if command -v stripe >/dev/null 2>&1; then \
+		stripe listen --forward-to "$(STRIPE_FORWARD_TO)"; \
+	else \
+		echo "Stripe CLI introuvable."; \
+		echo "Installe-le localement, ou utilise: make stripe-listen-docker STRIPE_API_KEY=sk_test_..."; \
+		exit 127; \
+	fi
+
+stripe-listen-docker:
+	@test -n "$(STRIPE_API_KEY)" || (echo "Missing STRIPE_API_KEY. Example: make stripe-listen-docker STRIPE_API_KEY=sk_test_..."; exit 1)
+	docker run --rm -it --network host \
+		-e STRIPE_API_KEY="$(STRIPE_API_KEY)" \
+		$(STRIPE_CLI_DOCKER_IMAGE) \
+		listen --forward-to "$(STRIPE_FORWARD_TO)"
 
 stripe-trigger:
-	stripe trigger "$(STRIPE_TRIGGER_EVENT)"
+	@if command -v stripe >/dev/null 2>&1; then \
+		stripe trigger "$(STRIPE_TRIGGER_EVENT)"; \
+	else \
+		echo "Stripe CLI introuvable."; \
+		echo "Installe-le localement d'abord pour utiliser stripe-trigger."; \
+		exit 127; \
+	fi
 
 stripe-trigger-checkout:
-	stripe trigger checkout.session.completed
+	@if command -v stripe >/dev/null 2>&1; then \
+		stripe trigger checkout.session.completed; \
+	else \
+		echo "Stripe CLI introuvable."; \
+		echo "Installe-le localement d'abord pour utiliser stripe-trigger-checkout."; \
+		exit 127; \
+	fi
 
 prod: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) $(PROFILES_PROD) up -d
@@ -260,7 +282,7 @@ prod-services: prod-migrate
 prod-migrate: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) up -d postgres
 	$(COMPOSE_PROD_LOCAL_SERIAL) up postgres-bootstrap
-	$(COMPOSE_PROD_LOCAL_SERIAL) up --build --no-deps \
+	@for service in \
 		kratos-migrate \
 		user-migrate \
 		organizations-migrate \
@@ -269,7 +291,12 @@ prod-migrate: secrets-check
 		project-migrate \
 		analysis-migrate \
 		ia-migrate \
-		notification-migrate
+		notification-migrate; do \
+		echo "==> Building $$service"; \
+		$(COMPOSE_PROD_LOCAL_SERIAL) build $$service || exit $$?; \
+		echo "==> Running $$service"; \
+		$(COMPOSE_PROD_LOCAL_SERIAL) up --no-deps $$service || exit $$?; \
+	done
 
 prod-doc: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile doc up -d
@@ -279,9 +306,6 @@ prod-email: secrets-check
 
 prod-mcp: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile mcp up -d
-
-prod-monitoring: secrets-check
-	$(COMPOSE_PROD_LOCAL_SERIAL) --profile monitoring up -d
 
 prod-ping:
 	ansible -i $(ANSIBLE_INVENTORY) production -m ping --ask-become-pass
@@ -307,6 +331,9 @@ deploy-prod-services:
 deploy-prod-service:
 	@test -n "$(SERVICE)" || (echo "Usage: make deploy-prod-service SERVICE=api-gateway"; exit 1)
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["$(SERVICE)"]}'
+
+deploy-prod-backup-cron:
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_BACKUP_CRON_PLAYBOOK) --ask-become-pass
 
 secrets-generate:
 	python3 scripts/generate_secrets_config.py

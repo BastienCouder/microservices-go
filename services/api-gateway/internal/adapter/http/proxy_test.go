@@ -602,6 +602,113 @@ func TestGatewayAdminUsersForbiddenWithoutAdminRole(t *testing.T) {
 	}
 }
 
+func TestGatewayDeleteOrganizationCancelsBillingFirst(t *testing.T) {
+	callOrder := make([]string, 0, 3)
+
+	organizationsUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/organizations/me":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"organizationId":"org_123","internalId":"7","publicId":"org_123","role":"editor"}]`))
+		case r.URL.Path == "/organizations/org_123" && r.Method == http.MethodDelete:
+			callOrder = append(callOrder, "organization-delete")
+			if got := r.Header.Get("X-Organization-ID"); got != "7" {
+				t.Fatalf("expected organization delete scoped to 7, got %q", got)
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected organizations request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer organizationsUpstream.Close()
+
+	billingUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/billing/subscriptions/cancel" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected billing request: %s %s", r.Method, r.URL.Path)
+		}
+		callOrder = append(callOrder, "billing-cancel")
+		if got := r.Header.Get("X-Organization-ID"); got != "7" {
+			t.Fatalf("expected billing cancel scoped to 7, got %q", got)
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer billingUpstream.Close()
+
+	userUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/users/by-auth/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":42}`))
+	}))
+	defer userUpstream.Close()
+
+	authUpstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/auth/validate" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"identity_id":"kratos-id-42"}`))
+	}))
+	defer authUpstream.Close()
+
+	grpcListener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen grpc: %v", err)
+	}
+	defer grpcListener.Close()
+	grpcServer := grpc.NewServer()
+	permissionv1.RegisterPermissionServiceServer(grpcServer, &permissionGRPCAllowService{})
+	defer grpcServer.GracefulStop()
+	go func() {
+		if serveErr := grpcServer.Serve(grpcListener); serveErr != nil {
+			t.Logf("grpc server stopped: %v", serveErr)
+		}
+	}()
+
+	h, err := NewHandlerWithGRPC(
+		userUpstream.URL,
+		authUpstream.URL,
+		organizationsUpstream.URL,
+		organizationsUpstream.URL,
+		grpcListener.Addr().String(),
+		billingUpstream.URL,
+		organizationsUpstream.URL,
+		100,
+		"test-secret",
+		"api-gateway",
+		nil,
+		nil,
+		grpctls.ClientConfig{AllowInsecure: true},
+	)
+	if err != nil {
+		t.Fatalf("new handler: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodDelete, "/organizations/org_123", nil)
+	req.Header.Set("X-Organization-ID", "org_123")
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+	if len(callOrder) != 2 {
+		t.Fatalf("expected two downstream calls, got %#v", callOrder)
+	}
+	if callOrder[0] != "billing-cancel" || callOrder[1] != "organization-delete" {
+		t.Fatalf("unexpected downstream order: %#v", callOrder)
+	}
+}
+
 func TestGatewayUsersReadForbidsOtherUserID(t *testing.T) {
 	var getUserCalls int32
 
@@ -849,4 +956,12 @@ func (s *permissionGRPCDenyService) Check(_ context.Context, req *permissionv1.C
 		s.t.Fatalf("unexpected permission check request: %+v", req)
 	}
 	return &permissionv1.CheckResponse{Allowed: false, Reason: "missing required role"}, nil
+}
+
+type permissionGRPCAllowService struct {
+	permissionv1.UnimplementedPermissionServiceServer
+}
+
+func (s *permissionGRPCAllowService) Check(_ context.Context, _ *permissionv1.CheckRequest) (*permissionv1.CheckResponse, error) {
+	return &permissionv1.CheckResponse{Allowed: true, Reason: "role grants full access"}, nil
 }

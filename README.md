@@ -107,6 +107,7 @@ make lint
 
 ## Documentation
 
+- CI/CD et commandes production: [docs/cicd-and-prod.md](docs/cicd-and-prod.md)
 - Public API avec API key: [apps/app/docs/public-api.md](apps/app/docs/public-api.md)
 - Standard backend Go: [docs/backend-standard.md](docs/backend-standard.md)
 - Template nouveau service backend: [docs/backend-service-template.md](docs/backend-service-template.md)
@@ -195,18 +196,46 @@ Un service `postgres-backup-r2` exécute un `pg_dumpall`, compresse en `gzip`, p
 
 Secrets Docker à remplir:
 
-- `deployments/secrets/r2_bucket.txt`
-- `deployments/secrets/r2_account_id.txt`
-- `deployments/secrets/r2_access_key_id.txt`
-- `deployments/secrets/r2_secret_access_key.txt`
+- `secrets/r2_bucket.txt`
+- `secrets/r2_account_id.txt`
+- `secrets/r2_access_key_id.txt`
+- `secrets/r2_secret_access_key.txt`
 
-Lancement:
+Exécution ponctuelle:
 
 ```bash
+docker compose --profile infra --profile backup run --rm \
+  -e BACKUP_RUN_ONCE=1 \
+  -e BACKUP_POSTGRES_HOST=postgres \
+  -e BACKUP_POSTGRES_PORT=5432 \
+  -e BACKUP_POSTGRES_USER=postgres \
+  -e R2_PREFIX=postgres \
+  -e R2_REGION=auto \
+  postgres-backup-r2
+```
+
+Exécution en boucle:
+
+```bash
+BACKUP_POSTGRES_HOST=postgres \
+BACKUP_POSTGRES_PORT=5432 \
+BACKUP_POSTGRES_USER=postgres \
+R2_PREFIX=postgres \
+R2_REGION=auto \
+BACKUP_INTERVAL_SECONDS=86400 \
 docker compose --profile infra --profile backup up -d postgres postgres-backup-r2
 ```
 
 Réglages:
 
-- intervalle: `BACKUP_INTERVAL_SECONDS` (par défaut dans compose: `86400`)
-- préfixe objet: `R2_PREFIX` (par défaut dans compose: `postgres`)
+- `BACKUP_POSTGRES_HOST`
+- `BACKUP_POSTGRES_PORT`
+- `BACKUP_POSTGRES_USER`
+- `R2_PREFIX`
+- `R2_REGION`
+- `BACKUP_INTERVAL_SECONDS` si tu veux le mode boucle
+
+Déploiement production:
+
+- le cron quotidien à `00:00` est géré par le playbook `ansible/playbooks/postgres-r2-backup-cron.yml`
+- le cron n'est créé que si les 4 secrets `r2_*.txt` sont présents sur le serveur

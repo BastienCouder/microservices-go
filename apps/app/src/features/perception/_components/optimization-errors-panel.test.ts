@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 const source = await Bun.file(
-  new URL("./top-errors-panel.tsx", import.meta.url),
+  new URL("./optimization-errors-panel.tsx", import.meta.url),
 ).text();
 
-describe("top errors panel", () => {
+describe("optimization errors panel", () => {
   test("hides card footers on the perception panel while keeping action wiring available", () => {
     expect(
       source.includes("actionGenerated={generatedIds?.has(error.id) ?? false}"),
@@ -27,11 +27,10 @@ describe("top errors panel", () => {
     ).toBe(true);
     expect(source.includes('actionStatus === "done"')).toBe(true);
     expect(source.includes("canMarkDone")).toBe(true);
-    expect(source.includes('t("topErrorsMarkDone")')).toBe(true);
+    expect(source.includes('t("optimizationErrorsMarkDone")')).toBe(true);
     expect(source.includes("hideAddedErrors")).toBe(false);
-    expect(source.includes("topErrorsHideAdded")).toBe(false);
     expect(source.includes("onRemoveAction")).toBe(true);
-    expect(source.includes("topErrorsRemove")).toBe(true);
+    expect(source.includes("optimizationErrorsRemove")).toBe(true);
     expect(source.includes("const canRemoveAction")).toBe(true);
     expect(source.includes("const shouldShowActionButton")).toBe(true);
     expect(source.includes("hideFooter")).toBe(true);

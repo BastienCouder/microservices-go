@@ -27,6 +27,16 @@ type ShouldRedirectAwayFromAccountOnboardingInput = {
   projectCount: number | null;
 };
 
+type ShouldRedirectAccountOnboardingToBillingInput = {
+  apiBaseURL: string;
+  busy: boolean;
+  user: UserProfile | null;
+  isOnboardingRoute: boolean;
+  onboardingSetupMode: OnboardingSetupMode;
+  billingAccess: BillingAccessState;
+  isCheckoutSuccessRoute?: boolean;
+};
+
 export type BillingAccessState =
   | "loading"
   | "unknown"
@@ -109,6 +119,27 @@ export function shouldRedirectAwayFromAccountOnboarding({
     return false;
   }
   return projectCount > 0;
+}
+
+export function shouldRedirectAccountOnboardingToBilling({
+  apiBaseURL,
+  busy,
+  user,
+  isOnboardingRoute,
+  onboardingSetupMode,
+  billingAccess,
+  isCheckoutSuccessRoute = false,
+}: ShouldRedirectAccountOnboardingToBillingInput): boolean {
+  if (apiBaseURL.trim() === "") {
+    return false;
+  }
+  if (busy || user === null || !isOnboardingRoute) {
+    return false;
+  }
+  if (onboardingSetupMode !== "account" || isCheckoutSuccessRoute) {
+    return false;
+  }
+  return billingAccess === "missing_organization" || billingAccess === "unpaid";
 }
 
 export function shouldRedirectToBillingGate({

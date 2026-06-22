@@ -180,7 +180,6 @@ function buildPerceptionBase(
     competitors: derived.competitors,
     radar: derived.radar,
     scores: derived.scores,
-    topErrors: derived.topErrors,
     modelAxisHeatmap: derived.modelAxisHeatmap,
     trend: derived.trend,
     responses: derived.responses,
@@ -245,7 +244,6 @@ function mergePerceptionData(
       factualAccuracy: clampScore(asNumber(payload.scores?.factualAccuracy ?? base.scores.factualAccuracy)),
       sentimentScore: clampScore(asNumber(payload.scores?.sentimentScore ?? base.scores.sentimentScore)),
     },
-    topErrors: base.topErrors,
     modelAxisHeatmap: buildHeatmapFromBackendRadar(base.modelAxisHeatmap, radar),
     responses: base.responses,
     metadata: {

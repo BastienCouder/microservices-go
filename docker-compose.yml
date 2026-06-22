@@ -2,7 +2,6 @@ networks:
   frontend-net:
   backend-net:
   infra-net:
-  monitoring-net:
  
 services:
   web:
@@ -472,7 +471,6 @@ services:
       STRIPE_PRICE_GROWTH_YEARLY_FILE: /run/secrets/stripe_price_growth_yearly
       STRIPE_PRICE_PRO_MONTHLY_FILE: /run/secrets/stripe_price_pro_monthly
       STRIPE_PRICE_PRO_YEARLY_FILE: /run/secrets/stripe_price_pro_yearly
-      STRIPE_PRICE_CORRECTION_CREDITS_FILE: /run/secrets/stripe_price_correction_credits
     secrets:
       - billsvc_db_password
       - internal_jwt_secret
@@ -488,7 +486,6 @@ services:
       - stripe_price_growth_yearly
       - stripe_price_pro_monthly
       - stripe_price_pro_yearly
-      - stripe_price_correction_credits
     # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
@@ -811,8 +808,8 @@ services:
   langgraph-scheduler:
     profiles: ["backend"]
     build:
-      context: .
-      dockerfile: services/langgraph-scheduler/Dockerfile
+      context: ./services/langgraph-scheduler
+      dockerfile: Dockerfile
     image: microservices-go/langgraph-scheduler:prod
     restart: unless-stopped
     networks:
@@ -941,90 +938,6 @@ services:
     secrets:
       - notifsvc_db_password
  
-  loki:
-    profiles: ["monitoring"]
-    image: grafana/loki:3.0.0
-    restart: unless-stopped
-    networks:
-      - monitoring-net
-    command: ["-config.file=/etc/loki/config.yaml"]
-    volumes:
-      - ./deployments/loki/loki-config.yaml:/etc/loki/config.yaml:ro
-      - loki-data:/loki
-    ports:
-      - "127.0.0.1:60002:3100"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
- 
-  promtail:
-    profiles: ["monitoring"]
-    image: grafana/promtail:3.0.0
-    restart: unless-stopped
-    networks:
-      - monitoring-net
-    command: ["-config.file=/etc/promtail/config.yaml"]
-    volumes:
-      - ./deployments/loki/promtail-config.yaml:/etc/promtail/config.yaml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      - promtail-positions:/tmp
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
- 
-  grafana:
-    profiles: ["monitoring"]
-    image: grafana/grafana:11.0.0
-    restart: unless-stopped
-    networks:
-      - monitoring-net
-    environment:
-      GF_SECURITY_ADMIN_USER_FILE: /run/secrets/grafana_admin_user
-      GF_SECURITY_ADMIN_PASSWORD_FILE: /run/secrets/grafana_admin_password
-      GF_SECURITY_DISABLE_GRAVATAR: "true"
-      GF_SECURITY_COOKIE_SECURE: "true"
-      GF_USERS_ALLOW_SIGN_UP: "false"
-    secrets:
-      - grafana_admin_user
-      - grafana_admin_password
-    volumes:
-      - grafana-data:/var/lib/grafana
-      - ./deployments/loki/grafana/provisioning:/etc/grafana/provisioning:ro
-    ports:
-      - "127.0.0.1:60000:3000"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
- 
-  prometheus:
-    profiles: ["monitoring"]
-    image: prom/prometheus:v3.3.1
-    restart: unless-stopped
-    networks:
-      - monitoring-net
-      - backend-net
-    command:
-      - "--config.file=/etc/prometheus/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--storage.tsdb.retention.time=15d"
-      - "--web.listen-address=127.0.0.1:9090"
-    volumes:
-      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus-data:/prometheus
-    ports:
-      - "127.0.0.1:60001:9090"
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
- 
   redis:
     profiles: ["backend", "infra"]
     image: redis:8.4.0-alpine
@@ -1123,14 +1036,8 @@ services:
         condition: service_healthy
     entrypoint: ["sh", "/opt/backups/postgres-r2-backup.sh"]
     environment:
-      BACKUP_POSTGRES_HOST: postgres
-      BACKUP_POSTGRES_PORT: "5432"
-      BACKUP_POSTGRES_USER: postgres
       BACKUP_POSTGRES_PASSWORD_FILE: /run/secrets/postgres_superuser_password
-      BACKUP_INTERVAL_SECONDS: "86400"
       R2_BUCKET_FILE: /run/secrets/r2_bucket
-      R2_PREFIX: postgres
-      R2_REGION: auto
       R2_ACCOUNT_ID_FILE: /run/secrets/r2_account_id
       R2_ACCESS_KEY_ID_FILE: /run/secrets/r2_access_key_id
       R2_SECRET_ACCESS_KEY_FILE: /run/secrets/r2_secret_access_key
@@ -1247,9 +1154,5 @@ volumes:
   redis-data:
   rabbitmq-data:
   postgres-data:
-  loki-data:
-  promtail-positions:
-  grafana-data:
-  prometheus-data:
  
 # Secrets are defined in docker-compose.secrets.generated.yml.

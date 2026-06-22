@@ -1,15 +1,16 @@
 import type { UserProfile } from "@/shared/models";
+
 import { BillingGateLayout } from "./layout";
 
 type BillingGatePageProps = {
   apiBaseURL: string;
-  routeSearch?: string;
+  routeSearch: string;
   user: UserProfile | null;
 };
 
 export function BillingGatePage({
   apiBaseURL,
-  routeSearch = "",
+  routeSearch,
   user,
 }: BillingGatePageProps) {
   return (

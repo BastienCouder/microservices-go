@@ -143,6 +143,48 @@ func (n *noopStripeProvider) CreateSubscriptionCheckoutSession(_ context.Context
 	}, nil
 }
 
+func (n *noopStripeProvider) GetCheckoutSession(_ context.Context, _ string) (usecase.StripeCheckoutSessionDetails, error) {
+	return usecase.StripeCheckoutSessionDetails{
+		ID:                   "cs_test",
+		OrganizationID:       7,
+		Plan:                 domain.PlanGrowth,
+		BillingCycle:         domain.BillingCycleMonthly,
+		Seats:                2,
+		MonthlyQuota:         750,
+		Paid:                 true,
+		StripeCustomerID:     "cus_7",
+		StripeSubscriptionID: "sub_7",
+	}, nil
+}
+
+func (n *noopStripeProvider) GetSubscription(_ context.Context, _ string) (usecase.StripeSubscriptionDetails, error) {
+	return usecase.StripeSubscriptionDetails{
+		OrganizationID:       7,
+		Plan:                 domain.PlanGrowth,
+		BillingCycle:         domain.BillingCycleMonthly,
+		Seats:                2,
+		MonthlyQuota:         750,
+		StripeCustomerID:     "cus_7",
+		StripeSubscriptionID: "sub_7",
+		StripePriceID:        "price_growth_m",
+		Status:               domain.SubscriptionStatusActive,
+	}, nil
+}
+
+func (n *noopStripeProvider) CancelSubscription(_ context.Context, subscriptionID, _ string) (usecase.StripeSubscriptionDetails, error) {
+	return usecase.StripeSubscriptionDetails{
+		OrganizationID:       7,
+		Plan:                 domain.PlanGrowth,
+		BillingCycle:         domain.BillingCycleMonthly,
+		Seats:                2,
+		MonthlyQuota:         750,
+		StripeCustomerID:     "cus_7",
+		StripeSubscriptionID: subscriptionID,
+		StripePriceID:        "price_growth_m",
+		Status:               domain.SubscriptionStatusCanceled,
+	}, nil
+}
+
 func (n *noopStripeProvider) FindPriceIDByLookupKey(_ context.Context, _ string) (string, error) {
 	return "price_admin_pricing", nil
 }
@@ -193,6 +235,29 @@ func TestCreateStripeCheckoutSessionRejectsOrganizationScopeMismatch(t *testing.
 	}
 }
 
+func TestConfirmStripeCheckoutSessionRejectsOrganizationScopeMismatch(t *testing.T) {
+	repo := &memoryRepo{}
+	svc := usecase.NewService(repo)
+	svc.EnableStripe(&noopStripeProvider{}, usecase.StripeCatalog{}, "https://app.local/success", "https://app.local/cancel", "https://app.local/portal")
+
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/stripe/checkout-session/confirm", strings.NewReader(`{
+		"organization_id": 99,
+		"session_id": "cs_test"
+	}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d body=%s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestUpsertSubscriptionRejectsOrganizationScopeMismatch(t *testing.T) {
 	repo := &memoryRepo{}
 	svc := usecase.NewService(repo)
@@ -216,6 +281,48 @@ func TestUpsertSubscriptionRejectsOrganizationScopeMismatch(t *testing.T) {
 	}
 	if repo.subs[99] != nil {
 		t.Fatalf("scope mismatch should not persist subscription: %+v", repo.subs[99])
+	}
+}
+
+func TestCancelSubscriptionUsesScopedOrganization(t *testing.T) {
+	repo := &memoryRepo{
+		subs: map[int64]*domain.Subscription{
+			7: {
+				OrganizationID:       7,
+				Plan:                 domain.PlanGrowth,
+				Seats:                2,
+				MonthlyQuota:         750,
+				StripeCustomerID:     "cus_7",
+				StripeSubscriptionID: "sub_7",
+				StripePriceID:        "price_growth_m",
+				BillingCycle:         domain.BillingCycleMonthly,
+				Status:               domain.SubscriptionStatusActive,
+				UpdatedAt:            time.Now().UTC(),
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	svc.EnableStripe(&noopStripeProvider{}, usecase.StripeCatalog{}, "", "", "")
+
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodPost, "/billing/subscriptions/cancel", nil)
+	req.Header.Set("X-Organization-ID", "7")
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	stored, err := repo.GetByOrganizationID(context.Background(), 7)
+	if err != nil {
+		t.Fatalf("load stored subscription: %v", err)
+	}
+	if stored.Status != domain.SubscriptionStatusCanceled {
+		t.Fatalf("expected canceled status, got %s", stored.Status)
 	}
 }
 

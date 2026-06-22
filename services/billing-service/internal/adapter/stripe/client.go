@@ -141,6 +141,118 @@ func (c *Client) CreateCustomerPortalSession(ctx context.Context, customerID, re
 	return strings.TrimSpace(resp.URL), nil
 }
 
+func (c *Client) GetCheckoutSession(ctx context.Context, sessionID string) (usecase.StripeCheckoutSessionDetails, error) {
+	if strings.TrimSpace(c.secretKey) == "" {
+		return usecase.StripeCheckoutSessionDetails{}, usecase.ErrStripeDisabled
+	}
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return usecase.StripeCheckoutSessionDetails{}, fmt.Errorf("%w: stripe checkout session id is required", usecase.ErrStripeInvalidRequest)
+	}
+
+	body, err := c.doStripeRequest(ctx, http.MethodGet, "/v1/checkout/sessions/"+url.PathEscape(sessionID), nil, "")
+	if err != nil {
+		return usecase.StripeCheckoutSessionDetails{}, err
+	}
+
+	parsed, err := parseCheckoutSessionCompleted(body)
+	if err != nil {
+		return usecase.StripeCheckoutSessionDetails{}, err
+	}
+
+	return usecase.StripeCheckoutSessionDetails{
+		ID:                   sessionID,
+		OrganizationID:       parsed.OrganizationID,
+		ProjectID:            parsed.ProjectID,
+		AttributionSource:    parsed.AttributionSource,
+		Plan:                 parsed.Plan,
+		BillingCycle:         parsed.BillingCycle,
+		Seats:                parsed.Seats,
+		MonthlyQuota:         parsed.MonthlyQuota,
+		Paid:                 parsed.Paid,
+		StripeCustomerID:     parsed.StripeCustomerID,
+		StripeSubscriptionID: parsed.StripeSubscriptionID,
+	}, nil
+}
+
+func (c *Client) GetSubscription(ctx context.Context, subscriptionID string) (usecase.StripeSubscriptionDetails, error) {
+	if strings.TrimSpace(c.secretKey) == "" {
+		return usecase.StripeSubscriptionDetails{}, usecase.ErrStripeDisabled
+	}
+	subscriptionID = strings.TrimSpace(subscriptionID)
+	if subscriptionID == "" {
+		return usecase.StripeSubscriptionDetails{}, fmt.Errorf("%w: stripe subscription id is required", usecase.ErrStripeInvalidRequest)
+	}
+
+	body, err := c.doStripeRequest(ctx, http.MethodGet, "/v1/subscriptions/"+url.PathEscape(subscriptionID), nil, "")
+	if err != nil {
+		return usecase.StripeSubscriptionDetails{}, err
+	}
+
+	parsed, err := parseSubscriptionEvent(body)
+	if err != nil {
+		return usecase.StripeSubscriptionDetails{}, err
+	}
+
+	return usecase.StripeSubscriptionDetails{
+		OrganizationID:       parsed.OrganizationID,
+		ProjectID:            parsed.ProjectID,
+		AttributionSource:    parsed.AttributionSource,
+		Plan:                 parsed.Plan,
+		BillingCycle:         parsed.BillingCycle,
+		Seats:                parsed.Seats,
+		MonthlyQuota:         parsed.MonthlyQuota,
+		StripeCustomerID:     parsed.StripeCustomerID,
+		StripeSubscriptionID: parsed.StripeSubscriptionID,
+		StripePriceID:        parsed.StripePriceID,
+		Status:               parsed.Status,
+		CancelAtPeriodEnd:    parsed.CancelAtPeriodEnd,
+		CurrentPeriodEnd:     parsed.CurrentPeriodEnd,
+	}, nil
+}
+
+func (c *Client) CancelSubscription(ctx context.Context, subscriptionID, requestID string) (usecase.StripeSubscriptionDetails, error) {
+	if strings.TrimSpace(c.secretKey) == "" {
+		return usecase.StripeSubscriptionDetails{}, usecase.ErrStripeDisabled
+	}
+	subscriptionID = strings.TrimSpace(subscriptionID)
+	if subscriptionID == "" {
+		return usecase.StripeSubscriptionDetails{}, fmt.Errorf("%w: stripe subscription id is required", usecase.ErrStripeInvalidRequest)
+	}
+
+	body, err := c.doStripeRequest(ctx, http.MethodDelete, "/v1/subscriptions/"+url.PathEscape(subscriptionID), nil, strings.TrimSpace(requestID))
+	if err != nil {
+		if isStripeStatus(err, http.StatusNotFound) {
+			return usecase.StripeSubscriptionDetails{
+				StripeSubscriptionID: subscriptionID,
+				Status:               domain.SubscriptionStatusCanceled,
+			}, nil
+		}
+		return usecase.StripeSubscriptionDetails{}, err
+	}
+
+	parsed, err := parseSubscriptionEvent(body)
+	if err != nil {
+		return usecase.StripeSubscriptionDetails{}, err
+	}
+
+	return usecase.StripeSubscriptionDetails{
+		OrganizationID:       parsed.OrganizationID,
+		ProjectID:            parsed.ProjectID,
+		AttributionSource:    parsed.AttributionSource,
+		Plan:                 parsed.Plan,
+		BillingCycle:         parsed.BillingCycle,
+		Seats:                parsed.Seats,
+		MonthlyQuota:         parsed.MonthlyQuota,
+		StripeCustomerID:     parsed.StripeCustomerID,
+		StripeSubscriptionID: parsed.StripeSubscriptionID,
+		StripePriceID:        parsed.StripePriceID,
+		Status:               parsed.Status,
+		CancelAtPeriodEnd:    parsed.CancelAtPeriodEnd,
+		CurrentPeriodEnd:     parsed.CurrentPeriodEnd,
+	}, nil
+}
+
 func (c *Client) SyncPricingCatalog(ctx context.Context, req usecase.StripePricingCatalogSyncRequest) (usecase.StripePricingCatalogSyncResult, error) {
 	if strings.TrimSpace(c.secretKey) == "" {
 		return usecase.StripePricingCatalogSyncResult{}, usecase.ErrStripeDisabled
@@ -526,16 +638,25 @@ type parsedCheckoutSession struct {
 
 func parseCheckoutSessionCompleted(raw json.RawMessage) (parsedCheckoutSession, error) {
 	var payload struct {
-		Customer      json.RawMessage   `json:"customer"`
-		Subscription  json.RawMessage   `json:"subscription"`
-		PaymentStatus string            `json:"payment_status"`
-		Metadata      map[string]string `json:"metadata"`
+		ID              string            `json:"id"`
+		ClientReference string            `json:"client_reference_id"`
+		Customer        json.RawMessage   `json:"customer"`
+		Subscription    json.RawMessage   `json:"subscription"`
+		PaymentStatus   string            `json:"payment_status"`
+		Metadata        map[string]string `json:"metadata"`
 	}
 	if err := json.Unmarshal(raw, &payload); err != nil {
 		return parsedCheckoutSession{}, fmt.Errorf("decode checkout.session.completed object: %w", err)
 	}
+	organizationID := metadataInt64(payload.Metadata, "organization_id")
+	if organizationID <= 0 {
+		parsed, err := strconv.ParseInt(strings.TrimSpace(payload.ClientReference), 10, 64)
+		if err == nil && parsed > 0 {
+			organizationID = parsed
+		}
+	}
 	return parsedCheckoutSession{
-		OrganizationID:       metadataInt64(payload.Metadata, "organization_id"),
+		OrganizationID:       organizationID,
 		ProjectID:            metadataString(payload.Metadata, "project_id"),
 		AttributionSource:    metadataString(payload.Metadata, "attribution_source"),
 		Plan:                 metadataString(payload.Metadata, "plan"),

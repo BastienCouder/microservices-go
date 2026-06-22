@@ -127,7 +127,6 @@ export type PerceptionViewData = {
   competitors: BrandCompetitor[];
   radar: PerceptionRadarPoint[];
   scores: PerceptionScores;
-  topErrors: PerceptionError[];
   modelAxisHeatmap: {
     axes: PerceptionHeatmapAxis[];
     rows: PerceptionHeatmapRow[];
@@ -160,7 +159,6 @@ export type PerceptionApiPayload = {
   };
   scores?: Partial<PerceptionScores>;
   radar?: Array<Partial<PerceptionRadarPoint>>;
-  topErrors?: Array<Partial<PerceptionError>>;
   responses?: unknown;
   metadata?: Partial<PerceptionViewData["metadata"]> & {
     projectModels?: unknown;
@@ -212,7 +210,6 @@ export function createEmptyPerceptionViewData(
       factualAccuracy: 0,
       sentimentScore: 0,
     },
-    topErrors: [],
     modelAxisHeatmap: {
       axes: [],
       rows: [],

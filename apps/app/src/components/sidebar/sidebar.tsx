@@ -23,9 +23,7 @@ import {
 import { gatewayJSON } from "@/shared/api/gateway";
 import { useI18nScope } from "@/shared/hooks/use-i18n";
 import type { OrganizationHierarchy } from "@/shared/models";
-import {
-  loadProjectContextHierarchies,
-} from "@/shared/project-context";
+import { loadProjectContextHierarchies } from "@/shared/project-context";
 import { findBySlugIdOrPublicId, findBySlugOrId } from "@/shared/public-slugs";
 import {
   SELECTED_CONTEXT_CHANGE_EVENT,
@@ -57,6 +55,38 @@ import { Button } from "../ui/button";
 const EMPTY_ORGANIZATIONS: OrganizationSummary[] = [];
 const SETTINGS_PATHS = ["/organizations", "/account"];
 
+const routePreloaders: Record<string, () => Promise<unknown>> = {
+  "/monitoring": () => import("@/features/monitoring/index"),
+  "/prompts": () => import("@/features/prompts/index"),
+  "/pages": () => import("@/features/pages/index"),
+  "/traffic": () => import("@/features/traffic/index"),
+  "/models": () => import("@/features/models/index"),
+  "/perception": () => import("@/features/perception"),
+  "/perception/responses": () => import("@/features/perception/responses"),
+  "/content-optimizer": () => import("@/features/content-optimizer/index"),
+  "/ai-agent-ready": () => import("@/features/ai-agent-ready/index"),
+  "/error-hub": () => import("@/features/error-hub/index"),
+  "/optimize/actions": () => import("@/features/error-hub/index"),
+  "/brands": () => import("@/features/brands/index"),
+  "/brand-canon": () => import("@/features/brands/brand-canon/index"),
+  "/organizations": () => import("@/features/organizations/index"),
+  "/account": () => import("@/features/account/index"),
+};
+
+const preloadedRoutePaths = new Set<string>();
+
+function preloadRouteFromHref(href: string) {
+  const [path] = href.split("?");
+  const preload = routePreloaders[path];
+
+  if (!preload || preloadedRoutePaths.has(path)) return;
+
+  preloadedRoutePaths.add(path);
+  void preload().catch(() => {
+    preloadedRoutePaths.delete(path);
+  });
+}
+
 type SidebarProps = {
   apiBaseURL?: string;
   className?: string;
@@ -71,6 +101,7 @@ type NavItem = {
   label: string;
   active: boolean;
   onClick?: () => void;
+  onPreload?: () => void;
 };
 
 type NavSectionProps = {
@@ -90,18 +121,18 @@ const normalizeProjects = (
 ): SidebarProjectOption[] =>
   hierarchy
     ? [...hierarchy.projects]
-      .sort((a, b) => a.name.localeCompare(b.name, "en"))
-      .map((project) => ({
-        id: project.id,
-        slug: project.slug,
-        name: project.name,
-        organizationId: hierarchy.organization.id,
-        organizationSlug: hierarchy.organization.slug,
-        organizationName: hierarchy.organization.name,
-        brandName: project.brandName,
-        status: project.status,
-        initials: initials(project.name),
-      }))
+        .sort((a, b) => a.name.localeCompare(b.name, "en"))
+        .map((project) => ({
+          id: project.id,
+          slug: project.slug,
+          name: project.name,
+          organizationId: hierarchy.organization.id,
+          organizationSlug: hierarchy.organization.slug,
+          organizationName: hierarchy.organization.name,
+          brandName: project.brandName,
+          status: project.status,
+          initials: initials(project.name),
+        }))
     : [];
 
 async function loadHierarchy(
@@ -137,15 +168,20 @@ function NavSection({ title, items, collapsed, indent }: NavSectionProps) {
         )}
 
         {items.map((item) => (
-          <SidebarNavItem
+          <div
             key={item.href}
-            href={item.href}
-            label={item.label}
-            active={item.active}
-            indent={indent && !collapsed}
-            collapsed={collapsed}
-            onClick={item.onClick}
-          />
+            onPointerEnter={item.onPreload}
+            onFocusCapture={item.onPreload}
+          >
+            <SidebarNavItem
+              href={item.href}
+              label={item.label}
+              active={item.active}
+              indent={indent && !collapsed}
+              collapsed={collapsed}
+              onClick={item.onClick}
+            />
+          </div>
         ))}
       </div>
     </section>
@@ -292,7 +328,7 @@ function SidebarComponent({
       dashboard: buildScopedHref("/monitoring", { project }),
       prompts: buildScopedHref("/prompts", { project, tab: "prompts" }),
       responses: buildScopedHref("/prompts", { project, tab: "responses" }),
-     // pages: buildScopedHref("/pages", { project }),
+      // pages: buildScopedHref("/pages", { project }),
       perception: buildScopedHref("/perception", { project }),
       traffic: buildScopedHref("/traffic", { project }),
       models: buildScopedHref("/models", { project }),
@@ -303,7 +339,7 @@ function SidebarComponent({
       account: buildScopedHref("/account", { project }),
       addProject: buildCreateProjectOnboardingHref(),
     };
-  }, [activeProject, activeOrg]);
+  }, [activeProject]);
 
   const isActiveHref = (href: string) => {
     const [path, search = ""] = href.split("?");
@@ -321,7 +357,13 @@ function SidebarComponent({
     label: string,
     onClick?: () => void,
     active = isActiveHref(href),
-  ): NavItem => ({ href, label, active, onClick });
+  ): NavItem => ({
+    href,
+    label,
+    active,
+    onClick,
+    onPreload: () => preloadRouteFromHref(href),
+  });
 
   const startCreateProjectOnboarding = () => {
     prepareCreateProjectOnboardingContext(selectedOrgId);
@@ -381,7 +423,7 @@ function SidebarComponent({
         item(links.dashboard, content.dashboard),
         item(links.prompts, content.prompts),
         item(links.responses, content.responses),
-      //  item(links.pages, content.pages),
+        // item(links.pages, content.pages),
       ],
     },
     {
@@ -424,15 +466,15 @@ function SidebarComponent({
       items: orgTabs
         .filter(({ value }) => value !== "apiKeys")
         .map(({ value, label }) =>
-        item(
-          organizationLinks[value],
-          content[
-          `organizationTab${value[0]?.toUpperCase()}${value.slice(1)}`
-          ] || label,
-          undefined,
-          currentPath === "/organizations" && activeSection === value,
+          item(
+            organizationLinks[value],
+            content[
+              `organizationTab${value[0]?.toUpperCase()}${value.slice(1)}`
+            ] || label,
+            undefined,
+            currentPath === "/organizations" && activeSection === value,
+          ),
         ),
-      ),
     },
     {
       title: content.account,
@@ -458,19 +500,18 @@ function SidebarComponent({
               collapsed ? "justify-center" : "justify-between",
             )}
           >
-         {/*    <div className="flex h-8 w-8">
+            {/* <div className="flex h-8 w-8">
               <img src="/logo_icon_white.svg" alt="Logo" />
             </div> */}
 
             {!collapsed && (
               <span className="ml-2 truncate text-sm font-semibold text-background">
-               <img src="/logo_white.svg" alt="Logo" className="h-10"/>
+                <img src="/logo_white.svg" alt="Logo" className="h-10" />
               </span>
             )}
           </div>
 
-      
-  <div className="shrink-0 border-b border-border/40 px-3 py-4">
+          <div className="shrink-0 border-b border-border/40 px-3 py-4">
             <SidebarOrganizationSwitcher
               collapsed={collapsed}
               projects={projects}
@@ -516,8 +557,6 @@ function SidebarComponent({
               </div>
             )}
           </nav>
-
-
         </div>
 
         <div className="shrink-0 border-t border-background/40 p-2">

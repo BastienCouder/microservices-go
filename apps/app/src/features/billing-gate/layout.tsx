@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useLayoutEffect } from "react";
 
 import { redirectToWebPricing } from "@/shared/auth/web-auth";
 
@@ -13,13 +13,11 @@ export function BillingGateLayout({
   routeSearch: _routeSearch,
   userEmail: _userEmail,
 }: BillingGateLayoutProps) {
-  useEffect(() => {
+  useLayoutEffect(() => {
     redirectToWebPricing();
   }, []);
 
   return (
-    <div className="flex min-h-[320px] items-center justify-center p-6 text-sm text-muted-foreground">
-      Redirection vers les tarifs...
-    </div>
+    <div className="min-h-[320px]" aria-hidden="true" />
   );
 }

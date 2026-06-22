@@ -10,16 +10,17 @@ import (
 )
 
 var (
-	ErrOrganizationNotFound     = errors.New("organization not found")
-	ErrInvalidOrganization      = errors.New("invalid organization")
-	ErrMemberNotFound           = errors.New("member not found")
-	ErrInvalidMember            = errors.New("invalid member")
-	ErrInvalidRole              = errors.New("invalid role")
-	ErrInvitationNotFound       = errors.New("invitation not found")
-	ErrInvalidInvitation        = errors.New("invalid invitation")
-	ErrInvitationExpired        = errors.New("invitation expired")
-	ErrInvitationAlreadyHandled = errors.New("invitation already handled")
-	ErrInvitationEmailMismatch  = errors.New("invitation email does not match authenticated user")
+	ErrOrganizationNotFound        = errors.New("organization not found")
+	ErrInvalidOrganization         = errors.New("invalid organization")
+	ErrOwnerAlreadyHasOrganization = errors.New("owner already has organization")
+	ErrMemberNotFound              = errors.New("member not found")
+	ErrInvalidMember               = errors.New("invalid member")
+	ErrInvalidRole                 = errors.New("invalid role")
+	ErrInvitationNotFound          = errors.New("invitation not found")
+	ErrInvalidInvitation           = errors.New("invalid invitation")
+	ErrInvitationExpired           = errors.New("invitation expired")
+	ErrInvitationAlreadyHandled    = errors.New("invitation already handled")
+	ErrInvitationEmailMismatch     = errors.New("invitation email does not match authenticated user")
 )
 
 type Organization struct {
