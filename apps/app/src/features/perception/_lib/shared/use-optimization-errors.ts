@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
-import { pushErrorToast } from "@/components/ui/toast-actions";
-import { apiRoutes } from "@/lib/api-config";
 import type { ProjectModelMeta } from "@/lib/project-models";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
@@ -12,7 +10,6 @@ import {
   readOrganizationIdFromSearch,
   readSelectedOrganizationPublicID,
 } from "@/shared/selection";
-import { getPerceptionClientJSON, patchPerceptionClientJSON, postPerceptionClientJSON } from "../client-api";
 import { getOptimizationActionMatchIds } from "../optimization-action-ids";
 import {
   resolvePerceptionGeneratedContent,
@@ -28,8 +25,6 @@ import type {
   OptimizePriority,
   PerceptionError,
 } from "./perception-data";
-
-const DISABLE_GATEWAY_TIMEOUT_MS = 0;
 
 type OptimizeActionStatus = "draft" | "published" | "processing" | "done" | string;
 
@@ -81,8 +76,7 @@ type UseOptimizationErrorsResult = {
 };
 
 export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): UseOptimizationErrorsResult {
-  const { locale, t } = useScopedI18n("perception");
-  const { t: tErrorHub } = useScopedI18n("error-hub");
+  const { locale } = useScopedI18n("perception");
   const projectId = readOptimizationProjectIdFromSearch(routeSearch);
   const organizationId = useMemo(
     () =>
@@ -98,6 +92,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   const [savingErrorIds, setSavingErrorIds] = useState<Set<string>>(new Set());
   const [markingDoneErrorIds, setMarkingDoneErrorIds] = useState<Set<string>>(new Set());
   const [persistError, setPersistError] = useState<string | null>(null);
+  const [aiBriefSettingsData, setAIBriefSettingsData] = useState<AIBriefSettings | null>(null);
   const query = useQuery({
     queryKey: appQueryKeys.optimizationErrors(
       apiBaseURL,
@@ -107,7 +102,6 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     enabled: apiBaseURL.trim() !== "",
     queryFn: () => loadOptimizationErrors(apiBaseURL, routeSearch),
   });
-  const activeProjectId = query.data?.projectId ?? projectId ?? "";
   const billingQuery = useQuery({
     queryKey: appQueryKeys.billingQuota(apiBaseURL, billingOrganization.organizationId),
     enabled: apiBaseURL.trim() !== "" && billingOrganization.organizationId.trim() !== "",
@@ -115,44 +109,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
       loadBillingEntitlements(apiBaseURL, billingOrganization.organizationId, { signal }),
   });
   const canGenerateAiBrief = billingQuery.data?.allowAiBriefs === true;
-  const actionOrganizationId = organizationId?.trim() || undefined;
-  const {
-    data: aiBriefSettingsData,
-    refetch: refetchAIBriefSettings,
-  } = useQuery({
-    queryKey: appQueryKeys.aiBriefSettings(
-      apiBaseURL,
-      activeProjectId || null,
-      organizationId || null,
-    ),
-    enabled: apiBaseURL.trim() !== "" && activeProjectId.trim() !== "",
-    queryFn: () =>
-      getPerceptionClientJSON<AIBriefSettings>(
-        apiRoutes.analysis.aiBriefSettings(activeProjectId),
-        { organizationId: actionOrganizationId },
-      ),
-  });
   const [savingAIBriefSettings, setSavingAIBriefSettings] = useState(false);
-
-  useEffect(() => {
-    if (!activeProjectId) return;
-
-    let isMounted = true;
-    void getPerceptionClientJSON<PersistedOptimizeAction[]>(
-      apiRoutes.analysis.optimizeActions(activeProjectId),
-      { organizationId: actionOrganizationId },
-    )
-      .then((actions) => {
-        if (isMounted) {
-          setPersistedActions(actions);
-        }
-      })
-      .catch(() => undefined);
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeProjectId, actionOrganizationId]);
 
   const generatedIds = useMemo(
     () =>
@@ -193,7 +150,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
     async (error: OptimizationError) => {
       setPersistError(null);
       if (!canGenerateAiBrief) return;
-      if (savingErrorIds.has(error.id) || generatedIds.has(error.id) || !activeProjectId) return;
+      if (savingErrorIds.has(error.id) || generatedIds.has(error.id)) return;
 
       const localizedGeneratedContent = resolvePerceptionGeneratedContent(
         error.generatedContent,
@@ -221,130 +178,69 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
       );
 
       setSavingErrorIds((current) => new Set(current).add(error.id));
-      try {
-        const result = await postPerceptionClientJSON<{
-          id: string;
-          generatedContent?: string;
-          status: OptimizeActionStatus;
-        }>(
-          apiRoutes.analysis.optimizeActions(activeProjectId),
-          {
-            priority: error.optimizePriority,
-            type: error.fixType,
-            title: localizedTitle,
-            issue: localizedIssue,
-            impact: localizedImpact,
-            generatedContent: localizedGeneratedContent,
-            status: "processing",
-            sourceErrorId: error.id,
-            metadata: {
-              source: error.source,
-              detectedInModels: error.detectedInModels,
-              aiModels: error.detectedInModels,
-              createdBy: "ai",
-              workflow: "error_hub_fix",
-              promptsCount: 0,
-            },
+      setPersistedActions((current) => [
+        {
+          id: `local-${error.id}-${Date.now()}`,
+          priority: error.optimizePriority,
+          type: error.fixType,
+          title: localizedTitle,
+          issue: localizedIssue,
+          impact: localizedImpact,
+          generatedContent: localizedGeneratedContent,
+          status: "processing",
+          sourceErrorId: error.id,
+          metadata: {
+            briefSource: "ai",
+            source: error.source,
+            detectedInModels: error.detectedInModels,
+            aiModels: error.detectedInModels,
+            createdBy: "ai",
+            workflow: "error_hub_fix",
+            promptsCount: 0,
           },
-          { organizationId: actionOrganizationId, timeoutMs: DISABLE_GATEWAY_TIMEOUT_MS },
-        );
-
-        setPersistedActions((current) => [
-          {
-            id: result.id,
-            priority: error.optimizePriority,
-            type: error.fixType,
-            title: localizedTitle,
-            issue: localizedIssue,
-            impact: localizedImpact,
-            generatedContent: result.generatedContent || localizedGeneratedContent,
-            status: result.status || "processing",
-            sourceErrorId: error.id,
-            metadata: { briefSource: "ai" },
-          },
-          ...current,
-        ]);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : t("optimizeActionsCreateError");
-        setPersistError(message);
-        pushErrorToast(err, message);
-      } finally {
-        setSavingErrorIds((current) => {
-          const next = new Set(current);
-          next.delete(error.id);
-          return next;
-        });
-      }
+        },
+        ...current,
+      ]);
+      setSavingErrorIds((current) => {
+        const next = new Set(current);
+        next.delete(error.id);
+        return next;
+      });
     },
-    [activeProjectId, actionOrganizationId, canGenerateAiBrief, generatedIds, locale, savingErrorIds, t],
+    [canGenerateAiBrief, generatedIds, locale, savingErrorIds],
   );
 
   const saveAIBriefSettings = useCallback(
     async (input: SaveAIBriefSettingsInput) => {
-      if (!activeProjectId || savingAIBriefSettings) return;
+      if (savingAIBriefSettings) return;
       setPersistError(null);
       setSavingAIBriefSettings(true);
-      try {
-        await patchPerceptionClientJSON<AIBriefSettings>(
-          apiRoutes.analysis.aiBriefSettings(activeProjectId),
-          input,
-          { organizationId: actionOrganizationId },
-        );
-        refetchAIBriefSettings().catch(() => undefined);
-      } catch (err) {
-        const message =
-          err instanceof Error ? err.message : tErrorHub("aiBriefModelSaveError");
-        setPersistError(message);
-        pushErrorToast(err, message);
-        throw err;
-      } finally {
-        setSavingAIBriefSettings(false);
-      }
+      setAIBriefSettingsData({
+        projectId: query.data?.projectId ?? projectId ?? "",
+        ...input,
+      });
+      setSavingAIBriefSettings(false);
     },
-    [activeProjectId, actionOrganizationId, refetchAIBriefSettings, savingAIBriefSettings, tErrorHub],
+    [projectId, query.data?.projectId, savingAIBriefSettings],
   );
 
   const handleMarkDone = useCallback(
     async (error: OptimizationError) => {
       setPersistError(null);
       const action = actionsByErrorId.get(error.id);
-      if (!action || action.status === "done" || markingDoneErrorIds.has(error.id) || !activeProjectId) return;
+      if (!action || action.status === "done" || markingDoneErrorIds.has(error.id)) return;
 
       setMarkingDoneErrorIds((current) => new Set(current).add(error.id));
-      const previousStatus = action.status || "processing";
       setPersistedActions((current) =>
         current.map((item) => (item.id === action.id ? { ...item, status: "done" } : item)),
       );
-
-      try {
-        const result = await patchPerceptionClientJSON<{ id: string; status: OptimizeActionStatus }>(
-          apiRoutes.analysis.optimizeAction(activeProjectId, action.id),
-          { status: "done" },
-          { organizationId: actionOrganizationId },
-        );
-        setPersistedActions((current) =>
-          current.map((item) =>
-            item.id === action.id ? { ...item, status: result.status || "done" } : item,
-          ),
-        );
-      } catch (err) {
-        setPersistedActions((current) =>
-          current.map((item) => (item.id === action.id ? { ...item, status: previousStatus } : item)),
-        );
-        const message =
-          err instanceof Error ? err.message : t("optimizeActionsCreateError");
-        setPersistError(message);
-        pushErrorToast(err, message);
-      } finally {
-        setMarkingDoneErrorIds((current) => {
-          const next = new Set(current);
-          next.delete(error.id);
-          return next;
-        });
-      }
+      setMarkingDoneErrorIds((current) => {
+        const next = new Set(current);
+        next.delete(error.id);
+        return next;
+      });
     },
-    [actionOrganizationId, actionsByErrorId, activeProjectId, markingDoneErrorIds, t],
+    [actionsByErrorId, markingDoneErrorIds],
   );
 
   const reload = useCallback(async () => {
@@ -352,7 +248,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
   }, [query.refetch]);
 
   return {
-    aiBriefSettings: aiBriefSettingsData ?? null,
+    aiBriefSettings: aiBriefSettingsData,
     competitors: query.data?.competitors ?? [],
     canGenerateAiBrief,
     data: query.data?.data ?? null,

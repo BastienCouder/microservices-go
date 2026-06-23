@@ -45,19 +45,21 @@ describe("resolveSelectedProjectForModels", () => {
     expect(dataSource.includes("resolvedProjectContextQuery.data?.projectId || hintedProjectToken")).toBe(true);
   });
 
+  test("uses the stored internal organization id when the url hides organization context", () => {
+    expect(viewModelSource.includes("readSelectedOrganizationID")).toBe(true);
+    expect(viewModelSource.includes("return readSelectedOrganizationPublicID();")).toBe(false);
+  });
+
   test("keeps the selection limit unset until billing entitlements are resolved", () => {
     expect(dataSource.includes("const resolvedSelectionLimit = billingQuery.data")).toBe(true);
     expect(dataSource.includes("const selectionLimitReady =")).toBe(true);
     expect(dataSource.includes("resolvedSelectionLimit ??")).toBe(true);
   });
 
-  test("keeps the opaque project id in the canonical models redirect", () => {
-    const redirectBlock = viewModelSource.slice(
-      viewModelSource.indexOf('buildScopedHref("/models"'),
-      viewModelSource.indexOf("  }, [", viewModelSource.indexOf('buildScopedHref("/models"')),
-    );
-    expect(redirectBlock.includes("project: data.selectedProject.id")).toBe(true);
-    expect(redirectBlock.includes("organizationId")).toBe(false);
+  test("keeps the public project slug in the canonical models redirect", () => {
+    expect(viewModelSource.includes("hintedProject === data.selectedProject.slug")).toBe(true);
+    expect(viewModelSource.includes("project: data.selectedProject.slug || data.selectedProject.id")).toBe(true);
+    expect(viewModelSource.includes('buildScopedHref("/models", {')).toBe(true);
   });
 });
 

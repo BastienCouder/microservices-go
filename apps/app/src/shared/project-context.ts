@@ -1,6 +1,7 @@
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { attachStableSlugs, slugifyPublicName } from "@/shared/public-slugs";
+import { ROUTE_PROJECT_PARAM } from "@/shared/selection";
 import type { UserOrganizationSummary } from "@/shared/organizations";
 
 type JsonRecord = Record<string, unknown>;
@@ -206,10 +207,11 @@ export function applyResolvedProjectContextSearch(
   const params = new URLSearchParams(
     routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch,
   );
-  params.set("project", context.projectSlug || context.projectId);
-  params.set("projectId", context.projectId);
+  params.set(ROUTE_PROJECT_PARAM, context.projectSlug || context.projectId);
+  params.delete("projectId");
   params.delete("project_id");
-  params.set("organizationId", context.organizationPublicId || context.organizationId);
+  params.delete("org");
+  params.delete("organizationId");
   params.delete("organization_id");
 
   const search = params.toString();

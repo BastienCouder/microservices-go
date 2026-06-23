@@ -276,6 +276,16 @@ func copyContentOptimizerCrawlSnapshot(snapshot *ContentOptimizerCrawlSnapshot) 
 	return out
 }
 
+func copyContentOptimizerSelectionDraft(draft *ContentOptimizerSelectionDraft) ContentOptimizerSelectionDraft {
+	if draft == nil {
+		return ContentOptimizerSelectionDraft{}
+	}
+	out := *draft
+	out.SelectedURLs = append([]string(nil), draft.SelectedURLs...)
+	out.Result = copyContentOptimizerCrawlResult(draft.Result)
+	return out
+}
+
 func copyOptimizeAction(action *OptimizeAction) OptimizeAction {
 	if action == nil {
 		return OptimizeAction{}
@@ -344,6 +354,18 @@ func nonNilContentOptimizerCrawlMap(input map[string]*ContentOptimizerCrawlSnaps
 	out := make(map[string]*ContentOptimizerCrawlSnapshot, len(input))
 	for key, value := range input {
 		clone := copyContentOptimizerCrawlSnapshot(value)
+		out[key] = &clone
+	}
+	return out
+}
+
+func nonNilContentOptimizerSelectionMap(input map[string]*ContentOptimizerSelectionDraft) map[string]*ContentOptimizerSelectionDraft {
+	if input == nil {
+		return make(map[string]*ContentOptimizerSelectionDraft)
+	}
+	out := make(map[string]*ContentOptimizerSelectionDraft, len(input))
+	for key, value := range input {
+		clone := copyContentOptimizerSelectionDraft(value)
 		out[key] = &clone
 	}
 	return out

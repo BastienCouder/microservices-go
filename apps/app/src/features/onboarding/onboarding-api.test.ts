@@ -94,4 +94,35 @@ describe("createOnboardingProject", () => {
     expect(requestBody.organizationId).toBe("");
     expect(requestBody.organizationName).toBe("Acme");
   });
+
+  test("does not invent an organization name when an organization is already selected", async () => {
+    let requestBody: Record<string, unknown> = {};
+    globalThis.fetch = (async (_input, init) => {
+      requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+      return jsonResponse(201, {
+        success: true,
+        data: {
+          projectId: "prj_300",
+          organizationId: 42,
+          projectSlug: "acme-project",
+        },
+      });
+    }) as typeof fetch;
+
+    await createOnboardingProject("http://api.test", {
+      organizationId: "42",
+      organizationName: "Stale organization name",
+      brandName: "Acme Project",
+      websiteUrl: "https://acme.test",
+      attributionSource: "",
+      brandDescription: "",
+      industry: "",
+      competitors: [],
+      prompts: [],
+      modelIds: ["gpt-oss-120b-free"],
+    });
+
+    expect(requestBody.organizationId).toBe("42");
+    expect(requestBody.organizationName).toBe("");
+  });
 });

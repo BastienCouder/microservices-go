@@ -32,8 +32,16 @@ describe("useOptimizationErrors", () => {
     ).toBe(true);
   });
 
-  test("uses the resolved organization scope for optimize action reads and writes", () => {
-    expect(source.includes('const actionOrganizationId = organizationId?.trim() || undefined;')).toBe(true);
-    expect(source.includes('{ organizationId: actionOrganizationId },')).toBe(true);
+  test("keeps generated optimize actions local instead of calling removed backend endpoints", () => {
+    expect(source.includes("postPerceptionClientJSON")).toBe(false);
+    expect(source.includes("patchPerceptionClientJSON")).toBe(false);
+    expect(source.includes("getPerceptionClientJSON")).toBe(false);
+    expect(source.includes("apiRoutes.analysis.optimizeActions")).toBe(false);
+    expect(source.includes("apiRoutes.analysis.aiBriefSettings")).toBe(false);
+  });
+
+  test("does not resolve the route project token for removed optimize action side queries", () => {
+    expect(source.includes("resolveProjectTokenToId")).toBe(false);
+    expect(source.includes("resolvedProjectIdQuery")).toBe(false);
   });
 });

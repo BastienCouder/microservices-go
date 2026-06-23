@@ -65,6 +65,32 @@ describe("onboarding mode", () => {
     });
   });
 
+  test("uses the internal organization id for onboarding API calls", () => {
+    const storage = new Map<string, string>([
+      ["selected-organization-id", "42"],
+      ["selected-organization-public-id", "org_public_42"],
+    ]);
+    const originalWindow = globalThis.window;
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        localStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          setItem: (_key: string, _value: string) => {},
+          removeItem: (_key: string) => {},
+        },
+      },
+    });
+
+    expect(resolveOnboardingOrganizationId("?setup=project")).toBe("42");
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  });
+
   test("prefers the organization from the route when onboarding is explicitly scoped", () => {
     expect(resolveOnboardingOrganizationId("?setup=account&organizationId=42")).toBe("42");
   });

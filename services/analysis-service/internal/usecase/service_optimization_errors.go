@@ -27,9 +27,15 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 	}
 	perceptionErrors := derivePerceptionOptimizationErrors(perception)
 
+	crawlerUnavailable := false
 	crawlerErrors, err := s.listCrawlerOptimizationErrors(ctx, projectID, organizationID)
 	if err != nil {
-		return OptimizationErrorBoard{}, err
+		if errors.Is(err, ErrDependencyUnavailable) {
+			crawlerUnavailable = true
+			crawlerErrors = nil
+		} else {
+			return OptimizationErrorBoard{}, err
+		}
 	}
 
 	errors := make([]OptimizationError, 0, len(perceptionErrors)+len(crawlerErrors))
@@ -59,6 +65,7 @@ func (s *Service) GetOptimizationErrors(ctx context.Context, projectID string, o
 			"monitoringDerivedErrors": 0,
 			"perceptionErrors":        len(perceptionErrors),
 			"crawlerErrors":           len(crawlerErrors),
+			"crawlerUnavailable":      crawlerUnavailable,
 			"analyzedResponses":       perception.Metadata["analyzedResponses"],
 		},
 	}, nil

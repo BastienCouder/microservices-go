@@ -79,7 +79,7 @@ describe("auth route guards", () => {
     ).toBe(true);
   });
 
-  test("blocks account onboarding once a project already exists", () => {
+  test("blocks account onboarding once an organization already exists", () => {
     expect(
       shouldRedirectAwayFromAccountOnboarding({
         apiBaseURL: "https://api.local",
@@ -87,6 +87,19 @@ describe("auth route guards", () => {
         user,
         isOnboardingRoute: true,
         onboardingSetupMode: "account",
+        organizationCount: 1,
+        projectCount: 0,
+      }),
+    ).toBe(true);
+
+    expect(
+      shouldRedirectAwayFromAccountOnboarding({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "account",
+        organizationCount: 0,
         projectCount: 1,
       }),
     ).toBe(true);
@@ -98,6 +111,7 @@ describe("auth route guards", () => {
         user,
         isOnboardingRoute: true,
         onboardingSetupMode: "project",
+        organizationCount: 1,
         projectCount: 1,
       }),
     ).toBe(false);

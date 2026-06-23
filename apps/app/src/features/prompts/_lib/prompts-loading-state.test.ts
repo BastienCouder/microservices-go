@@ -5,6 +5,8 @@ import {
   readPromptsWorkspaceTab,
 } from "./use-prompts-responses-state";
 
+const source = await Bun.file(new URL("./use-prompts-responses-state.ts", import.meta.url)).text();
+
 describe("getPromptsWorkspaceLoadingState", () => {
   test("uses data skeletons for initial monitoring or prompt catalog loading", () => {
     expect(
@@ -50,5 +52,10 @@ describe("getPromptsWorkspaceLoadingState", () => {
     expect(readPromptsWorkspaceTab("?project=fury-defendu&tab=responses")).toBe("responses");
     expect(readPromptsWorkspaceTab("?project=fury-defendu&tab=prompts")).toBe("prompts");
     expect(readPromptsWorkspaceTab("?project=fury-defendu")).toBe("prompts");
+  });
+
+  test("falls back to the stored internal organization id when the URL hides org ids", () => {
+    expect(source.includes("readSelectedOrganizationID")).toBe(true);
+    expect(source.includes("readSelectedOrganizationPublicID")).toBe(false);
   });
 });

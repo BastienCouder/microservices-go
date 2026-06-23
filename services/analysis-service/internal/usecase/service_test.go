@@ -34,6 +34,20 @@ type staticBillingQuotaProvider struct {
 	monthlyQuota int
 }
 
+type unavailableLatestCrawlProvider struct{}
+
+func (unavailableLatestCrawlProvider) StartCrawl(context.Context, ContentOptimizerCrawlStartInput) (ContentOptimizerCrawlJob, error) {
+	return ContentOptimizerCrawlJob{}, errors.New("not implemented")
+}
+
+func (unavailableLatestCrawlProvider) GetCrawl(context.Context, string, ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error) {
+	return ContentOptimizerCrawlResult{}, errors.New("not implemented")
+}
+
+func (unavailableLatestCrawlProvider) GetLatestCrawl(context.Context, string, int64) (ContentOptimizerCrawlSnapshot, error) {
+	return ContentOptimizerCrawlSnapshot{}, ErrDependencyUnavailable
+}
+
 func (p staticBillingQuotaProvider) GetMonthlyQuota(_ context.Context, _ int64) (int, bool, error) {
 	if p.monthlyQuota <= 0 {
 		return 0, false, nil
@@ -1674,6 +1688,79 @@ func TestGetOptimizationErrorsExcludesDerivedMonitoringDiagnostics(t *testing.T)
 	}
 	if got, ok := board.Metadata["monitoringDerivedErrors"].(int); !ok || got != 0 {
 		t.Fatalf("expected monitoringDerivedErrors metadata to be zero, got %#v", board.Metadata["monitoringDerivedErrors"])
+	}
+}
+
+func TestGetOptimizationErrorsFallsBackWhenCrawlerDependencyIsUnavailable(t *testing.T) {
+	ctx := context.Background()
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ContentCrawler: unavailableLatestCrawlProvider{},
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	brandName := "Acme"
+	category := "CRM"
+	positioning := "CRM simple pour PME"
+	useCases := []string{"Prospection"}
+	features := []string{"Automatisation"}
+
+	if _, err := svc.UpdateBrandCanon(ctx, "project-1", 42, UpdateBrandCanonInput{
+		BrandName:   &brandName,
+		Category:    &category,
+		Positioning: &positioning,
+		UseCases:    &useCases,
+		Features:    &features,
+	}); err != nil {
+		t.Fatalf("seed brand canon: %v", err)
+	}
+
+	started, err := svc.StartAnalysis(ctx, StartAnalysisInput{
+		OrganizationID: 42,
+		CreatedBy:      7,
+		ProjectID:      "project-1",
+		PromptTexts: []PromptText{
+			{ID: "prompt-1", Text: "Quel CRM pour PME ?", Kind: promptKindPerception},
+		},
+		ModelIDs: []string{"gpt-4o-mini"},
+		RunType:  promptKindPerception,
+	})
+	if err != nil {
+		t.Fatalf("start analysis: %v", err)
+	}
+
+	if err := svc.RecordResponse(ctx, ResponseInput{
+		RunID:          started.AnalysisRun.ID,
+		PromptRunID:    started.PromptRuns[0].ID,
+		ModelID:        "gpt-4o-mini",
+		RawResponse:    "Acme est parfois cite mais sans preuve claire.",
+		BrandMentioned: true,
+		BrandPosition:  "bottom",
+		CitationFound:  false,
+		Sentiment:      "negative",
+	}); err != nil {
+		t.Fatalf("record response: %v", err)
+	}
+
+	board, err := svc.GetOptimizationErrors(ctx, "project-1", 42)
+	if err != nil {
+		t.Fatalf("get optimization errors: %v", err)
+	}
+
+	if len(board.Errors) == 0 {
+		t.Fatalf("expected perception errors even when crawler is unavailable, got %#v", board)
+	}
+	for _, item := range board.Errors {
+		if item.Source == "crawler" {
+			t.Fatalf("expected crawler errors to be omitted when dependency is unavailable, got %#v", board.Errors)
+		}
+	}
+	if got, ok := board.Metadata["crawlerErrors"].(int); !ok || got != 0 {
+		t.Fatalf("expected crawlerErrors metadata to stay at 0 on dependency fallback, got %#v", board.Metadata["crawlerErrors"])
+	}
+	if got, ok := board.Metadata["crawlerUnavailable"].(bool); !ok || !got {
+		t.Fatalf("expected crawlerUnavailable metadata to be true, got %#v", board.Metadata["crawlerUnavailable"])
 	}
 }
 

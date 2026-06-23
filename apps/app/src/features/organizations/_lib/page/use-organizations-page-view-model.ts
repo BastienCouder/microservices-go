@@ -257,11 +257,16 @@ export function useOrganizationsPageViewModel({
   );
   const canManageProjects = canManageOrganizationPages(effectiveCurrentUserRoles);
   const canDeleteProjects = effectiveCurrentUserRoles.some((role) => role === "editor");
-  const effectiveActiveTab = isOrganizationViewTabAvailable(activeTab, effectiveCurrentUserRoles)
+  const shouldDeferTabPermissionResolution =
+    resourcesQuery.isLoading || (resourcesQuery.isFetching && !resourcesQuery.data);
+  const effectiveActiveTab =
+    shouldDeferTabPermissionResolution ||
+    isOrganizationViewTabAvailable(activeTab, effectiveCurrentUserRoles)
     ? activeTab
     : DEFAULT_ORGANIZATION_VIEW_TAB;
 
   useEffect(() => {
+    if (shouldDeferTabPermissionResolution) return;
     if (isOrganizationViewTabAvailable(routeSection, effectiveCurrentUserRoles)) return;
     if (!selectedOrganization) return;
     navigateIfChanged(
@@ -271,7 +276,14 @@ export function useOrganizationsPageViewModel({
       }),
       { replace: true },
     );
-  }, [effectiveCurrentUserRoles, navigateIfChanged, routeSearch, routeSection, selectedOrganization]);
+  }, [
+    effectiveCurrentUserRoles,
+    navigateIfChanged,
+    routeSearch,
+    routeSection,
+    selectedOrganization,
+    shouldDeferTabPermissionResolution,
+  ]);
 
   useEffect(() => {
     if (!selectedOrganization) return;

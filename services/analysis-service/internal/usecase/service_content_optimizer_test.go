@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,6 +18,7 @@ type recordingContentCrawler struct {
 	resultJobID string
 	resultInput ContentOptimizerCrawlResultInput
 	result      ContentOptimizerCrawlResult
+	resultErr   error
 }
 
 type recordingContentIssueAnalyzer struct {
@@ -44,6 +46,9 @@ func (c *recordingContentCrawler) StartCrawl(_ context.Context, input ContentOpt
 func (c *recordingContentCrawler) GetCrawl(_ context.Context, jobID string, input ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error) {
 	c.resultJobID = jobID
 	c.resultInput = input
+	if c.resultErr != nil {
+		return ContentOptimizerCrawlResult{}, c.resultErr
+	}
 	return c.result, nil
 }
 
@@ -112,8 +117,66 @@ func TestStartContentOptimizerCrawlValidatesAccessAndNormalizesRequest(t *testin
 	if usage.UsedCredits != 0 {
 		t.Fatalf("expected pending crawl to consume 0 credits, got %d", usage.UsedCredits)
 	}
-	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, svc.now().UTC()); reserved != 10 {
-		t.Fatalf("expected pending crawl to reserve 10 credits, got %d", reserved)
+	if reserved := svc.currentMonthlyReservedCreditUsageLocked(42, svc.now().UTC()); reserved != 0 {
+		t.Fatalf("expected free crawl to reserve 0 credits, got %d", reserved)
+	}
+}
+
+func TestStartContentOptimizerCrawlAllowsUnlimitedDiscoveryWhenLimitIsOmitted(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{ID: "crawl-discovery", Status: "running"},
+	}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		ContentCrawler: crawler,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	_, err = svc.StartContentOptimizerCrawl(ctx, "project-1", 42, ContentOptimizerCrawlStartInput{
+		URL: "https://example.com",
+	})
+	if err != nil {
+		t.Fatalf("start discovery crawl: %v", err)
+	}
+	if crawler.startInput.Limit != 0 {
+		t.Fatalf("expected omitted discovery limit to stay unlimited, got %d", crawler.startInput.Limit)
+	}
+}
+
+func TestStartContentOptimizerCrawlRejectsSelectedPagesAbovePlanLimit(t *testing.T) {
+	ctx := context.Background()
+	crawler := &recordingContentCrawler{
+		job: ContentOptimizerCrawlJob{ID: "crawl-selected", Status: "running"},
+	}
+
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{
+		BillingQuota:   staticBillingEntitlementsProvider{plan: "starter", monthlyQuota: 100},
+		ContentCrawler: crawler,
+	})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	include := make([]string, 0, starterContentSelectedLimit+1)
+	for i := 0; i < starterContentSelectedLimit+1; i++ {
+		include = append(include, fmt.Sprintf("https://example.com/page-%d", i))
+	}
+
+	_, err = svc.StartContentOptimizerCrawl(ctx, "project-1", 42, ContentOptimizerCrawlStartInput{
+		URL:   "https://example.com",
+		Limit: len(include),
+		Options: ContentOptimizerCrawlOptions{
+			IncludePatterns: include,
+		},
+	})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected ErrValidation, got %v", err)
+	}
+	if crawler.startInput.URL != "" {
+		t.Fatalf("expected crawler not to be called, got %#v", crawler.startInput)
 	}
 }
 
@@ -142,24 +205,6 @@ func TestStartContentOptimizerCrawlReleasesReservationOnCrawlerFailure(t *testin
 	}
 }
 
-func TestContentOptimizerCrawlCreditCostUsesConfiguredTiers(t *testing.T) {
-	tests := []struct {
-		limit int
-		want  int
-	}{
-		{limit: 10, want: 10},
-		{limit: 50, want: 35},
-		{limit: 200, want: 100},
-		{limit: 215, want: 103},
-	}
-
-	for _, tt := range tests {
-		if got := contentOptimizerCrawlCreditCost(tt.limit); got != tt.want {
-			t.Fatalf("limit %d: expected %d credits, got %d", tt.limit, tt.want, got)
-		}
-	}
-}
-
 func TestPreviewOnboardingBrandProfileCrawlsHomeAndAboutPages(t *testing.T) {
 	crawler := &recordingContentCrawler{
 		job: ContentOptimizerCrawlJob{ID: "onboarding-crawl", Status: "running"},
@@ -173,7 +218,7 @@ func TestPreviewOnboardingBrandProfileCrawlsHomeAndAboutPages(t *testing.T) {
 					URL:      "https://example.com/",
 					Status:   "completed",
 					Title:    "Acme",
-					Markdown: "Acme aide les equipes marketing a suivre leur visibilite dans les reponses IA.\n\n- Monitoring des prompts strategiques\n- Analyse des concurrents\n- Optimisation du contenu cite par les IA",
+					Markdown: "[Portes Ouvertes](https://example.com/agenda/) [Candidater](https://example.com/candidater/)\n\nAcme aide les **equipes marketing** a suivre leur visibilite dans les reponses IA.\n\n![Hero](data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcv)\n\n- Monitoring des prompts strategiques\n- Analyse des concurrents\n- Optimisation du contenu cite par les IA",
 				},
 				{
 					URL:      "https://example.com/a-propos",
@@ -216,6 +261,16 @@ func TestPreviewOnboardingBrandProfileCrawlsHomeAndAboutPages(t *testing.T) {
 	}
 	if preview.BrandDescription == "" {
 		t.Fatalf("expected description to be inferred, got %#v", preview)
+	}
+	for _, disallowed := range []string{"[", "](", "https://", "data:image", "**"} {
+		if strings.Contains(preview.BrandDescription, disallowed) {
+			t.Fatalf("expected clean description without %q, got %q", disallowed, preview.BrandDescription)
+		}
+	}
+	for _, navigationLabel := range []string{"Portes Ouvertes", "Candidater"} {
+		if strings.Contains(preview.BrandDescription, navigationLabel) {
+			t.Fatalf("expected description to skip navigation label %q, got %q", navigationLabel, preview.BrandDescription)
+		}
 	}
 	if preview.Industry != "SaaS / logiciel" {
 		t.Fatalf("expected SaaS industry, got %q", preview.Industry)
@@ -360,8 +415,8 @@ func TestGetContentOptimizerCrawlStoresCompletedResultAsLatest(t *testing.T) {
 	if len(latest.Result.Records) != 1 || latest.Result.Records[0].Markdown != "# Docs" {
 		t.Fatalf("expected saved record markdown, got %#v", latest.Result.Records)
 	}
-	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 10 {
-		t.Fatalf("expected completed crawl to consume 10 credits, got %d", used)
+	if used := svc.currentMonthlyCreditUsageLocked(42, svc.now().UTC()); used != 0 {
+		t.Fatalf("expected completed crawl to consume 0 credits, got %d", used)
 	}
 }
 
@@ -413,9 +468,9 @@ func TestGetContentOptimizerCrawlCanSkipAnalysisForDiscovery(t *testing.T) {
 	if analyzer.input.ProjectID != "" {
 		t.Fatalf("expected AI analyzer to be skipped, got %#v", analyzer.input)
 	}
-	_, err = svc.GetLatestContentOptimizerCrawl(ctx, "project-1", 42)
-	if !errors.Is(err, ErrNotFound) {
-		t.Fatalf("expected discovery result not to be saved as latest analysis, got %v", err)
+	latest, err := svc.GetLatestContentOptimizerCrawl(ctx, "project-1", 42)
+	if err != nil || len(latest.Result.Records) != 1 {
+		t.Fatalf("expected raw discovery result to be available without AI analysis, got %#v, %v", latest, err)
 	}
 }
 
@@ -607,7 +662,7 @@ func TestGetContentOptimizerCrawlAnalyzesSEOAndGEOIssues(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 
-	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
+	result, err := svc.AnalyzeSelectedContentOptimizerRecords(ctx, "project-1", 42, crawler.result.Records)
 	if err != nil {
 		t.Fatalf("get content optimizer crawl: %v", err)
 	}
@@ -668,7 +723,7 @@ func TestGetContentOptimizerCrawlReportsDetailedSEOAndGEOIssues(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 
-	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
+	result, err := svc.AnalyzeSelectedContentOptimizerRecords(ctx, "project-1", 42, crawler.result.Records)
 	if err != nil {
 		t.Fatalf("get content optimizer crawl: %v", err)
 	}
@@ -732,7 +787,7 @@ func TestGetContentOptimizerCrawlEnrichesIssuesWithAIAnalyzer(t *testing.T) {
 		t.Fatalf("new service: %v", err)
 	}
 
-	result, err := svc.GetContentOptimizerCrawl(ctx, "project-1", 42, "crawl-123", ContentOptimizerCrawlResultInput{})
+	result, err := svc.AnalyzeSelectedContentOptimizerRecords(ctx, "project-1", 42, crawler.result.Records)
 	if err != nil {
 		t.Fatalf("get content optimizer crawl: %v", err)
 	}

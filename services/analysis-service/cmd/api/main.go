@@ -19,8 +19,8 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/serviceboot"
 	rediscache "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/cache/redis"
 	billingclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/billing"
-	cloudflarecrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/cloudflarecrawl"
 	iaclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/ia"
+	obscuracrawl "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/obscuracrawl"
 	projectclient "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/client/project"
 	grpcadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/grpc"
 	httpadapter "github.com/bastiencouder/microservices-go/services/analysis-service/internal/adapter/http"
@@ -63,16 +63,16 @@ func main() {
 
 	dashboardCache := rediscache.NewDashboardCache(cfg.RedisAddr, cfg.RedisPassword)
 	var contentCrawler usecase.ContentCrawler
-	if cfg.CloudflareAccountID != "" && cfg.CloudflareAPIToken != "" {
-		contentCrawler, err = cloudflarecrawl.NewClient(cloudflarecrawl.Config{
-			AccountID: cfg.CloudflareAccountID,
-			APIToken:  cfg.CloudflareAPIToken,
+	if cfg.CrawlerServiceURL != "" {
+		contentCrawler, err = obscuracrawl.NewClient(obscuracrawl.Config{
+			BaseURL: cfg.CrawlerServiceURL,
+			Token:   cfg.CrawlerServiceToken,
 		})
 		if err != nil {
-			log.Fatalf("init cloudflare crawl client: %v", err)
+			log.Fatalf("init obscura crawl client: %v", err)
 		}
 	} else {
-		log.Printf("content optimizer live crawl disabled: CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN are both required")
+		log.Printf("content optimizer live crawl disabled: CRAWLER_SERVICE_URL is required")
 	}
 
 	var contentIssueAnalyzer usecase.ContentIssueAnalyzer

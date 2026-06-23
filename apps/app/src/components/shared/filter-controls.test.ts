@@ -83,7 +83,7 @@ const errorHubCompetitorsSource = await Bun.file(
 ).text();
 const crawlerResultsSource = await Bun.file(
   new URL(
-    "../../features/crawler/_components/crawl-panel/_components/crawler-results-view.tsx",
+    "../../features/content-optimizer/_components/crawl-panel/_components/crawler-results-view.tsx",
     import.meta.url,
   ),
 ).text();

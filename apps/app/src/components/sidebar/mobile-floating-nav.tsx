@@ -78,19 +78,27 @@ export function MobileFloatingNav({ busy = false, onLogout }: MobileFloatingNavP
               : undefined,
       })),
       {
-        href: buildScopedHref("/perception", { project: activeProjectToken }),
+        href: buildScopedHref("/perception", {
+          project: activeProjectToken,
+        }),
         label: content.perception,
       },
       ...OPTIMIZATION_ITEMS.map<MobileNavigationItem>((item) => ({
-        href: buildScopedHref(item.href, { project: activeProjectToken }),
+        href: buildScopedHref(item.href, {
+          project: activeProjectToken,
+        }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
       {
-        href: buildScopedHref("/traffic", { project: activeProjectToken }),
+        href: buildScopedHref("/traffic", {
+          project: activeProjectToken,
+        }),
         label: content.traffic,
       },
       ...BRAND_CONTEXT_ITEMS.map<MobileNavigationItem>((item) => ({
-        href: buildScopedHref(item.href, { project: activeProjectToken }),
+        href: buildScopedHref(item.href, {
+          project: activeProjectToken,
+        }),
         label: formatMobileLabel(content[item.labelKey] || SIDEBAR_LABELS[item.labelKey]),
       })),
       ...SETTINGS_ITEMS.map<MobileNavigationItem>((item) => ({

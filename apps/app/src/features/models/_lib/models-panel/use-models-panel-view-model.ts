@@ -3,8 +3,8 @@ import {
   buildScopedHref,
   readOrganizationIdFromSearch,
   readProjectTokenFromSearch,
+  readSelectedOrganizationID,
   readSelectedProjectID,
-  readSelectedOrganizationPublicID,
   SELECTED_CONTEXT_CHANGE_EVENT,
 } from "@/shared/selection";
 import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions";
@@ -31,7 +31,7 @@ function readOrganizationId(routeSearch: string): string {
   if (routeOrganizationId !== "") {
     return routeOrganizationId;
   }
-  return readSelectedOrganizationPublicID();
+  return readSelectedOrganizationID();
 }
 
 function readCanonicalProjectToken(routeSearch: string): string {
@@ -61,9 +61,7 @@ export function useModelsPanelViewModel({
     [routeSearch, storedProjectToken],
   );
   const deferScopedLoadsUntilProjectContextResolves = useMemo(
-    () =>
-      readProjectTokenFromSearch(routeSearch) !== "" &&
-      readOrganizationIdFromSearch(routeSearch) === "",
+    () => readProjectTokenFromSearch(routeSearch) !== "",
     [routeSearch],
   );
 
@@ -198,16 +196,20 @@ export function useModelsPanelViewModel({
     if (!data.selectedProject) return null;
 
     const hintedProject = hintedProjectToken.trim();
-    if (hintedProject === data.selectedProject.id) {
+    if (hintedProject === data.selectedProject.slug) {
       return null;
     }
 
-    if (hintedProject !== "" && hintedProject !== data.selectedProject.slug) {
+    if (
+      hintedProject !== "" &&
+      hintedProject !== data.selectedProject.id &&
+      hintedProject !== data.selectedProject.slug
+    ) {
       return null;
     }
 
     return buildScopedHref("/models", {
-      project: data.selectedProject.id,
+      project: data.selectedProject.slug || data.selectedProject.id,
     });
   }, [
     data.hasMissingHintedProject,

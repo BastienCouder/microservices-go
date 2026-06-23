@@ -65,18 +65,6 @@ export const appQueryKeys = {
       projectIdOrDefault(projectId),
     ] as const,
 
-  aiBriefSettings: (
-    apiBaseURL: string,
-    projectId: string | null,
-    organizationId: string | null,
-  ) =>
-    [
-      "ai-brief-settings",
-      apiBaseURL,
-      organizationIdOrDefault(organizationId),
-      projectIdOrDefault(projectId),
-    ] as const,
-
   traffic: (
     apiBaseURL: string,
     projectId: string | null,
@@ -93,16 +81,6 @@ export const appQueryKeys = {
       period,
       search,
       engine,
-    ] as const,
-
-  optimizeActions: (
-    apiBaseURL: string,
-    projectId: string | null,
-  ) =>
-    [
-      "optimize-actions",
-      apiBaseURL,
-      projectIdOrDefault(projectId),
     ] as const,
 
   modelsCatalog: (

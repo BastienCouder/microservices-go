@@ -39,7 +39,6 @@ export function projectScopeQueryKeys(
     ["perception", apiBaseURL, organizationId, projectId],
     appQueryKeys.optimizationErrors(apiBaseURL, projectId, organizationId),
     ["traffic", apiBaseURL, organizationId, projectId],
-    ["optimize-actions", apiBaseURL, projectId],
     ["prompts", apiBaseURL, organizationId, projectId],
     ["prompts", "catalog", apiBaseURL, organizationId, projectId],
   ];

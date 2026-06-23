@@ -27,7 +27,6 @@
   "discoverCreditConsumptionTemplate": "Discovering pages will use about {{credits}} credits. {{quotaLabel}}",
   "discoveryToastTitle": "Page discovery in progress.",
   "discoveryToastDescription": "Detected pages will be available for selection as soon as discovery is complete.",
-  "backgroundAnalysisDescription": "The request is running. You can switch pages; processing continues server-side.",
   "backgroundAnalysisAcceptedTitle": "Analysis started",
   "backgroundAnalysisAcceptedDescription": "Processing continues in the background. Return to this page to follow the results.",
   "analysisCompletedToastTitle": "Analysis complete",

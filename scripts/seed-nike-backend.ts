@@ -1004,7 +1004,7 @@ export function buildRuntimeSeedPlan({
     cleanupProjectIDs: dedupeStrings([...cleanupProjectIDs, projectId]),
     projectId,
     liveRequestId: buildLiveRequestID(projectId),
-    crawlJobId: `seed-crawl-${projectId}`,
+    crawlJobId: randomUUID(),
     prompts,
     competitors,
     runs,
@@ -1397,39 +1397,53 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
 
 async function seedContentOptimizerCrawl(organization: OrganizationSeed, plan: RuntimeSeedPlan) {
   const completedRecords = SEED_CONTENT_CRAWL_RECORDS.filter((record) => record.status === "completed").length;
-  const result = {
-    id: plan.crawlJobId,
-    status: "completed",
-    browserSecondsUsed: 0,
-    total: SEED_CONTENT_CRAWL_RECORDS.length,
-    finished: SEED_CONTENT_CRAWL_RECORDS.length,
-    records: SEED_CONTENT_CRAWL_RECORDS,
-  };
-  const resultJSON = JSON.stringify(result).replaceAll("'", "''");
+  const failedRecords = SEED_CONTENT_CRAWL_RECORDS.length - completedRecords;
+  const pageStatements = SEED_CONTENT_CRAWL_RECORDS.map((record, index) => `
+    insert into crawler_pages (
+      run_id, normalized_url, title, position, status, http_status,
+      markdown, markdown_chars, attempts, completed_at
+    ) values (
+      ${quoteLiteral(plan.crawlJobId)}::uuid,
+      ${quoteLiteral(record.url)},
+      ${quoteLiteral(record.title)},
+      ${index + 1},
+      ${quoteLiteral(record.status)},
+      ${record.httpStatus},
+      ${record.markdown ? quoteLiteral(record.markdown) : "NULL"},
+      ${record.markdown?.length ?? 0},
+      1,
+      ${quoteLiteral(NOW)}
+    );
+  `).join("\n");
 
   await psql(
     "analysissvc",
     `
-      insert into content_optimizer_crawls (
-        project_id,
-        organization_id,
-        job_id,
-        result,
-        created_at,
-        updated_at
+      insert into crawler_runs (
+        id, project_id, organization_id, kind, status, root_url,
+        page_limit, depth_limit, total_pages, completed_pages, failed_pages,
+        created_at, updated_at, started_at, finished_at
       )
       values (
+        ${quoteLiteral(plan.crawlJobId)}::uuid,
         ${quoteLiteral(plan.projectId)},
         ${organization.id},
-        ${quoteLiteral(plan.crawlJobId)},
-        '${resultJSON}'::jsonb,
+        'markdown',
+        ${quoteLiteral(failedRecords > 0 ? "partially_completed" : "completed")},
+        'https://www.nike.com',
+        ${SEED_CONTENT_CRAWL_RECORDS.length},
+        1,
+        ${SEED_CONTENT_CRAWL_RECORDS.length},
+        ${completedRecords},
+        ${failedRecords},
+        ${quoteLiteral(EARLIER)},
+        ${quoteLiteral(NOW)},
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
       )
-      on conflict (project_id, organization_id) do update set
-        job_id = excluded.job_id,
-        result = excluded.result,
-        updated_at = excluded.updated_at;
+      on conflict (id) do nothing;
+
+      ${pageStatements}
     `,
   );
 
@@ -1441,7 +1455,7 @@ async function resetAnalysisDataForProjects(projectIDs: readonly string[]) {
   await psql(
     "analysissvc",
     `
-      delete from content_optimizer_crawls
+      delete from crawler_runs
       where project_id = any(${projectIDArray});
 
       delete from brand_canon

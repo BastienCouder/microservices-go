@@ -102,6 +102,10 @@ OPTIONAL_SECRETS := \
 	dev-doc dev-email dev-mcp \
 	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate \
 	prod-front prod-app prod-web prod-services prod-service \
+	prod-services-api-gateway prod-services-user prod-services-organizations \
+	prod-services-permission prod-services-billing prod-services-notification \
+	prod-services-project prod-services-analysis prod-services-ia prod-services-crawler \
+	prod-services-kratos \
 	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service deploy-prod-backup-cron \
 	prod-doc prod-email prod-mcp \
 	db-generate db-migrate \
@@ -149,6 +153,11 @@ help:
 	@echo "    make prod-web         Rebuild and start only web"
 	@echo "    make prod-services    Run migrations, then rebuild and start backend services"
 	@echo "    make prod-service     Rebuild and start only one service (SERVICE=name)"
+	@echo "    make prod-services-analysis Rebuild and start analysis-service"
+	@echo "    make prod-services-billing  Rebuild and start billing-service"
+	@echo "    make prod-services-project  Rebuild and start project-service"
+	@echo "    make prod-services-crawler  Rebuild and start crawler-service"
+	@echo "    make prod-services-api-gateway Rebuild and start api-gateway"
 	@echo "    make prod-migrate     Run all production migrations"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
@@ -278,6 +287,43 @@ prod-web: secrets-check
 prod-services: prod-migrate
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend build --no-cache
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile backend up -d --force-recreate
+
+prod-service:
+	@test -n "$(SERVICE)" || (echo "Usage: make prod-service SERVICE=analysis-service"; exit 1)
+	$(MAKE) prod-rebuild SERVICE=$(SERVICE)
+
+prod-services-api-gateway:
+	$(MAKE) prod-rebuild SERVICE=api-gateway
+
+prod-services-user:
+	$(MAKE) prod-rebuild SERVICE=user-service
+
+prod-services-organizations:
+	$(MAKE) prod-rebuild SERVICE=organizations-service
+
+prod-services-permission:
+	$(MAKE) prod-rebuild SERVICE=permission-service
+
+prod-services-billing:
+	$(MAKE) prod-rebuild SERVICE=billing-service
+
+prod-services-notification:
+	$(MAKE) prod-rebuild SERVICE=notification-service
+
+prod-services-project:
+	$(MAKE) prod-rebuild SERVICE=project-service
+
+prod-services-analysis:
+	$(MAKE) prod-rebuild SERVICE=analysis-service
+
+prod-services-ia:
+	$(MAKE) prod-rebuild SERVICE=ia-service
+
+prod-services-crawler:
+	$(MAKE) prod-rebuild SERVICE=crawler-service
+
+prod-services-kratos:
+	$(MAKE) prod-rebuild SERVICE=kratos
 
 prod-migrate: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) up -d postgres

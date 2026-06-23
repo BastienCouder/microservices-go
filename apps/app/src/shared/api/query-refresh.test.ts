@@ -15,7 +15,6 @@ describe("project scope query invalidation", () => {
       ["perception", "http://api.test", "org-9", "project-1"],
       ["optimization-errors", "http://api.test", "org-9", "project-1"],
       ["traffic", "http://api.test", "org-9", "project-1"],
-      ["optimize-actions", "http://api.test", "project-1"],
       ["prompts", "http://api.test", "org-9", "project-1"],
       ["prompts", "catalog", "http://api.test", "org-9", "project-1"],
     ]);

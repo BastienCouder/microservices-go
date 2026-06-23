@@ -9,7 +9,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import {
   readOrganizationIdFromSearch,
   readRouteQueryParam,
-  readSelectedOrganizationPublicID,
+  readSelectedOrganizationID,
   SELECTED_CONTEXT_CHANGE_EVENT,
 } from "@/shared/selection";
 import {
@@ -49,11 +49,11 @@ import type {
 
 function readOrganizationId(routeSearch: string): string {
   const routeOrganizationId = readOrganizationIdFromSearch(routeSearch);
-  if (/^\d+$/.test(routeOrganizationId)) {
+  if (routeOrganizationId !== "") {
     return routeOrganizationId;
   }
 
-  return readSelectedOrganizationPublicID();
+  return readSelectedOrganizationID();
 }
 
 type PromptsWorkspaceLoadingStateInput = {

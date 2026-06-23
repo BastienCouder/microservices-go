@@ -25,8 +25,8 @@ type Config struct {
 	RedisAddr                      string
 	RedisPassword                  string
 	DashboardCacheTTL              time.Duration
-	CloudflareAccountID            string
-	CloudflareAPIToken             string
+	CrawlerServiceURL              string
+	CrawlerServiceToken            string
 	IAServiceURL                   string
 	ContentIssueAnalyzerModelID    string
 	ContentIssueAnalyzerProviderID string
@@ -83,11 +83,7 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	cloudflareAccountID, err := envcfg.OptionalValueFromEnv("CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID_FILE")
-	if err != nil {
-		return Config{}, err
-	}
-	cloudflareAPIToken, err := envcfg.OptionalSecretFromEnv("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_API_TOKEN_FILE")
+	crawlerServiceToken, err := envcfg.OptionalSecretFromEnv("CRAWLER_SERVICE_TOKEN", "CRAWLER_SERVICE_TOKEN_FILE")
 	if err != nil {
 		return Config{}, err
 	}
@@ -111,8 +107,8 @@ func Load() (Config, error) {
 		RedisAddr:                      redisAddr,
 		RedisPassword:                  redisPassword,
 		DashboardCacheTTL:              dashboardCacheTTL,
-		CloudflareAccountID:            cloudflareAccountID,
-		CloudflareAPIToken:             cloudflareAPIToken,
+		CrawlerServiceURL:              envcfg.OptionalEnv("CRAWLER_SERVICE_URL"),
+		CrawlerServiceToken:            crawlerServiceToken,
 		IAServiceURL:                   envcfg.OptionalEnv("IA_SERVICE_URL"),
 		ContentIssueAnalyzerModelID:    envcfg.OptionalEnv("CONTENT_ISSUE_ANALYZER_MODEL_ID"),
 		ContentIssueAnalyzerProviderID: envcfg.OptionalEnv("CONTENT_ISSUE_ANALYZER_PROVIDER_ID"),

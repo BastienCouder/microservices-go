@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AppToaster } from "@/components/ui/toaster";
 import {
   ACCOUNT_SETUP_SEARCH,
+  PROJECT_SETUP_SEARCH,
   getOnboardingSetupMode,
 } from "@/features/onboarding/onboarding-mode";
 import { AdminBootstrapClaim } from "@/features/admin/admin-bootstrap-claim";
@@ -30,8 +31,6 @@ import {
   clearSelectedContext,
   clearSelectedProjectContext,
   clearProjectContextSearch,
-  buildScopedHref,
-  keepProjectOnlyContextSearch,
   readOrganizationIdFromSearch,
   readProjectIdFromSearch,
   readProjectTokenFromSearch,
@@ -145,10 +144,6 @@ export default function App() {
     if (!isCheckoutSuccessRoute) return "";
     return new URLSearchParams(location.search).get("organization_id")?.trim() ?? "";
   }, [isCheckoutSuccessRoute, location.search]);
-  const useCompactProjectContext =
-    location.pathname === "/organizations" ||
-    location.pathname === "/account" ||
-    location.pathname === "/brand-canon";
   const bypassResolvedContext =
     isOnboardingRoute || isInvitationRoute || isBillingRoute || isAdminRoute;
   const baseRouteSearch = useMemo(
@@ -353,11 +348,6 @@ export default function App() {
         return baseRouteSearch;
       }
       if (resolvedProjectContext) {
-        if (routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === "") {
-          return buildScopedHref(location.pathname, {
-            project: resolvedProjectContext.projectSlug || resolvedProjectContext.projectId,
-          }).replace(`${location.pathname}`, "") || `?project=${encodeURIComponent(resolvedProjectContext.projectSlug || resolvedProjectContext.projectId)}`;
-        }
         return applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext);
       }
       if (hasUnresolvedRouteProjectContext) {
@@ -376,13 +366,7 @@ export default function App() {
       routeProjectToken,
     ],
   );
-  const routeSearch = useMemo(
-    () =>
-      useCompactProjectContext
-        ? keepProjectOnlyContextSearch(resolvedRouteSearch)
-        : resolvedRouteSearch,
-    [resolvedRouteSearch, useCompactProjectContext],
-  );
+  const routeSearch = resolvedRouteSearch;
   const billingAccess: BillingAccessState = !shouldCheckBillingGuard
     ? "loading"
     : organizationsQuery.isError
@@ -457,6 +441,10 @@ export default function App() {
       user,
       isOnboardingRoute,
       onboardingSetupMode,
+      organizationCount:
+        organizationsQuery.isLoading || organizationsQuery.isFetching
+          ? null
+          : organizations.length,
       projectCount:
         projectGuardQuery.isLoading || projectGuardQuery.isFetching
           ? null
@@ -558,6 +546,8 @@ export default function App() {
 
     storeSelectedProjectContext({
       organizationId: resolvedProjectContext.organizationId,
+      organizationPublicId:
+        resolvedProjectContext.organizationPublicId || resolvedProjectContext.organizationId,
       projectId: resolvedProjectContext.projectId,
     });
   }, [resolvedProjectContext]);
@@ -571,7 +561,10 @@ export default function App() {
       organizations.find(
         (organization) =>
           organization.id === selectedOrganizationId ||
-          organization.publicId === selectedOrganizationPublicId,
+          organization.publicId === selectedOrganizationId ||
+          organization.slug === selectedOrganizationId ||
+          organization.publicId === selectedOrganizationPublicId ||
+          organization.slug === selectedOrganizationPublicId,
       ) ?? null;
 
     if (!selectedOrganization) {
@@ -588,7 +581,14 @@ export default function App() {
   }, [isAdminRoute, organizations, routeOrganizationToken]);
 
   useEffect(() => {
-    if (!useCompactProjectContext && !hasUnresolvedRouteProjectContext) return;
+    if (bypassResolvedContext) return;
+    if (
+      routeProjectToken !== "" &&
+      !resolvedProjectContext &&
+      !hasUnresolvedRouteProjectContext
+    ) {
+      return;
+    }
     if (routeSearch === location.search) return;
 
     navigate(`${location.pathname}${routeSearch}${location.hash}`, {
@@ -599,9 +599,11 @@ export default function App() {
     location.pathname,
     location.search,
     navigate,
+    bypassResolvedContext,
+    resolvedProjectContext,
+    routeProjectToken,
     routeSearch,
     hasUnresolvedRouteProjectContext,
-    useCompactProjectContext,
   ]);
 
   if (!apiBaseURL) {
@@ -661,11 +663,15 @@ export default function App() {
   }
 
   if (mustRedirectToOnboarding) {
-    return <Navigate replace to={`/onboarding${ACCOUNT_SETUP_SEARCH}`} />;
+    const onboardingSearch =
+      billingAccess === "missing_organization"
+        ? ACCOUNT_SETUP_SEARCH
+        : PROJECT_SETUP_SEARCH;
+    return <Navigate replace to={`/onboarding${onboardingSearch}`} />;
   }
 
   if (mustRedirectAwayFromAccountOnboarding) {
-    return <Navigate replace to="/monitoring" />;
+    return <Navigate replace to={`/onboarding${PROJECT_SETUP_SEARCH}`} />;
   }
 
   if (isOnboardingRoute && busy) {

@@ -299,6 +299,15 @@ type ContentCrawler interface {
 	GetCrawl(ctx context.Context, jobID string, input ContentOptimizerCrawlResultInput) (ContentOptimizerCrawlResult, error)
 }
 
+type ContentOptimizerSelectionDraft struct {
+	ProjectID      string                      `json:"projectId"`
+	OrganizationID int64                       `json:"organizationId"`
+	JobID          string                      `json:"jobId"`
+	SelectedURLs   []string                    `json:"selectedUrls"`
+	Result         ContentOptimizerCrawlResult `json:"result"`
+	UpdatedAt      time.Time                   `json:"updatedAt"`
+}
+
 type ContentIssueAnalysisInput struct {
 	ProjectID           string
 	OrganizationID      int64
@@ -357,20 +366,21 @@ type Dependencies struct {
 }
 
 type persistedState struct {
-	Seq                 int64                                     `json:"seq"`
-	Runs                map[string]*AnalysisRun                   `json:"runs"`
-	RunsByProject       map[string][]string                       `json:"runsByProject"`
-	PromptRuns          map[string]*PromptRun                     `json:"promptRuns"`
-	PromptRunsByRun     map[string][]string                       `json:"promptRunsByRun"`
-	Responses           map[string]*AIResponse                    `json:"responses"`
-	ResponsesByRun      map[string][]string                       `json:"responsesByRun"`
-	ResponseIndexByRun  map[string]map[string]string              `json:"responseIndexByRun"`
-	RunByRequest        map[string]string                         `json:"runByRequest"`
-	BrandCanonByProject map[string]*BrandCanon                    `json:"brandCanonByProject"`
-	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
-	OptimizeActions     map[string]*OptimizeAction                `json:"optimizeActions"`
-	ActionsByProject    map[string][]string                       `json:"actionsByProject"`
-	AIBriefSettings     map[string]*ProjectAIBriefSettings        `json:"aiBriefSettings"`
+	Seq                 int64                                      `json:"seq"`
+	Runs                map[string]*AnalysisRun                    `json:"runs"`
+	RunsByProject       map[string][]string                        `json:"runsByProject"`
+	PromptRuns          map[string]*PromptRun                      `json:"promptRuns"`
+	PromptRunsByRun     map[string][]string                        `json:"promptRunsByRun"`
+	Responses           map[string]*AIResponse                     `json:"responses"`
+	ResponsesByRun      map[string][]string                        `json:"responsesByRun"`
+	ResponseIndexByRun  map[string]map[string]string               `json:"responseIndexByRun"`
+	RunByRequest        map[string]string                          `json:"runByRequest"`
+	BrandCanonByProject map[string]*BrandCanon                     `json:"brandCanonByProject"`
+	ContentCrawls       map[string]*ContentOptimizerCrawlSnapshot  `json:"contentCrawls"`
+	ContentSelections   map[string]*ContentOptimizerSelectionDraft `json:"contentSelections"`
+	OptimizeActions     map[string]*OptimizeAction                 `json:"optimizeActions"`
+	ActionsByProject    map[string][]string                        `json:"actionsByProject"`
+	AIBriefSettings     map[string]*ProjectAIBriefSettings         `json:"aiBriefSettings"`
 }
 
 type Service struct {
@@ -387,6 +397,7 @@ type Service struct {
 	runByRequest        map[string]string
 	brandCanonByProject map[string]*BrandCanon
 	contentCrawls       map[string]*ContentOptimizerCrawlSnapshot
+	contentSelections   map[string]*ContentOptimizerSelectionDraft
 	optimizeActions     map[string]*OptimizeAction
 	actionsByProject    map[string][]string
 	aiBriefSettings     map[string]*ProjectAIBriefSettings

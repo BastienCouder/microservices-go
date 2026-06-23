@@ -4,7 +4,6 @@ import {
   useOnboarding,
 } from "@/hooks/use-onboarding";
 import { OnboardingLeftPanel } from "./left-panel";
-import { StepAnalysis } from "./step-analysis";
 import { StepAttribution } from "./step-attribution";
 import { StepAccountType } from "./step-account-type";
 import { StepBrand } from "./step-brand";
@@ -34,6 +33,7 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
   const { step } = useOnboarding();
   const navigate = useNavigate();
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const setupMode = getOnboardingSetupMode(routeSearch);
   const selectedOrganizationId = resolveOnboardingOrganizationId(routeSearch);
   const hasOrganizationContext = selectedOrganizationId !== "";
 
@@ -44,6 +44,7 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
         <StepWebsite
           apiBaseURL={apiBaseURL}
           organizationId={selectedOrganizationId}
+          showOrganizationName={setupMode === "account"}
         />
       ),
       id: hasOrganizationContext ? 1 : 2,
@@ -63,15 +64,6 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
         />
       ),
       id: hasOrganizationContext ? 5 : 7,
-    },
-    {
-      component: (
-        <StepAnalysis
-          apiBaseURL={apiBaseURL}
-          organizationId={selectedOrganizationId}
-        />
-      ),
-      id: hasOrganizationContext ? 6 : 8,
     },
   ];
 
@@ -125,7 +117,7 @@ export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps)
   const normalizedRouteSearch = routeSearch ?? "";
   const setupMode = getOnboardingSetupMode(normalizedRouteSearch);
   const selectedOrganizationId = resolveOnboardingOrganizationId(normalizedRouteSearch);
-  const totalSteps = selectedOrganizationId ? 6 : 8;
+  const totalSteps = selectedOrganizationId ? 5 : 7;
   const providerKey =
     setupMode === "resume"
       ? selectedOrganizationId || "no-organization"

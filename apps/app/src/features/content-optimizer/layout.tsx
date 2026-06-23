@@ -1,6 +1,6 @@
 import { memo } from "react";
 
-import { CrawlPanel } from "@/features/crawler/_components/crawl-panel";
+import { CrawlPanel } from "./_components/crawl-panel";
 
 type ContentOptimizerLayoutProps = {
   apiBaseURL: string;
@@ -16,8 +16,8 @@ export const ContentOptimizerLayout = memo(function ContentOptimizerLayout({
       <CrawlPanel
         key={routeSearch}
         apiBaseURL={apiBaseURL}
-        routeSearch={routeSearch}
         variant="contentOptimizer"
+        routeSearch={routeSearch}
       />
     </div>
   );

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  buildScopedHref,
   clearSelectedProjectContext,
   clearProjectContextSearch,
   clearSelectedContext,
@@ -98,7 +99,7 @@ describe("selection helpers", () => {
     });
 
     expect(readSelectedOrganizationID()).toBe("2");
-    expect(readSelectedOrganizationPublicID()).toBe("2");
+    expect(readSelectedOrganizationPublicID()).toBe("org_a1b2c3d4");
 
     Object.defineProperty(globalThis, "window", {
       configurable: true,
@@ -138,7 +139,7 @@ describe("selection helpers", () => {
     clearSelectedProjectContext();
 
     expect(readSelectedOrganizationID()).toBe("org-1");
-    expect(readSelectedOrganizationPublicID()).toBe("org-1");
+    expect(readSelectedOrganizationPublicID()).toBe("org_public_1");
     expect(readSelectedProjectID()).toBe("");
 
     Object.defineProperty(globalThis, "window", {
@@ -147,7 +148,7 @@ describe("selection helpers", () => {
     });
   });
 
-  test("restores the stored project selection with a canonical projectId query param", () => {
+  test("restores the stored project selection without exposing organization context", () => {
     const storage = new Map<string, string>();
     const originalWindow = globalThis.window;
 
@@ -177,13 +178,22 @@ describe("selection helpers", () => {
     });
 
     expect(resolveSelectedContextSearch("?section=members")).toBe(
-      "?section=members&projectId=prj_123&organizationId=org-1",
+      "?section=members&project=prj_123",
     );
 
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: originalWindow,
     });
+  });
+
+  test("keeps organization tokens out of generated urls", () => {
+    expect(
+      buildScopedHref("/models?organizationId=org_old&projectId=prj_old", {
+        project: "acme",
+        org: "org_public_1",
+      }),
+    ).toBe("/models?project=acme");
   });
 
   test("drops the legacy last-selected project token when storing a project id", () => {
@@ -250,8 +260,10 @@ describe("selection helpers", () => {
     });
 
     expect(storage.get("selected-organization-id")).toBe("42");
+    expect(storage.get("selected-organization-public-id")).toBe("org_public_42");
     expect(storage.has("selected-organization-internal-id")).toBe(false);
     expect(readSelectedOrganizationID()).toBe("42");
+    expect(readSelectedOrganizationPublicID()).toBe("org_public_42");
 
     Object.defineProperty(globalThis, "window", {
       configurable: true,

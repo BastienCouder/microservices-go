@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { findResolvedProjectContext } from "./project-context";
+import {
+  applyResolvedProjectContextSearch,
+  findResolvedProjectContext,
+} from "./project-context";
 
 describe("project context", () => {
   const hierarchies = [
@@ -42,5 +45,16 @@ describe("project context", () => {
       projectSlug: "acme",
       projectName: "Acme",
     });
+  });
+
+  test("keeps canonical route context on project slug without organization tokens", () => {
+    const context = findResolvedProjectContext(hierarchies, "prj_123");
+
+    expect(
+      applyResolvedProjectContextSearch(
+        "?projectId=prj_123&organizationId=org-1&section=members&tab=responses",
+        context,
+      ),
+    ).toBe("?section=members&tab=responses&project=acme");
   });
 });

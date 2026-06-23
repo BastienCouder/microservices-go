@@ -139,6 +139,10 @@ func (h *Handler) projectRoutesWithPrefix(w http.ResponseWriter, r *http.Request
 		h.getLatestContentOptimizerCrawl(w, r, projectID)
 	case len(parts) == 4 && parts[1] == "content-optimizer" && parts[2] == "crawl" && r.Method == http.MethodGet:
 		h.getContentOptimizerCrawl(w, r, projectID, parts[3])
+	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "selection" && r.Method == http.MethodGet:
+		h.getContentOptimizerSelectionDraft(w, r, projectID)
+	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "selection" && r.Method == http.MethodPut:
+		h.saveContentOptimizerSelectionDraft(w, r, projectID)
 	case len(parts) == 3 && parts[1] == "content-optimizer" && parts[2] == "analyze" && r.Method == http.MethodPost:
 		h.analyzeSelectedContentOptimizerRecords(w, r, projectID)
 	case len(parts) == 2 && parts[1] == "brand-canon" && r.Method == http.MethodGet:
@@ -588,6 +592,12 @@ type analyzeSelectedContentOptimizerRecordsRequest struct {
 	Records []usecase.ContentOptimizerCrawlRecord `json:"records"`
 }
 
+type contentOptimizerSelectionDraftRequest struct {
+	JobID        string                              `json:"jobId"`
+	SelectedURLs []string                            `json:"selectedUrls"`
+	Result       usecase.ContentOptimizerCrawlResult `json:"result"`
+}
+
 func (h *Handler) startContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {
 	organizationID, ok := authenticatedOrganizationID(r)
 	if !ok {
@@ -667,6 +677,50 @@ func (h *Handler) analyzeSelectedContentOptimizerRecords(w http.ResponseWriter, 
 		return
 	}
 	writeSuccess(w, http.StatusOK, result)
+}
+
+func (h *Handler) getContentOptimizerSelectionDraft(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	draft, err := h.svc.GetContentOptimizerSelectionDraft(r.Context(), projectID, organizationID)
+	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			writeSuccess(w, http.StatusOK, nil)
+			return
+		}
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, draft)
+}
+
+func (h *Handler) saveContentOptimizerSelectionDraft(w http.ResponseWriter, r *http.Request, projectID string) {
+	organizationID, ok := authenticatedOrganizationID(r)
+	if !ok {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing organization identity")
+		return
+	}
+
+	var req contentOptimizerSelectionDraftRequest
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
+		return
+	}
+
+	draft, err := h.svc.SaveContentOptimizerSelectionDraft(r.Context(), projectID, organizationID, usecase.ContentOptimizerSelectionDraft{
+		JobID:        req.JobID,
+		SelectedURLs: req.SelectedURLs,
+		Result:       req.Result,
+	})
+	if err != nil {
+		h.writeUsecaseError(w, err)
+		return
+	}
+	writeSuccess(w, http.StatusOK, draft)
 }
 
 func (h *Handler) getLatestContentOptimizerCrawl(w http.ResponseWriter, r *http.Request, projectID string) {

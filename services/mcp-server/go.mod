@@ -2,7 +2,10 @@ module github.com/bastiencouder/microservices-go/services/mcp-server
 
 go 1.25.7
 
-require github.com/modelcontextprotocol/go-sdk v1.2.0
+require (
+	github.com/bastiencouder/microservices-go/contracts v0.0.0
+	github.com/modelcontextprotocol/go-sdk v1.2.0
+)
 
 require (
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -22,3 +25,5 @@ require (
 	golang.org/x/tools v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.8 // indirect
 )
+
+replace github.com/bastiencouder/microservices-go/contracts => ../contracts

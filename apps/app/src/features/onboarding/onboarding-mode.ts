@@ -1,13 +1,14 @@
 import {
   readOrganizationIdFromSearch,
   readRouteQueryParam,
-  readSelectedOrganizationPublicID,
+  readSelectedOrganizationID,
 } from "@/shared/selection";
 import type { OnboardingInitialState } from "@/hooks/use-onboarding";
 
 export type OnboardingSetupMode = "account" | "project" | "resume";
 
 export const ACCOUNT_SETUP_SEARCH = "?setup-account";
+export const PROJECT_SETUP_SEARCH = "?setup=project";
 
 export function getOnboardingSetupMode(routeSearch: string): OnboardingSetupMode {
   const normalized = routeSearch.startsWith("?") ? routeSearch.slice(1) : routeSearch;
@@ -30,7 +31,7 @@ export function shouldStartFreshOnboarding(routeSearch: string): boolean {
 export function resolveOnboardingOrganizationId(routeSearch: string): string {
   return (
     readOrganizationIdFromSearch(routeSearch) ||
-    readSelectedOrganizationPublicID()
+    readSelectedOrganizationID()
   ).trim();
 }
 

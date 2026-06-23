@@ -8,6 +8,10 @@ import {
   ORGANIZATION_VIEW_TABS,
 } from "./constants";
 
+const viewModelSource = await Bun.file(
+  new URL("../page/use-organizations-page-view-model.ts", import.meta.url),
+).text();
+
 describe("organization view tabs", () => {
   test("exposes the organization sections as pages for the secondary sidebar", () => {
     expect(ORGANIZATION_VIEW_TABS.map((tab) => tab.value)).toEqual([
@@ -46,5 +50,10 @@ describe("organization view tabs", () => {
     ]);
     expect(isOrganizationViewTabAvailable("apiKeys", ["viewer"])).toBe(false);
     expect(isOrganizationViewTabAvailable("apiKeys", ["editor"])).toBe(true);
+  });
+
+  test("does not redirect restricted tabs before organization resources load", () => {
+    expect(viewModelSource.includes("shouldDeferTabPermissionResolution")).toBe(true);
+    expect(viewModelSource.includes("if (shouldDeferTabPermissionResolution) return;")).toBe(true);
   });
 });

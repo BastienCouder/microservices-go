@@ -3,6 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { gatewayJSON, toGatewayError, unwrapGatewayPayload } from "./gateway";
 import {
   SELECTED_ORG_KEY,
+  SELECTED_ORG_PUBLIC_KEY,
   storeSelectedOrganizationContext,
 } from "@/shared/selection";
 
@@ -28,6 +29,7 @@ function jsonResponse(status: number, body: unknown) {
 afterEach(() => {
   globalThis.fetch = originalFetch;
   getTestStorage()?.removeItem(SELECTED_ORG_KEY);
+  getTestStorage()?.removeItem(SELECTED_ORG_PUBLIC_KEY);
   getTestStorage()?.removeItem("selected-organization-internal-id");
 });
 

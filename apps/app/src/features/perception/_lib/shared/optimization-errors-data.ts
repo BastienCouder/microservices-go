@@ -246,6 +246,11 @@ export function readOptimizationProjectIdFromSearch(routeSearch: string): string
   return readOptionalProjectTokenFromSearch(routeSearch);
 }
 
+function looksLikeProjectId(projectToken: string): boolean {
+  const normalized = projectToken.trim();
+  return normalized.startsWith("prj_") || normalized.startsWith("prj-");
+}
+
 async function resolveFirstProjectId(apiBaseURL: string, signal?: AbortSignal): Promise<string | null> {
   const projectsPayload = unwrapRequiredEnvelope(
     await gatewayJSON<unknown>(apiBaseURL, "/projects", {
@@ -329,6 +334,13 @@ export async function loadOptimizationErrors(
   }
   if (!projectId) {
     throw new OptimizationErrorsRequestError(404, "no project available");
+  }
+
+  if (!looksLikeProjectId(projectId)) {
+    const resolvedProjectId = await resolveProjectSlug(apiBaseURL, projectId, options?.signal);
+    if (resolvedProjectId) {
+      projectId = resolvedProjectId;
+    }
   }
 
   let result = await gatewayJSON<unknown>(

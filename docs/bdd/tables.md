@@ -7,7 +7,7 @@ La colonne `Contraintes / defaut` reprend les informations utiles au niveau colo
 
 | Service | Tables |
 | --- | --- |
-| `analysis-service` | `analysis_runs`, `prompt_runs`, `ai_responses`, `content_optimizer_crawls`, `optimize_actions` |
+| `analysis-service` | `analysis_runs`, `prompt_runs`, `ai_responses`, `crawler_runs`, `crawler_pages`, `optimize_actions` |
 | `api-gateway` | Aucune table PostgreSQL propre detectee |
 | `attribution-service` | Aucune table PostgreSQL propre detectee |
 | `auth-service` | Aucune table PostgreSQL propre detectee |
@@ -69,16 +69,10 @@ La colonne `Contraintes / defaut` reprend les informations utiles au niveau colo
 | `sentiment` | `TEXT` | NOT NULL DEFAULT 'neutral' |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
 
-### `content_optimizer_crawls`
+### `crawler_runs` et `crawler_pages`
 
-| Colonne | Type | Contraintes / defaut |
-| --- | --- | --- |
-| `project_id` | `TEXT` | NOT NULL |
-| `organization_id` | `BIGINT` | NOT NULL |
-| `job_id` | `TEXT` | NOT NULL |
-| `result` | `JSONB` | NOT NULL |
-| `created_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
-| `updated_at` | `TIMESTAMPTZ` | NOT NULL DEFAULT NOW() |
+Les runs de découverte et de crawl Markdown sont stockés dans `crawler_runs`.
+Les résultats progressifs de chaque URL sont stockés dans `crawler_pages` et supprimés en cascade avec leur run.
 
 ### `optimize_actions`
 

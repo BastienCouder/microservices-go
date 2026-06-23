@@ -170,18 +170,6 @@ export function preloadContentOptimizerPage() {
 
 const ContentOptimizerPage = lazy(loadContentOptimizerPageModule);
 
-export function loadAgentReadyPageModule() {
-  return import("@/features/ai-agent-ready/index").then((module) => ({
-    default: module.AgentReadyPage,
-  }));
-}
-
-export function preloadAgentReadyPage() {
-  preloadRoute(loadAgentReadyPageModule);
-}
-
-const AgentReadyPage = lazy(loadAgentReadyPageModule);
-
 export function loadErrorHubPageModule() {
   return import("@/features/error-hub/index").then((module) => ({
     default: module.ErrorHubPage,
@@ -193,7 +181,6 @@ export function preloadErrorHubPage() {
 }
 
 const ErrorHubPage = lazy(loadErrorHubPageModule);
-const PerceptionOptimizeActionsPage = ErrorHubPage;
 
 export function loadBrandsPageModule() {
   return import("@/features/brands/index").then((module) => ({
@@ -438,10 +425,6 @@ export function AppRouter({
         }
       />
       <Route
-        path="/crawler"
-        element={<Navigate replace to={{ pathname: "/content-optimizer", search: routeSearch }} />}
-      />
-      <Route
         path="/content-optimizer"
         element={
           <Suspense fallback={null}>
@@ -453,29 +436,10 @@ export function AppRouter({
         }
       />
       <Route
-        path="/ai-agent-ready"
-        element={
-          <Suspense fallback={null}>
-            <AgentReadyPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
-      />
-      <Route
         path="/error-hub"
         element={
           <Suspense fallback={null}>
             <ErrorHubPage apiBaseURL={apiBaseURL} routeSearch={routeSearch} />
-          </Suspense>
-        }
-      />
-      <Route
-        path="/optimize/actions"
-        element={
-          <Suspense fallback={null}>
-            <PerceptionOptimizeActionsPage
-              apiBaseURL={apiBaseURL}
-              routeSearch={routeSearch}
-            />
           </Suspense>
         }
       />

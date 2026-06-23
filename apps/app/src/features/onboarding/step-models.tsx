@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { ModelCard } from "@/components/shared/model-card";
 import {
@@ -23,12 +24,22 @@ import {
 } from "@/features/models/_lib/model-access";
 import { ProviderApiKeysPanel } from "@/features/models/_components/provider-keys/provider-api-keys-panel";
 import { useProviderCredentialMutations } from "@/features/models/_lib/models-panel/use-provider-credential-mutations";
-import { useOnboarding } from "@/hooks/use-onboarding";
+import {
+  clearPersistedOnboardingState,
+  useOnboarding,
+} from "@/hooks/use-onboarding";
 import { appQueryKeys } from "@/lib/query-keys";
 import { loadBillingEntitlements } from "@/shared/billing";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
 import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
+import { createOnboardingProject } from "./onboarding-api";
+import { invalidateOrganizationScope } from "@/shared/api/query-refresh";
+import {
+  buildScopedHref,
+  readSelectedOrganizationID,
+  storeSelectedProjectContext,
+} from "@/shared/selection";
 import { OnboardingStep, OnboardingStepFooter } from "./step-shell";
 
 type StepModelsProps = {
@@ -63,12 +74,27 @@ export function StepModels({
   hideBack = false,
   nextLabel,
 }: StepModelsProps) {
-  const { selectedModels, setSelectedModels, nextStep, prevStep } =
-    useOnboarding();
+  const {
+    organizationName,
+    websiteUrl,
+    attributionSource,
+    brandName,
+    brandDescription,
+    industry,
+    competitors,
+    selectedPrompts,
+    selectedModels,
+    setSelectedModels,
+    prevStep,
+  } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const organizationId = providedOrganizationId?.trim() ?? "";
   const didApplyDefaultsRef = useRef(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [creationError, setCreationError] = useState<string | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [providerKeyDrafts, setProviderKeyDrafts] = useState<
     Record<string, string>
   >({});
@@ -243,6 +269,13 @@ export function StepModels({
       ).length,
     [allowedModelIds, selectedModels, usableModelIds],
   );
+  const selectedModelIdsForSubmit = useMemo(
+    () =>
+      selectedModels.filter(
+        (modelId) => allowedModelIds.has(modelId) && usableModelIds.has(modelId),
+      ),
+    [allowedModelIds, selectedModels, usableModelIds],
+  );
 
   useEffect(() => {
     if (selectedModels.length === 0) return;
@@ -401,9 +434,82 @@ export function StepModels({
   const canContinue =
     selectedCount > 0 &&
     !developerPlanMissingKeys &&
-    (!requiresProjectProviderCredentials || providerCredentialsReady);
+    (!requiresProjectProviderCredentials || providerCredentialsReady) &&
+    !isCreatingProject;
   const catalogErrorMessage =
     catalogQuery.error instanceof Error ? catalogQuery.error.message : "";
+
+  const finishOnboarding = useCallback(async () => {
+    if (!canContinue || isCreatingProject) return;
+
+    setCreationError(null);
+    setIsCreatingProject(true);
+
+    try {
+      const resolvedOrganizationId =
+        organizationId || readSelectedOrganizationID();
+      const result = await createOnboardingProject(apiBaseURL, {
+        organizationId: resolvedOrganizationId,
+        organizationName,
+        brandName,
+        websiteUrl,
+        attributionSource,
+        brandDescription,
+        industry,
+        competitors,
+        prompts: selectedPrompts,
+        modelIds: selectedModelIdsForSubmit,
+      });
+
+      storeSelectedProjectContext({
+        organizationId: result.organizationId,
+        projectId: result.projectId,
+      });
+      clearPersistedOnboardingState();
+      if (result.warnings.length > 0) {
+        pushWarningToast(result.warnings.join(" "));
+      }
+      await invalidateOrganizationScope(
+        queryClient,
+        apiBaseURL,
+        result.organizationId,
+      );
+      queryClient.removeQueries({
+        queryKey: ["route-project-guard", apiBaseURL],
+      });
+      navigate(
+        buildScopedHref("/monitoring", {
+          project: result.projectSlug,
+          org: null,
+        }),
+        { replace: true },
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("createProjectError");
+      setCreationError(message);
+      pushErrorToast(error, t("createProjectError"));
+    } finally {
+      setIsCreatingProject(false);
+    }
+  }, [
+    apiBaseURL,
+    attributionSource,
+    brandDescription,
+    brandName,
+    canContinue,
+    competitors,
+    industry,
+    isCreatingProject,
+    navigate,
+    organizationId,
+    organizationName,
+    queryClient,
+    selectedModelIdsForSubmit,
+    selectedPrompts,
+    t,
+    websiteUrl,
+  ]);
 
   useEffect(() => {
     if (developerPlanMissingKeysMessage) {
@@ -534,12 +640,22 @@ export function StepModels({
         <OnboardingStepFooter
           hideBack={hideBack}
           onBack={prevStep}
-          onNext={nextStep}
+          onNext={finishOnboarding}
           nextDisabled={!canContinue}
-          nextLabel={nextLabel ?? t("next")}
+          nextLabel={
+            isCreatingProject
+              ? t("creatingProject")
+              : nextLabel ?? t("createProject")
+          }
         />
       }
     >
+      {creationError ? (
+        <div className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          {creationError}
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-2 rounded-[24px] border border-border/70 bg-muted/20 px-4 py-3">
         <span className="text-sm font-medium text-foreground">
           {t("modelsSelectedWithLimit", {

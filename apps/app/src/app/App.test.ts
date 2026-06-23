@@ -22,12 +22,17 @@ describe("app onboarding guard", () => {
     expect(source.includes("const hasUnresolvedRouteProjectContext =")).toBe(true);
     expect(source.includes("return clearProjectContextSearch(baseRouteSearch);")).toBe(true);
     expect(source.includes("!routeProjectContextQuery.isFetching")).toBe(true);
-    expect(source.includes("if (!useCompactProjectContext && !hasUnresolvedRouteProjectContext) return;")).toBe(true);
+    expect(source.includes("if (bypassResolvedContext) return;")).toBe(true);
+    expect(source.includes("!resolvedProjectContext &&")).toBe(true);
     expect(source.includes("clearSelectedProjectContext();")).toBe(true);
   });
 
-  test("keeps the brand canon route on slug-only project context", () => {
-    expect(source.includes('location.pathname === "/brand-canon"')).toBe(true);
+  test("keeps scoped organization and project context on every app page", () => {
+    expect(source.includes("useCompactProjectContext")).toBe(false);
+    expect(source.includes("keepProjectOnlyContextSearch")).toBe(false);
+    expect(source.includes('location.pathname === "/organizations"')).toBe(false);
+    expect(source.includes('location.pathname === "/account"')).toBe(false);
+    expect(source.includes('location.pathname === "/brand-canon"')).toBe(false);
   });
 
   test("stores only canonical project ids in the persisted project context", () => {
@@ -37,7 +42,8 @@ describe("app onboarding guard", () => {
   });
 
   test("keeps slug-only project urls clean when the route is already readable", () => {
-    expect(source.includes('routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === ""')).toBe(true);
     expect(source.includes("applyResolvedProjectContextSearch(baseRouteSearch, resolvedProjectContext)")).toBe(true);
+    expect(source.includes('routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === ""')).toBe(false);
+    expect(source.includes("buildScopedHref(location.pathname")).toBe(false);
   });
 });

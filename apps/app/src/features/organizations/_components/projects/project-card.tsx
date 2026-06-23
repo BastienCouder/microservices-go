@@ -130,7 +130,6 @@ export const ProjectCard = memo(function ProjectCard({
       <Button asChild variant="outline" className="w-full gap-2 rounded-lg">
         <Link to={buildScopedHref("/monitoring", {
           project: project.slug,
-          projectId: project.id,
         })}>
           {t("accessProject")}
         </Link>

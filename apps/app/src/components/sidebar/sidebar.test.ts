@@ -31,5 +31,12 @@ describe("sidebar navigation", () => {
     expect(mobileSource.includes('item.labelKey === "responses"')).toBe(true);
     expect(mobileSource.includes('? location.search.slice(1) : location.search')).toBe(true);
     expect(mobileSource.includes('(item.promptTab ?? "prompts") === (activeTab || "prompts")')).toBe(true);
+    expect(mobileSource.includes("org:")).toBe(false);
+  });
+
+  test("keeps organization scope out of desktop sidebar urls", () => {
+    expect(source.includes('buildScopedHref("/monitoring", { project })')).toBe(true);
+    expect(source.includes("const org = activeOrg?.publicId || activeOrg?.id || selectedOrgId")).toBe(false);
+    expect(source.includes("org: activeOrg")).toBe(false);
   });
 });

@@ -2,26 +2,28 @@ FROM oven/bun:1.2.22-alpine AS deps
 
 WORKDIR /app
 
-COPY services/langgraph-scheduler/package.json ./package.json
-COPY services/langgraph-scheduler/bun.lock ./bun.lock
+COPY package.json ./package.json
+COPY bun.lock ./bun.lock
+RUN rm -rf node_modules
 RUN bun install --frozen-lockfile
 
 FROM deps AS build
 
-COPY services/langgraph-scheduler/tsconfig.json ./tsconfig.json
-COPY services/langgraph-scheduler/src ./src
-COPY services/contracts/proto ./proto
+COPY tsconfig.json ./tsconfig.json
+COPY src ./src
+COPY proto ./proto
 RUN bun run build
 
 FROM oven/bun:1.2.22-alpine AS prod-deps
 
 WORKDIR /app
 
-COPY services/langgraph-scheduler/package.json ./package.json
-COPY services/langgraph-scheduler/bun.lock ./bun.lock
+COPY package.json ./package.json
+COPY bun.lock ./bun.lock
+RUN rm -rf node_modules
 RUN bun install --frozen-lockfile --production
 
-FROM gcr.io/distroless/nodejs22-debian12:nonroot
+FROM gcr.io/distroless/nodejs22-debian13:nonroot
 
 WORKDIR /app
 

@@ -12,4 +12,12 @@ describe("step models", () => {
     expect(source.includes("selectedCount >= selectionLimit")).toBe(true);
     expect(source.includes("modelsPlanLimitReached")).toBe(false);
   });
+
+  test("creates the onboarding project from the final model selection step", () => {
+    expect(source.includes("createOnboardingProject")).toBe(true);
+    expect(source.includes("finishOnboarding")).toBe(true);
+    expect(source.includes("clearPersistedOnboardingState")).toBe(true);
+    expect(source.includes('buildScopedHref("/monitoring"')).toBe(true);
+    expect(source.includes("createProject")).toBe(true);
+  });
 });

@@ -14,7 +14,7 @@
   "donutTitle": "Perception de la marque",
   "donutSubtitle": "Niveau d’alignement de votre marque dans les réponses IA.",
   "donutEmpty": "Aucun signal de perception disponible pour les filtres sélectionnés.",
-  "brandContextRequiredEmpty": "Complétez le nom et la catégorie de la marque avant de lancer une analyse de perception.",
+  "brandContextRequiredEmpty": "Complétez le nom et le secteur de la marque avant de lancer une analyse de perception.",
   "donutAboveTarget": "Objectif atteint",
   "donutBelowTarget": "À renforcer",
   "gradeInsufficient": "Insuffisant",

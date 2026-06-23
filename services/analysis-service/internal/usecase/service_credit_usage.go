@@ -7,7 +7,6 @@ import (
 )
 
 const (
-	RunTypeContentCrawl            = "content_crawl"
 	RunTypeContentSelectedAnalysis = "content_selected_analysis"
 	RunTypeAgentReadyScan          = "agent_ready_scan"
 	RunTypeOptimizeActionBrief     = "optimize_action_brief"

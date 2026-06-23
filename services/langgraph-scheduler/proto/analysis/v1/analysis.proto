@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package analysis.v1;
+
+option go_package = "github.com/bastiencouder/microservices-go/contracts/gen/go/analysis/v1;analysisv1";
+
+service AnalysisService {
+  rpc StartAnalysis(StartAnalysisRequest) returns (StartAnalysisResponse);
+  rpc GetAnalysisRun(GetAnalysisRunRequest) returns (GetAnalysisRunResponse);
+  rpc RecordResponse(RecordResponseRequest) returns (RecordResponseResponse);
+  rpc FailAnalysisRun(FailAnalysisRunRequest) returns (FailAnalysisRunResponse);
+  rpc ListMissingAnalysisPrompts(ListMissingAnalysisPromptsRequest) returns (ListMissingAnalysisPromptsResponse);
+}
+
+message PromptText {
+  string id = 1;
+  string text = 2;
+  string kind = 3;
+}
+
+message PromptRun {
+  string id = 1;
+  string prompt_id = 2;
+  string prompt_text = 3;
+}
+
+message AnalysisRun {
+  string id = 1;
+  string status = 2;
+}
+
+message GetAnalysisRunRequest {
+  string run_id = 1;
+}
+
+message GetAnalysisRunResponse {
+  AnalysisRun analysis_run = 1;
+}
+
+message StartAnalysisRequest {
+  string request_id = 1;
+  int64 user_id = 2;
+  string project_id = 3;
+  repeated PromptText prompt_texts = 4;
+  repeated string model_ids = 5;
+  string run_type = 6;
+}
+
+message StartAnalysisResponse {
+  AnalysisRun analysis_run = 1;
+  repeated PromptRun prompt_runs = 2;
+}
+
+message RecordResponseRequest {
+  string run_id = 1;
+  string prompt_run_id = 2;
+  string model_id = 3;
+  string raw_response = 4;
+  bool brand_mentioned = 5;
+  string brand_position = 6;
+  bool citation_found = 7;
+  repeated string cited_urls = 8;
+  string sentiment = 9;
+}
+
+message RecordResponseResponse {
+  bool recorded = 1;
+}
+
+message FailAnalysisRunRequest {
+  string run_id = 1;
+}
+
+message FailAnalysisRunResponse {
+  AnalysisRun analysis_run = 1;
+}
+
+message ListMissingAnalysisPromptsRequest {
+  string project_id = 1;
+  repeated string prompt_ids = 2;
+  repeated string model_ids = 3;
+  string run_type = 4;
+}
+
+message ListMissingAnalysisPromptsResponse {
+  repeated string prompt_ids = 1;
+}

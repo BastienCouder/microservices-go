@@ -650,6 +650,63 @@ services:
         max-size: "10m"
         max-file: "3"
  
+  obscura:
+    profiles: ["backend"]
+    image: h4ckf0r0day/obscura@sha256:026ac64cc37adae8fe4cbbcc9a7376e40245ec11df64cdf9ade73853ae9322a5
+    restart: unless-stopped
+    networks:
+      - backend-net
+    command: ["serve", "--port", "9222", "--host", "0.0.0.0"]
+    expose:
+      - "9222"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  crawler-service:
+    profiles: ["backend"]
+    build:
+      context: ./services/crawler-service
+      dockerfile: Dockerfile
+    image: microservices-go/crawler-service:prod
+    restart: unless-stopped
+    networks:
+      - backend-net
+      - infra-net
+    depends_on:
+      obscura:
+        condition: service_started
+    environment:
+      PORT: "8094"
+      OBSCURA_WS: ws://obscura:9222/devtools/browser
+      ANALYSIS_DB_HOST: postgres
+      ANALYSIS_DB_PORT: "5432"
+      ANALYSIS_DB_USER: analysissvc
+      ANALYSIS_DB_NAME: analysissvc
+      ANALYSIS_DB_SSLMODE: disable
+      ANALYSIS_DB_PASSWORD_FILE: /run/secrets/analysissvc_db_password
+      CRAWLER_SERVICE_TOKEN_FILE: /run/secrets/internal_jwt_secret
+      CRAWLER_CONCURRENCY: "3"
+      CRAWLER_NAVIGATION_TIMEOUT_MS: "45000"
+    secrets:
+      - analysissvc_db_password
+      - internal_jwt_secret
+    expose:
+      - "8094"
+    healthcheck:
+      test: ["CMD", "/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:8094/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 3s
+      retries: 5
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+          cpus: '0.5'
+
   analysis-service:
     profiles: ["backend"]
     build:
@@ -680,8 +737,8 @@ services:
       REDIS_ADDR: redis:6379
       REDIS_PASSWORD_FILE: /run/secrets/redis_password
       DASHBOARD_CACHE_TTL: 30s
-      CLOUDFLARE_ACCOUNT_ID_FILE: /run/secrets/cloudflare_account_id
-      CLOUDFLARE_API_TOKEN_FILE: /run/secrets/cloudflare_api_token
+      CRAWLER_SERVICE_URL: http://crawler-service:8094
+      CRAWLER_SERVICE_TOKEN_FILE: /run/secrets/internal_jwt_secret
       IA_SERVICE_URL: http://ia-service:8091
       CONTENT_ISSUE_ANALYZER_MODEL_ID: gpt-oss-20b-free
       CONTENT_ISSUE_ANALYZER_PROVIDER_ID: openrouter
@@ -691,8 +748,6 @@ services:
       - analysissvc_db_password
       - internal_jwt_secret
       - redis_password
-      - cloudflare_account_id
-      - cloudflare_api_token
     # gRPC port exposé uniquement en interne (pas de port HTTP public)
     ports:
       - "127.0.0.1:9089:9089"

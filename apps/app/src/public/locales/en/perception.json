@@ -14,7 +14,7 @@
   "donutTitle": "Brand perception",
   "donutSubtitle": "How well your brand is aligned in AI responses.",
   "donutEmpty": "No perception signal available for the selected filters.",
-  "brandContextRequiredEmpty": "Complete the brand name and category before launching a perception analysis.",
+  "brandContextRequiredEmpty": "Complete the brand name and sector before launching a perception analysis.",
   "donutAboveTarget": "Target reached",
   "donutBelowTarget": "Needs work",
   "gradeInsufficient": "Insufficient",

@@ -24,6 +24,7 @@ type ShouldRedirectAwayFromAccountOnboardingInput = {
   user: UserProfile | null;
   isOnboardingRoute: boolean;
   onboardingSetupMode: OnboardingSetupMode;
+  organizationCount: number | null;
   projectCount: number | null;
 };
 
@@ -104,6 +105,7 @@ export function shouldRedirectAwayFromAccountOnboarding({
   user,
   isOnboardingRoute,
   onboardingSetupMode,
+  organizationCount,
   projectCount,
 }: ShouldRedirectAwayFromAccountOnboardingInput): boolean {
   if (apiBaseURL.trim() === "") {
@@ -114,6 +116,12 @@ export function shouldRedirectAwayFromAccountOnboarding({
   }
   if (onboardingSetupMode !== "account") {
     return false;
+  }
+  if (organizationCount === null) {
+    return false;
+  }
+  if (organizationCount > 0) {
+    return true;
   }
   if (projectCount === null) {
     return false;

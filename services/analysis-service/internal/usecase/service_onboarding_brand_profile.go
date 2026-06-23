@@ -197,9 +197,12 @@ func onboardingCrawlText(records []ContentOptimizerCrawlRecord) string {
 
 func firstUsefulParagraph(content string) string {
 	for _, line := range strings.Split(content, "\n") {
-		line = cleanMarkdownLine(line)
-		if len([]rune(line)) >= 45 && len([]rune(line)) <= 260 {
-			return line
+		cleaned := cleanMarkdownLine(line)
+		if isLikelyNavigationLine(line, cleaned) {
+			continue
+		}
+		if len([]rune(cleaned)) >= 45 && len([]rune(cleaned)) <= 260 {
+			return cleaned
 		}
 	}
 	return ""
@@ -211,11 +214,14 @@ func longDescriptionFromContent(leadDescription, content string) string {
 	}
 	paragraphs := make([]string, 0, 2)
 	for _, line := range strings.Split(content, "\n") {
-		line = cleanMarkdownLine(line)
-		if len([]rune(line)) < 45 || line == leadDescription {
+		cleaned := cleanMarkdownLine(line)
+		if isLikelyNavigationLine(line, cleaned) {
 			continue
 		}
-		paragraphs = append(paragraphs, line)
+		if len([]rune(cleaned)) < 45 || cleaned == leadDescription {
+			continue
+		}
+		paragraphs = append(paragraphs, cleaned)
 		if len(paragraphs) == 2 {
 			break
 		}
@@ -230,11 +236,14 @@ func inferKeyFeatures(content string) []string {
 	features := make([]string, 0, 5)
 	seen := map[string]struct{}{}
 	for _, line := range strings.Split(content, "\n") {
-		line = cleanMarkdownLine(line)
-		if len([]rune(line)) < 18 || len([]rune(line)) > 110 {
+		cleaned := cleanMarkdownLine(line)
+		if isLikelyNavigationLine(line, cleaned) {
 			continue
 		}
-		lower := strings.ToLower(line)
+		if len([]rune(cleaned)) < 18 || len([]rune(cleaned)) > 110 {
+			continue
+		}
+		lower := strings.ToLower(cleaned)
 		if !strings.Contains(lower, " ") {
 			continue
 		}
@@ -242,7 +251,7 @@ func inferKeyFeatures(content string) []string {
 			continue
 		}
 		seen[lower] = struct{}{}
-		features = append(features, line)
+		features = append(features, cleaned)
 		if len(features) == 5 {
 			break
 		}
@@ -299,13 +308,39 @@ func inferBrandNameFromURL(rawURL string) string {
 	return strings.ToUpper(part[:1]) + part[1:]
 }
 
-var markdownNoise = regexp.MustCompile(`^\s*(#+|\*|-|\d+\.)\s*`)
+var (
+	markdownNoise = regexp.MustCompile(`^\s*(#+|\*|-|\d+\.)\s*`)
+	markdownImage = regexp.MustCompile(`!\[[^\]]*\]\([^)]*\)`)
+	markdownLink  = regexp.MustCompile(`\[([^\]]+)\]\([^)]*\)`)
+	rawURL        = regexp.MustCompile(`https?://\S+`)
+)
 
 func cleanMarkdownLine(value string) string {
 	line := strings.TrimSpace(value)
+	if strings.Contains(strings.ToLower(line), "data:image") {
+		return ""
+	}
 	line = markdownNoise.ReplaceAllString(line, "")
+	line = markdownImage.ReplaceAllString(line, "")
+	line = markdownLink.ReplaceAllString(line, "$1")
+	line = rawURL.ReplaceAllString(line, "")
+	line = strings.NewReplacer("**", "", "__", "", "`", "").Replace(line)
 	line = strings.Trim(line, "`*_ ")
 	return strings.Join(strings.Fields(line), " ")
+}
+
+func isLikelyNavigationLine(raw string, cleaned string) bool {
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" {
+		return true
+	}
+	if markdownLink.MatchString(raw) && !strings.ContainsAny(cleaned, ".!?;:") {
+		return true
+	}
+	if len([]rune(cleaned)) <= 80 && cleaned == strings.ToUpper(cleaned) {
+		return true
+	}
+	return false
 }
 
 func mergeOnboardingBrandProfilePreview(
@@ -323,7 +358,7 @@ func mergeOnboardingBrandProfilePreview(
 		merged.BrandName = strings.TrimSpace(ai.BrandName)
 	}
 	if strings.TrimSpace(ai.BrandDescription) != "" {
-		merged.BrandDescription = strings.TrimSpace(ai.BrandDescription)
+		merged.BrandDescription = cleanMarkdownText(ai.BrandDescription)
 	}
 	if strings.TrimSpace(ai.Industry) != "" {
 		merged.Industry = strings.TrimSpace(ai.Industry)
@@ -338,4 +373,15 @@ func mergeOnboardingBrandProfilePreview(
 		merged.Prompts = ai.Prompts
 	}
 	return merged
+}
+
+func cleanMarkdownText(value string) string {
+	paragraphs := make([]string, 0, 2)
+	for _, line := range strings.Split(value, "\n") {
+		line = cleanMarkdownLine(line)
+		if line != "" {
+			paragraphs = append(paragraphs, line)
+		}
+	}
+	return strings.Join(paragraphs, "\n\n")
 }

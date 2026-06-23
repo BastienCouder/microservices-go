@@ -64,9 +64,7 @@ const routePreloaders: Record<string, () => Promise<unknown>> = {
   "/perception": () => import("@/features/perception"),
   "/perception/responses": () => import("@/features/perception/responses"),
   "/content-optimizer": () => import("@/features/content-optimizer/index"),
-  "/ai-agent-ready": () => import("@/features/ai-agent-ready/index"),
   "/error-hub": () => import("@/features/error-hub/index"),
-  "/optimize/actions": () => import("@/features/error-hub/index"),
   "/brands": () => import("@/features/brands/index"),
   "/brand-canon": () => import("@/features/brands/brand-canon/index"),
   "/organizations": () => import("@/features/organizations/index"),
@@ -379,14 +377,13 @@ function SidebarComponent({
 
     storeSelectedProjectContext({
       organizationId: project?.organizationId,
+      organizationPublicId: activeOrg?.publicId || project?.organizationId,
       projectId,
     });
 
     navigate(
       buildScopedHref(location.pathname, {
         project: project?.slug,
-        projectId,
-        org: null,
         createProject: null,
       }),
     );
@@ -401,7 +398,6 @@ function SidebarComponent({
       value,
       buildScopedHref("/organizations", {
         project: activeProject?.slug,
-        projectId: activeProject?.id,
         section: value === DEFAULT_ORGANIZATION_VIEW_TAB ? null : value,
       }),
     ]),

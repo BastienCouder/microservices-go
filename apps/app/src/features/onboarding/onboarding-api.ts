@@ -124,7 +124,9 @@ export async function createOnboardingProject(
   const brandName = input.brandName.trim();
   const websiteUrl = input.websiteUrl.trim();
   const organizationId = input.organizationId.trim();
-  const organizationName = input.organizationName.trim() || brandName;
+  const organizationName = organizationId
+    ? ""
+    : input.organizationName.trim() || brandName;
   const modelIds = input.modelIds.map((modelId) => modelId.trim()).filter(Boolean);
 
   if (!brandName) {

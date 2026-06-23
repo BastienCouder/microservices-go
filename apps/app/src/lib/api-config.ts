@@ -126,10 +126,6 @@ export const apiRoutes = {
         : `/analysis/projects/${projectId}/perception`,
     response: (responseId: string) => `/analysis/responses/${encodeURIComponent(responseId)}`,
     optimizationErrors: (projectId: string) => `/analysis/projects/${projectId}/optimization-errors`,
-    aiBriefSettings: (projectId: string) => `/analysis/projects/${projectId}/ai-brief-settings`,
-    optimizeActions: (projectId: string) => `/analysis/projects/${projectId}/optimize-actions`,
-    optimizeAction: (projectId: string, actionId: string) =>
-      `/analysis/projects/${projectId}/optimize-actions/${encodeURIComponent(actionId)}`,
     brandCanon: (projectId: string) => `/analysis/projects/${projectId}/brand-canon`,
   },
   attribution: {

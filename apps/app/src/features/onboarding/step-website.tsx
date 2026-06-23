@@ -12,12 +12,14 @@ import {
 type StepWebsiteProps = {
   apiBaseURL: string;
   organizationId?: string;
+  showOrganizationName?: boolean;
   isDemo?: boolean;
 };
 
 export function StepWebsite({
   apiBaseURL,
   organizationId = "",
+  showOrganizationName = false,
   isDemo = false,
 }: StepWebsiteProps) {
   const {
@@ -31,12 +33,16 @@ export function StepWebsite({
   } = useOnboarding();
   const { t } = useScopedI18n("onboarding");
   const canContinue =
-    organizationName.trim() !== "" &&
+    (!showOrganizationName || organizationName.trim() !== "") &&
     brandName.trim() !== "" &&
     websiteUrl.trim() !== "";
 
   useEffect(() => {
-    if (organizationName.trim() !== "" || organizationId.trim() === "") {
+    if (
+      !showOrganizationName ||
+      organizationName.trim() !== "" ||
+      organizationId.trim() === ""
+    ) {
       return;
     }
 
@@ -56,7 +62,7 @@ export function StepWebsite({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseURL, organizationId, organizationName, setOrganizationName]);
+  }, [apiBaseURL, organizationId, organizationName, setOrganizationName, showOrganizationName]);
 
   return (
     <OnboardingStep
@@ -69,14 +75,16 @@ export function StepWebsite({
         </div>
       }
     >
-      <OnboardingField label={t("organizationNameLabel")} htmlFor="organizationName">
-        <Input
-          id="organizationName"
-          value={organizationName}
-          onChange={(event) => setOrganizationName(event.target.value)}
-          placeholder={t("organizationNamePlaceholder")}
-        />
-      </OnboardingField>
+      {showOrganizationName ? (
+        <OnboardingField label={t("organizationNameLabel")} htmlFor="organizationName">
+          <Input
+            id="organizationName"
+            value={organizationName}
+            onChange={(event) => setOrganizationName(event.target.value)}
+            placeholder={t("organizationNamePlaceholder")}
+          />
+        </OnboardingField>
+      ) : null}
 
       <OnboardingField label={t("brandNameLabel")} htmlFor="brandName">
         <Input

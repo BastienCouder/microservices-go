@@ -21,6 +21,7 @@ func NewService() *Service {
 		runByRequest:        make(map[string]string),
 		brandCanonByProject: make(map[string]*BrandCanon),
 		contentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot),
+		contentSelections:   make(map[string]*ContentOptimizerSelectionDraft),
 		optimizeActions:     make(map[string]*OptimizeAction),
 		actionsByProject:    make(map[string][]string),
 		aiBriefSettings:     make(map[string]*ProjectAIBriefSettings),
@@ -88,6 +89,7 @@ func (s *Service) snapshotLocked() *persistedState {
 		RunByRequest:        make(map[string]string, len(s.runByRequest)),
 		BrandCanonByProject: make(map[string]*BrandCanon, len(s.brandCanonByProject)),
 		ContentCrawls:       make(map[string]*ContentOptimizerCrawlSnapshot, len(s.contentCrawls)),
+		ContentSelections:   make(map[string]*ContentOptimizerSelectionDraft, len(s.contentSelections)),
 		OptimizeActions:     make(map[string]*OptimizeAction, len(s.optimizeActions)),
 		ActionsByProject:    make(map[string][]string, len(s.actionsByProject)),
 		AIBriefSettings:     make(map[string]*ProjectAIBriefSettings, len(s.aiBriefSettings)),
@@ -132,6 +134,10 @@ func (s *Service) snapshotLocked() *persistedState {
 		clone := copyContentOptimizerCrawlSnapshot(value)
 		state.ContentCrawls[key] = &clone
 	}
+	for key, value := range s.contentSelections {
+		clone := copyContentOptimizerSelectionDraft(value)
+		state.ContentSelections[key] = &clone
+	}
 	for key, value := range s.optimizeActions {
 		clone := copyOptimizeAction(value)
 		state.OptimizeActions[key] = &clone
@@ -162,6 +168,7 @@ func (s *Service) restoreLocked(state *persistedState) {
 	s.runByRequest = nonNilRunByRequestMap(state.RunByRequest)
 	s.brandCanonByProject = nonNilBrandCanonMap(state.BrandCanonByProject)
 	s.contentCrawls = nonNilContentOptimizerCrawlMap(state.ContentCrawls)
+	s.contentSelections = nonNilContentOptimizerSelectionMap(state.ContentSelections)
 	s.optimizeActions = nonNilOptimizeActionMap(state.OptimizeActions)
 	s.actionsByProject = nonNilSliceMap(state.ActionsByProject)
 	s.aiBriefSettings = nonNilAIBriefSettingsMap(state.AIBriefSettings)

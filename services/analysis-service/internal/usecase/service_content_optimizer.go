@@ -11,10 +11,15 @@ import (
 )
 
 const (
-	defaultContentCrawlLimit = 25
 	defaultContentCrawlDepth = 2
 	maxContentCrawlLimit     = 1000
 	maxContentCrawlDepth     = 25
+)
+
+const (
+	starterContentSelectedLimit = 10
+	growthContentSelectedLimit  = 50
+	agencyContentSelectedLimit  = 200
 )
 
 type ContentOptimizerCrawlOptions struct {
@@ -25,14 +30,16 @@ type ContentOptimizerCrawlOptions struct {
 }
 
 type ContentOptimizerCrawlStartInput struct {
-	URL           string                       `json:"url"`
-	Limit         int                          `json:"limit"`
-	Depth         int                          `json:"depth"`
-	Source        string                       `json:"source"`
-	Formats       []string                     `json:"formats"`
-	Render        bool                         `json:"render"`
-	Options       ContentOptimizerCrawlOptions `json:"options"`
-	CrawlPurposes []string                     `json:"crawlPurposes"`
+	ProjectID      string                       `json:"-"`
+	OrganizationID int64                        `json:"-"`
+	URL            string                       `json:"url"`
+	Limit          int                          `json:"limit"`
+	Depth          int                          `json:"depth"`
+	Source         string                       `json:"source"`
+	Formats        []string                     `json:"formats"`
+	Render         bool                         `json:"render"`
+	Options        ContentOptimizerCrawlOptions `json:"options"`
+	CrawlPurposes  []string                     `json:"crawlPurposes"`
 }
 
 type ContentOptimizerCrawlResultInput struct {
@@ -104,29 +111,36 @@ func (s *Service) StartContentOptimizerCrawl(
 	if s.contentCrawler == nil {
 		return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: content crawler is not configured", ErrDependencyUnavailable)
 	}
-
-	reservation, err := s.ReserveCreditUsage(ctx, CreditUsageInput{
-		OrganizationID: organizationID,
-		ProjectID:      projectID,
-		RunType:        RunTypeContentCrawl,
-		Credits:        contentOptimizerCrawlCreditCost(normalized.Limit),
-	})
-	if err != nil {
-		return ContentOptimizerCrawlJob{}, err
+	normalized.ProjectID = strings.TrimSpace(projectID)
+	normalized.OrganizationID = organizationID
+	if len(normalized.Options.IncludePatterns) > 0 {
+		limit, hasLimit, err := s.contentSelectedCrawlLimit(ctx, organizationID)
+		if err != nil {
+			return ContentOptimizerCrawlJob{}, err
+		}
+		if hasLimit && len(normalized.Options.IncludePatterns) > limit {
+			return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: selected crawl cannot exceed plan limit of %d pages", ErrValidation, limit)
+		}
+		if hasLimit && normalized.Limit > limit {
+			normalized.Limit = limit
+		}
 	}
 
 	job, err := s.contentCrawler.StartCrawl(ctx, normalized)
 	if err != nil {
-		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
 		return ContentOptimizerCrawlJob{}, err
 	}
 	if strings.TrimSpace(job.ID) == "" {
-		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
 		return ContentOptimizerCrawlJob{}, fmt.Errorf("%w: content crawler returned an empty job id", ErrDependencyUnavailable)
 	}
-	if err := s.LinkCreditUsageRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(job.ID), reservation.ID); err != nil {
-		_, _ = s.ReleaseCreditUsage(ctx, reservation.ID)
-		return ContentOptimizerCrawlJob{}, err
+	if len(normalized.Options.IncludePatterns) > 0 {
+		_ = s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, job.ID, ContentOptimizerCrawlResult{
+			ID:       job.ID,
+			Status:   job.Status,
+			Total:    normalized.Limit,
+			Finished: 0,
+			Records:  nil,
+		})
 	}
 	return job, nil
 }
@@ -166,17 +180,8 @@ func (s *Service) GetContentOptimizerCrawl(
 	if err != nil {
 		return ContentOptimizerCrawlResult{}, err
 	}
-	if !normalized.SkipAnalysis {
-		result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
-	}
-	if isTerminalCrawlJobStatus(result.Status) {
-		if !normalized.SkipAnalysis && shouldSaveContentOptimizerCrawlResult(normalized, result) {
-			if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
-				_ = s.finalizeContentOptimizerCrawlCredit(ctx, projectID, jobID, false)
-				return ContentOptimizerCrawlResult{}, err
-			}
-		}
-		if err := s.finalizeContentOptimizerCrawlCredit(ctx, projectID, jobID, strings.EqualFold(result.Status, "completed")); err != nil {
+	if isTerminalCrawlJobStatus(result.Status) && shouldSaveContentOptimizerCrawlResult(normalized, result) {
+		if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
 			return ContentOptimizerCrawlResult{}, err
 		}
 	}
@@ -206,7 +211,7 @@ func (s *Service) AnalyzeSelectedContentOptimizerRecords(
 		OrganizationID: organizationID,
 		ProjectID:      projectID,
 		RunType:        RunTypeContentSelectedAnalysis,
-		Credits:        contentOptimizerCrawlCreditCost(len(normalizedRecords)),
+		Credits:        len(normalizedRecords),
 	})
 	if err != nil {
 		return ContentOptimizerCrawlResult{}, err
@@ -239,9 +244,20 @@ func (s *Service) GetLatestContentOptimizerCrawl(
 		return ContentOptimizerCrawlSnapshot{}, err
 	}
 
+	if provider, ok := s.contentCrawler.(interface {
+		GetLatestCrawl(context.Context, string, int64) (ContentOptimizerCrawlSnapshot, error)
+	}); ok {
+		snapshot, err := provider.GetLatestCrawl(ctx, projectID, organizationID)
+		if err == nil {
+			return snapshot, nil
+		}
+		if !errors.Is(err, ErrNotFound) {
+			return ContentOptimizerCrawlSnapshot{}, err
+		}
+	}
+
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-
 	snapshot, ok := s.contentCrawls[contentOptimizerCrawlKey(projectID, organizationID)]
 	if !ok || snapshot == nil {
 		return ContentOptimizerCrawlSnapshot{}, fmt.Errorf("%w: content optimizer crawl not found", ErrNotFound)
@@ -249,6 +265,71 @@ func (s *Service) GetLatestContentOptimizerCrawl(
 	out := copyContentOptimizerCrawlSnapshot(snapshot)
 	out.Result = analyzeContentOptimizerCrawlResult(out.Result)
 	return out, nil
+}
+
+func (s *Service) GetContentOptimizerSelectionDraft(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+) (ContentOptimizerSelectionDraft, error) {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return ContentOptimizerSelectionDraft{}, err
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	draft, ok := s.contentSelections[contentOptimizerCrawlKey(projectID, organizationID)]
+	if !ok || draft == nil {
+		return ContentOptimizerSelectionDraft{}, fmt.Errorf("%w: content optimizer selection not found", ErrNotFound)
+	}
+	return copyContentOptimizerSelectionDraft(draft), nil
+}
+
+func (s *Service) SaveContentOptimizerSelectionDraft(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	draft ContentOptimizerSelectionDraft,
+) (ContentOptimizerSelectionDraft, error) {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return ContentOptimizerSelectionDraft{}, err
+	}
+	normalized := ContentOptimizerSelectionDraft{
+		ProjectID:      strings.TrimSpace(projectID),
+		OrganizationID: organizationID,
+		JobID:          strings.TrimSpace(draft.JobID),
+		SelectedURLs:   normalizeTrimmedStringList(draft.SelectedURLs),
+		Result:         copyContentOptimizerCrawlResult(draft.Result),
+		UpdatedAt:      s.now().UTC(),
+	}
+	if normalized.JobID == "" {
+		normalized.JobID = strings.TrimSpace(normalized.Result.ID)
+	}
+	if normalized.Result.ID == "" {
+		normalized.Result.ID = normalized.JobID
+	}
+	if normalized.Result.Total < len(normalized.Result.Records) {
+		normalized.Result.Total = len(normalized.Result.Records)
+	}
+	if normalized.Result.Finished < len(normalized.Result.Records) && isTerminalCrawlJobStatus(normalized.Result.Status) {
+		normalized.Result.Finished = len(normalized.Result.Records)
+	}
+	if len(normalized.Result.Records) == 0 {
+		return ContentOptimizerSelectionDraft{}, fmt.Errorf("%w: selection result records are required", ErrValidation)
+	}
+
+	key := contentOptimizerCrawlKey(projectID, organizationID)
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	backup := s.snapshotLocked()
+	s.contentSelections[key] = &normalized
+	if err := s.persistLocked(ctx); err != nil {
+		s.restoreLocked(backup)
+		return ContentOptimizerSelectionDraft{}, err
+	}
+	return copyContentOptimizerSelectionDraft(&normalized), nil
 }
 
 func normalizeSelectedContentOptimizerRecords(records []ContentOptimizerCrawlRecord) []ContentOptimizerCrawlRecord {
@@ -318,12 +399,6 @@ func normalizeContentOptimizerCrawlStartInput(input ContentOptimizerCrawlStartIn
 		return ContentOptimizerCrawlStartInput{}, fmt.Errorf("%w: url must use http or https", ErrValidation)
 	}
 
-	if normalized.Limit <= 0 {
-		normalized.Limit = defaultContentCrawlLimit
-	}
-	if normalized.Limit > maxContentCrawlLimit {
-		return ContentOptimizerCrawlStartInput{}, fmt.Errorf("%w: limit cannot exceed %d", ErrValidation, maxContentCrawlLimit)
-	}
 	if normalized.Depth <= 0 {
 		normalized.Depth = defaultContentCrawlDepth
 	}
@@ -361,7 +436,51 @@ func normalizeContentOptimizerCrawlStartInput(input ContentOptimizerCrawlStartIn
 
 	normalized.Options.IncludePatterns = normalizeTrimmedStringList(normalized.Options.IncludePatterns)
 	normalized.Options.ExcludePatterns = normalizeTrimmedStringList(normalized.Options.ExcludePatterns)
+	if len(normalized.Options.IncludePatterns) > 0 {
+		if normalized.Limit <= 0 {
+			normalized.Limit = len(normalized.Options.IncludePatterns)
+		}
+		if normalized.Limit > maxContentCrawlLimit {
+			return ContentOptimizerCrawlStartInput{}, fmt.Errorf("%w: limit cannot exceed %d", ErrValidation, maxContentCrawlLimit)
+		}
+	} else if normalized.Limit < 0 {
+		return ContentOptimizerCrawlStartInput{}, fmt.Errorf("%w: limit must be positive", ErrValidation)
+	}
 	return normalized, nil
+}
+
+func (s *Service) contentSelectedCrawlLimit(ctx context.Context, organizationID int64) (int, bool, error) {
+	if s.billingQuota == nil {
+		return agencyContentSelectedLimit, true, nil
+	}
+	provider, ok := s.billingQuota.(BillingEntitlementsProvider)
+	if !ok {
+		return agencyContentSelectedLimit, true, nil
+	}
+	entitlements, found, err := provider.GetOrganizationEntitlements(ctx, organizationID)
+	if err != nil {
+		return 0, false, err
+	}
+	if !found {
+		return starterContentSelectedLimit, true, nil
+	}
+	limit, limited := contentSelectedCrawlLimitForPlan(entitlements.Plan)
+	return limit, limited, nil
+}
+
+func contentSelectedCrawlLimitForPlan(plan string) (int, bool) {
+	switch strings.ToLower(strings.TrimSpace(plan)) {
+	case "starter", "free":
+		return starterContentSelectedLimit, true
+	case "growth", "pro-monthly":
+		return growthContentSelectedLimit, true
+	case "pro", "agency", "pro-yearly":
+		return agencyContentSelectedLimit, true
+	case "agency-enterprise", "enterprise":
+		return 0, false
+	default:
+		return starterContentSelectedLimit, true
+	}
 }
 
 func normalizeStringList(values []string) []string {
@@ -400,7 +519,7 @@ func normalizeTrimmedStringList(values []string) []string {
 
 func isAllowedCrawlRecordStatus(status string) bool {
 	switch status {
-	case "queued", "completed", "disallowed", "skipped", "errored", "cancelled":
+	case "queued", "running", "completed", "partially_completed", "disallowed", "skipped", "errored", "cancelled":
 		return true
 	default:
 		return false
@@ -409,7 +528,7 @@ func isAllowedCrawlRecordStatus(status string) bool {
 
 func isTerminalCrawlJobStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-	case "completed", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user", "errored":
+	case "completed", "partially_completed", "cancelled_due_to_timeout", "cancelled_due_to_limits", "cancelled_by_user", "errored":
 		return true
 	default:
 		return false
@@ -417,10 +536,7 @@ func isTerminalCrawlJobStatus(status string) bool {
 }
 
 func shouldSaveContentOptimizerCrawlResult(input ContentOptimizerCrawlResultInput, result ContentOptimizerCrawlResult) bool {
-	if input.Limit <= 0 {
-		return true
-	}
-	if result.Total <= 0 {
+	if input.Limit <= 0 || result.Total <= 0 {
 		return len(result.Records) > 0
 	}
 	return len(result.Records) >= result.Total
@@ -428,40 +544,6 @@ func shouldSaveContentOptimizerCrawlResult(input ContentOptimizerCrawlResultInpu
 
 func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 	return fmt.Sprintf("%d|%s", organizationID, strings.TrimSpace(projectID))
-}
-
-func contentOptimizerCrawlCreditRequestID(jobID string) string {
-	return "content-crawl-job:" + strings.TrimSpace(jobID)
-}
-
-func (s *Service) finalizeContentOptimizerCrawlCredit(ctx context.Context, projectID string, jobID string, success bool) error {
-	var err error
-	if success {
-		_, err = s.CompleteCreditUsageByRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(jobID))
-	} else {
-		_, err = s.ReleaseCreditUsageByRequest(ctx, projectID, contentOptimizerCrawlCreditRequestID(jobID))
-	}
-	if errors.Is(err, ErrNotFound) {
-		return nil
-	}
-	return err
-}
-
-func contentOptimizerCrawlCreditCost(pageLimit int) int {
-	if pageLimit <= 0 {
-		pageLimit = defaultContentCrawlLimit
-	}
-	switch {
-	case pageLimit <= 10:
-		return 10
-	case pageLimit <= 50:
-		return 35
-	case pageLimit <= 200:
-		return 100
-	default:
-		extraPages := pageLimit - 200
-		return 100 + (extraPages+4)/5
-	}
 }
 
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {

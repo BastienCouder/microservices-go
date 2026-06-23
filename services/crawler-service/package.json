@@ -1,0 +1,26 @@
+{
+  "name": "crawler-service",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production URL discovery and Markdown crawl worker backed by Obscura",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc --noEmit -p tsconfig.json",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "pg": "^8.16.3",
+    "puppeteer-core": "^25.1.0",
+    "turndown": "^7.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.6",
+    "@types/turndown": "^5.0.5",
+    "typescript": "^5.8.3"
+  }
+}
