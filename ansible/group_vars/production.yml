@@ -1,7 +1,6 @@
 app_name: visia
 web_domains:
   - visia.bastiencouder.fr
-  - www.visia.bastiencouder.fr
 app_domains:
   - app.visia.bastiencouder.fr
 api_domains:
