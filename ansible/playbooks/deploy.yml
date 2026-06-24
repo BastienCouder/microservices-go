@@ -195,7 +195,7 @@
         dest: "{{ deploy_path }}/.env"
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
-        mode: "0600"
+        mode: "0644"
 
     - name: Check Docker secrets exist on server
       ansible.builtin.stat:
