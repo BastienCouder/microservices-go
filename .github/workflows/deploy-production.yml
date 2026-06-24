@@ -106,14 +106,23 @@ jobs:
       - name: Deploy production stack
         env:
           PRODUCTION_GITHUB_DEPLOY_KEY: ${{ secrets.PRODUCTION_GITHUB_DEPLOY_KEY }}
+          PRODUCTION_GITHUB_DEPLOY_KEY_B64: ${{ secrets.PRODUCTION_GITHUB_DEPLOY_KEY_B64 }}
         run: |
           SERVICE="${{ steps.scope.outputs.service }}"
           EXTRA_ARGS=()
 
-          if [ -n "$PRODUCTION_GITHUB_DEPLOY_KEY" ]; then
+          if [ -n "$PRODUCTION_GITHUB_DEPLOY_KEY_B64" ] || [ -n "$PRODUCTION_GITHUB_DEPLOY_KEY" ]; then
             DEPLOY_KEY_FILE="$RUNNER_TEMP/production_github_deploy_key"
-            printf '%s\n' "$PRODUCTION_GITHUB_DEPLOY_KEY" > "$DEPLOY_KEY_FILE"
+
+            if [ -n "$PRODUCTION_GITHUB_DEPLOY_KEY_B64" ]; then
+              printf '%s' "$PRODUCTION_GITHUB_DEPLOY_KEY_B64" | base64 -d > "$DEPLOY_KEY_FILE"
+            else
+              printf '%s\n' "$PRODUCTION_GITHUB_DEPLOY_KEY" > "$DEPLOY_KEY_FILE"
+            fi
+
+            sed -i 's/\r$//' "$DEPLOY_KEY_FILE"
             chmod 600 "$DEPLOY_KEY_FILE"
+            ssh-keygen -y -f "$DEPLOY_KEY_FILE" >/dev/null
             EXTRA_ARGS+=(-e "repo_deploy_private_key_file=$DEPLOY_KEY_FILE")
           fi
 
