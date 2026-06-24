@@ -22,6 +22,16 @@
       analysissvc: analysissvc_db_password.txt
       iasvc: iasvc_db_password.txt
       kratos: kratos_db_password.txt
+    migration_services:
+      - kratos-migrate
+      - user-migrate
+      - organizations-migrate
+      - permission-migrate
+      - billing-migrate
+      - project-migrate
+      - analysis-migrate
+      - ia-migrate
+      - notification-migrate
     compose_profiles_default:
       - frontend
       - backend
@@ -291,6 +301,21 @@
       args:
         chdir: "{{ deploy_path }}"
 
+    - name: Ensure PostgreSQL roles and databases exist
+      ansible.builtin.shell: >
+        sudo -u {{ deploy_user }} env
+        PUBLIC_WEB_URL={{ public_web_url | quote }}
+        PUBLIC_APP_URL={{ public_app_url | quote }}
+        PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }}
+        PUBLIC_AUTH_URL={{ public_auth_url | quote }}
+        PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }}
+        CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }}
+        docker compose
+        {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
+        up postgres-bootstrap
+      args:
+        chdir: "{{ deploy_path }}"
+
     - name: Synchronize PostgreSQL role passwords with Docker secrets
       ansible.builtin.shell: |
         set -eu
@@ -315,6 +340,38 @@
         chdir: "{{ deploy_path }}"
       loop: "{{ postgres_role_password_files | dict2items }}"
       no_log: true
+
+    - name: Build production migration containers
+      ansible.builtin.shell: >
+        sudo -u {{ deploy_user }} env
+        PUBLIC_WEB_URL={{ public_web_url | quote }}
+        PUBLIC_APP_URL={{ public_app_url | quote }}
+        PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }}
+        PUBLIC_AUTH_URL={{ public_auth_url | quote }}
+        PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }}
+        CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }}
+        docker compose
+        {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
+        build {{ item | quote }}
+      args:
+        chdir: "{{ deploy_path }}"
+      loop: "{{ migration_services }}"
+
+    - name: Run production migrations
+      ansible.builtin.shell: >
+        sudo -u {{ deploy_user }} env
+        PUBLIC_WEB_URL={{ public_web_url | quote }}
+        PUBLIC_APP_URL={{ public_app_url | quote }}
+        PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }}
+        PUBLIC_AUTH_URL={{ public_auth_url | quote }}
+        PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }}
+        CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }}
+        docker compose
+        {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
+        up --no-deps {{ item | quote }}
+      args:
+        chdir: "{{ deploy_path }}"
+      loop: "{{ migration_services }}"
 
     - name: Start requested application stack
       ansible.builtin.shell: >
