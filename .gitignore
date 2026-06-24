@@ -1,3 +1,7 @@
 secrets
+.env
 tmp/
 .gomodproxy
+docs/diagrams
+docs/database
+docs/project

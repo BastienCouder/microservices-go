@@ -10,10 +10,10 @@ services:
       context: ./apps/web
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
-        NEXT_PUBLIC_APP_URL: http://localhost:30004
-        NEXT_PUBLIC_SITE_URL: http://localhost:30000
-        NEXT_PUBLIC_WEB_URL: http://localhost:30000
+        NEXT_PUBLIC_API_GATEWAY_URL: ${PUBLIC_API_GATEWAY_URL:?PUBLIC_API_GATEWAY_URL is required}
+        NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+        NEXT_PUBLIC_SITE_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
+        NEXT_PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
     image: microservices-go/web:prod
     restart: unless-stopped
     networks:
@@ -21,10 +21,10 @@ services:
       - backend-net
     environment:
       KRATOS_PUBLIC_PROXY_URL: http://kratos:4433
-      NEXT_PUBLIC_API_GATEWAY_URL: http://localhost:50000
-      NEXT_PUBLIC_APP_URL: http://localhost:30004
-      NEXT_PUBLIC_SITE_URL: http://localhost:30000
-      NEXT_PUBLIC_WEB_URL: http://localhost:30000
+      NEXT_PUBLIC_API_GATEWAY_URL: ${PUBLIC_API_GATEWAY_URL:?PUBLIC_API_GATEWAY_URL is required}
+      NEXT_PUBLIC_APP_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+      NEXT_PUBLIC_SITE_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
+      NEXT_PUBLIC_WEB_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
     ports:
       - "127.0.0.1:30000:3000"
     deploy:
@@ -39,8 +39,8 @@ services:
       context: ./apps/app
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://localhost:50000
-        VITE_WEB_AUTH_URL: http://localhost:30000/login
+        VITE_API_BASE_URL: ${PUBLIC_API_GATEWAY_URL:?PUBLIC_API_GATEWAY_URL is required}
+        VITE_WEB_AUTH_URL: ${PUBLIC_WEB_AUTH_URL:?PUBLIC_WEB_AUTH_URL is required}
     image: microservices-go/app:prod
     restart: unless-stopped
     networks:
@@ -48,8 +48,8 @@ services:
       - backend-net
     environment:
       API_GATEWAY_INTERNAL_URL: http://api-gateway:8080
-      APP_PUBLIC_URL: http://localhost:30004
-      WEB_AUTH_URL: http://localhost:30000/login
+      APP_PUBLIC_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+      WEB_AUTH_URL: ${PUBLIC_WEB_AUTH_URL:?PUBLIC_WEB_AUTH_URL is required}
     ports:
       - "127.0.0.1:30004:8080"
     deploy:
@@ -159,7 +159,7 @@ services:
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
       PERMISSION_GRPC_ALLOW_INSECURE: "true"
-      CORS_ALLOWED_ORIGINS: http://localhost:30000,http://localhost:30004
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
     secrets:
       - gateway_http_addr
       - gateway_metrics_addr
@@ -192,15 +192,14 @@ services:
       HTTP_ADDR: :8083
       METRICS_ADDR: :9090
       KRATOS_PUBLIC_URL: http://kratos:4433
-      KRATOS_BROWSER_URL: http://localhost:35433
+      KRATOS_BROWSER_URL: ${PUBLIC_AUTH_URL:?PUBLIC_AUTH_URL is required}
       USER_SERVICE_URL: http://user-service:8081
-      APP_RETURN_URL: http://localhost:30004/
-      ALLOWED_ORIGIN: http://localhost:30000
+      APP_RETURN_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}/
+      ALLOWED_ORIGIN: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
       INTERNAL_JWT_ISSUER: api-gateway
     secrets:
       - internal_jwt_secret
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     deploy:
       resources:
         limits:
@@ -237,7 +236,6 @@ services:
     secrets:
       - usersvc_db_password
       - internal_jwt_secret
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -303,8 +301,8 @@ services:
       PERMISSION_SERVICE_URL: http://permission-service:8085
       USER_SERVICE_URL: http://user-service:8081
       PROJECT_SERVICE_URL: http://project-service:8088
-      APP_BASE_URL: http://localhost:30004
-      INVITATION_LOGIN_URL: http://localhost:30000/auth
+      APP_BASE_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
+      INVITATION_LOGIN_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}/auth
       RABBITMQ_URL_FILE: /run/secrets/rabbitmq_url
       RABBITMQ_EXCHANGE: microservices.events
       RABBITMQ_NOTIFICATION_EMAIL_QUEUE: notification.email.send
@@ -323,7 +321,6 @@ services:
       - orgsvc_db_password
       - internal_jwt_secret
       - rabbitmq_url
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -395,7 +392,6 @@ services:
     secrets:
       - permsvc_db_password
       - internal_jwt_secret
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -486,7 +482,6 @@ services:
       - stripe_price_growth_yearly
       - stripe_price_pro_monthly
       - stripe_price_pro_yearly
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -566,7 +561,6 @@ services:
       - resend_from_email
       - internal_jwt_secret
       - rabbitmq_url
-    # Port non exposé publiquement — accessible uniquement via api-gateway
     healthcheck:
       test: ["CMD", "/app/service", "healthcheck"]
       interval: 20s
@@ -792,7 +786,7 @@ services:
       IA_EXECUTION_MODE: provider
       IA_PROVIDER_BASE_URL: https://openrouter.ai/api/v1
       IA_PROVIDER_API_KEY_FILE: /run/secrets/openrouter_api_key
-      IA_PROVIDER_HTTP_REFERER: http://localhost:30004
+      IA_PROVIDER_HTTP_REFERER: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
       IA_PROVIDER_APP_NAME: microservices-go
       IA_PROVIDER_TIMEOUT_MS: "90000"
       INTERNAL_JWT_SECRET_FILE: /run/secrets/internal_jwt_secret
@@ -1126,11 +1120,11 @@ services:
       KRATOS_DB_NAME: kratos
       KRATOS_DB_SSLMODE: disable
       KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
-      KRATOS_PUBLIC_BASE_URL: http://localhost:35433
-      WEB_PUBLIC_URL: http://localhost:30000
-      APP_PUBLIC_URL: http://localhost:30004
+      KRATOS_PUBLIC_BASE_URL: ${PUBLIC_AUTH_URL:?PUBLIC_AUTH_URL is required}
+      WEB_PUBLIC_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
+      APP_PUBLIC_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
       DOC_PUBLIC_URL: http://localhost:30001
-      WEB_AUTH_URL: http://localhost:30000/login
+      WEB_AUTH_URL: ${PUBLIC_WEB_AUTH_URL:?PUBLIC_WEB_AUTH_URL is required}
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
@@ -1157,11 +1151,11 @@ services:
       KRATOS_DB_NAME: kratos
       KRATOS_DB_SSLMODE: disable
       KRATOS_DB_PASSWORD_FILE: /run/secrets/kratos_db_password
-      KRATOS_PUBLIC_BASE_URL: http://localhost:35433
-      WEB_PUBLIC_URL: http://localhost:30000
-      APP_PUBLIC_URL: http://localhost:30004
+      KRATOS_PUBLIC_BASE_URL: ${PUBLIC_AUTH_URL:?PUBLIC_AUTH_URL is required}
+      WEB_PUBLIC_URL: ${PUBLIC_WEB_URL:?PUBLIC_WEB_URL is required}
+      APP_PUBLIC_URL: ${PUBLIC_APP_URL:?PUBLIC_APP_URL is required}
       DOC_PUBLIC_URL: http://localhost:30001
-      WEB_AUTH_URL: http://localhost:30000/login
+      WEB_AUTH_URL: ${PUBLIC_WEB_AUTH_URL:?PUBLIC_WEB_AUTH_URL is required}
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri

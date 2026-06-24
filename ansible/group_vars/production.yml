@@ -1,15 +1,29 @@
 app_name: visia
+web_domains:
+  - visia.bastiencouder.fr
+  - www.visia.bastiencouder.fr
 app_domains:
-  - visia.ai
-  - www.visia.ai
+  - app.visia.bastiencouder.fr
+api_domains:
+  - api.visia.bastiencouder.fr
+auth_domains:
+  - auth.visia.bastiencouder.fr
+app_all_domains: "{{ web_domains + app_domains + api_domains + auth_domains }}"
+
+public_web_url: https://visia.bastiencouder.fr
+public_app_url: https://app.visia.bastiencouder.fr
+public_api_gateway_url: https://api.visia.bastiencouder.fr
+public_auth_url: https://auth.visia.bastiencouder.fr
+public_web_auth_url: "{{ public_web_url }}/login"
+cors_allowed_origins: "{{ public_web_url }},{{ public_app_url }}"
 
 deploy_path: /opt/visia
 deploy_user: deploy
-repo_url: git@github-visia:BastienCouder/visia.git
+repo_url: git@github.com:BastienCouder/microservices-go.git
 repo_version: main
 nginx_site_path: /etc/nginx/sites-available/visia.conf
 nginx_site_link_path: /etc/nginx/sites-enabled/visia.conf
-letsencrypt_email: sarl.konstrikthor@gmail.com
+letsencrypt_email: couderbastien@gmail.com
 postgres_backup_r2_postgres_host: postgres
 postgres_backup_r2_postgres_port: "5432"
 postgres_backup_r2_postgres_user: postgres

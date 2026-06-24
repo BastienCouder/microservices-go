@@ -21,8 +21,6 @@ REQUIRED_SECRETS := \
 	organizations_db_user.txt \
 	organizations_db_name.txt \
 	openrouter_api_key.txt \
-	cloudflare_account_id.txt \
-	cloudflare_api_token.txt \
 	resend_api_key.txt \
 	resend_from_email.txt \
 	resend_smtp_connection_uri.txt \
@@ -47,6 +45,7 @@ REQUIRED_SECRETS := \
 
 OPTIONAL_SECRETS := \
 	admin_bootstrap_code.txt \
+	stripe_price_correction_credits.txt \
 	r2_bucket.txt \
 	r2_account_id.txt \
 	r2_access_key_id.txt \
@@ -65,7 +64,6 @@ OPTIONAL_SECRETS := \
 	billing_metrics_addr.txt \
 	notification_http_addr.txt \
 	notification_metrics_addr.txt \
-	stripe_price_correction_credits.txt \
 	project_http_addr.txt \
 	project_metrics_addr.txt \
 	analysis_http_addr.txt \

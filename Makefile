@@ -46,8 +46,6 @@ REQUIRED_SECRETS := \
 	organizations_db_user.txt \
 	organizations_db_name.txt \
 	openrouter_api_key.txt \
-	cloudflare_account_id.txt \
-	cloudflare_api_token.txt \
 	resend_api_key.txt \
 	resend_from_email.txt \
 	resend_smtp_connection_uri.txt \

@@ -6,6 +6,7 @@
     compose_files:
       - "{{ deploy_path }}/docker-compose.yml"
       - "{{ deploy_path }}/docker-compose.secrets.generated.yml"
+    certbot_domains: "{{ app_all_domains | default(app_domains) }}"
     compose_profiles_default:
       - frontend
       - backend
@@ -129,7 +130,14 @@
 
     - name: Start requested application stack
       ansible.builtin.shell: >
-        sudo -u {{ deploy_user }} docker compose
+        sudo -u {{ deploy_user }} env
+        PUBLIC_WEB_URL={{ public_web_url | quote }}
+        PUBLIC_APP_URL={{ public_app_url | quote }}
+        PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }}
+        PUBLIC_AUTH_URL={{ public_auth_url | quote }}
+        PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }}
+        CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }}
+        docker compose
         {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
         {% for profile in deploy_profiles %}--profile {{ profile | quote }} {% endfor %}
         up
@@ -147,7 +155,7 @@
       ansible.builtin.shell: >
         certbot --nginx --non-interactive --agree-tos --redirect
         --email {{ letsencrypt_email }}
-        {% for domain in app_domains %}-d {{ domain }} {% endfor %}
+        {% for domain in certbot_domains %}-d {{ domain }} {% endfor %}
       register: certbot_result
       changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
 
