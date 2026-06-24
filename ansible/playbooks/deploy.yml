@@ -7,6 +7,7 @@
       - "{{ deploy_path }}/docker-compose.yml"
       - "{{ deploy_path }}/docker-compose.secrets.generated.yml"
     certbot_domains: "{{ app_all_domains | default(app_domains) }}"
+    initial_clone_path: "/tmp/{{ app_name }}-initial-clone"
     compose_profiles_default:
       - frontend
       - backend
@@ -30,7 +31,22 @@
         path: "{{ deploy_path }}/.git"
       register: deploy_git_dir
 
-    - name: Clone repository if missing
+    - name: Ensure deploy directory exists before initial clone
+      ansible.builtin.file:
+        path: "{{ deploy_path }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0755"
+      when: not deploy_git_dir.stat.exists
+
+    - name: Remove stale initial clone directory
+      ansible.builtin.file:
+        path: "{{ initial_clone_path }}"
+        state: absent
+      when: not deploy_git_dir.stat.exists
+
+    - name: Clone repository into temporary directory if missing
       ansible.builtin.command:
         argv:
           - sudo
@@ -41,7 +57,16 @@
           - --branch
           - "{{ repo_version }}"
           - "{{ repo_url }}"
-          - "{{ deploy_path }}"
+          - "{{ initial_clone_path }}"
+      when: not deploy_git_dir.stat.exists
+
+    - name: Copy initial repository into deploy directory
+      ansible.builtin.command:
+        argv:
+          - cp
+          - -a
+          - "{{ initial_clone_path }}/."
+          - "{{ deploy_path }}/"
       when: not deploy_git_dir.stat.exists
 
     - name: Ensure deploy directory owner after initial clone
@@ -51,6 +76,12 @@
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
         recurse: true
+      when: not deploy_git_dir.stat.exists
+
+    - name: Remove initial clone directory
+      ansible.builtin.file:
+        path: "{{ initial_clone_path }}"
+        state: absent
       when: not deploy_git_dir.stat.exists
 
     - name: Update repository
