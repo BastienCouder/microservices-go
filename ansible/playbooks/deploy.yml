@@ -197,6 +197,29 @@
         group: "{{ deploy_user }}"
         mode: "0644"
 
+    - name: Make required Docker secret files readable by containers
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/secrets/{{ item }}"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0444"
+      loop: "{{ docker_required_secret_files }}"
+
+    - name: Check optional Docker secrets exist on server
+      ansible.builtin.stat:
+        path: "{{ deploy_path }}/secrets/{{ item }}"
+      register: optional_docker_secret_files
+      loop: "{{ docker_optional_secret_files }}"
+
+    - name: Make existing optional Docker secret files readable by containers
+      ansible.builtin.file:
+        path: "{{ deploy_path }}/secrets/{{ item.item }}"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0444"
+      when: item.stat.exists
+      loop: "{{ optional_docker_secret_files.results }}"
+
     - name: Check Docker secrets exist on server
       ansible.builtin.stat:
         path: "{{ deploy_path }}/secrets/{{ item }}"
