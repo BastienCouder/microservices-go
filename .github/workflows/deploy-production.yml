@@ -10,17 +10,29 @@ on:
         description: "Service Docker Compose a deployer (all, app, web, api-gateway, ...)"
         required: false
         default: "all"
+      run_migrations:
+        description: "Lancer les migrations DB (auto, true, false)"
+        required: false
+        default: "auto"
+      run_certbot:
+        description: "Relancer Certbot/Let's Encrypt"
+        required: false
+        default: "false"
 
 concurrency:
   group: deploy-production
   cancel-in-progress: true
 
 jobs:
-  validate-ansible:
+  deploy:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -32,25 +44,6 @@ jobs:
 
       - name: Ansible syntax check
         run: ansible-playbook -i ansible/inventory/production.ini ansible/playbooks/deploy.yml --syntax-check
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: validate-ansible
-    if: github.ref == 'refs/heads/main'
-    environment: production
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-
-      - name: Set up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      - name: Install Ansible
-        run: python -m pip install ansible-core
 
       - name: Start SSH agent
         uses: webfactory/ssh-agent@v0.10.0
@@ -66,42 +59,122 @@ jobs:
       - name: Compute deploy scope
         id: scope
         run: |
+          set -euo pipefail
+
+          RUN_MIGRATIONS_INPUT="auto"
+          RUN_CERTBOT="false"
+          MIGRATIONS='["kratos-migrate","user-migrate","organizations-migrate","permission-migrate","billing-migrate","project-migrate","analysis-migrate","ia-migrate","notification-migrate"]'
+
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             SERVICE="${{ github.event.inputs.service || 'all' }}"
+            RUN_MIGRATIONS_INPUT="${{ github.event.inputs.run_migrations || 'auto' }}"
+            RUN_CERTBOT="${{ github.event.inputs.run_certbot || 'false' }}"
           else
-            mapfile -t CHANGED_FILES < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+            if git rev-parse --verify "${{ github.event.before }}" >/dev/null 2>&1; then
+              mapfile -t CHANGED_FILES < <(git diff --name-only "${{ github.event.before }}" "${{ github.sha }}")
+            else
+              mapfile -t CHANGED_FILES < <(git diff --name-only HEAD~1 HEAD)
+            fi
 
             if [ "${#CHANGED_FILES[@]}" -eq 0 ]; then
               SERVICE="all"
             else
               SERVICE="all"
 
-              if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/billing-service/'; then
-                :
-              else
+              if ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/app/'; then
+                SERVICE="app"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/web/'; then
+                SERVICE="web"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/api-gateway/'; then
+                SERVICE="api-gateway"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/user-service/'; then
+                SERVICE="user-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/organizations-service/'; then
+                SERVICE="organizations-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/permission-service/'; then
+                SERVICE="permission-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/billing-service/'; then
                 SERVICE="billing-service"
-              fi
-
-              if [ "$SERVICE" = "all" ]; then
-                if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/app/'; then
-                  :
-                else
-                  SERVICE="app"
-                fi
-              fi
-
-              if [ "$SERVICE" = "all" ]; then
-                if printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^apps/web/'; then
-                  :
-                else
-                  SERVICE="web"
-                fi
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/project-service/'; then
+                SERVICE="project-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/analysis-service/'; then
+                SERVICE="analysis-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/ia-service/'; then
+                SERVICE="ia-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/notification-service/'; then
+                SERVICE="notification-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/crawler-service/'; then
+                SERVICE="crawler-service"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^deployments/kratos/'; then
+                SERVICE="kratos"
               fi
             fi
           fi
 
+          case "$SERVICE" in
+            app|web)
+              DEFAULT_RUN_MIGRATIONS="false"
+              MIGRATIONS="[]"
+              ;;
+            kratos)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["kratos-migrate"]'
+              ;;
+            user-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["user-migrate"]'
+              ;;
+            organizations-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["organizations-migrate"]'
+              ;;
+            permission-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["permission-migrate"]'
+              ;;
+            billing-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["billing-migrate"]'
+              ;;
+            project-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["project-migrate"]'
+              ;;
+            analysis-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["analysis-migrate"]'
+              ;;
+            ia-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["ia-migrate"]'
+              ;;
+            notification-service)
+              DEFAULT_RUN_MIGRATIONS="true"
+              MIGRATIONS='["notification-migrate"]'
+              ;;
+            api-gateway|crawler-service)
+              DEFAULT_RUN_MIGRATIONS="false"
+              MIGRATIONS="[]"
+              ;;
+            *)
+              DEFAULT_RUN_MIGRATIONS="true"
+              ;;
+          esac
+
+          if [ "$RUN_MIGRATIONS_INPUT" = "auto" ]; then
+            RUN_MIGRATIONS="$DEFAULT_RUN_MIGRATIONS"
+          else
+            RUN_MIGRATIONS="$RUN_MIGRATIONS_INPUT"
+          fi
+
           echo "service=$SERVICE" >> "$GITHUB_OUTPUT"
+          echo "run_migrations=$RUN_MIGRATIONS" >> "$GITHUB_OUTPUT"
+          echo "run_certbot=$RUN_CERTBOT" >> "$GITHUB_OUTPUT"
+          echo "migrations=$MIGRATIONS" >> "$GITHUB_OUTPUT"
           echo "Deploy scope: $SERVICE"
+          echo "Run migrations: $RUN_MIGRATIONS"
+          echo "Run certbot: $RUN_CERTBOT"
+          echo "Migrations: $MIGRATIONS"
 
       - name: Deploy production stack
         env:
@@ -131,6 +204,9 @@ jobs:
               -i ansible/inventory/production.ini \
               ansible/playbooks/deploy.yml \
               -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}" \
+              -e "deploy_run_migrations=${{ steps.scope.outputs.run_migrations }}" \
+              -e "deploy_run_certbot=${{ steps.scope.outputs.run_certbot }}" \
+              -e '{"migration_services":${{ steps.scope.outputs.migrations }}}' \
               "${EXTRA_ARGS[@]}"
           else
             ansible-playbook \
@@ -138,5 +214,8 @@ jobs:
               ansible/playbooks/deploy.yml \
               -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}" \
               "${EXTRA_ARGS[@]}" \
+              -e "deploy_run_migrations=${{ steps.scope.outputs.run_migrations }}" \
+              -e "deploy_run_certbot=${{ steps.scope.outputs.run_certbot }}" \
+              -e '{"migration_services":${{ steps.scope.outputs.migrations }}}' \
               -e "{\"deploy_services\":[\"$SERVICE\"]}"
           fi

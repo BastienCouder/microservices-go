@@ -361,13 +361,13 @@ deploy-prod:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass
 
 deploy-prod-front:
-	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web","app"]}'
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web","app"],"deploy_run_migrations":false}'
 
 deploy-prod-app:
-	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["app"]}'
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["app"],"deploy_run_migrations":false}'
 
 deploy-prod-web:
-	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web"]}'
+	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_services":["web"],"deploy_run_migrations":false}'
 
 deploy-prod-services:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_PLAYBOOK) --ask-become-pass -e '{"deploy_profiles":["backend"]}'

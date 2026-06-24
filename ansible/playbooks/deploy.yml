@@ -2,6 +2,7 @@
 - name: Deploy visia
   hosts: production
   become: true
+  gather_facts: false
   vars:
     compose_files:
       - "{{ deploy_path }}/docker-compose.yml"
@@ -40,6 +41,8 @@
     deploy_profiles: "{{ [] if (deploy_services | length > 0) else compose_profiles_default }}"
     deploy_build: true
     deploy_detached: true
+    deploy_run_migrations: true
+    deploy_run_certbot: false
   vars_files:
     - ../group_vars/production.yml
     - ../group_vars/generated_secrets.yml
@@ -218,73 +221,75 @@
         group: "{{ deploy_user }}"
         mode: "0644"
 
-    - name: Make required Docker secret files readable by containers
-      ansible.builtin.file:
-        path: "{{ deploy_path }}/secrets/{{ item }}"
-        owner: "{{ deploy_user }}"
-        group: "{{ deploy_user }}"
-        mode: "0444"
-      loop: "{{ docker_required_secret_files }}"
+    - name: Validate Docker secrets and normalize permissions
+      ansible.builtin.shell: |
+        set -eu
+        secrets_dir={{ (deploy_path ~ '/secrets') | quote }}
+        missing=""
 
-    - name: Check optional Docker secrets exist on server
-      ansible.builtin.stat:
-        path: "{{ deploy_path }}/secrets/{{ item }}"
-      register: optional_docker_secret_files
-      loop: "{{ docker_optional_secret_files }}"
+        for secret in {% for secret in docker_required_secret_files %}{{ secret | quote }} {% endfor %}; do
+          if [ ! -f "$secrets_dir/$secret" ]; then
+            missing="${missing}${secrets_dir}/${secret}\n"
+          fi
+        done
 
-    - name: Make existing optional Docker secret files readable by containers
-      ansible.builtin.file:
-        path: "{{ deploy_path }}/secrets/{{ item.item }}"
-        owner: "{{ deploy_user }}"
-        group: "{{ deploy_user }}"
-        mode: "0444"
-      when: item.stat.exists
-      loop: "{{ optional_docker_secret_files.results }}"
+        if [ -n "$missing" ]; then
+          printf 'Missing server secrets:\n%b' "$missing" >&2
+          exit 1
+        fi
 
-    - name: Check Docker secrets exist on server
-      ansible.builtin.stat:
-        path: "{{ deploy_path }}/secrets/{{ item }}"
-      register: docker_secret_files
-      loop: "{{ docker_required_secret_files }}"
-
-    - name: Stop deploy if a Docker secret is missing
-      ansible.builtin.fail:
-        msg: "Missing server secret: {{ deploy_path }}/secrets/{{ item.item }}"
-      when: not item.stat.exists
-      loop: "{{ docker_secret_files.results }}"
+        for secret in {% for secret in docker_required_secret_files + docker_optional_secret_files %}{{ secret | quote }} {% endfor %}; do
+          if [ -e "$secrets_dir/$secret" ]; then
+            chown {{ deploy_user | quote }}:{{ deploy_user | quote }} "$secrets_dir/$secret"
+            chmod 0444 "$secrets_dir/$secret"
+          fi
+        done
+      changed_when: false
 
     - name: Render Nginx site
       ansible.builtin.template:
         src: ../templates/nginx-site.conf.j2
         dest: "{{ nginx_site_path }}"
         mode: "0644"
+      register: nginx_site_result
 
-    - name: Enable Nginx site
-      ansible.builtin.file:
-        src: "{{ nginx_site_path }}"
-        dest: "{{ nginx_site_link_path }}"
-        state: link
+    - name: Configure Nginx site links and validate config
+      ansible.builtin.shell: |
+        set -eu
+        changed=0
 
-    - name: Disable default Nginx site
-      ansible.builtin.file:
-        path: /etc/nginx/sites-enabled/default
-        state: absent
+        if [ "$(readlink {{ nginx_site_link_path | quote }} 2>/dev/null || true)" != {{ nginx_site_path | quote }} ]; then
+          ln -sfn {{ nginx_site_path | quote }} {{ nginx_site_link_path | quote }}
+          changed=1
+        fi
 
-    - name: Check Nginx config
-      ansible.builtin.command: nginx -t
-      changed_when: false
+        if [ -e /etc/nginx/sites-enabled/default ]; then
+          rm -f /etc/nginx/sites-enabled/default
+          changed=1
+        fi
+
+        nginx -t
+        echo "changed=$changed"
+      register: nginx_links_result
+      changed_when: "'changed=1' in nginx_links_result.stdout"
 
     - name: Check Docker Compose files exist
-      ansible.builtin.stat:
-        path: "{{ item }}"
-      register: compose_files_stats
-      loop: "{{ compose_files }}"
+      ansible.builtin.shell: |
+        set -eu
+        missing=""
 
-    - name: Stop deploy if a Docker Compose file is missing
-      ansible.builtin.fail:
-        msg: "Missing compose file: {{ item.item }}. Check that repo_version={{ repo_version }} is pushed to GitHub and contains this file."
-      when: not item.stat.exists
-      loop: "{{ compose_files_stats.results }}"
+        for compose_file in {% for compose_file in compose_files %}{{ compose_file | quote }} {% endfor %}; do
+          if [ ! -f "$compose_file" ]; then
+            missing="${missing}${compose_file}\n"
+          fi
+        done
+
+        if [ -n "$missing" ]; then
+          printf 'Missing compose files:\n%b' "$missing" >&2
+          printf 'Check that repo_version=%s is pushed to GitHub and contains these files.\n' {{ repo_version | quote }} >&2
+          exit 1
+        fi
+      changed_when: false
 
     - name: Ensure PostgreSQL is running before synchronizing role passwords
       ansible.builtin.shell: >
@@ -300,6 +305,7 @@
         up -d postgres
       args:
         chdir: "{{ deploy_path }}"
+      when: deploy_run_migrations | bool
 
     - name: Ensure PostgreSQL roles and databases exist
       ansible.builtin.shell: >
@@ -315,6 +321,7 @@
         up postgres-bootstrap
       args:
         chdir: "{{ deploy_path }}"
+      when: deploy_run_migrations | bool
 
     - name: Synchronize PostgreSQL role passwords with Docker secrets
       ansible.builtin.shell: |
@@ -340,6 +347,7 @@
         chdir: "{{ deploy_path }}"
       loop: "{{ postgres_role_password_files | dict2items }}"
       no_log: true
+      when: deploy_run_migrations | bool
 
     - name: Build production migration containers
       ansible.builtin.shell: >
@@ -356,6 +364,7 @@
       args:
         chdir: "{{ deploy_path }}"
       loop: "{{ migration_services }}"
+      when: deploy_run_migrations | bool
 
     - name: Run production migrations
       ansible.builtin.shell: >
@@ -372,6 +381,7 @@
       args:
         chdir: "{{ deploy_path }}"
       loop: "{{ migration_services }}"
+      when: deploy_run_migrations | bool
 
     - name: Start requested application stack
       ansible.builtin.shell: >
@@ -395,6 +405,7 @@
     - name: Check Certbot is installed
       ansible.builtin.command: certbot --version
       changed_when: false
+      when: deploy_run_certbot | bool
 
     - name: Configure HTTPS with Let's Encrypt
       ansible.builtin.shell: >
@@ -403,8 +414,13 @@
         {% for domain in certbot_domains %}-d {{ domain }} {% endfor %}
       register: certbot_result
       changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
+      when: deploy_run_certbot | bool
 
     - name: Reload Nginx
       ansible.builtin.service:
         name: nginx
         state: reloaded
+      when: >
+        nginx_site_result.changed
+        or nginx_links_result.changed
+        or (deploy_run_certbot | bool and certbot_result is defined and certbot_result.changed)
