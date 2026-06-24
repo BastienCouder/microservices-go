@@ -189,6 +189,14 @@
         group: "{{ deploy_user }}"
         mode: "0700"
 
+    - name: Render production Compose environment
+      ansible.builtin.template:
+        src: ../templates/prod.env.j2
+        dest: "{{ deploy_path }}/.env"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0600"
+
     - name: Check Docker secrets exist on server
       ansible.builtin.stat:
         path: "{{ deploy_path }}/secrets/{{ item }}"
