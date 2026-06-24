@@ -42,12 +42,18 @@
         group: "{{ deploy_user }}"
         mode: "0700"
 
+    - name: Check existing GitHub deploy key on server
+      ansible.builtin.stat:
+        path: "{{ repo_deploy_key_path }}"
+      register: existing_repo_deploy_key
+
     - name: Stop deploy if GitHub SSH deploy key is missing
       ansible.builtin.fail:
-        msg: "repo_url uses git@github.com, but no deploy key was provided. Configure GitHub Actions secret PRODUCTION_GITHUB_DEPLOY_KEY_B64."
+        msg: "repo_url uses git@github.com, but no deploy key was provided and {{ repo_deploy_key_path }} does not exist. Either configure GitHub Actions secret PRODUCTION_GITHUB_DEPLOY_KEY_B64 or create the key on the server for user {{ deploy_user }}."
       when:
         - repo_url is search('git@github.com')
         - effective_repo_deploy_private_key | length == 0
+        - not existing_repo_deploy_key.stat.exists
 
     - name: Install GitHub deploy key
       ansible.builtin.copy:
@@ -70,8 +76,9 @@
           - -f
           - "{{ repo_deploy_key_path }}"
       changed_when: false
-      when: effective_repo_deploy_private_key | length > 0
-      no_log: true
+      when:
+        - repo_url is search('git@github.com')
+        - effective_repo_deploy_private_key | length > 0 or existing_repo_deploy_key.stat.exists
 
     - name: Configure GitHub SSH identity for deploy user
       ansible.builtin.blockinfile:
@@ -87,7 +94,9 @@
             User git
             IdentityFile {{ repo_deploy_key_path }}
             IdentitiesOnly yes
-      when: effective_repo_deploy_private_key | length > 0
+      when:
+        - repo_url is search('git@github.com')
+        - effective_repo_deploy_private_key | length > 0 or existing_repo_deploy_key.stat.exists
 
     - name: Trust GitHub host key for deploy user
       ansible.builtin.known_hosts:
