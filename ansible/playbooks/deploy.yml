@@ -42,6 +42,13 @@
         group: "{{ deploy_user }}"
         mode: "0700"
 
+    - name: Stop deploy if GitHub SSH deploy key is missing
+      ansible.builtin.fail:
+        msg: "repo_url uses git@github.com, but no deploy key was provided. Configure GitHub Actions secret PRODUCTION_GITHUB_DEPLOY_KEY_B64."
+      when:
+        - repo_url is search('git@github.com')
+        - effective_repo_deploy_private_key | length == 0
+
     - name: Install GitHub deploy key
       ansible.builtin.copy:
         content: "{{ effective_repo_deploy_private_key }}"
@@ -49,6 +56,20 @@
         owner: "{{ deploy_user }}"
         group: "{{ deploy_user }}"
         mode: "0600"
+      when: effective_repo_deploy_private_key | length > 0
+      no_log: true
+
+    - name: Validate GitHub deploy key on server
+      ansible.builtin.command:
+        argv:
+          - sudo
+          - -u
+          - "{{ deploy_user }}"
+          - ssh-keygen
+          - -y
+          - -f
+          - "{{ repo_deploy_key_path }}"
+      changed_when: false
       when: effective_repo_deploy_private_key | length > 0
       no_log: true
 
