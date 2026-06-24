@@ -12,9 +12,20 @@
     repo_deploy_private_key_file: ""
     effective_repo_deploy_private_key: "{{ lookup('file', repo_deploy_private_key_file) if (repo_deploy_private_key_file | length > 0) else repo_deploy_private_key }}"
     repo_deploy_key_path: "/home/{{ deploy_user }}/.ssh/github_deploy_key"
+    postgres_role_password_files:
+      usersvc: usersvc_db_password.txt
+      orgsvc: orgsvc_db_password.txt
+      permsvc: permsvc_db_password.txt
+      billsvc: billsvc_db_password.txt
+      notifsvc: notifsvc_db_password.txt
+      projectsvc: projectsvc_db_password.txt
+      analysissvc: analysissvc_db_password.txt
+      iasvc: iasvc_db_password.txt
+      kratos: kratos_db_password.txt
     compose_profiles_default:
       - frontend
       - backend
+      - infra
     deploy_services: []
     deploy_profiles: "{{ [] if (deploy_services | length > 0) else compose_profiles_default }}"
     deploy_build: true
@@ -264,6 +275,46 @@
         msg: "Missing compose file: {{ item.item }}. Check that repo_version={{ repo_version }} is pushed to GitHub and contains this file."
       when: not item.stat.exists
       loop: "{{ compose_files_stats.results }}"
+
+    - name: Ensure PostgreSQL is running before synchronizing role passwords
+      ansible.builtin.shell: >
+        sudo -u {{ deploy_user }} env
+        PUBLIC_WEB_URL={{ public_web_url | quote }}
+        PUBLIC_APP_URL={{ public_app_url | quote }}
+        PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }}
+        PUBLIC_AUTH_URL={{ public_auth_url | quote }}
+        PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }}
+        CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }}
+        docker compose
+        {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %}
+        up -d postgres
+      args:
+        chdir: "{{ deploy_path }}"
+
+    - name: Synchronize PostgreSQL role passwords with Docker secrets
+      ansible.builtin.shell: |
+        set -eu
+        role={{ item.key | quote }}
+        secret_file={{ (deploy_path ~ '/secrets/' ~ item.value) | quote }}
+        password="$(tr -d '\r\n' < "$secret_file")"
+        if [ -z "$password" ]; then
+          echo "Empty password file: $secret_file" >&2
+          exit 1
+        fi
+        sudo -u {{ deploy_user }} env \
+          PUBLIC_WEB_URL={{ public_web_url | quote }} \
+          PUBLIC_APP_URL={{ public_app_url | quote }} \
+          PUBLIC_API_GATEWAY_URL={{ public_api_gateway_url | quote }} \
+          PUBLIC_AUTH_URL={{ public_auth_url | quote }} \
+          PUBLIC_WEB_AUTH_URL={{ public_web_auth_url | quote }} \
+          CORS_ALLOWED_ORIGINS={{ cors_allowed_origins | quote }} \
+          docker compose {% for compose_file in compose_files %}-f {{ compose_file | quote }} {% endfor %} \
+          exec -T postgres psql -U postgres -d postgres \
+          -c "ALTER ROLE \"$role\" WITH LOGIN PASSWORD '$password';"
+      args:
+        chdir: "{{ deploy_path }}"
+      loop: "{{ postgres_role_password_files | dict2items }}"
+      no_log: true
 
     - name: Start requested application stack
       ansible.builtin.shell: >
