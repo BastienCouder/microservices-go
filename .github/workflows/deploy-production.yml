@@ -104,18 +104,30 @@ jobs:
           echo "Deploy scope: $SERVICE"
 
       - name: Deploy production stack
+        env:
+          PRODUCTION_GITHUB_DEPLOY_KEY: ${{ secrets.PRODUCTION_GITHUB_DEPLOY_KEY }}
         run: |
           SERVICE="${{ steps.scope.outputs.service }}"
+          EXTRA_ARGS=()
+
+          if [ -n "$PRODUCTION_GITHUB_DEPLOY_KEY" ]; then
+            DEPLOY_KEY_FILE="$RUNNER_TEMP/production_github_deploy_key"
+            printf '%s\n' "$PRODUCTION_GITHUB_DEPLOY_KEY" > "$DEPLOY_KEY_FILE"
+            chmod 600 "$DEPLOY_KEY_FILE"
+            EXTRA_ARGS+=(-e "repo_deploy_private_key_file=$DEPLOY_KEY_FILE")
+          fi
 
           if [ "$SERVICE" = "all" ]; then
             ansible-playbook \
               -i ansible/inventory/production.ini \
               ansible/playbooks/deploy.yml \
-              -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}"
+              -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}" \
+              "${EXTRA_ARGS[@]}"
           else
             ansible-playbook \
               -i ansible/inventory/production.ini \
               ansible/playbooks/deploy.yml \
               -e "ansible_become_password=${{ secrets.PRODUCTION_BECOME_PASSWORD }}" \
+              "${EXTRA_ARGS[@]}" \
               -e "{\"deploy_services\":[\"$SERVICE\"]}"
           fi

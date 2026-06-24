@@ -8,10 +8,13 @@
       - "{{ deploy_path }}/docker-compose.secrets.generated.yml"
     certbot_domains: "{{ app_all_domains | default(app_domains) }}"
     initial_clone_path: "/tmp/{{ app_name }}-initial-clone"
+    repo_deploy_private_key: ""
+    repo_deploy_private_key_file: ""
+    effective_repo_deploy_private_key: "{{ lookup('file', repo_deploy_private_key_file) if (repo_deploy_private_key_file | length > 0) else repo_deploy_private_key }}"
+    repo_deploy_key_path: "/home/{{ deploy_user }}/.ssh/github_deploy_key"
     compose_profiles_default:
       - frontend
       - backend
-      - infra
     deploy_services: []
     deploy_profiles: "{{ [] if (deploy_services | length > 0) else compose_profiles_default }}"
     deploy_build: true
@@ -30,6 +33,48 @@
       ansible.builtin.stat:
         path: "{{ deploy_path }}/.git"
       register: deploy_git_dir
+
+    - name: Ensure deploy user SSH directory exists
+      ansible.builtin.file:
+        path: "/home/{{ deploy_user }}/.ssh"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0700"
+
+    - name: Install GitHub deploy key
+      ansible.builtin.copy:
+        content: "{{ effective_repo_deploy_private_key }}"
+        dest: "{{ repo_deploy_key_path }}"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0600"
+      when: effective_repo_deploy_private_key | length > 0
+      no_log: true
+
+    - name: Configure GitHub SSH identity for deploy user
+      ansible.builtin.blockinfile:
+        path: "/home/{{ deploy_user }}/.ssh/config"
+        create: true
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_user }}"
+        mode: "0600"
+        marker: "# {mark} ANSIBLE MANAGED GITHUB DEPLOY KEY"
+        block: |
+          Host github.com
+            HostName github.com
+            User git
+            IdentityFile {{ repo_deploy_key_path }}
+            IdentitiesOnly yes
+      when: effective_repo_deploy_private_key | length > 0
+
+    - name: Trust GitHub host key for deploy user
+      ansible.builtin.known_hosts:
+        path: "/home/{{ deploy_user }}/.ssh/known_hosts"
+        name: github.com
+        key: "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqQ7VJ8AnrK+HfNqjUCbEOv17l0D3/VvI5E8Q+Kve"
+        state: present
+      when: repo_url is search('git@github.com')
 
     - name: Ensure deploy directory exists before initial clone
       ansible.builtin.file:
