@@ -5,6 +5,7 @@ import (
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -16,6 +17,7 @@ type Handler struct {
 	svc              *usecase.Service
 	allowedOrigin    string
 	kratosBrowserURL string
+	cookieDomain     string
 }
 
 type modeRequest struct {
@@ -48,6 +50,7 @@ func NewHandler(svc *usecase.Service, allowedOrigin, kratosBrowserURL string) *H
 		svc:              svc,
 		allowedOrigin:    allowedOrigin,
 		kratosBrowserURL: strings.TrimRight(kratosBrowserURL, "/"),
+		cookieDomain:     sharedCookieDomain(kratosBrowserURL),
 	}
 }
 
@@ -193,8 +196,8 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appendSetCookies(w, initSetCookies)
-	appendSetCookies(w, submitSetCookies)
+	h.appendSetCookies(w, initSetCookies)
+	h.appendSetCookies(w, submitSetCookies)
 	if submitStatus >= 400 {
 		writeRawJSON(w, submitStatus, raw)
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "denied", "status": submitStatus})
@@ -271,8 +274,8 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appendSetCookies(w, initSetCookies)
-	appendSetCookies(w, submitSetCookies)
+	h.appendSetCookies(w, initSetCookies)
+	h.appendSetCookies(w, submitSetCookies)
 	if submitStatus >= 400 {
 		writeRawJSON(w, submitStatus, raw)
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "denied", "status": submitStatus})
@@ -330,7 +333,7 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appendSetCookies(w, submitSetCookies)
+	h.appendSetCookies(w, submitSetCookies)
 	if submitStatus >= 400 {
 		writeRawJSON(w, submitStatus, raw)
 		auditSecurityEvent("auth_otp_verify", map[string]any{"mode": req.Mode, "result": "denied", "status": submitStatus})
@@ -385,8 +388,8 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appendSetCookies(w, initSetCookies)
-	appendSetCookies(w, completeSetCookies)
+	h.appendSetCookies(w, initSetCookies)
+	h.appendSetCookies(w, completeSetCookies)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "message": "logout ok"})
 	auditSecurityEvent("auth_logout", map[string]any{"result": "success"})
 }
@@ -452,8 +455,8 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	appendSetCookies(w, initSetCookies)
-	appendSetCookies(w, submitSetCookies)
+	h.appendSetCookies(w, initSetCookies)
+	h.appendSetCookies(w, submitSetCookies)
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "redirectTo": redirectTo})
 	auditSecurityEvent("auth_oidc_google", map[string]any{"mode": req.Mode, "result": "success", "status": submitStatus})
 }
@@ -485,13 +488,36 @@ func writeRawJSON(w http.ResponseWriter, status int, raw []byte) {
 	_, _ = w.Write(raw)
 }
 
-func appendSetCookies(w http.ResponseWriter, values []string) {
+func (h *Handler) appendSetCookies(w http.ResponseWriter, values []string) {
 	for _, value := range values {
 		if value == "" {
 			continue
 		}
-		w.Header().Add("Set-Cookie", value)
+		w.Header().Add("Set-Cookie", addCookieDomain(value, h.cookieDomain))
 	}
+}
+
+func addCookieDomain(value, domain string) string {
+	if strings.TrimSpace(domain) == "" || strings.Contains(strings.ToLower(value), "domain=") {
+		return value
+	}
+	return value + "; Domain=" + domain
+}
+
+func sharedCookieDomain(rawURL string) string {
+	parsed, err := url.Parse(strings.TrimSpace(rawURL))
+	if err != nil {
+		return ""
+	}
+	host := parsed.Hostname()
+	if host == "" || host == "localhost" || host == "127.0.0.1" || !strings.Contains(host, ".") {
+		return ""
+	}
+	parts := strings.Split(host, ".")
+	if len(parts) < 3 {
+		return host
+	}
+	return "." + strings.Join(parts[1:], ".")
 }
 
 func (h *Handler) setCORSHeaders(w http.ResponseWriter) {

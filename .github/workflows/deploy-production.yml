@@ -87,6 +87,8 @@ jobs:
                 SERVICE="web"
               elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/api-gateway/'; then
                 SERVICE="api-gateway"
+              elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/auth-service/'; then
+                SERVICE="auth-service"
               elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/user-service/'; then
                 SERVICE="user-service"
               elif ! printf '%s\n' "${CHANGED_FILES[@]}" | grep -qv '^services/organizations-service/'; then
@@ -152,7 +154,7 @@ jobs:
               DEFAULT_RUN_MIGRATIONS="true"
               MIGRATIONS='["notification-migrate"]'
               ;;
-            api-gateway|crawler-service)
+            api-gateway|auth-service|crawler-service)
               DEFAULT_RUN_MIGRATIONS="false"
               MIGRATIONS="[]"
               ;;
