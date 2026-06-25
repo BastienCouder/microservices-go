@@ -4,5 +4,13 @@
   "loginTitle": "Sign in",
   "loginDescription": "Sign in to Visia to continue your AI visibility analysis and access your workspace.",
   "registerTitle": "Create an account",
-  "registerDescription": "Create your Visia account to start measuring and improving your presence in AI answers."
+  "registerDescription": "Create your Visia account to start measuring and improving your presence in AI answers.",
+  "legalNoticeTitle": "Legal notice",
+  "legalNoticeDescription": "View the temporary legal notice for the Visia website.",
+  "privacyPolicyTitle": "Privacy policy",
+  "privacyPolicyDescription": "View the temporary privacy policy for the Visia website.",
+  "returnPolicyTitle": "Return policy",
+  "returnPolicyDescription": "View the temporary return policy for the Visia website.",
+  "termsAndConditionsTitle": "Terms and conditions",
+  "termsAndConditionsDescription": "View the temporary terms and conditions for the Visia website."
 }

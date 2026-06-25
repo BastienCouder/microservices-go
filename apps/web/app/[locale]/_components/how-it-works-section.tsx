@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  getSectionRevealClass,
   sectionCompactBodyClass,
   sectionCompactTitleClass,
   sectionHeadingClass,
@@ -113,7 +114,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
         <div className="mx-auto w-full max-w-[760px]">
           <div className="h-full min-h-[390px] w-full rounded-md border border-white/70 bg-white/95 shadow-none">
             {phase <= 2 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <div className="lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
                
 
                 <div className="space-y-4 px-6 pb-6">
@@ -149,7 +150,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {phase === 3 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 p-6 duration-500">
+              <div className="space-y-4 p-6 lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
                 <div className="space-y-1.5">
                   <h3 className="text-2xl font-semibold leading-none tracking-tight">
                     Préparation de votre profil de marque
@@ -171,7 +172,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {phase === 4 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 p-6 duration-500">
+              <div className="space-y-4 p-6 lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
 
                 <div className="space-y-3">
                   {[
@@ -191,7 +192,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {phase === 5 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 p-6 duration-500">
+              <div className="space-y-4 p-6 lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
                 <div className="grid gap-2 sm:grid-cols-2">
                   {["Semrush", "Ahrefs", "Profound", "Peec AI"].map((competitor) => (
                     <div key={competitor} className="rounded-md border border-border/80 px-3 py-2 text-sm font-medium">
@@ -203,7 +204,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {phase === 6 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 p-6 duration-500">
+              <div className="space-y-4 p-6 lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
                 <div className="space-y-2">
                   {[
                     "Quel outil choisir pour suivre sa visibilité dans ChatGPT ?",
@@ -219,7 +220,7 @@ function AppOnboardingConnectPreview({ isActive }: { isActive: boolean }) {
             ) : null}
 
             {phase >= 7 ? (
-              <div className="animate-in fade-in slide-in-from-bottom-2 space-y-4 p-6 duration-500">
+              <div className="space-y-4 p-6 lg:animate-in lg:fade-in lg:slide-in-from-bottom-2 lg:duration-500">
                
                 <div className="space-y-3">
                   {["Concurrents comparés", "Prompts regroupés par intention", "Score de visibilité généré"].map((item) => (
@@ -309,9 +310,7 @@ export function HowItWorksSection() {
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="mb-16 lg:mb-24">
           <h2
-            className={`${sectionHeadingClass} transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`${sectionHeadingClass} ${getSectionRevealClass(isVisible, "up", "sm")}`}
           >
             {t("headline.title")}
             <br />

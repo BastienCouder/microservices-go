@@ -1,6 +1,6 @@
 {
-  "title": "Des tarifs qui suivent votre volume.",
-  "description": "Choisissez un plan selon le nombre de prompts analysés chaque mois et montez en puissance sans changer de stack.",
+  "title": "Des tarifs pensés selon votre usage.",
+  "description": "Choisissez selon votre usage et le niveau d'accompagnement dont vous avez besoin, puis montez en puissance sans changer de stack.",
   "volumeLabel": "Volume mensuel",
   "volumeSuffix": "prompts suivis",
   "volumeHelper": "Faites varier le curseur pour estimer le bon plan selon votre usage.",

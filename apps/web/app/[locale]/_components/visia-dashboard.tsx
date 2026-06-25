@@ -121,7 +121,7 @@ const defaultPrompts: PromptItem[] = Array.from({ length: 4 }).map((_, index) =>
 
 export default function VisiaDashboardShell({
   appName = "VISIA.",
-  brandName = "Nike",
+  brandName = "Visia",
   brandDescription = "garde un léger avantage sur la visibilité IA sur 14 jours",
   navSections = defaultNavSections,
   metrics = defaultMetrics,
@@ -169,7 +169,7 @@ function Sidebar({
       <div className="px-5 py-5 text-2xl font-bold tracking-tight">{appName}</div>
 
       <div className="mx-3 mb-6 flex items-center gap-3 rounded-lg bg-white/15 px-3 py-3 text-sm">
-        <div className="flex size-8 items-center justify-center rounded-full bg-white/30 text-xs font-semibold">N</div>
+        <div className="flex size-8 items-center justify-center rounded-full bg-white/30 text-xs font-semibold">V</div>
         <span className="flex-1">{brandName}</span>
         <ChevronDown className="size-4 opacity-70" />
       </div>
@@ -273,8 +273,8 @@ function BrandControlPanel({ brandName, description }: { brandName: string; desc
 
       <CardBlock title="Top concurrents (SOV)">
         <div className="space-y-2 text-sm">
-          <Competitor name="New Balance" value="40.0%" />
-          <Competitor name="Puma" value="0.0%" />
+          <Competitor name="Lorem A" value="40.0%" />
+          <Competitor name="Ipsum B" value="0.0%" />
         </div>
       </CardBlock>
     </section>
@@ -338,10 +338,10 @@ function DashboardMainContent() {
             <p className="text-xs text-slate-500">par visibilité</p>
             <div className="mt-3 divide-y divide-slate-100">
               {[
-                ["Nike", "28.6%", "4 mentions"],
-                ["New Balance", "28.6%", "4 mentions"],
-                ["ASICS", "28.6%", "4 mentions"],
-                ["Adidas", "14.3%", "2 mentions"],
+                ["Visia", "28.6%", "4 mentions"],
+                ["Lorem A", "28.6%", "4 mentions"],
+                ["Ipsum B", "28.6%", "4 mentions"],
+                ["Dolor C", "14.3%", "2 mentions"],
               ].map(([name, percent, mentions]) => (
                 <div key={name} className="flex items-center justify-between py-3 text-sm">
                   <div className="flex items-center gap-3">
@@ -383,7 +383,7 @@ function DashboardMainContent() {
       <CardBlock title="Insights automatiques">
         <div className="divide-y divide-slate-100 text-sm">
           <Insight label="DeepSeek" value="100%" text="DeepSeek mentionne votre marque dans 4/4 réponses sur le scope actuel." />
-          <Insight label="Concurrence" value="4" text="New Balance est le concurrent le plus cité dans le scope actuel." />
+          <Insight label="Concurrence" value="4" text="Lorem A est le concurrent le plus cité dans le scope actuel." />
           <Insight label="Qualité" value="70/100" text="Le score moyen de visibilité sur les réponses filtrées est de 70/100." />
         </div>
       </CardBlock>
@@ -528,7 +528,7 @@ Utilisation simple :
 import VisiaDashboardShell from "./VisiaDashboardShell";
 
 export default function MonitoringMockPage() {
-  return <VisiaDashboardShell appName="VISIA." brandName="Nike" />;
+  return <VisiaDashboardShell appName="VISIA." brandName="Visia" />;
 }
 
 Utilisation avec fake data personnalisées :
@@ -576,7 +576,7 @@ export function MonitoringMockPage() {
   return (
     <VisiaDashboardShell
       appName="VISIA."
-      brandName="Nike"
+      brandName="Visia"
       brandDescription="garde un léger avantage sur la visibilité IA sur 14 jours"
       metrics={fakeMetrics}
       prompts={fakePrompts}

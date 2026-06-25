@@ -1,0 +1,121 @@
+{
+  "privacyPolicy": {
+    "title": "Politique de confidentialité",
+    "description": "Consultez la politique de confidentialité provisoire du site Visia.",
+    "intro": "Cette politique de confidentialité provisoire explique comment Visia collecte, utilise et protège les données personnelles dans le cadre de l'utilisation du site.",
+    "sections": {
+      "dataCollected": {
+        "title": "Données collectées",
+        "body": [
+          "Nous pouvons collecter les données que vous nous transmettez volontairement, comme votre nom, votre adresse email ou les informations envoyées via un formulaire de contact.",
+          "Nous pouvons également collecter des données techniques telles que l'adresse IP, le navigateur utilisé, le type d'appareil et des données de navigation."
+        ]
+      },
+      "purposes": {
+        "title": "Finalités du traitement",
+        "body": [
+          "Les données collectées sont utilisées pour répondre à vos demandes, améliorer le site, assurer sa sécurité et mesurer son audience.",
+          "Elles peuvent également être utilisées pour vous recontacter dans le cadre d'une demande initiée par vous."
+        ]
+      },
+      "retention": {
+        "title": "Durée de conservation",
+        "body": [
+          "Les données sont conservées pendant une durée limitée et proportionnée à la finalité du traitement.",
+          "Les données de contact sont conservées le temps nécessaire au suivi de la relation, sauf obligation légale contraire."
+        ]
+      },
+      "sharing": {
+        "title": "Partage des données",
+        "body": [
+          "Les données ne sont pas vendues à des tiers.",
+          "Elles peuvent être partagées avec des prestataires techniques strictement habilités lorsque cela est nécessaire à l'hébergement, à la maintenance ou au fonctionnement du site."
+        ]
+      },
+      "rights": {
+        "title": "Vos droits",
+        "body": [
+          "Conformément à la réglementation applicable, vous disposez d'un droit d'accès, de rectification, d'effacement, d'opposition, de limitation et de portabilité lorsque ce droit s'applique.",
+          "Vous pouvez exercer ces droits en nous contactant à l'adresse : contact@visia.example."
+        ]
+      }
+    }
+  },
+  "returnPolicy": {
+    "title": "Politique de retour",
+    "description": "Consultez la politique de retour provisoire du site Visia.",
+    "intro": "Cette politique de retour provisoire décrit les modalités applicables aux éventuelles commandes ou prestations commercialisées par Visia.",
+    "sections": {
+      "scope": {
+        "title": "Champ d'application",
+        "body": [
+          "Cette politique s'applique aux produits et services vendus par Visia via son site ou sur devis, sous réserve des conditions particulières précisées au moment de la commande.",
+          "Certains services numériques exécutés immédiatement peuvent ne pas être remboursables lorsque la réglementation le permet."
+        ]
+      },
+      "withdrawal": {
+        "title": "Droit de rétractation",
+        "body": [
+          "Lorsqu'il est applicable, le droit de rétractation peut être exercé dans le délai légal à compter de la conclusion du contrat ou de la réception du produit.",
+          "Pour exercer ce droit, vous pouvez nous contacter à l'adresse : contact@visia.example."
+        ]
+      },
+      "refunds": {
+        "title": "Remboursements",
+        "body": [
+          "Après validation de la demande, le remboursement est effectué par le même moyen de paiement que celui utilisé lors de la commande, sauf accord contraire.",
+          "Les délais de traitement peuvent varier selon l'établissement bancaire ou le prestataire de paiement."
+        ]
+      },
+      "exceptions": {
+        "title": "Exceptions",
+        "body": [
+          "Les prestations déjà pleinement exécutées, les contenus numériques fournis sans support matériel après accord exprès, ou les services personnalisés peuvent être exclus du remboursement selon la loi applicable.",
+          "Chaque offre peut prévoir des modalités spécifiques qui prévalent lorsqu'elles sont indiquées clairement avant achat."
+        ]
+      }
+    }
+  },
+  "termsAndConditions": {
+    "title": "Conditions générales",
+    "description": "Consultez les conditions générales provisoires du site Visia.",
+    "intro": "Ces conditions générales provisoires encadrent l'accès au site Visia ainsi que, le cas échéant, la souscription à ses services.",
+    "sections": {
+      "acceptance": {
+        "title": "Acceptation",
+        "body": [
+          "L'utilisation du site implique l'acceptation pleine et entière des présentes conditions générales.",
+          "Si vous n'acceptez pas ces conditions, vous êtes invité à ne pas utiliser le site."
+        ]
+      },
+      "services": {
+        "title": "Services proposés",
+        "body": [
+          "Visia propose des services liés à l'analyse de visibilité et de perception des marques dans les réponses générées par des systèmes d'intelligence artificielle.",
+          "Les caractéristiques essentielles des offres sont présentées sur le site ou communiquées avant toute souscription."
+        ]
+      },
+      "userObligations": {
+        "title": "Obligations de l'utilisateur",
+        "body": [
+          "L'utilisateur s'engage à fournir des informations exactes et à utiliser le site de manière loyale, licite et conforme à sa destination.",
+          "Toute utilisation abusive, frauduleuse ou portant atteinte aux droits de tiers pourra entraîner une suspension d'accès."
+        ]
+      },
+      "availability": {
+        "title": "Disponibilité du service",
+        "body": [
+          "Visia s'efforce d'assurer l'accessibilité du site, sans garantir une disponibilité continue et sans interruption.",
+          "Des opérations de maintenance, des mises à jour ou des incidents techniques peuvent affecter temporairement l'accès."
+        ]
+      },
+      "limitation": {
+        "title": "Limitation de responsabilité",
+        "body": [
+          "Visia ne pourra être tenue responsable des dommages indirects ou des pertes résultant de l'utilisation du site, dans les limites permises par la loi.",
+          "La responsabilité de Visia ne saurait être engagée en cas de mauvaise utilisation du service ou d'événement extérieur indépendant de sa volonté."
+        ]
+      }
+    }
+  }
+}

@@ -17,3 +17,36 @@ export const sectionCompactTitleClass =
 
 export const sectionCompactBodyClass =
   "text-sm sm:text-base text-muted-foreground leading-relaxed";
+
+export const sectionRevealBaseClass =
+  "opacity-100 translate-x-0 translate-y-0 lg:transform-gpu lg:transition-all lg:duration-700 lg:ease-[cubic-bezier(0.22,1,0.36,1)] lg:will-change-transform";
+
+export const sectionRevealDelaySmClass = "lg:delay-100";
+export const sectionRevealDelayMdClass = "lg:delay-200";
+export const sectionRevealDelayLgClass = "lg:delay-300";
+
+type RevealDirection = "up" | "left" | "right";
+type RevealDistance = "sm" | "md";
+
+export function getSectionRevealClass(
+  isVisible: boolean,
+  direction: RevealDirection = "up",
+  distance: RevealDistance = "md",
+) {
+  const hiddenState =
+    direction === "left"
+      ? distance === "sm"
+        ? "lg:opacity-0 lg:-translate-x-4"
+        : "lg:opacity-0 lg:-translate-x-8"
+      : direction === "right"
+        ? distance === "sm"
+          ? "lg:opacity-0 lg:translate-x-4"
+          : "lg:opacity-0 lg:translate-x-8"
+        : distance === "sm"
+          ? "lg:opacity-0 lg:translate-y-4"
+          : "lg:opacity-0 lg:translate-y-8";
+
+  return `${sectionRevealBaseClass} ${
+    isVisible ? "lg:opacity-100 lg:translate-x-0 lg:translate-y-0" : hiddenState
+  }`;
+}

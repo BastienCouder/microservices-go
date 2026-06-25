@@ -4,8 +4,7 @@
   "status": "Tous les systèmes opérationnels",
   "groups": {
     "product": "Produit",
-    "company": "Entreprise",
-    "legal": "Légal"
+    "legal": "Informations légales"
   },
   "links": {
     "features": "Fonctionnalités",
@@ -13,13 +12,9 @@
     "developers": "Développeurs",
     "pricing": "Tarifs",
     "faq": "FAQ",
-    "about": "À propos",
-    "blog": "Blog",
-    "careers": "Carrières",
-    "hiring": "On recrute",
-    "contact": "Contact",
-    "privacy": "Confidentialité",
-    "terms": "Conditions",
-    "security": "Sécurité"
+    "legalNotice": "Mentions légales",
+    "privacyPolicy": "Politique de confidentialité",
+    "returnPolicy": "Politique de retour",
+    "termsAndConditions": "Conditions générales"
   }
 }

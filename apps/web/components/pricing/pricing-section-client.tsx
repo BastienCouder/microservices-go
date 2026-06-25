@@ -4,10 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   ArrowRight,
-  Building2,
   Check,
-  Code,
-  Zap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type {
@@ -331,14 +328,13 @@ export function PricingSectionClient({
     () => ({
       starter: {
         name: "Starter",
-        icon: <Code className="h-4 w-4" />,
         description:
           "Pour suivre votre présence IA sur un petit périmètre.",
         features: [
           "100 crédits inclus par mois",
           "1 projet",
           "2 modèles IA",
-          "1 siège utilisateur",
+          "1 utilisateur",
           "Monitoring et premiers audits GEO",
         ],
         cta: "Commencer",
@@ -346,14 +342,13 @@ export function PricingSectionClient({
       },
       growth: {
         name: "Growth",
-        icon: <Zap className="h-4 w-4" />,
         description:
           "Pour piloter monitoring, perception, audits et recommandations.",
         features: [
           "750 crédits inclus par mois",
           "5 projets",
           "6 modèles IA",
-          "3 sièges utilisateurs",
+          "3 utilisateurs",
           "Plan recommandé pour les équipes en croissance",
         ],
         cta: "Choisir Growth",
@@ -361,14 +356,13 @@ export function PricingSectionClient({
       },
       pro: {
         name: "Agency",
-        icon: <Building2 className="h-4 w-4" />,
         description:
           "Pour les agences qui gèrent plusieurs clients et rapports.",
         features: [
           "3000 crédits inclus par mois",
           "20 projets",
           "15 modèles IA",
-          "5 sièges utilisateurs",
+          "5 utilisateurs",
           "Usage multi-client, crawls, rapports et recommandations",
         ],
         cta: "Choisir Agency",
@@ -376,7 +370,6 @@ export function PricingSectionClient({
       },
       enterprise: {
         name: "Enterprise",
-        icon: <Building2 className="h-4 w-4" />,
         description:
           "Pour les volumes élevés, besoins sécurité, SLA et accompagnement dédié.",
         features: [
@@ -429,33 +422,7 @@ export function PricingSectionClient({
           <p className={sectionIntroTextClass}>{t("description")}</p>
         </div>
 
-        <div className="mb-12 flex flex-col gap-4 rounded-2xl border border-foreground/10 bg-background p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 lg:mb-16">
-          <div>
-            <p className="text-sm font-medium text-foreground">
-              {billingCycle === "annual"
-                ? copy.annualHelper
-                : copy.monthlyHelper}
-            </p>
-
-            <p className="mt-1 text-sm text-muted-foreground">
-              {pricing.source === "database"
-                ? "Tarifs synchronisés avec la configuration active."
-                : "Tarifs par défaut affichés temporairement."}
-            </p>
-
-            {hasActivePaidPlan ? (
-              <p className="mt-1 text-sm text-foreground">
-                {copy.currentPlanPrefix} {activePlanName}
-              </p>
-            ) : null}
-
-            {busyPlan ? (
-              <p className="mt-1 text-sm text-primary">{copy.checkoutLoading}</p>
-            ) : checkoutError ? (
-              <p className="mt-1 text-sm text-destructive">{checkoutError}</p>
-            ) : null}
-          </div>
-
+        <div className="mb-12 flex justify-start lg:mb-16">
           <div className="grid grid-cols-2 rounded-full border border-foreground/10 bg-muted/40 p-1">
             <button
               type="button"
@@ -486,8 +453,20 @@ export function PricingSectionClient({
           </div>
         </div>
 
+        {hasActivePaidPlan ? (
+          <p className="mb-4 text-sm text-foreground">
+            {copy.currentPlanPrefix} {activePlanName}
+          </p>
+        ) : null}
+
+        {busyPlan ? (
+          <p className="mb-4 text-sm text-primary">{copy.checkoutLoading}</p>
+        ) : checkoutError ? (
+          <p className="mb-4 text-sm text-destructive">{checkoutError}</p>
+        ) : null}
+
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {pricing.plans.map((plan, index) => {
+          {pricing.plans.map((plan) => {
             const template = planTemplates[plan.id];
             const isCustom = plan.monthlyPrice === null;
             const popular = plan.popular || template?.popular;
@@ -506,8 +485,8 @@ export function PricingSectionClient({
                   ? `${plan.maxProjects} projets`
                   : "Projets sur mesure",
                 plan.seats && plan.seats > 0
-                  ? `${plan.seats} sièges utilisateurs`
-                  : "Sièges sur mesure",
+                  ? `${plan.seats} utilisateurs`
+                  : "Utilisateurs sur mesure",
               ];
 
             const annualBillingText = getAnnualBillingText(
@@ -543,15 +522,7 @@ export function PricingSectionClient({
                 ) : null}
 
                 <div className="mb-8">
-                  <div className="flex items-center gap-3 text-muted-foreground">
-                    {template?.icon ?? <Building2 className="h-4 w-4" />}
-
-                    <span className="font-mono text-xs">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                  </div>
-
-                  <h3 className="mt-3 font-display text-2xl tracking-tight text-primary sm:text-3xl">
+                  <h3 className="font-display text-2xl tracking-tight text-primary sm:text-3xl">
                     {name}
                   </h3>
 

@@ -1,6 +1,6 @@
 {
-  "title": "Pricing that scales with volume.",
-  "description": "Pick a plan based on how many prompts you analyze each month, then grow without changing your stack.",
+  "title": "Pricing designed around your usage.",
+  "description": "Choose based on your usage and the level of support you need, then scale without changing your stack.",
   "volumeLabel": "Monthly volume",
   "volumeSuffix": "prompts tracked",
   "volumeHelper": "Move the slider to estimate the right plan for your usage.",

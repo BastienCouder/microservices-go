@@ -19,7 +19,7 @@ export function BrandVisibilityPanel() {
           <CardTitle className="text-lg font-semibold">
             <SectionTitle>{content.brandVisibilityTitle}</SectionTitle>
           </CardTitle>
-          <CardDescription className="text-xs leading-relaxed md:text-sm">
+          <CardDescription className="hidden text-xs leading-relaxed md:block md:text-sm">
             {content.brandVisibilityDescription}
           </CardDescription>
         </CardHeader>

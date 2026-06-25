@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  getSectionRevealClass,
   sectionFeatureBodyClass,
   sectionFeatureTitleClass,
   sectionHeadingClass,
@@ -67,9 +68,7 @@ export function FeaturesSection() {
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="mb-16 lg:mb-24">
           <h2
-            className={`${sectionHeadingClass} transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-            }`}
+            className={`${sectionHeadingClass} ${getSectionRevealClass(isVisible, "up", "sm")}`}
           >
             {t("title")}
             <br />

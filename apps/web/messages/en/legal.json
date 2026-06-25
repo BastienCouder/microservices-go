@@ -1,0 +1,56 @@
+{
+  "badge": "Legal information",
+  "title": "Legal notice",
+  "description": "Temporary legal information for the Visia website.",
+  "intro": "This page contains temporary legal information for the Visia website while the company's final details are being prepared.",
+  "sections": {
+    "publisher": {
+      "title": "Website publisher",
+      "body": [
+        "Company name: Visia Labs SAS",
+        "Legal form: Simplified joint-stock company",
+        "Share capital: 10,000 euros",
+        "Registered office: 10 rue de la Paix, 75002 Paris, France",
+        "Registration: Paris Trade and Companies Register 912 345 678",
+        "VAT number: FR12 912345678",
+        "Contact email: contact@visia.example"
+      ]
+    },
+    "publication": {
+      "title": "Publication director",
+      "body": [
+        "Publication director: Bastien Cdr",
+        "The publication director can be contacted at: contact@visia.example"
+      ]
+    },
+    "hosting": {
+      "title": "Hosting",
+      "body": [
+        "This website is hosted by OVHcloud.",
+        "Hosting provider address: 2 rue Kellermann, 59100 Roubaix, France.",
+        "Website: https://www.ovhcloud.com"
+      ]
+    },
+    "intellectualProperty": {
+      "title": "Intellectual property",
+      "body": [
+        "All content available on this website, including text, graphics, logos, visuals and interface components, is protected by intellectual property laws.",
+        "Any reproduction, representation, adaptation or use, in whole or in part, without prior written authorization is prohibited."
+      ]
+    },
+    "liability": {
+      "title": "Liability",
+      "body": [
+        "The publisher strives to provide information that is as accurate as possible, but cannot guarantee the accuracy, completeness or timeliness of the published content.",
+        "Use of the website is at the user's own risk."
+      ]
+    },
+    "applicableLaw": {
+      "title": "Applicable law",
+      "body": [
+        "This legal notice is governed by French law.",
+        "In the event of a dispute, and unless mandatory legal provisions provide otherwise, French courts shall have exclusive jurisdiction."
+      ]
+    }
+  }
+}

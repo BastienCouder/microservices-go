@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import {
+  getSectionRevealClass,
   sectionCompactBodyClass,
   sectionHeadingClass,
   sectionHeadingMutedClass,
@@ -114,9 +115,7 @@ export function DevelopersSection() {
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-24 items-start">
           <div
-            className={`transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
+            className={getSectionRevealClass(isVisible)}
           >
             <h2 className={`${sectionHeadingClass} mb-8`}>
               <span className="block">{t("headline.title")}</span>
@@ -128,9 +127,7 @@ export function DevelopersSection() {
               {features.map((feature, index) => (
                 <div
                   key={feature.title}
-                  className={`transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                  }`}
+                  className={getSectionRevealClass(isVisible, "up", "sm")}
                   style={{ transitionDelay: `${index * 50 + 200}ms` }}
                 >
                   <h3 className="font-mono text-sm font-bold text-primary mb-2 flex items-center gap-2">
@@ -144,9 +141,7 @@ export function DevelopersSection() {
           </div>
 
           <div
-            className={`hidden md:block  lg:sticky lg:top-32 transition-all duration-700 delay-200 ${
-              isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
-            }`}
+            className={`hidden md:block lg:sticky lg:top-32 ${getSectionRevealClass(isVisible, "right")} delay-200`}
           >
             <div className="border border-foreground/10 bg-primary/[0.02] backdrop-blur-sm rounded-lg">
               <div className="flex items-center border-b border-primary/10 overflow-x-auto no-scrollbar">

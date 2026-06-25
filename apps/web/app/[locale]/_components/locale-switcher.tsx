@@ -66,7 +66,6 @@ function LocaleSwitcherContent({ className }: { className?: string }) {
             <Link
               href={href}
               hrefLang={nextLocale}
-              locale={false}
               onClick={() => {
                 document.cookie = `NEXT_LOCALE=${nextLocale}; Path=/; Max-Age=31536000; SameSite=Lax`;
               }}

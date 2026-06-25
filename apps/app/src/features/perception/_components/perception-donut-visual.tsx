@@ -54,7 +54,7 @@ export function PerceptionDonutVisual({
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 flex-1">
             <SectionTitle>{t("donutTitle")}</SectionTitle>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+            <p className="mt-2 hidden max-w-2xl text-sm text-muted-foreground md:block">{t("donutSubtitle")}</p>
           </div>
           <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
             {periodLabel}
@@ -70,7 +70,7 @@ export function PerceptionDonutVisual({
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <SectionTitle>{t("donutTitle")}</SectionTitle>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+          <p className="mt-2 hidden max-w-2xl text-sm text-muted-foreground md:block">{t("donutSubtitle")}</p>
         </div>
         <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
           {periodLabel}

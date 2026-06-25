@@ -92,6 +92,8 @@ type SidebarProps = {
   busy?: boolean;
   userId?: string | number | null;
   onLogout?: () => Promise<void>;
+  variant?: "desktop" | "mobile";
+  onNavigate?: () => void;
 };
 
 type NavItem = {
@@ -193,6 +195,8 @@ function SidebarComponent({
   busy = false,
   userId = null,
   onLogout,
+  variant = "desktop",
+  onNavigate,
 }: SidebarProps) {
   const content = useI18nScope("sidebar");
   const location = useLocation();
@@ -365,6 +369,7 @@ function SidebarComponent({
 
   const startCreateProjectOnboarding = () => {
     prepareCreateProjectOnboardingContext(selectedOrgId);
+    onNavigate?.();
   };
 
   const selectProject = (projectId: string) => {
@@ -387,6 +392,7 @@ function SidebarComponent({
         createProject: null,
       }),
     );
+    onNavigate?.();
   };
 
   const activeSection =
@@ -480,12 +486,37 @@ function SidebarComponent({
     },
   ];
 
+  const wrapNavAction = (handler?: () => void) => () => {
+    handler?.();
+    onNavigate?.();
+  };
+
+  const mappedMainSections = mainSections.map((section) => ({
+    ...section,
+    items: section.items.map((navItem) => ({
+      ...navItem,
+      onClick: wrapNavAction(navItem.onClick),
+    })),
+  }));
+
+  const mappedSettingsSections = settingsSections.map((section) => ({
+    ...section,
+    items: section.items.map((navItem) => ({
+      ...navItem,
+      onClick: wrapNavAction(navItem.onClick),
+    })),
+  }));
+
+  const isMobile = variant === "mobile";
+
   return (
     <TooltipProvider delayDuration={0}>
       <aside
         className={cn(
-          "sticky top-0 flex h-screen flex-col border-r border-border bg-primary transition-[width,min-width] duration-200 ease-in-out",
-          collapsed ? "w-[60px] min-w-[60px]" : "w-[220px] min-w-[220px]",
+          isMobile
+            ? "flex h-full w-full min-w-0 flex-col border-r border-border/40 bg-primary"
+            : "sticky top-0 flex h-screen flex-col border-r border-border bg-primary transition-[width,min-width] duration-200 ease-in-out",
+          !isMobile && (collapsed ? "w-[60px] min-w-[60px]" : "w-[220px] min-w-[220px]"),
           className,
         )}
       >
@@ -537,13 +568,13 @@ function SidebarComponent({
                   {!collapsed && <span>{content.back}</span>}
                 </button>
 
-                {settingsSections.map((section) => (
+                {mappedSettingsSections.map((section) => (
                   <NavSection key={section.title} {...section} collapsed={collapsed} indent />
                 ))}
               </div>
             ) : (
               <div className="space-y-3">
-                {mainSections.map((section, index) => (
+                {mappedMainSections.map((section, index) => (
                   <NavSection
                     key={section.title ?? index}
                     {...section}
@@ -570,7 +601,10 @@ function SidebarComponent({
           <Button
             type="button"
             variant="ghost"
-            onClick={onLogout}
+            onClick={() => {
+              onNavigate?.();
+              void onLogout?.();
+            }}
             disabled={busy}
             className={cn(
               "w-full rounded-md bg-background/10 px-2 py-1.5 text-sm text-background/80 hover:bg-background/20 hover:text-background",

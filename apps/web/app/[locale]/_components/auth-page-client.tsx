@@ -317,7 +317,6 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
                   id="email"
                   autoComplete="email"
                   onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
                   type="email"
                   value={email}
                 />

@@ -54,7 +54,7 @@ export function PerceptionModelAxisHeatmap({
             <CardTitle className="text-base">
               <SectionTitle>{t("heatmapTitle")}</SectionTitle>
             </CardTitle>
-            <CardDescription>{t("heatmapDescription")}</CardDescription>
+            <CardDescription className="hidden md:block">{t("heatmapDescription")}</CardDescription>
           </div>
           <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
             {periodLabel}

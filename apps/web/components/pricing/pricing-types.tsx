@@ -32,7 +32,6 @@ export type PricingTier = {
 
 export type PlanTemplate = {
   name: string;
-  icon: ReactNode;
   description: string;
   features: string[];
   cta: string;
