@@ -246,12 +246,18 @@
         done
       changed_when: false
 
+    - name: Check Nginx site file
+      ansible.builtin.stat:
+        path: "{{ nginx_site_path }}"
+      register: nginx_site_file
+
     - name: Render Nginx site
       ansible.builtin.template:
         src: ../templates/nginx-site.conf.j2
         dest: "{{ nginx_site_path }}"
         mode: "0644"
       register: nginx_site_result
+      when: deploy_run_certbot | bool or not nginx_site_file.stat.exists
 
     - name: Configure Nginx site links and validate config
       ansible.builtin.shell: |
@@ -421,6 +427,6 @@
         name: nginx
         state: reloaded
       when: >
-        nginx_site_result.changed
+        (nginx_site_result is defined and nginx_site_result.changed)
         or nginx_links_result.changed
         or (deploy_run_certbot | bool and certbot_result is defined and certbot_result.changed)
