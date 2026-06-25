@@ -1,4 +1,5 @@
 import { AuthCallbackClient } from "@/app/login/callback/auth-callback-client";
+import { Navigation } from "@/app/[locale]/_components/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -21,5 +22,15 @@ function getWebURL(): string {
 }
 
 export default function AuthCallbackPage() {
-  return <AuthCallbackClient appURL={getAppURL()} webURL={getWebURL()} />;
+  return (
+    <main className="h-screen w-full overflow-hidden bg-background">
+      <header className="h-20 w-full shrink-0">
+        <Navigation />
+      </header>
+
+      <section className="h-[calc(100vh-5rem)] w-full overflow-hidden">
+        <AuthCallbackClient appURL={getAppURL()} webURL={getWebURL()} />
+      </section>
+    </main>
+  );
 }

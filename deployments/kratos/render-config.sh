@@ -85,11 +85,27 @@ origin_from_url() {
   printf '%s' "$url" | sed -E 's#^((https?://[^/]+)).*$#\1#'
 }
 
+cookie_domain_from_url() {
+  host="$(trim_trailing_slash "$1" | sed -E 's#^https?://([^/:]+).*$#\1#')"
+  case "$host" in
+    localhost|127.0.0.1|'' )
+      printf '%s' "$host"
+      ;;
+    *.*.* )
+      printf '.%s' "$(printf '%s' "$host" | cut -d. -f2-)"
+      ;;
+    * )
+      printf '%s' "$host"
+      ;;
+  esac
+}
+
 WEB_PUBLIC_URL="$(trim_trailing_slash "${WEB_PUBLIC_URL:-http://localhost:30000}")"
 APP_PUBLIC_URL="$(trim_trailing_slash "${APP_PUBLIC_URL:-http://localhost:30004}")"
 DOC_PUBLIC_URL="$(trim_trailing_slash "${DOC_PUBLIC_URL:-http://localhost:30001}")"
 WEB_AUTH_URL="$(trim_trailing_slash "${WEB_AUTH_URL:-${WEB_PUBLIC_URL}}")"
 KRATOS_PUBLIC_BASE_URL="$(trim_trailing_slash "${KRATOS_PUBLIC_BASE_URL}")"
+KRATOS_COOKIE_DOMAIN="${KRATOS_COOKIE_DOMAIN:-$(cookie_domain_from_url "$KRATOS_PUBLIC_BASE_URL")}"
 
 allowed_origins=""
 allowed_origins="$(append_unique_line "$allowed_origins" "$(origin_from_url "$WEB_PUBLIC_URL")")"
@@ -107,6 +123,7 @@ allowed_return_urls="$(append_csv_lines "$allowed_return_urls" "${KRATOS_EXTRA_A
 
 ESC_DSN="$(escape_sed_replacement "$DSN")"
 ESC_KRATOS_PUBLIC_BASE_URL="$(escape_sed_replacement "$KRATOS_PUBLIC_BASE_URL")"
+ESC_KRATOS_COOKIE_DOMAIN="$(escape_sed_replacement "$(json_quote "$KRATOS_COOKIE_DOMAIN")")"
 ESC_ALLOWED_ORIGINS="$(escape_sed_replacement "$(json_array_from_lines "$allowed_origins")")"
 ESC_DEFAULT_BROWSER_RETURN_URL="$(escape_sed_replacement "$(json_quote "${APP_PUBLIC_URL}/")")"
 ESC_ALLOWED_RETURN_URLS="$(escape_sed_replacement "$(json_array_from_lines "$allowed_return_urls")")"
@@ -126,6 +143,7 @@ ESC_GOOGLE_CLIENT_SECRET="$(escape_sed_replacement "${KRATOS_OIDC_GOOGLE_CLIENT_
 sed \
   -e "s|\${DSN}|${ESC_DSN}|g" \
   -e "s|\${KRATOS_PUBLIC_BASE_URL}|${ESC_KRATOS_PUBLIC_BASE_URL}|g" \
+  -e "s|\${KRATOS_COOKIE_DOMAIN}|${ESC_KRATOS_COOKIE_DOMAIN}|g" \
   -e "s|\${KRATOS_ALLOWED_ORIGINS}|${ESC_ALLOWED_ORIGINS}|g" \
   -e "s|\${KRATOS_DEFAULT_BROWSER_RETURN_URL}|${ESC_DEFAULT_BROWSER_RETURN_URL}|g" \
   -e "s|\${KRATOS_ALLOWED_RETURN_URLS}|${ESC_ALLOWED_RETURN_URLS}|g" \

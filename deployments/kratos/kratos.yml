@@ -96,6 +96,10 @@ secrets:
   cipher:
     - abcdef0123456789abcdef0123456789
 
+session:
+  cookie:
+    domain: ${KRATOS_COOKIE_DOMAIN}
+
 ciphers:
   algorithm: xchacha20-poly1305
 
