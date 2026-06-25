@@ -96,6 +96,9 @@ secrets:
   cipher:
     - abcdef0123456789abcdef0123456789
 
+cookies:
+  domain: ${KRATOS_COOKIE_DOMAIN}
+
 session:
   cookie:
     domain: ${KRATOS_COOKIE_DOMAIN}
