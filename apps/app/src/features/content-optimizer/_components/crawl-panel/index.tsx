@@ -207,7 +207,7 @@ export function CrawlPanel({
   }
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden px-3 p-2 md:p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden md:p-4">
       {showProjectTransition ? <CrawlPanelTemplate /> : null}
       {showProjectTransition || showInitialSetup ? null : (
         <CrawlerPageHeader

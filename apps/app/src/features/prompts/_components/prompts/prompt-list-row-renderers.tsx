@@ -158,7 +158,7 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
           props.setIsPromptDetailsOpen(true);
         }
       }}
-      className="w-full rounded-2xl border border-border/70 bg-card/80 p-4 text-left"
+      className="w-full rounded-2xl border border-border/70 bg-card/80 p-3.5 text-left"
     >
       <div className="flex items-start gap-3">
         <div onClick={(event) => event.stopPropagation()}>
@@ -169,25 +169,28 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
         </div>
         <div className="min-w-0 flex-1 space-y-3">
           <div className="space-y-2">
-            <div className="line-clamp-3 text-sm font-medium leading-6">{item.prompt}</div>
+            <div className="line-clamp-2 text-sm font-medium leading-6">{item.prompt}</div>
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="outline">
+              <Badge variant="outline" className="h-6 px-2 text-[11px]">
                 {props.promptRowMode === "global" ? content.rowModeGlobal : content.rowModeModel}
               </Badge>
-              <Badge variant="outline" className={props.statusBadgeClassName(item.status)}>
+              <Badge
+                variant="outline"
+                className={cn("h-6 px-2 text-[11px]", props.statusBadgeClassName(item.status))}
+              >
                 {promptStatusLabel(item.status, props.locale)}
               </Badge>
+              {hasResults && item.rank !== null ? (
+                <Badge variant="outline" className={cn("h-6 px-2 text-[11px]", props.rankTone(item.rank))}>
+                  #{item.rank.toFixed(1)}
+                </Badge>
+              ) : null}
             </div>
           </div>
 
           <PromptModelBadges item={item} getModelVisual={props.getModelVisual} />
 
-          <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
-            <Metric label={content.mention} value={hasResults ? `${item.mentionRate}%` : null} />
-            <Metric
-              label={content.rank}
-              value={hasResults ? (item.rank !== null ? item.rank.toFixed(1) : "-") : null}
-            />
+          <div className="grid grid-cols-2 gap-3 text-sm">
             <Metric
               label={content.columnCadence}
               value={promptCadenceLabel(item, props.locale)}
@@ -205,14 +208,15 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
               label={content.columnLastRun}
               value={hasResults ? relativeRunLabel(item.lastRunMinutes, props.locale) : null}
             />
+            <Metric label={content.mention} value={hasResults ? `${item.mentionRate}%` : null} />
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               size="sm"
               variant="outline"
-              className="w-full rounded-lg sm:w-auto"
+              className="h-9 flex-1 rounded-lg"
               onClick={(event) => {
                 event.stopPropagation();
                 props.setFocusPromptId(sourcePromptId);
@@ -223,20 +227,20 @@ export function PromptMobileCard({ item, ...props }: { item: PromptItem } & Shar
             </Button>
             {item.runs[0]?.id ? (
               <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                className="w-full rounded-lg sm:w-auto"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onRunSelect(item.runs[0]!.id);
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-9 flex-1 rounded-lg"
+              onClick={(event) => {
+                event.stopPropagation();
+                props.onRunSelect(item.runs[0]!.id);
                 }}
               >
                 {content.openRun}
               </Button>
             ) : null}
             <div
-              className="pt-1 sm:ml-auto sm:pt-0"
+              className="shrink-0"
               onClick={(event) => event.stopPropagation()}
               onPointerDown={(event) => event.stopPropagation()}
             >
@@ -281,12 +285,12 @@ export function PromptRowModeSwitch({
   const content = useI18nScope("prompts-workspace");
 
   return (
-    <div className="flex h-10 max-w-full shrink-0 gap-1 rounded-xl border p-1">
+    <div className="flex h-10 max-w-full shrink-0 items-center gap-1.5 rounded-xl border border-border/70 bg-background px-1.5 py-1">
       <Button
         type="button"
         size="sm"
         variant={promptRowMode === "global" ? "default" : "ghost"}
-        className="h-8 rounded-lg px-2 text-xs sm:px-3 sm:text-sm"
+        className="h-8 rounded-lg px-2.5 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("global")}
       >
         <Layers3 className="mr-1.5 h-4 w-4" />
@@ -296,7 +300,7 @@ export function PromptRowModeSwitch({
         type="button"
         size="sm"
         variant={promptRowMode === "model" ? "default" : "ghost"}
-        className="h-8 rounded-lg px-2 text-xs sm:px-3 sm:text-sm"
+        className="h-8 rounded-lg px-2.5 text-xs sm:px-3 sm:text-sm"
         onClick={() => setPromptRowMode("model")}
       >
         <Bot className="mr-1.5 h-4 w-4" />
@@ -307,11 +311,13 @@ export function PromptRowModeSwitch({
 }
 
 export function RunSelectedButton({
+  className,
   disabled,
   runningSelectedPrompts,
   selectedRunnablePromptCount,
   runSelectedPrompts,
 }: {
+  className?: string;
   disabled: boolean;
   runningSelectedPrompts: boolean;
   selectedRunnablePromptCount: number;
@@ -324,7 +330,7 @@ export function RunSelectedButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-9 rounded-lg px-3 text-sm"
+      className={cn("h-9 rounded-lg px-3 text-sm", className)}
       disabled={disabled}
       onClick={runSelectedPrompts}
     >

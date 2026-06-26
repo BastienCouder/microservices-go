@@ -109,7 +109,6 @@ export function SettingsPanel({
           <SectionTitle showIndicator={false}>{t("sensitiveZoneTitle")}</SectionTitle>
         </div>
         <div className="grid gap-3 p-4 md:max-w-xl">
-          <p className="text-sm text-muted-foreground">{t("deleteOrganizationDescription")}</p>
           <ConfirmDialog
             open={deleteOpen}
             onOpenChange={(open) => {

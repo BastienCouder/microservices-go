@@ -31,7 +31,7 @@ export function BrandsOverviewPanel({ apiBaseURL, routeSearch }: BrandsOverviewP
   const emptyLabel = error || t("emptyLabel");
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-y-auto px-2 pb-4 pt-2 sm:px-4 sm:pb-5 md:p-4">
+    <div className="flex h-full min-h-0 flex-col overflow-y-auto md:p-4">
       <PageHeader
         title={t("pageTitle")}
         baseline={t("pageBaseline")}

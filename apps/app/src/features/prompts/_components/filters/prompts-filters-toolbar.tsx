@@ -76,21 +76,27 @@ export function PromptsFiltersToolbar({
   competitorsLoading = false,
 }: PromptsFiltersToolbarProps) {
   const content = useI18nScope("prompts-workspace");
+  const [mobileModelsPopoverOpen, setMobileModelsPopoverOpen] = useState(false);
+  const [mobileCompetitorsPopoverOpen, setMobileCompetitorsPopoverOpen] = useState(false);
   const [competitorsPopoverOpen, setCompetitorsPopoverOpen] = useState(false);
   const showResponsesPeriodFilter = currentTab === "responses";
 
-  const renderFilters = () => (
+  const renderFilters = (mobile = false) => (
     <>
       <SearchFilterInput
         value={search}
         onValueChange={setSearch}
         placeholder={content.searchPromptsPlaceholder}
-        className="w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]"
+        className={cn(
+          "w-full min-w-0 sm:min-w-[260px] sm:flex-1 lg:max-w-[480px]",
+          mobile && "sm:max-w-none",
+        )}
+        inputClassName={mobile ? "h-10" : undefined}
       />
 
       {showResponsesPeriodFilter ? (
         <DatePickerWithRange
-          className="w-full sm:w-[220px]"
+          className={cn("w-full sm:w-[220px]", mobile && "sm:w-full")}
           date={dateRange}
           setDate={setDateRange}
           period={period}
@@ -100,8 +106,8 @@ export function PromptsFiltersToolbar({
       ) : null}
 
       <ModelsFilterPopover
-        open={modelsPopoverOpen}
-        onOpenChange={setModelsPopoverOpen}
+        open={mobile ? mobileModelsPopoverOpen : modelsPopoverOpen}
+        onOpenChange={mobile ? setMobileModelsPopoverOpen : setModelsPopoverOpen}
         allModelsSelected={allModelsSelected}
         selectedModels={selectedModels}
         availableModels={availableModels}
@@ -112,8 +118,8 @@ export function PromptsFiltersToolbar({
 
       {currentTab === "responses" ? (
         <CompetitorsFilterPopover
-          open={competitorsPopoverOpen}
-          onOpenChange={setCompetitorsPopoverOpen}
+          open={mobile ? mobileCompetitorsPopoverOpen : competitorsPopoverOpen}
+          onOpenChange={mobile ? setMobileCompetitorsPopoverOpen : setCompetitorsPopoverOpen}
           selectedCompetitors={selectedCompetitors}
           toggleCompetitor={toggleCompetitor}
           clearCompetitors={clearCompetitors}
@@ -130,6 +136,7 @@ export function PromptsFiltersToolbar({
           aria-pressed={showArchived}
           className={cn(
             "h-8 shrink-0 rounded-lg px-4 text-sm font-medium transition-colors",
+            mobile && "h-10 w-full justify-center",
             showArchived
               ? "border-primary bg-primary/10 text-primary"
               : "border-border/80 text-foreground hover:border-primary hover:bg-primary/10 hover:text-primary",
@@ -145,7 +152,7 @@ export function PromptsFiltersToolbar({
         <Button
           size="xs"
           variant="ghost"
-          className="h-10 justify-center rounded-lg px-4 text-xs"
+          className={cn("h-10 justify-center rounded-lg px-4 text-xs", mobile && "w-full")}
           onClick={clearFilters}
         >
           {content.clearAll}
@@ -155,8 +162,13 @@ export function PromptsFiltersToolbar({
   );
 
   return (
-    <ResponsiveFiltersToolbar label={content.filters}>
-      {renderFilters}
+    <ResponsiveFiltersToolbar
+      label={content.filters}
+      mobileChildren={() => renderFilters(true)}
+      mobileClassName="mt-0"
+      desktopClassName="mt-0"
+    >
+      {() => renderFilters(false)}
     </ResponsiveFiltersToolbar>
   );
 }

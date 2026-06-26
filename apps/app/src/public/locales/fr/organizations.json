@@ -7,7 +7,7 @@
   "organizationSwitcherPlaceholder": "Sélectionner une organisation",
   "organizationSwitcherDescription": "Changez rapidement d’organisation pour gérer un autre espace sans repasser par la navigation latérale.",
   "organizationName": "Nom de l’organisation",
-  "sensitiveZoneTitle": "Zone sensible",
+  "sensitiveZoneTitle": "Suppression de l’organisation",
   "deleteOrganizationDescription": "La suppression désactive l’organisation, retire les accès, révoque les invitations et les clés API, puis anonymise les données sensibles rattachées à l’organisation.",
   "deleteOrganization": "Supprimer l’organisation",
   "deleteOrganizationTitle": "Supprimer cette organisation ?",

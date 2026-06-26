@@ -10,12 +10,12 @@ type PageHeaderProps = {
   actionsVariant?: "accent" | "classic";
   className?: string;
   titleClassName?: string;
+  baselineClassName?: string;
   actionsClassName?: string;
 };
 
 export function PageHeader({
   title,
-  baseline,
   meta,
   actions,
   actionsVariant = "accent",
@@ -26,21 +26,20 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex flex-col gap-3 bg-background px-3 py-3 md:gap-4 md:bg-transparent md:px-4 md:py-0 lg:flex-row lg:items-start lg:justify-between",
+        "flex flex-col gap-3 bg-background py-3 px-3 md:gap-4 md:bg-transparent md:px-0 md:py-0 lg:flex-row lg:items-start lg:justify-between",
         className,
-        !actions && "mb-4",
+        !actions && "md:mb-4",
       )}
     >
-      <div className="min-w-0 space-y-2">
+      <div className="min-w-0">
         <div className="flex flex-wrap items-end gap-2.5">
           <h1 className="min-w-0">
-            <SectionTitle className={cn("text-base md:text-lg", titleClassName)}>
+            <SectionTitle className={cn("text-base md:mt-4 md:text-lg", titleClassName)}>
               {title}
             </SectionTitle>
           </h1>
           {meta ? <div className="mb-1 flex flex-wrap items-center gap-2.5">{meta}</div> : null}
         </div>
-        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{baseline}</p>
       </div>
 
       {actions ? (

@@ -31,6 +31,7 @@
   "organizationTabProjects": "Projects",
   "organizationTabMembers": "Users",
   "organizationTabInvitations": "Invitations",
+  "organizationTabBilling": "Billing",
   "organizationTabSettings": "Settings",
   "organizationTabApiKeys": "API keys",
   "logout": "Logout",

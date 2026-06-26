@@ -39,7 +39,9 @@ export function PromptsPageHeader({
     <PageHeader
       title={title}
       baseline={baseline}
+      baselineClassName="hidden md:block"
       actionsVariant="classic"
+      className="gap-2 md:gap-4"
       meta={
         <>
           {activeCountLoading ? (
@@ -55,29 +57,43 @@ export function PromptsPageHeader({
           <Button
             aria-label={content.newPrompt}
             onClick={onNewPrompt}
-            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
+            className="h-10 min-w-0 flex-1 px-3 sm:h-auto sm:w-auto sm:min-w-fit sm:flex-none sm:px-4.5"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">{content.newPrompt}</span>
+            <span>{content.newPrompt}</span>
           </Button>
           <Button
             aria-label={content.autoGenerate}
             variant="outline"
             onClick={onAutoGenerate}
             disabled={generatingPrompts}
-            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
+            className="hidden h-10 min-w-0 px-3 sm:inline-flex sm:h-auto sm:min-w-fit sm:px-4.5"
           >
             {generatingPrompts ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-             null
+              <Sparkles className="h-4 w-4" />
             )}
             <span className="truncate">
               {generatingPrompts ? content.launching : content.autoGenerate}
             </span>
           </Button>
+          <Button
+            aria-label={content.autoGenerate}
+            variant="outline"
+            onClick={onAutoGenerate}
+            disabled={generatingPrompts}
+            className="h-10 w-10 shrink-0 px-0 sm:hidden"
+          >
+            {generatingPrompts ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4" />
+            )}
+          </Button>
         </>
       ) : null}
+      actionsClassName="flex-row items-center gap-2 bg-transparent p-0 sm:flex-row md:bg-background md:p-4"
     />
   );
 }

@@ -71,12 +71,13 @@ export function CrawlerPageHeader({
       title={labels.title}
       baseline={labels.baseline}
       actions={canEdit ? (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
           {reviewingDiscoveredPages ? (
               <Button
                 type="button"
                 disabled={!canCrawlSelected || reanalyzing}
                 onClick={onCrawlSelected}
+                className="w-full lg:w-auto"
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
@@ -89,6 +90,7 @@ export function CrawlerPageHeader({
                 disabled={loadingLatest || reanalyzing}
                 aria-label={localizedCopy.newSelectionAriaLabel}
                 onClick={onReviewSelection}
+                className="w-full lg:w-auto"
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}
@@ -103,6 +105,7 @@ export function CrawlerPageHeader({
                 disabled={!canReanalyze || loadingLatest}
                 aria-label={localizedCopy.discoverAriaLabel}
                 onClick={onAnalyzeSite}
+                className="w-full lg:w-auto"
               >
                 <RefreshCw
                   className={cn("h-4 w-4", reanalyzing && "animate-spin")}

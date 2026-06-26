@@ -200,7 +200,7 @@ export function BrandCanonEditorPanel({
         <EmptyStateCard label={loadError} className="mb-4 h-20 text-sm" />
       ) : null}
 
-      <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <div className="space-y-4">
           <Card className="rounded-tr-none">
             <CardContent className="space-y-4 pb-6">

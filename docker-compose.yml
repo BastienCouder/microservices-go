@@ -684,6 +684,7 @@ services:
       CRAWLER_SERVICE_TOKEN_FILE: /run/secrets/internal_jwt_secret
       CRAWLER_CONCURRENCY: "3"
       CRAWLER_NAVIGATION_TIMEOUT_MS: "45000"
+      CRAWLER_DNS_SERVERS: "1.1.1.1,8.8.8.8"
     secrets:
       - analysissvc_db_password
       - internal_jwt_secret
