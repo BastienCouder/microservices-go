@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { buildBrowserCallbackURL, normalizeAppReturnTo } from "@/src/auth/routing";
 import {
@@ -88,7 +88,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
   const locale = useLocale() as Locale;
 
   const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
+  const [name] = useState("");
   const [otpCode, setOTPCode] = useState("");
   const [otpMode, setOTPMode] = useState<"login" | "registration">(mode);
   const [otpFlowID, setOTPFlowID] = useState("");
@@ -97,7 +97,13 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
   const [busy, setBusy] = useState(false);
 
   const { appURL, gatewayURL } = config;
-  const isLogin = mode === "login";
+  const getDefaultReturnTo = useCallback((): string => {
+    if (typeof window === "undefined") {
+      return appURL;
+    }
+
+    return `${window.location.origin}/${locale === "fr" ? "" : `${locale}/`}#pricing`;
+  }, [appURL, locale]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -116,15 +122,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
     storeAuthReturnTo(resolved);
     currentURL.searchParams.delete("return_to");
     window.history.replaceState({}, "", currentURL.toString());
-  }, [appURL, locale]);
-
-  function getDefaultReturnTo(): string {
-    if (typeof window === "undefined") {
-      return appURL;
-    }
-
-    return `${window.location.origin}/${locale === "fr" ? "" : `${locale}/`}#pricing`;
-  }
+  }, [appURL, getDefaultReturnTo]);
 
   function getReturnTo(): string {
     if (typeof window === "undefined") {

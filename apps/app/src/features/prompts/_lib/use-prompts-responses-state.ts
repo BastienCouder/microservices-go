@@ -230,7 +230,10 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
       return runs.some((run) => run.status === "running") ? 4000 : false;
     },
   });
-  const analysisRuns = analysisRunsQuery.data ?? [];
+  const analysisRuns = useMemo(
+    () => analysisRunsQuery.data ?? [],
+    [analysisRunsQuery.data],
+  );
   const promptAnalysisRuns = useMemo(
     () => analysisRuns.filter((run) => run.runType !== "perception"),
     [analysisRuns],
@@ -294,9 +297,6 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     setRunningPromptRowIds(next.map((entry) => entry.rowId));
   }, [monitoringData.recent_prompts, pendingPromptRuns, serverAnalysisInProgress]);
 
-  const analysisProgressLabel = serverRunningRun
-    ? `${serverRunningRun.completedResponses}/${serverRunningRun.expectedResponses}`
-    : "";
   const analysisIssue =
     latestFailedRun
         ? {
@@ -664,7 +664,7 @@ export function usePromptsResponsesState(apiBaseURL: string, routeSearch = "") {
     }
   }, [
     activeAnalysisRunIds,
-    analysisRunsQuery.refetch,
+    analysisRunsQuery,
     cancelledAnalysisRunIdsSet,
     locallyCompletedAnalysisRunIdsSet,
     mutations.cancelAnalysisMutation,

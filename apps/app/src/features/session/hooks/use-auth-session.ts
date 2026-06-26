@@ -73,7 +73,7 @@ export function useAuthSession(apiBaseURL: string): UseAuthSessionResult {
 
   const refresh = useCallback(async () => {
     await sessionQuery.refetch();
-  }, [sessionQuery.refetch]);
+  }, [sessionQuery]);
 
   useEffect(() => {
     if (sessionQuery.error instanceof Error) {

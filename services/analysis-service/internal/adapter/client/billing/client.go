@@ -78,7 +78,9 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 	if err != nil {
 		return usecase.BillingEntitlements{}, false, fmt.Errorf("send billing quota request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode == http.StatusNotFound {
 		return usecase.BillingEntitlements{}, false, nil

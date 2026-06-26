@@ -19,6 +19,15 @@ SECRETS_DIR := secrets
 STRIPE_FORWARD_TO ?= http://localhost:50000/billing/stripe/webhook
 STRIPE_TRIGGER_EVENT ?= checkout.session.completed
 STRIPE_CLI_DOCKER_IMAGE ?= stripe/stripe-cli:latest
+FRONTEND_BUN_IMAGE ?= oven/bun:1.2.22
+FRONTEND_NODE_IMAGE ?= node:22-bookworm
+GOLANGCI_LINT_VERSION ?= v2.1.6
+GO_TOOLCHAIN_VERSION ?= go1.25.7
+BACKUP_POSTGRES_HOST ?= postgres
+BACKUP_POSTGRES_PORT ?= 5432
+BACKUP_POSTGRES_USER ?= postgres
+R2_PREFIX ?= postgres
+R2_REGION ?= auto
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -95,6 +104,8 @@ OPTIONAL_SECRETS := \
 
 .DEFAULT_GOAL := help
 
+GO_SERVICE_DIR = services/$(SERVICE)
+
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
 	dev-doc dev-email dev-mcp \
@@ -105,11 +116,19 @@ OPTIONAL_SECRETS := \
 	prod-services-project prod-services-analysis prod-services-ia prod-services-crawler \
 	prod-services-kratos \
 	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service deploy-prod-backup-cron \
+	backup-r2-once \
 	prod-doc prod-email prod-mcp \
 	db-generate db-migrate \
 	stripe-listen stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
-	test lint lint-fix fmt ci \
+	test lint lint-services lint-fix fmt build build-services ci ci-services \
+	go-test go-vet go-build go-ci docker-build \
+	app-lint app-build app-ci \
+	web-lint web-typecheck web-build web-ci \
+	email-build email-ci \
+	langgraph-check langgraph-test langgraph-build langgraph-ci \
+	crawler-check crawler-build crawler-ci \
+	ts-ci frontend-ci ci-all \
 	seed-nike seed-nike-live \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
 	$(foreach service,$(MIGRATION_SERVICES),migrate-$(service) migrate-$(service)-dev)
@@ -169,6 +188,7 @@ help:
 	@echo "    make deploy-prod-services Deploy backend services with Ansible"
 	@echo "    make deploy-prod-service SERVICE=name  Deploy one service with Ansible"
 	@echo "    make deploy-prod-backup-cron Configure daily PostgreSQL R2 backup cron with Ansible"
+	@echo "    make backup-r2-once   Run a one-shot PostgreSQL backup to R2"
 	@echo ""
 	@echo "  Secrets"
 	@echo "    make secrets-generate Regenerate Makefile/Compose/Ansible secrets files"
@@ -178,9 +198,32 @@ help:
 	@echo ""
 	@echo "  Quality"
 	@echo "    make test             Run Go tests"
-	@echo "    make lint             Run golangci-lint"
+	@echo "    make lint             Run lint/checks for services and apps"
+	@echo "    make lint-services    Run golangci-lint for Go services only"
 	@echo "    make fmt              Format Go code"
-	@echo "    make ci               Run fmt check, lint, test"
+	@echo "    make build            Build services and apps"
+	@echo "    make build-services   Build Go services only"
+	@echo "    make ci               Run full repo CI (services + apps)"
+	@echo "    make ci-services      Run Go services CI only"
+	@echo "    make go-test SERVICE=api-gateway   Run tests for one Go service"
+	@echo "    make go-vet SERVICE=api-gateway    Run go vet for one Go service"
+	@echo "    make go-build SERVICE=api-gateway  Build one Go service"
+	@echo "    make go-ci SERVICE=api-gateway     Run vet + test + build for one Go service"
+	@echo "    make docker-build SERVICE=api-gateway Build one service image with Docker Compose"
+	@echo "    make app-lint         Lint apps/app"
+	@echo "    make app-build        Build apps/app"
+	@echo "    make app-ci           Lint + build apps/app"
+	@echo "    make web-lint         Lint apps/web"
+	@echo "    make web-typecheck    Typecheck apps/web"
+	@echo "    make web-build        Build apps/web"
+	@echo "    make web-ci           Lint + typecheck + build apps/web"
+	@echo "    make email-build      Build apps/email"
+	@echo "    make email-ci         Build apps/email"
+	@echo "    make langgraph-ci     Check + test + build services/langgraph-scheduler"
+	@echo "    make crawler-ci       Check + build services/crawler-service"
+	@echo "    make ts-ci            Run TS/email checks"
+	@echo "    make frontend-ci      Run app + web checks"
+	@echo "    make ci-all           Run Go + frontend + TS/email checks"
 	@echo ""
 
 dev: secrets-check
@@ -379,6 +422,16 @@ deploy-prod-service:
 deploy-prod-backup-cron:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_BACKUP_CRON_PLAYBOOK) --ask-become-pass
 
+backup-r2-once: secrets-check
+	$(COMPOSE_PROD_LOCAL) --profile infra --profile backup run --rm --no-deps \
+		-e BACKUP_RUN_ONCE=1 \
+		-e BACKUP_POSTGRES_HOST=$(BACKUP_POSTGRES_HOST) \
+		-e BACKUP_POSTGRES_PORT=$(BACKUP_POSTGRES_PORT) \
+		-e BACKUP_POSTGRES_USER=$(BACKUP_POSTGRES_USER) \
+		-e R2_PREFIX=$(R2_PREFIX) \
+		-e R2_REGION=$(R2_REGION) \
+		postgres-backup-r2
+
 secrets-generate:
 	python3 scripts/generate_secrets_config.py
 
@@ -407,27 +460,212 @@ secrets-check:
 	fi
 
 test:
-	@for dir in services/*; do \
-		if [ -f "$$dir/go.mod" ]; then \
-			echo "Testing $$dir"; \
-			(cd "$$dir" && go test ./...); \
-		fi; \
-	done
+	@python3 scripts/run_go_tests.py
 
-lint:
-	GOWORK=$$(pwd)/services/go.work go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --config .golangci.yml
+lint-services:
+	@config_arg=""; \
+	if [ -f .golangci.yml ]; then \
+		config_arg="--config ../../.golangci.yml"; \
+	else \
+		echo "No .golangci.yml found, running golangci-lint with default config."; \
+	fi; \
+	results_file=$$(mktemp); \
+	failed=0; \
+	passed_count=0; \
+	failed_count=0; \
+	esc=$$(printf '\033'); \
+	green="$$esc[32m"; \
+	red="$$esc[31m"; \
+	reset="$$esc[0m"; \
+	for dir in services/*; do \
+		if [ -f "$$dir/go.mod" ]; then \
+			service=$${dir#services/}; \
+			log_file=$$(mktemp); \
+			echo "Linting $$dir"; \
+			if (cd "$$dir" && GOTOOLCHAIN=$(GO_TOOLCHAIN_VERSION) GOWORK=$$(pwd)/../go.work \
+				go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run $$config_arg) >"$$log_file" 2>&1; then \
+				passed_count=$$((passed_count + 1)); \
+				printf "%s\t%s\n" "$$service" "PASS" >> "$$results_file"; \
+			else \
+				failed=1; \
+				failed_count=$$((failed_count + 1)); \
+				cat "$$log_file"; \
+				printf "%s\t%s\n" "$$service" "FAIL" >> "$$results_file"; \
+			fi; \
+			rm -f "$$log_file"; \
+		fi; \
+	done; \
+	printf "\n%-30s | %s\n" "Lint target" "Status"; \
+	printf "%-30s-+-%s\n" "------------------------------" "------"; \
+	while IFS=$$(printf '\t') read -r service status; do \
+		printf "%-30s | %s\n" "$$service" "$$status"; \
+	done < "$$results_file"; \
+	printf "\nPassed services: %b%d%b | Failed services: %b%d%b\n" "$$green" "$$passed_count" "$$reset" "$$red" "$$failed_count" "$$reset"; \
+	rm -f "$$results_file"; \
+	exit $$failed
+
+lint: lint-services app-lint web-lint langgraph-check crawler-check
 
 lint-fix:
-	GOWORK=$$(pwd)/services/go.work go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run --fix --config .golangci.yml
+	@if [ -f .golangci.yml ]; then \
+		for dir in services/*; do \
+			if [ -f "$$dir/go.mod" ]; then \
+				echo "Lint-fixing $$dir"; \
+				(cd "$$dir" && GOTOOLCHAIN=$(GO_TOOLCHAIN_VERSION) GOWORK=$$(pwd)/../go.work \
+					go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --fix --config ../../.golangci.yml) || exit $$?; \
+			fi; \
+		done; \
+	else \
+		echo "No .golangci.yml found, running golangci-lint --fix with default config."; \
+		for dir in services/*; do \
+			if [ -f "$$dir/go.mod" ]; then \
+				echo "Lint-fixing $$dir"; \
+				(cd "$$dir" && GOTOOLCHAIN=$(GO_TOOLCHAIN_VERSION) GOWORK=$$(pwd)/../go.work \
+					go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --fix) || exit $$?; \
+			fi; \
+		done; \
+	fi
+
+build-services:
+	@results_file=$$(mktemp); \
+	failed=0; \
+	passed_count=0; \
+	failed_count=0; \
+	esc=$$(printf '\033'); \
+	green="$$esc[32m"; \
+	red="$$esc[31m"; \
+	reset="$$esc[0m"; \
+	for dir in services/*; do \
+		if [ -f "$$dir/go.mod" ]; then \
+			service=$${dir#services/}; \
+			log_file=$$(mktemp); \
+			echo "Building $$dir"; \
+			if (cd "$$dir" && GOTOOLCHAIN=$(GO_TOOLCHAIN_VERSION) GOWORK=$$(pwd)/../go.work go build ./...) >"$$log_file" 2>&1; then \
+				passed_count=$$((passed_count + 1)); \
+				printf "%s\t%s\n" "$$service" "PASS" >> "$$results_file"; \
+			else \
+				failed=1; \
+				failed_count=$$((failed_count + 1)); \
+				cat "$$log_file"; \
+				printf "%s\t%s\n" "$$service" "FAIL" >> "$$results_file"; \
+			fi; \
+			rm -f "$$log_file"; \
+		fi; \
+	done; \
+	printf "\n%-30s | %s\n" "Build target" "Status"; \
+	printf "%-30s-+-%s\n" "------------------------------" "------"; \
+	while IFS=$$(printf '\t') read -r service status; do \
+		printf "%-30s | %s\n" "$$service" "$$status"; \
+	done < "$$results_file"; \
+	printf "\nPassed services: %b%d%b | Failed services: %b%d%b\n" "$$green" "$$passed_count" "$$reset" "$$red" "$$failed_count" "$$reset"; \
+	rm -f "$$results_file"; \
+	exit $$failed
+
+build: build-services app-build web-build email-build langgraph-build crawler-build
 
 fmt:
 	gofmt -w services
 
-ci:
+ci-services:
 	$(MAKE) secrets-verify-generated
 	@test -z "$$(gofmt -l services)" || (echo "Go files need formatting:"; gofmt -l services; exit 1)
-	$(MAKE) lint
+	$(MAKE) lint-services
 	$(MAKE) test
+	$(MAKE) build-services
+
+ci: ci-services frontend-ci ts-ci
+
+go-test:
+	@test -n "$(SERVICE)" || (echo "Usage: make go-test SERVICE=api-gateway"; exit 1)
+	@test -f "$(GO_SERVICE_DIR)/go.mod" || (echo "Unknown Go service: $(SERVICE)"; exit 1)
+	cd "$(GO_SERVICE_DIR)" && go test ./...
+
+go-vet:
+	@test -n "$(SERVICE)" || (echo "Usage: make go-vet SERVICE=api-gateway"; exit 1)
+	@test -f "$(GO_SERVICE_DIR)/go.mod" || (echo "Unknown Go service: $(SERVICE)"; exit 1)
+	cd "$(GO_SERVICE_DIR)" && go vet ./...
+
+go-build:
+	@test -n "$(SERVICE)" || (echo "Usage: make go-build SERVICE=api-gateway"; exit 1)
+	@test -f "$(GO_SERVICE_DIR)/go.mod" || (echo "Unknown Go service: $(SERVICE)"; exit 1)
+	cd "$(GO_SERVICE_DIR)" && go build ./...
+
+go-ci: go-vet go-test go-build
+
+docker-build:
+	@test -n "$(SERVICE)" || (echo "Usage: make docker-build SERVICE=api-gateway"; exit 1)
+	docker compose build "$(SERVICE)"
+
+app-lint:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/app \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run lint"
+
+app-build:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/app \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run build"
+
+app-ci: app-lint app-build
+
+web-lint:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/web \
+		$(FRONTEND_NODE_IMAGE) sh -lc "corepack enable && npm install -g bun && bun install --frozen-lockfile && bun run lint"
+
+web-typecheck:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/web \
+		$(FRONTEND_NODE_IMAGE) sh -lc "corepack enable && npm install -g bun && bun install --frozen-lockfile && bun run check-types"
+
+web-build:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/web \
+		$(FRONTEND_NODE_IMAGE) sh -lc "corepack enable && npm install -g bun && bun install --frozen-lockfile && npm run build"
+
+web-ci: web-lint web-typecheck web-build
+
+email-build:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/apps/email \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run build"
+
+email-ci: email-build
+
+langgraph-check:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/services/langgraph-scheduler \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run check"
+
+langgraph-test:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/services/langgraph-scheduler \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun test"
+
+langgraph-build:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/services/langgraph-scheduler \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run build"
+
+langgraph-ci: langgraph-check langgraph-test langgraph-build
+
+crawler-check:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/services/crawler-service \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run check"
+
+crawler-build:
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace/services/crawler-service \
+		$(FRONTEND_BUN_IMAGE) sh -lc "bun install --frozen-lockfile && bun run build"
+
+crawler-ci: crawler-check crawler-build
+
+ts-ci: langgraph-ci crawler-ci email-ci
+
+frontend-ci: app-ci web-ci
+
+ci-all: ci
 
 seed-nike:
 	docker run --rm \

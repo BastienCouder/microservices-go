@@ -77,6 +77,13 @@ type ActiveBillingState = {
   subscriptionStatus: string;
 };
 
+type PlanCopy = {
+  name: string;
+  description: string;
+  cta: string;
+  features: string[];
+};
+
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null;
 }
@@ -184,6 +191,18 @@ function formatPlanLabel(plan: string) {
     .filter(Boolean)
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
+}
+
+function isPlanCopy(value: unknown): value is PlanCopy {
+  if (!isRecord(value)) return false;
+
+  return (
+    typeof value.name === "string" &&
+    typeof value.description === "string" &&
+    typeof value.cta === "string" &&
+    Array.isArray(value.features) &&
+    value.features.every((feature) => typeof feature === "string")
+  );
 }
 
 type PricingSectionClientProps = {
@@ -325,65 +344,20 @@ export function PricingSectionClient({
   const hasActivePaidPlan = activePlanId !== "";
 
   const planTemplates = useMemo<Record<string, PlanTemplate>>(
-    () => ({
-      starter: {
-        name: "Starter",
-        description:
-          "Pour suivre votre présence IA sur un petit périmètre.",
-        features: [
-          "100 crédits inclus par mois",
-          "1 projet",
-          "2 modèles IA",
-          "1 utilisateur",
-          "Monitoring et premiers audits GEO",
-        ],
-        cta: "Commencer",
-        popular: false,
-      },
-      growth: {
-        name: "Growth",
-        description:
-          "Pour piloter monitoring, perception, audits et recommandations.",
-        features: [
-          "750 crédits inclus par mois",
-          "5 projets",
-          "6 modèles IA",
-          "3 utilisateurs",
-          "Plan recommandé pour les équipes en croissance",
-        ],
-        cta: "Choisir Growth",
-        popular: true,
-      },
-      pro: {
-        name: "Agency",
-        description:
-          "Pour les agences qui gèrent plusieurs clients et rapports.",
-        features: [
-          "3000 crédits inclus par mois",
-          "20 projets",
-          "15 modèles IA",
-          "5 utilisateurs",
-          "Usage multi-client, crawls, rapports et recommandations",
-        ],
-        cta: "Choisir Agency",
-        popular: false,
-      },
-      enterprise: {
-        name: "Enterprise",
-        description:
-          "Pour les volumes élevés, besoins sécurité, SLA et accompagnement dédié.",
-        features: [
-          "Crédits sur mesure",
-          "Projets sur mesure",
-          "Modèles et limites personnalisés",
-          "SLA, sécurité et support dédié",
-          "Accompagnement commercial",
-        ],
-        cta: "Nous contacter",
-        popular: false,
-      },
-    }),
-    [],
+    () =>
+      pricing.plans.reduce<Record<string, PlanTemplate>>((templates, plan) => {
+        const copy = t.raw(`plans.${plan.id}`);
+
+        if (isPlanCopy(copy)) {
+          templates[plan.id] = {
+            ...copy,
+            popular: plan.popular,
+          };
+        }
+
+        return templates;
+      }, {}),
+    [pricing.plans, t],
   );
 
   function getDisplayPrice(
@@ -479,14 +453,20 @@ export function PricingSectionClient({
               [
                 `${formatCredits(plan.monthlyCredits)} ${copy.creditsSuffix}`,
                 plan.modelSelectionLimit && plan.modelSelectionLimit > 0
-                  ? `${plan.modelSelectionLimit} modèles sélectionnables`
-                  : "Modèles sur mesure",
+                  ? t("dynamic.features.models", {
+                      value: plan.modelSelectionLimit,
+                    })
+                  : t("dynamic.features.unlimitedModels"),
                 plan.maxProjects && plan.maxProjects > 0
-                  ? `${plan.maxProjects} projets`
-                  : "Projets sur mesure",
+                  ? t("dynamic.features.projects", {
+                      value: plan.maxProjects,
+                    })
+                  : t("dynamic.features.unlimitedProjects"),
                 plan.seats && plan.seats > 0
-                  ? `${plan.seats} utilisateurs`
-                  : "Utilisateurs sur mesure",
+                  ? t("dynamic.features.seats", {
+                      value: plan.seats,
+                    })
+                  : t("dynamic.features.unlimitedSeats"),
               ];
 
             const annualBillingText = getAnnualBillingText(

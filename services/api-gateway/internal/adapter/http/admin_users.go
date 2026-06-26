@@ -220,7 +220,9 @@ func (h *Handler) executeGatewayJSONDependency(ctx context.Context, audience str
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("%s status=%d", audience, resp.StatusCode)
 		}

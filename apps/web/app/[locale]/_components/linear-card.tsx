@@ -1115,8 +1115,6 @@ function LinearAppSidebarReplica() {
 
 export default function LinearHeroCard({
   children,
-  title = "Faster app launch",
-  eyebrow = "ENG-2703",
   className = "",
 }: LinearHeroCardProps) {
   const [enableIntroAnimation, setEnableIntroAnimation] = useState(false);

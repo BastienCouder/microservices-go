@@ -55,7 +55,7 @@ const ONBOARDING_MODEL_SELECTION_LIMIT = 3;
 
 function formatCreditCost(
   creditCost: number,
-  t: (key: string, options?: any) => string,
+  t: (key: string, options?: Record<string, unknown>) => string,
 ) {
   const normalized = Math.max(1, Math.floor(creditCost));
   return t("creditCost", { count: normalized });

@@ -33,6 +33,7 @@ export function PerceptionOptimizeActions({
   emptyLabel?: string | null;
   persistError: string | null;
 }) {
+  void persistError;
   const { locale, t } = useScopedI18n("perception");
   return (
     <Card>

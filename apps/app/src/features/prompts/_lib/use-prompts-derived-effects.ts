@@ -33,63 +33,91 @@ type UsePromptsDerivedEffectsParams = {
 };
 
 export function usePromptsDerivedEffects(params: UsePromptsDerivedEffectsParams) {
+  const {
+    criticalOnly,
+    dateRangeFrom,
+    dateRangeTo,
+    deferredSearch,
+    filteredPromptRows,
+    filteredResponsesLength,
+    focusPromptId,
+    noMentionOnly,
+    onlyErrors,
+    period,
+    promptPage,
+    promptRowMode,
+    promptSort,
+    promptSortDirection,
+    promptTotalPages,
+    search,
+    selectedCompetitorsKey,
+    selectedPromptModelsKey,
+    selectedResponseModelsKey,
+    setPromptPage,
+    setResponseVisibleCount,
+    setSelectedPromptId,
+    setSelectedPromptIds,
+    showArchived,
+    showHistorical,
+  } = params;
+
   useEffect(() => {
-    params.setPromptPage(1);
+    setPromptPage(1);
   }, [
-    params.dateRangeFrom,
-    params.dateRangeTo,
-    params.deferredSearch,
-    params.period,
-    params.promptRowMode,
-    params.promptSort,
-    params.promptSortDirection,
-    params.selectedPromptModelsKey,
-    params.setPromptPage,
-    params.showArchived,
+    dateRangeFrom,
+    dateRangeTo,
+    deferredSearch,
+    period,
+    promptRowMode,
+    promptSort,
+    promptSortDirection,
+    selectedPromptModelsKey,
+    setPromptPage,
+    showArchived,
   ]);
 
   useEffect(() => {
-    params.setSelectedPromptIds([]);
-  }, [params.promptRowMode, params.setSelectedPromptIds]);
+    setSelectedPromptIds([]);
+  }, [promptRowMode, setSelectedPromptIds]);
 
   useEffect(() => {
-    if (params.promptPage > params.promptTotalPages) {
-      params.setPromptPage(params.promptTotalPages);
+    if (promptPage > promptTotalPages) {
+      setPromptPage(promptTotalPages);
     }
-  }, [params.promptPage, params.promptTotalPages, params.setPromptPage]);
+  }, [promptPage, promptTotalPages, setPromptPage]);
 
   useEffect(() => {
     const selectablePromptIds = new Set(
-      params.filteredPromptRows.map((item) => getPromptSelectionKey(item, params.promptRowMode)),
+      filteredPromptRows.map((item) => getPromptSelectionKey(item, promptRowMode)),
     );
-    params.setSelectedPromptIds((current) => current.filter((id) => selectablePromptIds.has(id)));
-    params.setSelectedPromptId((current) =>
-      current && params.filteredPromptRows.some((item) => item.id === current)
+    setSelectedPromptIds((current) => current.filter((id) => selectablePromptIds.has(id)));
+    setSelectedPromptId((current) =>
+      current && filteredPromptRows.some((item) => item.id === current)
         ? current
-        : params.filteredPromptRows[0]?.id ?? null,
+        : filteredPromptRows[0]?.id ?? null,
     );
-  }, [params.filteredPromptRows, params.promptRowMode, params.setSelectedPromptId, params.setSelectedPromptIds]);
+  }, [filteredPromptRows, promptRowMode, setSelectedPromptId, setSelectedPromptIds]);
 
   useEffect(() => {
-    params.setResponseVisibleCount(RESPONSES_BATCH_SIZE);
+    setResponseVisibleCount(RESPONSES_BATCH_SIZE);
   }, [
-    params.criticalOnly,
-    params.dateRangeFrom,
-    params.dateRangeTo,
-    params.focusPromptId,
-    params.noMentionOnly,
-    params.onlyErrors,
-    params.period,
-    params.search,
-    params.selectedResponseModelsKey,
-    params.setResponseVisibleCount,
-    params.showHistorical,
-    params.selectedCompetitorsKey,
+    criticalOnly,
+    dateRangeFrom,
+    dateRangeTo,
+    focusPromptId,
+    noMentionOnly,
+    onlyErrors,
+    period,
+    search,
+    selectedCompetitorsKey,
+    selectedResponseModelsKey,
+    setResponseVisibleCount,
+    showHistorical,
   ]);
 
   useEffect(() => {
-    params.setResponseVisibleCount((current) =>
-      Math.min(Math.max(RESPONSES_BATCH_SIZE, current), params.filteredResponsesLength || RESPONSES_BATCH_SIZE),
+    setResponseVisibleCount((current) =>
+      Math.min(Math.max(RESPONSES_BATCH_SIZE, current), filteredResponsesLength || RESPONSES_BATCH_SIZE),
     );
-  }, [params.filteredResponsesLength, params.setResponseVisibleCount]);
+  }, [filteredResponsesLength, setResponseVisibleCount]);
 }

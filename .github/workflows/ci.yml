@@ -1,0 +1,195 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    name: Branch policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require develop -> main
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "Only pull requests from develop to main are allowed."
+            exit 1
+          fi
+
+  go-checks:
+    name: Go checks
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    env:
+      GOCACHE: ${{ runner.temp }}/go-build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/go.work
+
+      - name: Check Go formatting
+        working-directory: services
+        run: |
+          test -z "$(gofmt -l .)" || (echo "Go files need formatting:" && gofmt -l . && exit 1)
+
+      - name: Run Go vet
+        working-directory: services
+        run: |
+          for dir in *; do
+            if [ -f "$dir/go.mod" ]; then
+              echo "Vetting $dir"
+              (cd "$dir" && go vet ./...)
+            fi
+          done
+
+      - name: Run Go tests
+        working-directory: services
+        run: |
+          for dir in *; do
+            if [ -f "$dir/go.mod" ]; then
+              echo "Testing $dir"
+              (cd "$dir" && go test ./...)
+            fi
+          done
+
+      - name: Build Go services
+        working-directory: services
+        run: |
+          for dir in *; do
+            if [ -f "$dir/go.mod" ]; then
+              echo "Building $dir"
+              (cd "$dir" && go build ./...)
+            fi
+          done
+
+  app-checks:
+    name: App checks
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint app
+        run: bun run lint
+
+      - name: Build app
+        run: bun run build
+
+  web-checks:
+    name: Web checks
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint web
+        run: bun run lint
+
+      - name: Check web types
+        run: bun run check-types
+
+      - name: Build web
+        run: npm run build
+
+  typescript-services:
+    name: TypeScript service / ${{ matrix.name }}
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: crawler-service
+            path: services/crawler-service
+            test: "false"
+          - name: langgraph-scheduler
+            path: services/langgraph-scheduler
+            test: "true"
+    defaults:
+      run:
+        working-directory: ${{ matrix.path }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check types
+        run: bun run check
+
+      - name: Run tests
+        if: matrix.test == 'true'
+        run: bun test
+
+      - name: Build service
+        run: bun run build
+
+  email-build:
+    name: Email build
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/email
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build emails
+        run: bun run build

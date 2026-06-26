@@ -60,13 +60,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("init analysis grpc client: %v", err)
 	}
-	defer analysisGRPCClient.Close()
+	defer func() {
+		if err := analysisGRPCClient.Close(); err != nil {
+			log.Printf("close analysis grpc client: %v", err)
+		}
+	}()
 
 	iaGRPCClient, err := iaclient.NewClientWithOptions(cfg.IAServiceGRPCAddr, cfg.InternalJWTSecret, cfg.InternalJWTIssuer, grpcClientTLS, cfg.IAPromptTimeout)
 	if err != nil {
 		log.Fatalf("init ia grpc client: %v", err)
 	}
-	defer iaGRPCClient.Close()
+	defer func() {
+		if err := iaGRPCClient.Close(); err != nil {
+			log.Printf("close ia grpc client: %v", err)
+		}
+	}()
 
 	var billingHTTPClient usecase.BillingClient
 	if cfg.BillingServiceURL != "" {
@@ -81,7 +89,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("init organizations grpc client: %v", err)
 	}
-	defer projectMembershipClient.Close()
+	defer func() {
+		if err := projectMembershipClient.Close(); err != nil {
+			log.Printf("close organizations grpc client: %v", err)
+		}
+	}()
 
 	store, err := projectstate.NewStateStore(db, cfg.SecretEncryptionKey)
 	if err != nil {
@@ -144,7 +156,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen grpc error: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		if err := grpcListener.Close(); err != nil {
+			log.Printf("close grpc listener: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("project-service listening on %s", cfg.HTTPAddr)

@@ -52,7 +52,9 @@ func (c *Client) RolesForUser(ctx context.Context, organizationID, userID int64)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("organizations response status: %d", resp.StatusCode)

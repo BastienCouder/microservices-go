@@ -64,7 +64,9 @@ func (c *Client) GetOrganizationEntitlements(ctx context.Context, organizationID
 	if err != nil {
 		return usecase.BillingEntitlements{}, fmt.Errorf("send billing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
@@ -115,7 +117,9 @@ func (c *Client) GetCreditCostSettings(ctx context.Context) (usecase.CreditCostS
 	if err != nil {
 		return usecase.CreditCostSettings{}, fmt.Errorf("send billing request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))

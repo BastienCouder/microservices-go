@@ -75,7 +75,9 @@ func (c *Client) UserProfile(ctx context.Context, userID int64) (usecase.UserPro
 	if err != nil {
 		return usecase.UserProfile{}, fmt.Errorf("send user request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))

@@ -109,7 +109,9 @@ func (h *Handler) doInternalServiceRequest(
 	if err != nil {
 		return 0, nil, nil, err
 	}
-	defer response.Body.Close()
+	defer func() {
+		_ = response.Body.Close()
+	}()
 
 	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {

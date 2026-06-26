@@ -1,6 +1,6 @@
 "use client"
 import { motion } from "framer-motion";
-import { ArrowUpRight, Sparkles } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 
 const pages = [
   { path: "/pricing", visits: "2.5K", width: "100%", model: "openai" },

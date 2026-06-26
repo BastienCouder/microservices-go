@@ -51,13 +51,6 @@ function writeStoredValue(key: string, value: string): boolean {
   }
 }
 
-function storeValue(key: string, value: string): void {
-  const changed = writeStoredValue(key, value);
-  if (changed) {
-    dispatchSelectedContextChange(key, value.trim());
-  }
-}
-
 function dispatchSelectedContextChange(key: string, value: string): void {
   if (typeof window === "undefined") return;
 

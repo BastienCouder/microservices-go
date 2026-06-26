@@ -21,6 +21,7 @@ export function BrandCanonSummary({
   isDemo: boolean;
   action?: ReactNode;
 }) {
+  void isDemo;
   const { t } = useScopedI18n("perception-brand-canon");
   return (
     <div className="space-y-3">

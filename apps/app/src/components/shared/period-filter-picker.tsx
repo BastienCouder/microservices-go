@@ -53,7 +53,6 @@ export function PeriodFilterPicker({
   value,
   onValueChange,
   options,
-  label,
   title,
   date,
   onDateChange,
@@ -69,7 +68,6 @@ export function PeriodFilterPicker({
   const showCustomDates =
     value === customValue && typeof onDateChange === "function";
 
-  const effectiveLabel = label ?? content.period;
   const effectiveTitle = title ?? content.period;
 
   const handleOptionClick = useCallback(

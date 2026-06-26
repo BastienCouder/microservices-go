@@ -12,7 +12,6 @@ import { ErrorHubSearchFilter } from "./filters/error-hub-search-filter";
 import {
   ACTION_STATUS_OPTIONS,
   PERIOD_OPTIONS,
-  SOURCE_OPTIONS,
   type ActionStatusFilter,
   type PeriodFilter,
   type SourceFilter,
@@ -59,18 +58,6 @@ export function ErrorHubFiltersToolbar(props: ErrorHubFiltersToolbarProps) {
           ? t("actionStatusProcessing")
           : t("actionStatusDone"),
   }));
-  const sourceOptions = SOURCE_OPTIONS.map((option) => ({
-    ...option,
-    label:
-      option.value === "all"
-        ? t("sourceAll")
-        : option.value === "crawler"
-          ? t("sourceCrawler")
-          : option.value === "perception"
-            ? t("sourcePerception")
-            : t("sourceMonitoring"),
-  }));
-
   const renderFilters = () => (
     <>
       <ErrorHubSearchFilter

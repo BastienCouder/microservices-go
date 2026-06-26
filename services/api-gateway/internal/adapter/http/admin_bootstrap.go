@@ -106,7 +106,9 @@ func (h *Handler) claimGlobalSuperAdmin(r *http.Request, identityID string, user
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusOK {
 			return false, true, nil

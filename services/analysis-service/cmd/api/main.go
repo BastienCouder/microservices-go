@@ -55,7 +55,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("init project grpc client: %v", err)
 	}
-	defer projectGRPCClient.Close()
+	defer func() {
+		if err := projectGRPCClient.Close(); err != nil {
+			log.Printf("close project grpc client: %v", err)
+		}
+	}()
 	billingHTTPClient, err := billingclient.NewClient(cfg.BillingServiceURL, cfg.InternalJWTSecret, cfg.InternalJWTIssuer)
 	if err != nil {
 		log.Fatalf("init billing http client: %v", err)
@@ -148,7 +152,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen grpc error: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		if err := grpcListener.Close(); err != nil {
+			log.Printf("close grpc listener: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("analysis-service listening on %s", cfg.HTTPAddr)

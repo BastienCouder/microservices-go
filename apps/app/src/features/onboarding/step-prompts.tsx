@@ -8,11 +8,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus, Sparkles, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { PromptLanguageIndicator } from "@/features/prompts/_components/shared/prompt-language-indicator";
 import {
-  OnboardingField,
   OnboardingStep,
   OnboardingStepFooter,
 } from "./step-shell";

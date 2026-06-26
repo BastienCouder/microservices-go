@@ -41,8 +41,8 @@ export default function OTPEmail({
 }: OTPEmailProps) {
   const normalizedLocale = normalizeLocale(locale)
   const copy = getOtpCopy(normalizedLocale)
-  const cleanCode = code.trim()
-  const cleanPurpose = purpose.trim() || copy.fallbackPurpose
+  const cleanCode = code?.trim() || "000000"
+  const cleanPurpose = purpose?.trim() || copy.fallbackPurpose
   const validity = expiresIn?.trim() || copy.fallbackValidity
 
   return (

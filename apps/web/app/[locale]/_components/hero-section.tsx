@@ -27,13 +27,6 @@ export function HeroSection() {
   const appURL =
     process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:30004";
 
-  const stats = [
-    { value: "<3 min", label: t("stats.firstResults") },
-    { value: "10 LLMs", label: t("stats.tracked") },
-    { value: "4 modules", label: t("stats.modules") },
-    { value: "100%", label: t("stats.realData") },
-  ];
-
   useEffect(() => {
     setIsVisible(true);
   }, []);

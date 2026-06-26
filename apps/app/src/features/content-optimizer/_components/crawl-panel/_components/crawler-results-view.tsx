@@ -21,7 +21,6 @@ import { cn } from "@/shared/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
 import {
-  computeGeoKpiSummaries,
   computePriority,
   decodeHTMLText,
   geoInsightGroups,
@@ -149,47 +148,6 @@ function issueSourceDisplayLabel(
     return t("issueSourceAi");
   }
   return t("issueSourceRule");
-}
-
-function CrawlerKpiStrip({
-  records,
-}: {
-  records: ContentOptimizerCrawlRecord[];
-}) {
-  const { t } = useScopedI18n("crawler-panel");
-  const kpis = computeGeoKpiSummaries(records);
-
-  return (
-    <section
-      className="border-b bg-muted/20 px-4 py-3"
-      aria-label={t("resultsKpiAriaLabel")}
-    >
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        {kpis.map((kpi) => (
-          <div
-            key={kpi.id}
-            className={cn(
-              "rounded-md border bg-background px-3 py-2.5 shadow-sm",
-              kpi.tone === "success" && "border-emerald-200 bg-emerald-50/70",
-              kpi.tone === "warning" && "border-amber-200 bg-amber-50/70",
-            )}
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {kpi.label}
-            </p>
-            <div className="mt-1 flex items-end justify-between gap-2">
-              <p className="text-xl font-bold leading-none text-foreground">
-                {kpi.value}
-              </p>
-              <p className="truncate text-right text-[11px] font-medium text-muted-foreground">
-                {kpi.caption}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function CrawlerDetailPane({

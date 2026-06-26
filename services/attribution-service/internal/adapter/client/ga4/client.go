@@ -108,7 +108,9 @@ func (c *Client) getAccessToken(ctx context.Context, account serviceAccount) (st
 	if err != nil {
 		return "", fmt.Errorf("send oauth token request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
@@ -171,7 +173,9 @@ func (c *Client) getOAuthRefreshAccessToken(ctx context.Context, refreshToken st
 	if err != nil {
 		return "", fmt.Errorf("send oauth refresh request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))

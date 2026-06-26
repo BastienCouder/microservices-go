@@ -1149,7 +1149,3 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, out any) error {
 func writeSuccess(w http.ResponseWriter, status int, data any) {
 	httpjson.WriteSuccess(w, status, data)
 }
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	httpjson.WriteSuccess(w, status, payload)
-}

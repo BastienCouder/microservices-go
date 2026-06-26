@@ -921,10 +921,7 @@ func contentOptimizerHasEvidenceSignals(lowerContent string) bool {
 }
 
 func contentOptimizerHasFreshnessSignals(lowerContent string) bool {
-	if containsAny(lowerContent, "mis a jour", "mis à jour", "derniere mise", "dernière mise", "version", "actualise", "actualisé", "2024", "2025", "2026") {
-		return true
-	}
-	return false
+	return containsAny(lowerContent, "mis a jour", "mis à jour", "derniere mise", "dernière mise", "version", "actualise", "actualisé", "2024", "2025", "2026")
 }
 
 func contentOptimizerPageTopic(record ContentOptimizerCrawlRecord) string {

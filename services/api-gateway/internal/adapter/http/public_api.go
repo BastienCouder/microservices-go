@@ -164,7 +164,9 @@ func (h *Handler) validatePublicAPIKey(ctx context.Context, rawKey string) (publ
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
 			return false, false, errUnauthorized
@@ -201,7 +203,9 @@ func (h *Handler) loadPublicEntitlements(ctx context.Context, organizationID int
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			return isTransientHTTPStatus(resp.StatusCode), true, fmt.Errorf("billing entitlements status=%d", resp.StatusCode)

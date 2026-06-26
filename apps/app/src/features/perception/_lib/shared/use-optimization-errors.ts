@@ -245,7 +245,7 @@ export function useOptimizationErrors(apiBaseURL: string, routeSearch: string): 
 
   const reload = useCallback(async () => {
     await query.refetch();
-  }, [query.refetch]);
+  }, [query]);
 
   return {
     aiBriefSettings: aiBriefSettingsData,

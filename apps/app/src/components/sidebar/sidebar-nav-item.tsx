@@ -42,22 +42,6 @@ const itemClassName = ({
     className,
   );
 
-function ActiveMarker({
-  collapsed,
-  indent,
-}: Pick<SidebarNavItemProps, "collapsed" | "indent">) {
-  return (
-    <span
-      className={cn(
-        "absolute bg-background",
-        indent && !collapsed
-          ? "left-[10px] top-0 bottom-0 z-10 w-[3px] rounded-full"
-          : "left-0 top-1 bottom-1 w-[3px] rounded-r-full",
-      )}
-    />
-  );
-}
-
 export function SidebarSectionHeader({
   label,
   collapsed,

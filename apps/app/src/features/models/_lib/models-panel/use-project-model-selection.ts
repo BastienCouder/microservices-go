@@ -80,8 +80,9 @@ export function useProjectModelSelection({
 
         if (sameStringArray(serverSelection, resolved)) {
           if (!(projectId in current)) return current;
-          const { [projectId]: _removed, ...rest } = current;
-          return rest;
+          const nextOverrides = { ...current };
+          delete nextOverrides[projectId];
+          return nextOverrides;
         }
 
         return { ...current, [projectId]: resolved };

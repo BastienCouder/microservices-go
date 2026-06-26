@@ -679,12 +679,6 @@ export function OptimizationErrorCard({
         : actionGenerated
           ? t("optimizationErrorsAdded")
           : t("optimizationErrorsFix");
-  const resolvedGeneratedContent = resolvePerceptionGeneratedContent(
-    error.generatedContent,
-    error.generatedContentKey,
-    locale,
-    error.translationParams,
-  );
   const resolvedTitle = resolvePerceptionLocalizedText(
     error.title,
     error.titleKey,

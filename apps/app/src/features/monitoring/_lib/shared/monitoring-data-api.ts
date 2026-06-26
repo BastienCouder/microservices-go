@@ -71,10 +71,6 @@ function asString(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
 
-function asNumber(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? value : 0;
-}
-
 function asBool(value: unknown): boolean {
   return value === true;
 }

@@ -22,13 +22,6 @@ func (s *Service) storeDashboardInCache(ctx context.Context, projectID string, o
 	_ = s.dashboardCache.SetDashboard(ctx, projectID, organizationID, dashboard, s.dashboardCacheTTL)
 }
 
-func (s *Service) deleteDashboardFromCache(ctx context.Context, projectID string, organizationID int64) {
-	if s.dashboardCache == nil {
-		return
-	}
-	_ = s.dashboardCache.DeleteDashboard(ctx, projectID, organizationID)
-}
-
 func (s *Service) dashboardDataLocked(projectID string) DashboardData {
 	dashboard := filterDashboardForMonitoring(s.projectDashboardDataLocked(projectID))
 	ids := s.runsByProject[projectID]

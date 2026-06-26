@@ -39,7 +39,9 @@ func (h *Handler) validateAuth(ctx context.Context, cookieHeader, sessionToken s
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusUnauthorized {
 			return false, false, errUnauthorized
@@ -83,7 +85,9 @@ func (h *Handler) resolveUserID(ctx context.Context, identityID string) (int64, 
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusNotFound {
 			return false, false, errors.New("user not found")
@@ -129,7 +133,9 @@ func (h *Handler) resolveOrganizationID(ctx context.Context, userID int64) (int6
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusNotFound {
 			return false, false, errors.New("organization not found")
@@ -190,7 +196,9 @@ func (h *Handler) resolveScopedOrganizationID(ctx context.Context, userID int64,
 		if err != nil {
 			return isTransientNetError(err), true, err
 		}
-		defer resp.Body.Close()
+		defer func() {
+			_ = resp.Body.Close()
+		}()
 
 		if resp.StatusCode == http.StatusNotFound {
 			return false, false, errors.New("organization not found")

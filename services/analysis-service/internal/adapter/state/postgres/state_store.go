@@ -483,17 +483,6 @@ func stringValue(value *string) string {
 	return *value
 }
 
-func decodeStringSlice(raw []byte) []string {
-	if len(raw) == 0 {
-		return []string{}
-	}
-	var values []string
-	if err := json.Unmarshal(raw, &values); err != nil {
-		return []string{}
-	}
-	return values
-}
-
 func decodeMap(raw []byte) map[string]any {
 	if len(raw) == 0 {
 		return map[string]any{}

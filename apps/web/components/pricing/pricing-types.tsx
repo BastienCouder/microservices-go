@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export type MarketingPricingTier = {
   prompt_volume?: number;
   credit_volume?: number;

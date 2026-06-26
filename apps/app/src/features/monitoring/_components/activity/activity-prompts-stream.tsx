@@ -1,5 +1,4 @@
 import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,16 +45,12 @@ type ActivityPromptsStreamProps = {
   filteredPrompts: PromptItem[];
   previewCount: number;
   onSelectPrompt: (prompt: PromptItem) => void;
-  onRequestDeletePrompt: (prompt: PromptItem) => void;
-  deletingResponseId?: string | null;
 };
 
 export const ActivityPromptsStream = memo(function ActivityPromptsStream({
   filteredPrompts,
   previewCount,
   onSelectPrompt,
-  onRequestDeletePrompt,
-  deletingResponseId = null,
 }: ActivityPromptsStreamProps) {
   const content = useI18nScope("monitoring-activity-panel");
   const totalPrompts = filteredPrompts.length;

@@ -100,7 +100,7 @@ export default function InvitationEmail({
 }: InvitationEmailProps) {
   const normalizedLocale = normalizeLocale(locale)
   const copy = getInvitationCopy(normalizedLocale)
-  const org = organizationName.trim() || copy.defaultOrganization
+  const org = organizationName?.trim() || copy.defaultOrganization
   const message = customMessage?.trim()
   const expiry = expiresAt ? formatDateByLocale(expiresAt, normalizedLocale) : undefined
   const invitedBy = inviterName?.trim()

@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslations } from "next-intl";
 import { Shield, Lock, Eye, FileCheck } from "lucide-react";
 import { getSectionRevealClass } from "./section-styles";
 
 export function SecuritySection() {
-  const { t } = useTranslation();
+  const t = useTranslations("security");
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 

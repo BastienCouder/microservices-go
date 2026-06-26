@@ -1,59 +1,53 @@
 {
-  "title": "Pricing designed around your usage.",
-  "description": "Choose based on your usage and the level of support you need, then scale without changing your stack.",
-  "volumeLabel": "Monthly volume",
-  "volumeSuffix": "prompts tracked",
-  "volumeHelper": "Move the slider to estimate the right plan for your usage.",
-  "promptsShort": "prompts",
+  "title": "Simple plans to manage your AI visibility.",
+  "description": "Start with the volume you need today, then scale with more projects, models, and credits every month.",
   "mostPopular": "Most popular",
   "perMonth": "/month",
   "custom": "Custom",
   "plans": {
-    "developer": {
-      "name": "Developer",
-      "description": "For testing Visia on a few use cases and wiring the API quickly.",
-      "cta": "Start now",
-      "features": [
-        "Up to 1,000 prompts analyzed",
-        "API access and exports",
-        "1 workspace",
-        "Email support"
-      ]
-    },
     "starter": {
       "name": "Starter",
-      "description": "For small marketing teams that want to track AI visibility without friction.",
-      "cta": "Choose Starter",
+      "description": "For tracking your AI presence across a focused scope.",
+      "cta": "Get started",
       "features": [
-        "Multi-brand tracking",
-        "Analysis history",
-        "Competitor benchmarks",
-        "Priority recommendations",
-        "2 included users"
+        "100 credits included per month",
+        "1 project",
+        "2 AI models",
+        "1 user"
       ]
     },
     "growth": {
       "name": "Growth",
-      "description": "For scaling AI monitoring across countries, products and business units.",
-      "cta": "Upgrade to Growth",
+      "description": "For managing monitoring, perception, audits, and recommendations.",
+      "cta": "Choose Growth",
       "features": [
-        "All integrations included",
-        "Alerts and webhooks",
-        "Custom segments",
-        "Executive reporting",
-        "5 included users"
+        "750 credits included per month",
+        "5 projects",
+        "6 AI models",
+        "3 users"
       ]
     },
     "pro": {
-      "name": "Pro",
-      "description": "For advanced teams that need governance, support and tailored workflows.",
-      "cta": "Talk to the team",
+      "name": "Agency",
+      "description": "For agencies managing several clients and reports.",
+      "cta": "Choose Agency",
       "features": [
-        "High-volume and custom plans",
-        "SSO and access control",
-        "Dedicated onboarding",
-        "SLA and priority support",
-        "GEO strategy support"
+        "3000 credits included per month",
+        "20 projects",
+        "15 AI models",
+        "5 users"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "description": "For high-volume usage, security needs, SLA, and dedicated support.",
+      "cta": "Contact us",
+      "features": [
+        "Custom credits",
+        "Custom projects",
+        "Custom models and limits",
+        "SLA, security, and dedicated support",
+        "Sales-led onboarding"
       ]
     }
   },
@@ -61,13 +55,15 @@
     "description": "Plan configured from admin.",
     "cta": "Choose {plan}",
     "features": {
-      "monthlyQuota": "{value} app prompts / month",
+      "monthlyQuota": "{value} credits / month",
       "models": "{value} simultaneous models",
       "unlimitedModels": "Unlimited models",
       "modelChanges": "{value} model changes / month",
       "unlimitedModelChanges": "Unlimited model changes",
       "projects": "{value} projects maximum",
-      "unlimitedProjects": "Unlimited projects"
+      "unlimitedProjects": "Unlimited projects",
+      "seats": "{value} users",
+      "unlimitedSeats": "Custom users"
     }
   }
 }

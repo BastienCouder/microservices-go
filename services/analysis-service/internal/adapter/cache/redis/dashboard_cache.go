@@ -82,7 +82,9 @@ func (c *DashboardCache) do(ctx context.Context, parts ...string) (redisReply, e
 	if err != nil {
 		return redisReply{}, fmt.Errorf("dial redis %s: %w", c.addr, err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)

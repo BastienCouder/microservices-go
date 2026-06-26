@@ -1,7 +1,6 @@
 "use client";
 
 import type { ComponentProps, ReactNode } from "react";
-import { AlertTriangle } from "lucide-react";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
   AlertDialog,
@@ -11,7 +10,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogHeader,
-  AlertDialogMedia,
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
@@ -61,7 +59,6 @@ export function ConfirmDialog({
   cancelDisabled = false,
   confirmVariant = "destructive",
   size = "sm",
-  media = <AlertTriangle />,
   previewItems = [],
   previewLimit = 5,
   previewOverflowLabel,

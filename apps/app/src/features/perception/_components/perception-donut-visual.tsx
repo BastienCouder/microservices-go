@@ -43,11 +43,6 @@ export function PerceptionDonutVisual({
     return [...orderedPoints].sort((left, right) => right.score - left.score);
   }, [points]);
 
-  const overallScore = useMemo(() => averageScore(rankedPoints.map((point) => point.score)), [rankedPoints]);
-  const alignedAxesCount = rankedPoints.filter((point) => point.score >= point.target).length;
-  const bestPoint = rankedPoints[0] ?? null;
-  const weakestPoint = rankedPoints[rankedPoints.length - 1] ?? null;
-
   if (rankedPoints.length === 0) {
     return (
       <div className="px-5 py-3">
@@ -156,9 +151,4 @@ function AxisProgressRow({
       </div>
     </div>
   );
-}
-
-function averageScore(values: number[]): number {
-  if (values.length === 0) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }

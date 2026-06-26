@@ -271,10 +271,6 @@ func writeSuccess(w http.ResponseWriter, status int, data any) {
 	httpjson.WriteSuccess(w, status, data)
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	httpjson.WriteSuccess(w, status, payload)
-}
-
 func splitPathAfter(path, prefix string) []string {
 	if !strings.HasPrefix(path, prefix) {
 		return nil

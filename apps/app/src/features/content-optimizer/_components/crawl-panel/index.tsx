@@ -174,12 +174,6 @@ export function CrawlPanel({
     filteredRecords[0] ??
     null;
 
-  const recordsWithIssues = filteredRecords.filter(
-    (record) => (record.issues?.length ?? 0) > 0,
-  ).length;
-  const criticalCount = filteredRecords.filter(
-    (record) => computePriority(record).label === "Critique",
-  ).length;
   const reanalyzing = viewModel.discovering || viewModel.crawling;
   const hasAnalysis = viewModel.crawlRecords.length > 0 || viewModel.crawling;
   const showProjectTransition = viewModel.hydratingProjectScope;

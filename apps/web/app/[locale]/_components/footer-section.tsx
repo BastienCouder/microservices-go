@@ -5,6 +5,17 @@ import { useLocale, useTranslations } from "next-intl";
 import { AnimatedWave } from "./animated-wave";
 import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
 
+type FooterLink = {
+  badge?: string;
+  href: string;
+  name: string;
+};
+
+type FooterGroup = {
+  links: FooterLink[];
+  title: string;
+};
+
 export function FooterSection() {
   const t = useTranslations("footer");
   const locale = useLocale() as Locale;
@@ -14,7 +25,7 @@ export function FooterSection() {
   const returnPolicyPath = getLocalizedPathname(locale, "/politique-retour");
   const termsAndConditionsPath = getLocalizedPathname(locale, "/conditions-generales");
 
-  const groups = [
+  const groups: FooterGroup[] = [
     {
       title: t("groups.product"),
       links: [
@@ -81,7 +92,7 @@ export function FooterSection() {
                         className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
                       >
                         {link.name}
-                        {"badge" in link && link.badge ? (
+                        {link.badge ? (
                           <span className="text-xs px-2 py-0.5 bg-foreground text-background rounded-full">{link.badge}</span>
                         ) : null}
                       </Link>

@@ -47,7 +47,9 @@ func (c *Client) RenderNotification(ctx context.Context, title, message, locale 
 	if err != nil {
 		return "", "", "", fmt.Errorf("send renderer request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", "", "", fmt.Errorf("renderer returned status %d", resp.StatusCode)
@@ -93,7 +95,9 @@ func (c *Client) RenderInvitation(
 	if err != nil {
 		return "", "", "", fmt.Errorf("send invitation renderer request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", "", "", fmt.Errorf("invitation renderer returned status %d", resp.StatusCode)

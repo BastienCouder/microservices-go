@@ -1,4 +1,4 @@
-import { ChevronUp, FlaskConical } from "lucide-react";
+import { FlaskConical } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageHeader } from "@/components/shared/page-header";

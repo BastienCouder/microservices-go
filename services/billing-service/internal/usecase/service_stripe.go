@@ -16,8 +16,6 @@ import (
 	"github.com/bastiencouder/microservices-go/services/billing-service/internal/domain"
 )
 
-const proUnlimitedMonthlyQuota = 1_000_000
-
 func (s *Service) CreateStripeCheckoutSession(ctx context.Context, input CreateStripeCheckoutSessionInput) (CreateStripeCheckoutSessionOutput, error) {
 	if !s.stripeEnabled() {
 		return CreateStripeCheckoutSessionOutput{}, ErrStripeDisabled

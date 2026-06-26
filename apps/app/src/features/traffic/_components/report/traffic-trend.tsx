@@ -5,7 +5,6 @@ import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { useIsMobile } from "@/shared/hooks/use-mobile";
 import {
   formatDateLabel,
-  formatInteger,
 } from "../../_lib/report/traffic-report-formatters";
 import { getTrafficTrendPresentation } from "../../_lib/report/traffic-trend-presentation";
 import type { TrafficDailyPoint } from "../../_lib/report/types";
@@ -78,11 +77,11 @@ export function TrafficTrend({ errorLabel, points, loading = false }: TrafficTre
                   )}
                 >
                   <div className="flex h-full w-full items-end">
-                  <div
-  className="w-full rounded-t-md bg-primary transition-[height]"
-  style={{ height: `${height}%` }}
-  title={t("trafficBarTitle", { count: point.sessions })}
-/>
+                    <div
+                      className="w-full rounded-t-md bg-primary transition-[height]"
+                      style={{ height: `${height}%` }}
+                      title={t("trafficBarTitle", { count: point.sessions })}
+                    />
                   </div>
                   <div className="flex min-h-[28px] w-full items-start justify-center pt-1">
                     <span

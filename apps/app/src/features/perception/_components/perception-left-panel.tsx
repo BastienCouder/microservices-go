@@ -74,6 +74,8 @@ export function PerceptionLeftPanel({
   isDemo: boolean;
   heroActions?: ReactNode;
 }) {
+  void selectedSourceFilter;
+  void onSourceFilterChange;
   const { locale, t } = useScopedI18n("perception");
   const location = useLocation();
   const brandEditSearch = useMemo(() => {
@@ -172,6 +174,8 @@ function PerceptionFiltersPanel({
   showUniqueModelFilters: boolean;
   onToggleModelFilterMode: (value: boolean) => void;
 }) {
+  void selectedSourceFilter;
+  void onSourceFilterChange;
   const { locale, t } = useScopedI18n("perception");
   const visibleModelFilterItems = useMemo<ProjectModelFilterItem[]>(
     () => buildProjectModelFilterItems(modelOptions, showUniqueModelFilters),

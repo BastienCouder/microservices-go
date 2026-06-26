@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint";
 /** @type {import("eslint").Linter.Config[]} */
 export default [
   {
-    ignores: ["dist/**", "node_modules/**"],
+    ignores: [".next/**", "node_modules/**"],
   },
   js.configs.recommended,
   eslintConfigPrettier,
@@ -18,6 +18,7 @@ export default [
     languageOptions: {
       globals: {
         ...globals.browser,
+        ...globals.node,
       },
     },
     plugins: {
@@ -29,10 +30,9 @@ export default [
     },
     rules: {
       ...pluginReactHooks.configs.recommended.rules,
-      "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
-      "no-useless-escape": "warn",
-      "react/react-in-jsx-scope": "off"
+      "prefer-const": "warn",
+      "react/react-in-jsx-scope": "off",
     },
   },
 ];

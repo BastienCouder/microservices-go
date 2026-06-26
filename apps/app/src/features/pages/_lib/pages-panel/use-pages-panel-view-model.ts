@@ -51,7 +51,10 @@ export function usePagesPanelViewModel({
     () => (monitoring ? buildPagesPanelViewModel(monitoring) : null),
     [monitoring],
   );
-  const pages = panelModel?.pages ?? [];
+  const pages = useMemo(
+    () => panelModel?.pages ?? [],
+    [panelModel],
+  );
   const modelOptions = useMemo(
     () =>
       Array.from(

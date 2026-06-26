@@ -89,7 +89,7 @@ export function MonitoringDataProvider({
 
   const refresh = useCallback(async () => {
     await monitoringQuery.refetch();
-  }, [monitoringQuery.refetch]);
+  }, [monitoringQuery]);
 
   const error =
     monitoringQuery.error && !isAbortError(monitoringQuery.error)

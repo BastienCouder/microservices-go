@@ -26,7 +26,7 @@ letsencrypt_email: couderbastien@gmail.com
 postgres_backup_r2_postgres_host: postgres
 postgres_backup_r2_postgres_port: "5432"
 postgres_backup_r2_postgres_user: postgres
-postgres_backup_r2_prefix: postgres
+postgres_backup_r2_prefix: prod/postgres
 postgres_backup_r2_region: auto
 postgres_backup_r2_cron_minute: "0"
 postgres_backup_r2_cron_hour: "0"

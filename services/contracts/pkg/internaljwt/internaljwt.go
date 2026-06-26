@@ -80,7 +80,7 @@ func VerifyHS256(tokenString, secret, expectedIssuer, expectedAudience string) (
 	if token == nil || !token.Valid {
 		return TokenClaims{}, fmt.Errorf("verify internal jwt: invalid token")
 	}
-	if parsedClaims.ExpiresAt == nil || parsedClaims.ExpiresAt.Time.Before(time.Now().UTC()) {
+	if parsedClaims.ExpiresAt == nil || parsedClaims.ExpiresAt.Before(time.Now().UTC()) {
 		return TokenClaims{}, fmt.Errorf("verify internal jwt: token expired")
 	}
 	return parsedClaims.TokenClaims, nil

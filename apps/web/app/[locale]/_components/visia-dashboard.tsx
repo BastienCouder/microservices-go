@@ -1,18 +1,11 @@
 import React from "react";
 import {
-  BarChart3,
-  Bell,
   Bot,
   ChevronDown,
   ExternalLink,
   Globe2,
   LogOut,
-  PieChart,
-  Search,
-  Settings,
   Sparkles,
-  Target,
-  TrendingUp,
   Zap,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";

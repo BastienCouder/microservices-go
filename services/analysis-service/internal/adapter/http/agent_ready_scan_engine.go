@@ -256,7 +256,9 @@ func (a *agentReadyAnalyzer) fetch(referer string, method string, target string,
 	if err != nil {
 		return agentReadyHTTPResponse{err: err}
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, agentReadyResponseReadLimit))
 	if err != nil {
 		return agentReadyHTTPResponse{statusCode: resp.StatusCode, header: resp.Header.Clone(), err: err}

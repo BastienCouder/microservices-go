@@ -13,7 +13,7 @@ type AppLayoutProps = {
   onRefresh: () => Promise<void>;
 };
 
-export function AppLayout({ apiBaseURL, busy, children, feedback, userId, onLogout, onRefresh }: AppLayoutProps) {
+export function AppLayout({ apiBaseURL, busy, children, userId, onLogout }: AppLayoutProps) {
   return (
         <div className="flex h-dvh min-h-dvh w-full overflow-hidden">
 

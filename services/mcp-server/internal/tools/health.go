@@ -44,7 +44,9 @@ func HealthCheck(ctx context.Context, _ *mcp.CallToolRequest, in HealthInput) (*
 	if err != nil {
 		return errorResult(fmt.Sprintf("request failed: %v", err)), HealthOutput{}, nil
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var payload map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&payload)

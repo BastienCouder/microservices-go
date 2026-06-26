@@ -252,7 +252,9 @@ func (c *Client) runReport(ctx context.Context, accessToken, propertyID string, 
 	if err != nil {
 		return ga4RunReportResponse{}, fmt.Errorf("send ga4 runReport request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
