@@ -15,7 +15,7 @@ type KratosClient interface {
 }
 
 type UserProfileProvisioner interface {
-	EnsureProfile(ctx context.Context, identity domain.Identity) error
+	EnsureProfile(ctx context.Context, identity domain.Identity, consentAccepted bool) error
 }
 
 type Service struct {
@@ -35,11 +35,11 @@ func (s *Service) InitFlow(ctx context.Context, mode, returnTo, cookieHeader str
 	return s.kratosClient.InitFlow(ctx, mode, returnTo, cookieHeader)
 }
 
-func (s *Service) EnsureUserProfile(ctx context.Context, session *domain.Session) error {
+func (s *Service) EnsureUserProfile(ctx context.Context, session *domain.Session, consentAccepted bool) error {
 	if s.profileProvision == nil || session == nil {
 		return nil
 	}
-	return s.profileProvision.EnsureProfile(ctx, session.Identity)
+	return s.profileProvision.EnsureProfile(ctx, session.Identity, consentAccepted)
 }
 
 func (s *Service) SubmitFlow(ctx context.Context, mode, flowID string, payload any, cookieHeader string) (domain.RawJSON, []string, int, error) {

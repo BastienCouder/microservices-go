@@ -24,6 +24,9 @@ func TestDeleteMeSoftDeletesAuthenticatedUser(t *testing.T) {
 		"ada@example.com",
 		"Ada",
 		"Lovelace",
+		true,
+		domain.ConsentTypePrivacyPolicy,
+		domain.ConsentVersionV1,
 	)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
@@ -54,7 +57,7 @@ type handlerFakeRepo struct {
 	deletedID int64
 }
 
-func (f *handlerFakeRepo) Create(_ context.Context, user *domain.User) error {
+func (f *handlerFakeRepo) Create(_ context.Context, user *domain.User, _ domain.UserConsent) error {
 	f.nextID++
 	if f.users == nil {
 		f.users = make(map[int64]*domain.User)
@@ -62,6 +65,14 @@ func (f *handlerFakeRepo) Create(_ context.Context, user *domain.User) error {
 	user.ID = f.nextID
 	clone := *user
 	f.users[user.ID] = &clone
+	return nil
+}
+
+func (f *handlerFakeRepo) HasConsentByAuthIdentityID(_ context.Context, _, _, _ string) (bool, error) {
+	return true, nil
+}
+
+func (f *handlerFakeRepo) AddConsentByAuthIdentityID(_ context.Context, _ string, _ domain.UserConsent) error {
 	return nil
 }
 

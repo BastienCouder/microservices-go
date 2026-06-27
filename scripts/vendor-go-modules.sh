@@ -19,7 +19,6 @@ modules=(
   services/billing-service
   services/contracts
   services/ia-service
-  services/mcp-server
   services/notification-service
   services/organizations-service
   services/permission-service

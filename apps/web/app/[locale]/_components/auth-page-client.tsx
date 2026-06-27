@@ -12,6 +12,12 @@ import { type Locale } from "@/src/i18n/config";
 import { AnimatedWave } from "./animated-wave";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+import { REGEXP_ONLY_DIGITS } from "input-otp";
 
 type AuthPageClientProps = {
   config: {
@@ -31,6 +37,29 @@ type APISuccessEnvelope<T> = {
   success?: boolean;
   data?: T;
 };
+
+const CONSENT_STORAGE_KEY = "visia_privacy_policy_v1";
+const CONSENT_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
+
+function consentCookieDomain(hostname: string): string {
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "";
+  }
+
+  const parts = hostname.split(".");
+  const sharedDomain = parts.length >= 3 ? parts.slice(1).join(".") : hostname;
+  return `; Domain=.${sharedDomain}`;
+}
+
+function rememberPrivacyConsent(): void {
+  try {
+    window.localStorage.setItem(CONSENT_STORAGE_KEY, "accepted");
+  } catch {
+    // The consent cookie still supports the server-side check when storage is blocked.
+  }
+  const secure = window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${CONSENT_STORAGE_KEY}=accepted; Path=/; Max-Age=${CONSENT_MAX_AGE_SECONDS}; SameSite=Lax${secure}${consentCookieDomain(window.location.hostname)}`;
+}
 
 function parseError(value: unknown, fallback: string): string {
   return value instanceof Error ? value.message : fallback;
@@ -95,6 +124,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
   const [otpCSRF, setOTPCSRF] = useState("");
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
+  const [consentAccepted, setConsentAccepted] = useState(false);
 
   const { appURL, gatewayURL } = config;
   const getDefaultReturnTo = useCallback((): string => {
@@ -104,6 +134,14 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
 
     return `${window.location.origin}/${locale === "fr" ? "" : `${locale}/`}#pricing`;
   }, [appURL, locale]);
+
+  useEffect(() => {
+    try {
+      setConsentAccepted(window.localStorage.getItem(CONSENT_STORAGE_KEY) === "accepted");
+    } catch {
+      // Storage can be unavailable in strict privacy mode; the checkbox remains usable.
+    }
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -155,6 +193,9 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       if (!email) {
         throw new Error(t("messages.invalidEmail"));
       }
+      if (mode === "registration" && !consentAccepted) {
+        throw new Error(t("messages.consentRequired"));
+      }
 
       const response = await fetch(`${gatewayURL}/auth/otp/start`, {
         method: "POST",
@@ -164,6 +205,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
           mode,
           email,
           name,
+          consentAccepted,
         }),
       });
 
@@ -209,9 +251,12 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
         credentials: "include",
         body: JSON.stringify({
           mode: otpMode,
+          email,
+          name,
           flowId: otpFlowID,
           csrfToken: otpCSRF,
           code: otpCode,
+          consentAccepted,
         }),
       });
 
@@ -222,6 +267,10 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
 
       if (!response.ok) {
         throw new Error(readAPIErrorMessage(payload) ?? t("messages.otpVerifyFallback"));
+      }
+
+      if (otpMode === "registration" && consentAccepted) {
+        rememberPrivacyConsent();
       }
 
       setResult(data.message ?? t("messages.otpVerified"));
@@ -240,6 +289,9 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
     setResult("");
 
     try {
+      if (!consentAccepted) {
+        throw new Error(t("messages.consentRequired"));
+      }
       const response = await fetch(`${gatewayURL}/auth/oidc/google`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -247,6 +299,7 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
         body: JSON.stringify({
           mode,
           returnTo: buildBrowserCallbackURL(window.location.origin),
+          consentAccepted,
         }),
       });
 
@@ -258,6 +311,8 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       if (!response.ok || !data.redirectTo) {
         throw new Error(readAPIErrorMessage(payload) ?? t("messages.googleFallback"));
       }
+
+      rememberPrivacyConsent();
 
       window.location.replace(data.redirectTo);
     } catch (error) {
@@ -286,13 +341,13 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
         <div className="space-y-6">
           <Button
             className="flex w-full items-center justify-center gap-3"
-            disabled={busy}
+            disabled={busy || !consentAccepted}
             onClick={loginGoogle}
             type="button"
             variant="outline"
           >
             <GoogleLogo />
-            <span>Continuer avec Google</span>
+            <span>{t("google")}</span>
           </Button>
 
           <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -320,8 +375,27 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
                 />
               </div>
 
-              <Button className="w-full" disabled={busy} type="submit">
-                Continuer par email
+              {(
+                <label className="flex items-start gap-3 text-sm leading-5 text-muted-foreground">
+                  <input
+                    checked={consentAccepted}
+                    className="mt-1"
+                    onChange={(event) => setConsentAccepted(event.target.checked)}
+                    required
+                    type="checkbox"
+                  />
+                  <span>
+                    {t("consentPrefix")} {" "}
+                    <a className="underline" href={`/${locale}/politique-confidentialite`} target="_blank">
+                      {t("privacyPolicy")}
+                    </a>
+                    .
+                  </span>
+                </label>
+              )}
+
+              <Button className="w-full" disabled={busy || !consentAccepted} type="submit">
+                {t("continueEmail")}
               </Button>
             </form>
           ) : (
@@ -334,18 +408,31 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
                   {t("otpCodeLabel")}
                 </label>
 
-                <Input
+                <InputOTP
                   id="otp"
                   autoComplete="one-time-code"
+                  autoFocus
+                  containerClassName="justify-center"
                   inputMode="numeric"
-                  onChange={(event) => setOTPCode(event.target.value)}
-                  placeholder="000000"
+                  maxLength={6}
+                  onChange={setOTPCode}
+                  pattern={REGEXP_ONLY_DIGITS}
                   value={otpCode}
-                />
+                >
+                  <InputOTPGroup className="gap-2 sm:gap-3">
+                    {Array.from({ length: 6 }, (_, index) => (
+                      <InputOTPSlot
+                        className="h-12 w-11 rounded-md border sm:h-14 sm:w-12 sm:text-lg first:rounded-md first:border last:rounded-md"
+                        index={index}
+                        key={index}
+                      />
+                    ))}
+                  </InputOTPGroup>
+                </InputOTP>
               </div>
 
               <div className="space-y-3">
-                <Button className="w-full" disabled={busy} type="submit">
+                <Button className="w-full" disabled={busy || otpCode.length !== 6} type="submit">
                   {t("otpVerify")}
                 </Button>
 

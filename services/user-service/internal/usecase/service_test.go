@@ -16,10 +16,18 @@ type fakeRepo struct {
 	anonymized    *domain.AnonymizedUser
 }
 
-func (f *fakeRepo) Create(_ context.Context, user *domain.User) error {
+func (f *fakeRepo) Create(_ context.Context, user *domain.User, _ domain.UserConsent) error {
 	user.ID = 1
 	clone := *user
 	f.created = &clone
+	return nil
+}
+
+func (f *fakeRepo) HasConsentByAuthIdentityID(_ context.Context, _, _, _ string) (bool, error) {
+	return f.created != nil, nil
+}
+
+func (f *fakeRepo) AddConsentByAuthIdentityID(_ context.Context, _ string, _ domain.UserConsent) error {
 	return nil
 }
 
@@ -100,7 +108,7 @@ func TestCreateUser(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		repo := &fakeRepo{}
 		svc := NewService(repo)
-		user, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace")
+		user, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace", true, domain.ConsentTypePrivacyPolicy, domain.ConsentVersionV1)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -112,9 +120,18 @@ func TestCreateUser(t *testing.T) {
 	t.Run("validation error", func(t *testing.T) {
 		repo := &fakeRepo{}
 		svc := NewService(repo)
-		_, err := svc.CreateUser(context.Background(), "", "", "", "")
+		_, err := svc.CreateUser(context.Background(), "", "", "", "", true, domain.ConsentTypePrivacyPolicy, domain.ConsentVersionV1)
 		if !errors.Is(err, domain.ErrInvalidUser) {
 			t.Fatalf("expected validation error, got %v", err)
+		}
+	})
+
+	t.Run("consent required", func(t *testing.T) {
+		repo := &fakeRepo{}
+		svc := NewService(repo)
+		_, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace", false, domain.ConsentTypePrivacyPolicy, domain.ConsentVersionV1)
+		if !errors.Is(err, domain.ErrConsentRequired) {
+			t.Fatalf("expected consent error, got %v", err)
 		}
 	})
 }
@@ -122,7 +139,7 @@ func TestCreateUser(t *testing.T) {
 func TestUpdateUserProfile(t *testing.T) {
 	repo := &fakeRepo{}
 	svc := NewService(repo)
-	created, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace")
+	created, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace", true, domain.ConsentTypePrivacyPolicy, domain.ConsentVersionV1)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
@@ -141,7 +158,7 @@ func TestDeleteUserAnonymizesProfile(t *testing.T) {
 	svc := NewService(repo)
 	now := time.Date(2026, 4, 30, 12, 0, 0, 0, time.UTC)
 	svc.now = func() time.Time { return now }
-	created, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace")
+	created, err := svc.CreateUser(context.Background(), "kratos-id-1", "ada@example.com", "Ada", "Lovelace", true, domain.ConsentTypePrivacyPolicy, domain.ConsentVersionV1)
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}

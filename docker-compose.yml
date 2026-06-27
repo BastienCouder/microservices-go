@@ -103,30 +103,6 @@ services:
         max-size: "10m"
         max-file: "3"
  
-  mcp-server:
-    profiles: ["mcp"]
-    build:
-      dockerfile: Dockerfile
-      args:
-        SERVICE_PATH: mcp-server/cmd/server
-    image: microservices-go/mcp-server:prod
-    restart: unless-stopped
-    networks:
-      - backend-net
-    command: ["--transport", "http", "--http-addr", ":8090", "--metrics-addr", ":9090"]
-    ports:
-      - "127.0.0.1:50010:8090"
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-          cpus: '0.25'
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
- 
   api-gateway:
     profiles: ["backend"]
     build:
@@ -1129,6 +1105,7 @@ services:
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
+      - resend_from_email
       - google_oidc_client_id
       - google_oidc_client_secret
     volumes:
@@ -1160,6 +1137,7 @@ services:
     secrets:
       - kratos_db_password
       - resend_smtp_connection_uri
+      - resend_from_email
       - google_oidc_client_id
       - google_oidc_client_secret
     volumes:

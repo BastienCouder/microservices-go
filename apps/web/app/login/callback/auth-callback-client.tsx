@@ -8,6 +8,7 @@ import {
   readAuthReturnTo,
 } from "@/src/auth/browser-intent";
 import { normalizeAppReturnTo } from "@/src/auth/routing";
+import { defaultLocale, isLocale } from "@/src/i18n/config";
 import { AnimatedWave } from "@/app/[locale]/_components/animated-wave";
 
 type AuthCallbackClientProps = {
@@ -31,7 +32,8 @@ export function AuthCallbackClient({
     if (callbackError || errorId) {
       const currentPath = window.location.pathname;
       const firstSegment = currentPath.split("/").filter(Boolean)[0];
-      const localePrefix = firstSegment === "en" ? "/en" : "";
+      const resolvedLocale = isLocale(firstSegment) ? firstSegment : defaultLocale;
+      const localePrefix = `/${resolvedLocale}`;
       const errorURL = new URL(`${localePrefix}/login/error`, window.location.origin);
 
       if (callbackError) {

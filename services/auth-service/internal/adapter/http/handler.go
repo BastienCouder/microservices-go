@@ -2,6 +2,7 @@ package http
 
 import (
 	"encoding/json"
+	"errors"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"log"
 	"net/http"
@@ -21,28 +22,34 @@ type Handler struct {
 }
 
 type modeRequest struct {
-	Mode     string `json:"mode"`
-	ReturnTo string `json:"returnTo"`
+	Mode            string `json:"mode"`
+	ReturnTo        string `json:"returnTo"`
+	ConsentAccepted bool   `json:"consentAccepted"`
 }
 
 type passwordRequest struct {
-	Mode     string `json:"mode"`
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Password string `json:"password"`
+	Mode            string `json:"mode"`
+	Email           string `json:"email"`
+	Name            string `json:"name"`
+	Password        string `json:"password"`
+	ConsentAccepted bool   `json:"consentAccepted"`
 }
 
 type otpStartRequest struct {
-	Mode  string `json:"mode"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	Mode            string `json:"mode"`
+	Email           string `json:"email"`
+	Name            string `json:"name"`
+	ConsentAccepted bool   `json:"consentAccepted"`
 }
 
 type otpVerifyRequest struct {
-	Mode      string `json:"mode"`
-	FlowID    string `json:"flowId"`
-	CSRFToken string `json:"csrfToken"`
-	Code      string `json:"code"`
+	Mode            string `json:"mode"`
+	Email           string `json:"email"`
+	Name            string `json:"name"`
+	FlowID          string `json:"flowId"`
+	CSRFToken       string `json:"csrfToken"`
+	Code            string `json:"code"`
+	ConsentAccepted bool   `json:"consentAccepted"`
 }
 
 func NewHandler(svc *usecase.Service, allowedOrigin, kratosBrowserURL string) *Handler {
@@ -88,12 +95,14 @@ func (h *Handler) validate(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+	if err := h.svc.EnsureUserProfile(r.Context(), session, consentAcceptedFromRequest(r, false)); err != nil {
 		auditSecurityEvent("auth_validate", map[string]any{
 			"result":      "profile_unavailable",
 			"identity_id": session.Identity.ID,
 			"error":       err.Error(),
 		})
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
+		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -122,12 +131,14 @@ func (h *Handler) me(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteError(w, http.StatusUnauthorized, "unauthorized")
 		return
 	}
-	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+	if err := h.svc.EnsureUserProfile(r.Context(), session, consentAcceptedFromRequest(r, false)); err != nil {
 		auditSecurityEvent("auth_me", map[string]any{
 			"result":      "profile_unavailable",
 			"identity_id": session.Identity.ID,
 			"error":       err.Error(),
 		})
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
+		return
 	}
 
 	writeJSON(w, http.StatusOK, map[string]string{
@@ -155,6 +166,10 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 	if !validMode(req.Mode) || req.Email == "" || req.Password == "" {
 		httpjson.WriteError(w, http.StatusBadRequest, "invalid mode/email/password")
 		auditSecurityEvent("auth_password", map[string]any{"mode": req.Mode, "email": req.Email, "result": "invalid_input"})
+		return
+	}
+	if req.Mode == "registration" && !req.ConsentAccepted {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
 		return
 	}
 
@@ -208,7 +223,10 @@ func (h *Handler) password(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteError(w, http.StatusBadGateway, "invalid kratos response")
 		return
 	}
-	h.syncUserProfileFromSession(r, append([]string{}, initSetCookies...), append([]string{}, submitSetCookies...), "auth_password", req.Mode)
+	if err := h.syncUserProfileFromSession(r, append([]string{}, initSetCookies...), append([]string{}, submitSetCookies...), "auth_password", req.Mode, req.ConsentAccepted); err != nil {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
+		return
+	}
 	message := "connexion réussie"
 	if req.Mode == "registration" {
 		message = "inscription réussie"
@@ -235,6 +253,10 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 	if !validMode(req.Mode) || req.Email == "" {
 		httpjson.WriteError(w, http.StatusBadRequest, "invalid mode/email")
 		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "invalid_input"})
+		return
+	}
+	if req.Mode == "registration" && !req.ConsentAccepted {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
 		return
 	}
 
@@ -276,14 +298,21 @@ func (h *Handler) otpStart(w http.ResponseWriter, r *http.Request) {
 
 	h.appendSetCookies(w, initSetCookies)
 	h.appendSetCookies(w, submitSetCookies)
-	if submitStatus >= 400 {
-		writeRawJSON(w, submitStatus, raw)
-		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "denied", "status": submitStatus})
-		return
-	}
 	var body domain.BrowserFlow
 	if err := json.Unmarshal(raw, &body); err != nil {
+		if submitStatus >= 400 {
+			writeRawJSON(w, submitStatus, raw)
+			auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "denied", "status": submitStatus})
+			return
+		}
 		httpjson.WriteError(w, http.StatusBadGateway, "invalid kratos response")
+		return
+	}
+	// Kratos' browser code flow returns HTTP 400 while waiting for the OTP.
+	// The sent_email state is a successful start, not a rejected request.
+	if submitStatus >= 400 && body.State != "sent_email" {
+		writeRawJSON(w, submitStatus, raw)
+		auditSecurityEvent("auth_otp_start", map[string]any{"mode": req.Mode, "email": req.Email, "result": "denied", "status": submitStatus})
 		return
 	}
 	otpCSRF := body.CSRFToken()
@@ -315,9 +344,13 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteInvalidJSON(w)
 		return
 	}
-	if !validMode(req.Mode) || req.FlowID == "" || req.CSRFToken == "" || req.Code == "" {
-		httpjson.WriteError(w, http.StatusBadRequest, "invalid mode/flowId/csrfToken/code")
+	if !validMode(req.Mode) || req.Email == "" || req.FlowID == "" || req.CSRFToken == "" || req.Code == "" {
+		httpjson.WriteError(w, http.StatusBadRequest, "invalid mode/email/flowId/csrfToken/code")
 		auditSecurityEvent("auth_otp_verify", map[string]any{"mode": req.Mode, "result": "invalid_input"})
+		return
+	}
+	if req.Mode == "registration" && !req.ConsentAccepted {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
 		return
 	}
 
@@ -325,6 +358,11 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 		"method":     "code",
 		"csrf_token": req.CSRFToken,
 		"code":       req.Code,
+	}
+	if req.Mode == "login" {
+		payload["identifier"] = req.Email
+	} else {
+		payload["traits"] = map[string]string{"email": req.Email, "name": req.Name}
 	}
 	raw, submitSetCookies, submitStatus, err := h.svc.SubmitFlow(r.Context(), req.Mode, req.FlowID, payload, r.Header.Get("Cookie"))
 	if err != nil {
@@ -344,7 +382,10 @@ func (h *Handler) otpVerify(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteError(w, http.StatusBadGateway, "invalid kratos response")
 		return
 	}
-	h.syncUserProfileFromSession(r, nil, append([]string{}, submitSetCookies...), "auth_otp_verify", req.Mode)
+	if err := h.syncUserProfileFromSession(r, nil, append([]string{}, submitSetCookies...), "auth_otp_verify", req.Mode, req.ConsentAccepted); err != nil {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
+		return
+	}
 	message := "connexion OTP réussie"
 	if req.Mode == "registration" {
 		message = "inscription OTP réussie"
@@ -413,6 +454,13 @@ func (h *Handler) oidcGoogle(w http.ResponseWriter, r *http.Request) {
 		httpjson.WriteError(w, http.StatusBadRequest, "invalid mode")
 		auditSecurityEvent("auth_oidc_google", map[string]any{"result": "invalid_input"})
 		return
+	}
+	if req.Mode == "registration" && !req.ConsentAccepted {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent required")
+		return
+	}
+	if req.ConsentAccepted {
+		http.SetCookie(w, &http.Cookie{Name: consentCookieName, Value: "accepted", Path: "/", HttpOnly: true, Secure: strings.HasPrefix(h.kratosBrowserURL, "https://"), SameSite: http.SameSiteLaxMode, MaxAge: 1800})
 	}
 
 	flow, initSetCookies, statusCode, err := h.svc.InitFlow(r.Context(), req.Mode, strings.TrimSpace(req.ReturnTo), r.Header.Get("Cookie"))
@@ -542,14 +590,26 @@ func validMode(mode string) bool {
 
 func mergeCookieHeader(base string, setCookies []string) string {
 	parts := make([]string, 0, len(setCookies)+1)
-	if strings.TrimSpace(base) != "" {
-		parts = append(parts, strings.TrimSpace(base))
+	indexes := make(map[string]int, len(setCookies)+1)
+	add := func(pair string) {
+		pair = strings.TrimSpace(pair)
+		name, _, ok := strings.Cut(pair, "=")
+		name = strings.TrimSpace(name)
+		if !ok || name == "" {
+			return
+		}
+		if index, exists := indexes[name]; exists {
+			parts[index] = pair
+			return
+		}
+		indexes[name] = len(parts)
+		parts = append(parts, pair)
+	}
+	for _, pair := range strings.Split(base, ";") {
+		add(pair)
 	}
 	for _, cookie := range setCookies {
-		pair := cookiePair(cookie)
-		if pair != "" {
-			parts = append(parts, pair)
-		}
+		add(cookiePair(cookie))
 	}
 	return strings.Join(parts, "; ")
 }
@@ -579,25 +639,36 @@ func auditSecurityEvent(event string, fields map[string]any) {
 	log.Printf("audit %s", string(raw))
 }
 
-func (h *Handler) syncUserProfileFromSession(r *http.Request, initSetCookies, submitSetCookies []string, event, mode string) {
+func (h *Handler) syncUserProfileFromSession(r *http.Request, initSetCookies, submitSetCookies []string, event, mode string, consentAccepted bool) error {
 	submitCookie := mergeCookieHeader(mergeCookieHeader(r.Header.Get("Cookie"), initSetCookies), submitSetCookies)
 	session, statusCode, err := h.svc.WhoAmI(r.Context(), submitCookie, "")
 	if err != nil || statusCode != http.StatusOK || session == nil || !session.Active {
 		auditSecurityEvent(event, map[string]any{"mode": mode, "result": "profile_sync_skipped"})
-		return
+		return errors.New("profile session unavailable")
 	}
-	if err := h.svc.EnsureUserProfile(r.Context(), session); err != nil {
+	if err := h.svc.EnsureUserProfile(r.Context(), session, consentAccepted); err != nil {
 		auditSecurityEvent(event, map[string]any{
 			"mode":        mode,
 			"result":      "profile_sync_failed",
 			"identity_id": session.Identity.ID,
 			"error":       err.Error(),
 		})
-		return
+		return err
 	}
 	auditSecurityEvent(event, map[string]any{
 		"mode":        mode,
 		"result":      "profile_sync_ok",
 		"identity_id": session.Identity.ID,
 	})
+	return nil
+}
+
+const consentCookieName = "visia_privacy_policy_v1"
+
+func consentAcceptedFromRequest(r *http.Request, explicit bool) bool {
+	if explicit {
+		return true
+	}
+	cookie, err := r.Cookie(consentCookieName)
+	return err == nil && cookie.Value == "accepted"
 }

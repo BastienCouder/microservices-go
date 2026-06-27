@@ -49,7 +49,7 @@ func TestRepositoryIntegration_CreateAndGetUser(t *testing.T) {
 		LastName:       "User",
 		CreatedAt:      time.Now().UTC(),
 	}
-	if err := repo.Create(ctx, user); err != nil {
+	if err := repo.Create(ctx, user, domain.UserConsent{Type: domain.ConsentTypePrivacyPolicy, Version: domain.ConsentVersionV1, AcceptedAt: time.Now().UTC()}); err != nil {
 		t.Fatalf("create user: %v", err)
 	}
 	if user.ID <= 0 {

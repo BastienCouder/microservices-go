@@ -292,11 +292,6 @@ export function absoluteUrl(pathname = "/"): string {
 
 export function getLocalizedURL(locale: Locale, pathname = "/"): string {
   const normalizedPath = normalizePath(pathname);
-
-  if (locale === defaultLocale) {
-    return absoluteUrl(normalizedPath);
-  }
-
   return absoluteUrl(
     `/${locale}${normalizedPath === "/" ? "" : normalizedPath}`,
   );

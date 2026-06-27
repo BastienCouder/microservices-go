@@ -108,7 +108,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
-	dev-doc dev-email dev-mcp \
+	dev-doc dev-email \
 	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate \
 	prod-front prod-app prod-web prod-services prod-service \
 	prod-services-api-gateway prod-services-user prod-services-organizations \
@@ -117,7 +117,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	prod-services-kratos \
 	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service deploy-prod-backup-cron \
 	backup-r2-once \
-	prod-doc prod-email prod-mcp \
+	prod-doc prod-email \
 	db-generate db-migrate \
 	stripe-listen stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
@@ -146,7 +146,6 @@ help:
 	@echo "    make dev-reset        Stop, clean Go cache, rebuild backend"
 	@echo "    make dev-doc          Start docs only"
 	@echo "    make dev-email        Start email renderer only"
-	@echo "    make dev-mcp          Start MCP server only"
 	@echo ""
 	@echo "  Database"
 	@echo "    make db-generate      Run sqlc for all configured services"
@@ -178,7 +177,6 @@ help:
 	@echo "    make prod-migrate     Run all production migrations"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
-	@echo "    make prod-mcp         Start MCP server only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
 	@echo "    make prod-check       Ansible syntax check"
 	@echo "    make deploy-prod      Deploy full production stack with Ansible"
@@ -252,9 +250,6 @@ dev-doc: secrets-check
 
 dev-email: secrets-check
 	$(COMPOSE_DEV) --profile email up
-
-dev-mcp: secrets-check
-	$(COMPOSE_DEV) --profile mcp up
 
 db-generate:
 	@for service in $(SQLC_SERVICES); do \
@@ -390,9 +385,6 @@ prod-doc: secrets-check
 
 prod-email: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile email up -d
-
-prod-mcp: secrets-check
-	$(COMPOSE_PROD_LOCAL_SERIAL) --profile mcp up -d
 
 prod-ping:
 	ansible -i $(ANSIBLE_INVENTORY) production -m ping --ask-become-pass

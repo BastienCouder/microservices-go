@@ -21,6 +21,7 @@ import (
 var (
 	ErrProfileProvisionUnavailable = errors.New("user profile provision unavailable")
 	ErrProfileProvisionInvalid     = errors.New("user profile provision invalid")
+	ErrConsentRequired             = errors.New("privacy policy consent required")
 	nonWordPattern                 = regexp.MustCompile(`[^a-zA-Z0-9]+`)
 )
 
@@ -54,7 +55,7 @@ func NewClient(baseURL, secret, issuer string) *Client {
 	}
 }
 
-func (c *Client) EnsureProfile(ctx context.Context, identity domain.Identity) error {
+func (c *Client) EnsureProfile(ctx context.Context, identity domain.Identity, consentAccepted bool) error {
 	authIdentityID := strings.TrimSpace(identity.ID)
 	email := strings.TrimSpace(strings.ToLower(identity.Traits.Email))
 	if authIdentityID == "" || email == "" {
@@ -74,12 +75,19 @@ func (c *Client) EnsureProfile(ctx context.Context, identity domain.Identity) er
 		return err
 	}
 	if status == http.StatusOK {
-		return nil
+		err := c.checkConsent(ctx, token)
+		if errors.Is(err, ErrConsentRequired) && consentAccepted {
+			return c.acceptConsent(ctx, token)
+		}
+		return err
 	}
 	if status != http.StatusNotFound {
 		return fmt.Errorf("%w: unexpected lookup status %d", ErrProfileProvisionUnavailable, status)
 	}
 
+	if !consentAccepted {
+		return ErrConsentRequired
+	}
 	status, err = c.createUser(ctx, token, email, firstName, lastName)
 	if err != nil {
 		return err
@@ -88,6 +96,51 @@ func (c *Client) EnsureProfile(ctx context.Context, identity domain.Identity) er
 		return fmt.Errorf("%w: unexpected create status %d", ErrProfileProvisionUnavailable, status)
 	}
 	return nil
+}
+
+func (c *Client) acceptConsent(ctx context.Context, token string) error {
+	payload, err := json.Marshal(map[string]any{"type": "privacy_policy", "version": "v1", "accepted": true})
+	if err != nil {
+		return fmt.Errorf("%w: marshal consent: %v", ErrProfileProvisionUnavailable, err)
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/users/consent", bytes.NewReader(payload))
+	if err != nil {
+		return fmt.Errorf("%w: build consent request: %v", ErrProfileProvisionUnavailable, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: accept consent: %v", ErrProfileProvisionUnavailable, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("%w: unexpected accept consent status %d", ErrProfileProvisionUnavailable, resp.StatusCode)
+	}
+	return nil
+}
+
+func (c *Client) checkConsent(ctx context.Context, token string) error {
+	endpoint := c.baseURL + "/users/consent/check?type=privacy_policy&version=v1"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return fmt.Errorf("%w: build consent request: %v", ErrProfileProvisionUnavailable, err)
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("%w: check consent: %v", ErrProfileProvisionUnavailable, err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	_, _ = io.Copy(io.Discard, resp.Body)
+	if resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	if resp.StatusCode == http.StatusForbidden {
+		return ErrConsentRequired
+	}
+	return fmt.Errorf("%w: unexpected consent status %d", ErrProfileProvisionUnavailable, resp.StatusCode)
 }
 
 func (c *Client) getByAuthIdentityID(ctx context.Context, token, authIdentityID string) (int, error) {
@@ -110,10 +163,13 @@ func (c *Client) getByAuthIdentityID(ctx context.Context, token, authIdentityID 
 }
 
 func (c *Client) createUser(ctx context.Context, token, email, firstName, lastName string) (int, error) {
-	payload, err := json.Marshal(map[string]string{
-		"email":      email,
-		"first_name": firstName,
-		"last_name":  lastName,
+	payload, err := json.Marshal(map[string]any{
+		"email":            email,
+		"first_name":       firstName,
+		"last_name":        lastName,
+		"consent_accepted": true,
+		"consent_type":     "privacy_policy",
+		"consent_version":  "v1",
 	})
 	if err != nil {
 		return 0, fmt.Errorf("%w: marshal create user: %v", ErrProfileProvisionUnavailable, err)

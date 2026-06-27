@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/bastiencouder/microservices-go/contracts/pkg/httpjson"
 	"io"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -412,6 +413,13 @@ func (h *Handler) createStripeCheckoutSession(w http.ResponseWriter, r *http.Req
 		RequestID:         req.RequestID,
 	})
 	if err != nil {
+		log.Printf(
+			"stripe checkout failed organization_id=%d plan=%s billing_cycle=%s: %v",
+			organizationID,
+			domain.NormalizePlan(req.Plan),
+			domain.NormalizeBillingCycle(req.BillingCycle),
+			err,
+		)
 		switch {
 		case errors.Is(err, usecase.ErrStripeDisabled):
 			httpjson.WriteError(w, http.StatusServiceUnavailable, "stripe integration is disabled")

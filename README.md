@@ -15,7 +15,6 @@ Monorepo Go microservices avec API Gateway, auth Kratos, gestion utilisateurs, o
 - `services/analysis-service`: orchestration des runs d’analyse, dashboard, perception.
 - `services/ia-service`: exécution IA et extraction de marque (sans LangGraph).
 - `services/attribution-service`: rapports traffic GA4 lies aux projets.
-- `services/mcp-server`: outils MCP backend.
 - `apps/web`: frontend Next.js.
 - `apps/doc`: documentation.
 - `apps/email`: templates React Email + preview local.
