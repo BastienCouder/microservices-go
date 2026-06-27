@@ -28,6 +28,7 @@ BACKUP_POSTGRES_PORT ?= 5432
 BACKUP_POSTGRES_USER ?= postgres
 R2_PREFIX ?= postgres
 R2_REGION ?= auto
+SEED_USER_EMAIL ?= couderbastien
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -129,7 +130,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	langgraph-check langgraph-test langgraph-build langgraph-ci \
 	crawler-check crawler-build crawler-ci \
 	ts-ci frontend-ci ci-all \
-	seed-nike seed-nike-live \
+	seed-nike seed-nike-live seed-nike-prod seed-nike-prod-live \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
 	$(foreach service,$(MIGRATION_SERVICES),migrate-$(service) migrate-$(service)-dev)
 
@@ -175,6 +176,7 @@ help:
 	@echo "    make prod-services-crawler  Rebuild and start crawler-service"
 	@echo "    make prod-services-api-gateway Rebuild and start api-gateway"
 	@echo "    make prod-migrate     Run all production migrations"
+	@echo "    make seed-nike-prod   Migrate and seed a complete Nike project for SEED_USER_EMAIL"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
@@ -667,6 +669,7 @@ seed-nike:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=synthetic \
 		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 
@@ -678,6 +681,31 @@ seed-nike-live:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
+		-e SEED_ANALYSIS_MODE=live \
+		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+
+seed-nike-prod: prod-migrate
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace \
+		-v /usr/bin/docker:/usr/local/bin/docker \
+		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
+		-e SEED_ANALYSIS_MODE=synthetic \
+		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+
+seed-nike-prod-live: prod-migrate
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace \
+		-v /usr/bin/docker:/usr/local/bin/docker \
+		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=live \
 		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 

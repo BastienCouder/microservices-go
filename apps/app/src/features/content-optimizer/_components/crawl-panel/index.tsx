@@ -16,6 +16,12 @@ import {
 } from "./_lib/crawl-panel-utils";
 import { useSelectedOrganizationPermissions } from "@/shared/organization-permissions";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
+import {
+  loadModelCatalog,
+  loadProjectModels,
+} from "@/features/models/_lib/catalog/catalog-api";
+import type { ModelCatalogItem } from "@/features/models/_lib/model-access";
+import { resolveProjectTokenToId } from "@/shared/project-token-resolution";
 
 type CrawlPanelProps = {
   apiBaseURL: string;
@@ -88,6 +94,34 @@ export function CrawlPanel({
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("priority");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [analysisModels, setAnalysisModels] = useState<ModelCatalogItem[]>([]);
+  const [selectedAnalysisModelId, setSelectedAnalysisModelId] = useState("");
+
+  useEffect(() => {
+    if (!apiBaseURL || !viewModel.organizationId || !viewModel.projectId) return;
+    const controller = new AbortController();
+    void resolveProjectTokenToId(apiBaseURL, {
+      projectToken: viewModel.projectId,
+      organizationId: viewModel.organizationId,
+      signal: controller.signal,
+    }).then((resolvedProjectId) => Promise.all([
+      loadModelCatalog(apiBaseURL, viewModel.organizationId, { signal: controller.signal }),
+      loadProjectModels(
+        apiBaseURL,
+        viewModel.organizationId,
+        resolvedProjectId ?? viewModel.projectId,
+        controller.signal,
+      ),
+    ])).then(([catalog, enabledIds]) => {
+      const enabled = new Set(enabledIds);
+      const models = catalog.filter((model) => enabled.has(model.id) && model.isActive);
+      setAnalysisModels(models);
+      setSelectedAnalysisModelId((current) =>
+        models.some((model) => model.id === current) ? current : (models[0]?.id ?? ""),
+      );
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [apiBaseURL, viewModel.organizationId, viewModel.projectId]);
 
   useEffect(() => {
     setQuery("");
@@ -260,6 +294,18 @@ export function CrawlPanel({
                 records={records}
                 filteredRecords={filteredRecords}
                 selectedRecord={selectedRecord}
+                diagnosticsVerified={viewModel.crawlResult?.analysisStatus === "completed"}
+                analysisModels={analysisModels}
+                selectedAnalysisModelId={selectedAnalysisModelId}
+                onSelectedAnalysisModelIdChange={setSelectedAnalysisModelId}
+                analysisRunning={viewModel.diagnosticAnalysisRunning}
+                canAnalyze={permissions.canEdit}
+                onAnalyze={(model, record) => viewModel.analyzeDiagnostics({
+                  id: model.id,
+                  provider: model.provider,
+                  providerModelId: model.providerModelId,
+                  creditCost: model.creditCost,
+                }, record)}
                 onQueryChange={setQuery}
                 onStatusFilterChange={setStatusFilter}
                 onSeverityFilterChange={setSeverityFilter}

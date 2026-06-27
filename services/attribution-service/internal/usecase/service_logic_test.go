@@ -106,6 +106,20 @@ func TestGetTrafficReportRequiresConfiguredGA4Integration(t *testing.T) {
 	}
 }
 
+func TestGetTrafficReportAllowsExplicitSeedTrafficPropertyWithoutCredentials(t *testing.T) {
+	provider := &fakeTrafficProvider{report: TrafficReport{DataSource: TrafficDataSourceFake}}
+	svc := NewService(&fakeProjectResolver{project: ProjectMetadata{
+		GA4: ProjectGA4Integration{PropertyID: SeedTrafficPropertyID},
+	}}, provider)
+
+	if _, err := svc.GetTrafficReport(context.Background(), "nike", 42, time.Time{}, time.Time{}, TrafficFilters{}); err != nil {
+		t.Fatalf("expected seed traffic property to work without credentials, got %v", err)
+	}
+	if provider.calls != 1 {
+		t.Fatalf("expected traffic provider call, got %d", provider.calls)
+	}
+}
+
 func TestGetTrafficReportWrapsProviderFailureAsDependencyUnavailable(t *testing.T) {
 	resolver := &fakeProjectResolver{
 		project: ProjectMetadata{

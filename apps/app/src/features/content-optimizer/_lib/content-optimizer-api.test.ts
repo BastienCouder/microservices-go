@@ -159,7 +159,7 @@ describe("content optimizer api", () => {
     });
   });
 
-  test("analyzes selected discovered records without starting a new crawl", async () => {
+  test("starts an asynchronous selected-record analysis with the chosen model", async () => {
     const calls: Array<{ url: string; init?: RequestInit }> = [];
     globalThis.fetch = (async (input, init) => {
       calls.push({ url: String(input), init });
@@ -189,6 +189,10 @@ describe("content optimizer api", () => {
           markdown: "# Pricing",
         },
       ],
+      modelId: "model-1",
+      providerModelId: "openai/gpt-5-mini",
+      providerId: "openrouter",
+      creditCost: 2,
     });
 
     expect(result.id).toBe("selected-analysis-1");
@@ -205,6 +209,10 @@ describe("content optimizer api", () => {
           markdown: "# Pricing",
         },
       ],
+      modelId: "model-1",
+      providerModelId: "openai/gpt-5-mini",
+      providerId: "openrouter",
+      creditCost: 2,
     });
   });
 

@@ -311,6 +311,8 @@ type ContentOptimizerSelectionDraft struct {
 type ContentIssueAnalysisInput struct {
 	ProjectID           string
 	OrganizationID      int64
+	ModelID             string
+	ProviderID          string
 	Record              ContentOptimizerCrawlRecord
 	DeterministicIssues []ContentOptimizerIssue
 }

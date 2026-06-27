@@ -47,8 +47,10 @@ func (s *Service) GetTrafficReport(
 		}
 		return TrafficReport{}, fmt.Errorf("%w: project metadata unavailable: %v", ErrDependencyUnavailable, err)
 	}
-	if strings.TrimSpace(project.GA4.PropertyID) == "" ||
-		(strings.TrimSpace(project.GA4.ServiceAccountJSON) == "" && strings.TrimSpace(project.GA4.OAuthRefreshToken) == "") {
+	propertyID := strings.TrimSpace(project.GA4.PropertyID)
+	isSeedTraffic := propertyID == SeedTrafficPropertyID
+	if propertyID == "" ||
+		(!isSeedTraffic && strings.TrimSpace(project.GA4.ServiceAccountJSON) == "" && strings.TrimSpace(project.GA4.OAuthRefreshToken) == "") {
 		return TrafficReport{}, fmt.Errorf("%w: ga4 integration is not configured for project", ErrValidation)
 	}
 

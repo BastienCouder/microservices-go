@@ -1,4 +1,5 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Search } from "lucide-react";
+import { useState } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search, Sparkles } from "lucide-react";
 
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import {
@@ -8,6 +9,9 @@ import {
 import { SectionTitle } from "@/components/shared/section-title";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
@@ -20,6 +24,7 @@ import {
 import { cn } from "@/shared/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
+import type { ModelCatalogItem } from "@/features/models/_lib/model-access";
 import {
   computePriority,
   decodeHTMLText,
@@ -48,6 +53,13 @@ type CrawlerResultsViewProps = {
   records: ContentOptimizerCrawlRecord[];
   filteredRecords: ContentOptimizerCrawlRecord[];
   selectedRecord: ContentOptimizerCrawlRecord | null;
+  diagnosticsVerified: boolean;
+  analysisModels: ModelCatalogItem[];
+  selectedAnalysisModelId: string;
+  onSelectedAnalysisModelIdChange: (value: string) => void;
+  analysisRunning: boolean;
+  canAnalyze: boolean;
+  onAnalyze: (model: ModelCatalogItem, record: ContentOptimizerCrawlRecord) => Promise<void>;
   onQueryChange: (value: string) => void;
   onStatusFilterChange: (value: StatusFilter) => void;
   onSeverityFilterChange: (value: SeverityFilter) => void;
@@ -152,8 +164,18 @@ function issueSourceDisplayLabel(
 
 function CrawlerDetailPane({
   selectedRecord,
+  diagnosticsVerified,
+  analysisRunning,
+  canAnalyze,
+  analysisAvailable,
+  onRequestAnalysis,
 }: {
   selectedRecord: ContentOptimizerCrawlRecord | null;
+  diagnosticsVerified: boolean;
+  analysisRunning: boolean;
+  canAnalyze: boolean;
+  analysisAvailable: boolean;
+  onRequestAnalysis: () => void;
 }) {
   const { t } = useScopedI18n("crawler-panel");
 
@@ -184,7 +206,7 @@ function CrawlerDetailPane({
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <Badge variant="outline">HTTP {selectedRecord.httpStatus ?? "-"}</Badge>
           <Badge variant="outline">
             {signalCountLabel(selectedRecord.issues?.length ?? 0, t)}
@@ -192,6 +214,22 @@ function CrawlerDetailPane({
           <Badge className={computePriority(selectedRecord).className}>
             {priorityDisplayLabel(computePriority(selectedRecord).rank, t)}
           </Badge>
+          {canAnalyze ? (
+            <Button
+              type="button"
+              size="sm"
+              className="ml-auto"
+              disabled={analysisRunning || !analysisAvailable}
+              onClick={onRequestAnalysis}
+            >
+              {analysisRunning ? <Loader2 className="size-4 animate-spin" /> : null}
+              {analysisRunning
+                ? t("analysisInProgress")
+                : analysisAvailable
+                  ? t("analyzeDiagnostics")
+                  : t("noAnalysisModel")}
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -231,7 +269,11 @@ function CrawlerDetailPane({
                       variant={hasIssues ? "secondary" : "outline"}
                       className="h-6 shrink-0 rounded-sm px-2 text-xs font-bold"
                     >
-                      {hasIssues ? signalCountLabel(groupIssues.length, t) : t("ok")}
+                      {hasIssues
+                        ? signalCountLabel(groupIssues.length, t)
+                        : diagnosticsVerified
+                          ? t("verifiedOk")
+                          : t("toAnalyze")}
                     </Badge>
                   </div>
                 </div>
@@ -368,6 +410,13 @@ export function CrawlerResultsView({
   records,
   filteredRecords,
   selectedRecord,
+  diagnosticsVerified,
+  analysisModels,
+  selectedAnalysisModelId,
+  onSelectedAnalysisModelIdChange,
+  analysisRunning,
+  canAnalyze,
+  onAnalyze,
   onQueryChange,
   onStatusFilterChange,
   onSeverityFilterChange,
@@ -375,6 +424,9 @@ export function CrawlerResultsView({
   onSelectRecord,
 }: CrawlerResultsViewProps) {
   const { t } = useScopedI18n("crawler-panel");
+  const [confirmAnalysisOpen, setConfirmAnalysisOpen] = useState(false);
+  const selectedAnalysisModel = analysisModels.find((model) => model.id === selectedAnalysisModelId) ?? null;
+  const analysisCredits = selectedAnalysisModel?.creditCost ?? 0;
   const statusFilterOptions = [
     { value: "all", label: t("statusAll") },
     { value: "completed", label: t("statusCompleted") },
@@ -432,6 +484,33 @@ export function CrawlerResultsView({
               label={t("statusLabel")}
               title={t("statusLabel")}
             />
+
+            <Select
+              value={selectedAnalysisModelId}
+              onValueChange={onSelectedAnalysisModelIdChange}
+              disabled={analysisModels.length === 0}
+            >
+              <SelectTrigger className="w-full lg:w-[220px]">
+                {selectedAnalysisModel ? (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <img src={selectedAnalysisModel.icon} alt="" className="size-4 shrink-0 object-contain" />
+                    <span className="truncate">{selectedAnalysisModel.name}</span>
+                  </span>
+                ) : (
+                  <SelectValue placeholder={t("selectAnalysisModel")} />
+                )}
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                {analysisModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <span className="flex items-center gap-2">
+                      <img src={model.icon} alt="" className="size-4 object-contain" />
+                      <span>{model.name}</span>
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <PeriodFilterPicker
               className="w-full lg:w-[220px]"
@@ -616,9 +695,47 @@ export function CrawlerResultsView({
         </div>
 
         <aside className="hidden min-h-0 overflow-auto bg-background lg:block">
-          <CrawlerDetailPane selectedRecord={selectedRecord} />
+          <CrawlerDetailPane
+            selectedRecord={selectedRecord}
+            diagnosticsVerified={diagnosticsVerified}
+            analysisRunning={analysisRunning}
+            canAnalyze={canAnalyze}
+            analysisAvailable={Boolean(selectedAnalysisModel)}
+            onRequestAnalysis={() => setConfirmAnalysisOpen(true)}
+          />
         </aside>
       </div>
+      <Dialog open={confirmAnalysisOpen} onOpenChange={setConfirmAnalysisOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("confirmDiagnosticAnalysisTitle")}</DialogTitle>
+            <DialogDescription>
+              {t("confirmDiagnosticAnalysisDescription", {
+                pages: 1,
+                model: selectedAnalysisModel?.name ?? "-",
+                credits: analysisCredits,
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConfirmAnalysisOpen(false)} disabled={analysisRunning}>
+              {t("cancel")}
+            </Button>
+            <Button
+              type="button"
+              disabled={!selectedAnalysisModel || analysisRunning}
+              onClick={() => {
+                if (!selectedAnalysisModel) return;
+                setConfirmAnalysisOpen(false);
+                if (!selectedRecord) return;
+                void onAnalyze(selectedAnalysisModel, selectedRecord);
+              }}
+            >
+              {t("confirmAndAnalyze", { credits: analysisCredits })}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

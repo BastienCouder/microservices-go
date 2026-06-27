@@ -165,6 +165,16 @@ func (c *Client) GetTrafficReport(
 	if propertyID == "" {
 		return usecase.TrafficReport{}, fmt.Errorf("ga4 property id is required")
 	}
+	if propertyID == usecase.SeedTrafficPropertyID {
+		return buildFakeTrafficReport(usecase.TrafficReport{
+			ProjectID:  project.ID,
+			PropertyID: propertyID,
+			DateRange: usecase.TrafficDateRange{
+				StartDate: from.UTC().Format("2006-01-02"),
+				EndDate:   to.UTC().Format("2006-01-02"),
+			},
+		}, from, to), nil
+	}
 
 	accessToken, err := c.getProjectAccessToken(ctx, project)
 	if err != nil {

@@ -38,6 +38,7 @@ export type ContentOptimizerCrawlRecord = {
 export type ContentOptimizerCrawlResult = {
   id: string;
   status: string;
+  analysisStatus?: "pending" | "completed" | "failed";
   browserSecondsUsed?: number;
   total: number;
   finished: number;
@@ -99,6 +100,16 @@ export type AnalyzeSelectedContentOptimizerRecordsInput = {
   projectId: string;
   organizationId?: string;
   records: ContentOptimizerCrawlRecord[];
+  modelId: string;
+  providerModelId: string;
+  providerId: string;
+  creditCost: number;
+};
+
+export type ContentOptimizerAnalysisRun = {
+  id: string;
+  status: string;
+  creditsCount?: number;
 };
 
 function encodePathSegment(value: string): string {
@@ -391,10 +402,16 @@ export async function analyzeSelectedContentOptimizerRecords(
   apiBaseURL: string,
   input: AnalyzeSelectedContentOptimizerRecordsInput,
   signal?: AbortSignal,
-): Promise<ContentOptimizerCrawlResult> {
+): Promise<ContentOptimizerAnalysisRun> {
   const initialProjectId = await resolveInitialProjectId(apiBaseURL, input, signal);
-  const body = JSON.stringify({ records: input.records });
-  let response = await gatewayJSON<ContentOptimizerCrawlResult>(
+  const body = JSON.stringify({
+    records: input.records,
+    modelId: input.modelId,
+    providerModelId: input.providerModelId,
+    providerId: input.providerId,
+    creditCost: input.creditCost,
+  });
+  let response = await gatewayJSON<ContentOptimizerAnalysisRun>(
     apiBaseURL,
     `/analysis/projects/${encodePathSegment(initialProjectId)}/content-optimizer/analyze`,
     {
@@ -409,7 +426,7 @@ export async function analyzeSelectedContentOptimizerRecords(
   if (shouldRetryWithResolvedProjectId(response)) {
     const resolvedProjectId = await resolveProjectPathToken(apiBaseURL, input, signal);
     if (resolvedProjectId !== initialProjectId) {
-      response = await gatewayJSON<ContentOptimizerCrawlResult>(
+      response = await gatewayJSON<ContentOptimizerAnalysisRun>(
         apiBaseURL,
         `/analysis/projects/${encodePathSegment(resolvedProjectId)}/content-optimizer/analyze`,
         {
@@ -424,6 +441,25 @@ export async function analyzeSelectedContentOptimizerRecords(
   }
 
   return unwrapGatewayData(response);
+}
+
+export async function getContentOptimizerAnalysisRun(
+  apiBaseURL: string,
+  input: { runId: string; organizationId?: string },
+  signal?: AbortSignal,
+): Promise<ContentOptimizerAnalysisRun> {
+  const response = await gatewayJSON<unknown>(
+    apiBaseURL,
+    `/analysis/runs/${encodePathSegment(input.runId)}`,
+    { method: "GET", organizationId: input.organizationId, signal },
+  );
+  const details = unwrapGatewayData<{
+    analysisRun?: ContentOptimizerAnalysisRun;
+  }>(response);
+  if (!details.analysisRun) {
+    throw new Error(normalizeContentOptimizerError("Unable to read analysis status"));
+  }
+  return details.analysisRun;
 }
 
 export async function getLatestContentOptimizerCrawl(

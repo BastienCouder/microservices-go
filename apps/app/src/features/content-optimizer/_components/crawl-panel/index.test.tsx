@@ -40,7 +40,7 @@ describe("crawl panel", () => {
     expect(resultsViewSource.includes('t("improvementsTitle")')).toBe(true);
     expect(resultsViewSource.includes('t("noPriorityOpportunity")')).toBe(true);
     expect(resultsViewSource.includes("issueSourceDisplayLabel")).toBe(true);
-    expect(resultsViewSource.includes("SelectTrigger")).toBe(false);
+    expect(resultsViewSource.includes("SelectTrigger")).toBe(true);
   });
 
   test("keeps the initial discovery flow but delegates the setup card", () => {
@@ -165,8 +165,9 @@ describe("crawl panel", () => {
     expect(source.includes("!showProjectTransition &&")).toBe(true);
   });
 
-  test("always crawls selected pages as Markdown before optional AI optimization", () => {
-    expect(viewModelSource.includes("analyzeSelectedContentOptimizerRecords")).toBe(false);
+  test("crawls selected pages as Markdown before the explicit asynchronous AI diagnostic", () => {
+    expect(viewModelSource.includes("analyzeSelectedContentOptimizerRecords")).toBe(true);
+    expect(viewModelSource.includes("getContentOptimizerAnalysisRun")).toBe(true);
     expect(viewModelSource.includes("hasExtractedContent")).toBe(false);
     expect(viewModelSource.includes("crawlMutation.mutate(undefined)")).toBe(true);
   });

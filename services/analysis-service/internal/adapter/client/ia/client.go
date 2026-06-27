@@ -108,11 +108,19 @@ func (c *Client) GenerateOptimizeActionBrief(
 
 func (c *Client) AnalyzeContentIssues(ctx context.Context, input usecase.ContentIssueAnalysisInput) ([]usecase.ContentOptimizerIssue, error) {
 	prompt := buildContentIssuePrompt(input)
+	modelID := strings.TrimSpace(input.ModelID)
+	if modelID == "" {
+		modelID = c.modelID
+	}
+	providerID := strings.TrimSpace(input.ProviderID)
+	if providerID == "" {
+		providerID = c.providerID
+	}
 	body := executePromptRequest{
 		PromptID:   "content-optimizer-page-audit",
 		PromptText: prompt,
-		ModelID:    c.modelID,
-		ProviderID: c.providerID,
+		ModelID:    modelID,
+		ProviderID: providerID,
 	}
 
 	payload, err := json.Marshal(body)

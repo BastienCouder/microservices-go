@@ -14,18 +14,19 @@ import (
 )
 
 type persistedState struct {
-	Seq                int64                                      `json:"seq"`
-	Runs               map[string]*usecase.AnalysisRun            `json:"runs"`
-	RunsByProject      map[string][]string                        `json:"runsByProject"`
-	PromptRuns         map[string]*usecase.PromptRun              `json:"promptRuns"`
-	PromptRunsByRun    map[string][]string                        `json:"promptRunsByRun"`
-	Responses          map[string]*usecase.AIResponse             `json:"responses"`
-	ResponsesByRun     map[string][]string                        `json:"responsesByRun"`
-	ResponseIndexByRun map[string]map[string]string               `json:"responseIndexByRun"`
-	RunByRequest       map[string]string                          `json:"runByRequest"`
-	OptimizeActions    map[string]*usecase.OptimizeAction         `json:"optimizeActions"`
-	ActionsByProject   map[string][]string                        `json:"actionsByProject"`
-	AIBriefSettings    map[string]*usecase.ProjectAIBriefSettings `json:"aiBriefSettings"`
+	Seq                int64                                             `json:"seq"`
+	Runs               map[string]*usecase.AnalysisRun                   `json:"runs"`
+	RunsByProject      map[string][]string                               `json:"runsByProject"`
+	PromptRuns         map[string]*usecase.PromptRun                     `json:"promptRuns"`
+	PromptRunsByRun    map[string][]string                               `json:"promptRunsByRun"`
+	Responses          map[string]*usecase.AIResponse                    `json:"responses"`
+	ResponsesByRun     map[string][]string                               `json:"responsesByRun"`
+	ResponseIndexByRun map[string]map[string]string                      `json:"responseIndexByRun"`
+	RunByRequest       map[string]string                                 `json:"runByRequest"`
+	OptimizeActions    map[string]*usecase.OptimizeAction                `json:"optimizeActions"`
+	ActionsByProject   map[string][]string                               `json:"actionsByProject"`
+	AIBriefSettings    map[string]*usecase.ProjectAIBriefSettings        `json:"aiBriefSettings"`
+	ContentCrawls      map[string]*usecase.ContentOptimizerCrawlSnapshot `json:"contentCrawls"`
 }
 
 type StateStore struct {
@@ -49,6 +50,7 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 		OptimizeActions:    make(map[string]*usecase.OptimizeAction),
 		ActionsByProject:   make(map[string][]string),
 		AIBriefSettings:    make(map[string]*usecase.ProjectAIBriefSettings),
+		ContentCrawls:      make(map[string]*usecase.ContentOptimizerCrawlSnapshot),
 	}
 
 	if err := s.loadRuns(ctx, &state); err != nil {
@@ -66,8 +68,11 @@ func (s *StateStore) Load(ctx context.Context) ([]byte, bool, error) {
 	if err := s.loadAIBriefSettings(ctx, &state); err != nil {
 		return nil, false, err
 	}
+	if err := s.loadContentOptimizerCrawls(ctx, &state); err != nil {
+		return nil, false, err
+	}
 
-	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 && len(state.OptimizeActions) == 0 && len(state.AIBriefSettings) == 0 {
+	if len(state.Runs) == 0 && len(state.PromptRuns) == 0 && len(state.Responses) == 0 && len(state.OptimizeActions) == 0 && len(state.AIBriefSettings) == 0 && len(state.ContentCrawls) == 0 {
 		return nil, false, nil
 	}
 
@@ -95,6 +100,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	}()
 
 	for _, statement := range []string{
+		`DELETE FROM content_optimizer_crawls`,
 		`DELETE FROM project_ai_brief_settings`,
 		`DELETE FROM optimize_actions`,
 		`DELETE FROM ai_responses`,
@@ -121,11 +127,57 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 	if err := insertAIBriefSettings(ctx, tx, state.AIBriefSettings); err != nil {
 		return err
 	}
+	if err := insertContentOptimizerCrawls(ctx, tx, state.ContentCrawls); err != nil {
+		return err
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return fmt.Errorf("commit analysis state transaction: %w", err)
 	}
 	tx = nil
+	return nil
+}
+
+func (s *StateStore) loadContentOptimizerCrawls(ctx context.Context, state *persistedState) error {
+	rows, err := s.db.Query(ctx, `
+		SELECT project_id, organization_id, job_id, result, created_at, updated_at
+		FROM content_optimizer_crawls
+	`)
+	if err != nil {
+		return fmt.Errorf("select content optimizer crawls: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var snapshot usecase.ContentOptimizerCrawlSnapshot
+		var rawResult []byte
+		if err := rows.Scan(&snapshot.ProjectID, &snapshot.OrganizationID, &snapshot.JobID, &rawResult, &snapshot.CreatedAt, &snapshot.UpdatedAt); err != nil {
+			return fmt.Errorf("scan content optimizer crawl: %w", err)
+		}
+		if err := json.Unmarshal(rawResult, &snapshot.Result); err != nil {
+			return fmt.Errorf("decode content optimizer crawl result: %w", err)
+		}
+		key := fmt.Sprintf("%d|%s", snapshot.OrganizationID, strings.TrimSpace(snapshot.ProjectID))
+		state.ContentCrawls[key] = &snapshot
+	}
+	return rows.Err()
+}
+
+func insertContentOptimizerCrawls(ctx context.Context, tx pgx.Tx, crawls map[string]*usecase.ContentOptimizerCrawlSnapshot) error {
+	for _, snapshot := range crawls {
+		if snapshot == nil {
+			continue
+		}
+		result, err := json.Marshal(snapshot.Result)
+		if err != nil {
+			return fmt.Errorf("encode content optimizer crawl result: %w", err)
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO content_optimizer_crawls (project_id, organization_id, job_id, result, created_at, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, snapshot.ProjectID, snapshot.OrganizationID, snapshot.JobID, result, snapshot.CreatedAt, snapshot.UpdatedAt); err != nil {
+			return fmt.Errorf("insert content optimizer crawl: %w", err)
+		}
+	}
 	return nil
 }
 

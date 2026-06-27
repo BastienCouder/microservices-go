@@ -547,6 +547,46 @@ func TestAnalyzeSelectedContentOptimizerRecordsUsesExistingRecordsWithoutCrawler
 	}
 }
 
+func TestStartContentOptimizerAnalysisRunsAsynchronouslyWithSelectedModel(t *testing.T) {
+	ctx := context.Background()
+	analyzer := &recordingContentIssueAnalyzer{}
+	svc, err := NewServiceWithDependencies(ctx, Dependencies{ContentIssueAnalyzer: analyzer})
+	if err != nil {
+		t.Fatalf("new service: %v", err)
+	}
+
+	run, err := svc.StartContentOptimizerAnalysis(ctx, "project-1", 42, ContentOptimizerAnalysisStartInput{
+		Records: []ContentOptimizerCrawlRecord{{
+			URL: "https://example.com", Status: "completed", Title: "Example page title for SEO", Markdown: "# Example page title for SEO\n\nContent",
+		}},
+		ModelID: "catalog-model-1", ProviderModelID: "openai/gpt-5-mini", ProviderID: "openrouter", CreditCost: 2,
+	})
+	if err != nil {
+		t.Fatalf("start content analysis: %v", err)
+	}
+	if run.Status != "running" || run.CreditsCount != 2 {
+		t.Fatalf("unexpected async run: %#v", run)
+	}
+
+	deadline := time.Now().Add(time.Second)
+	for {
+		details, getErr := svc.GetAnalysisRun(ctx, run.ID, 42)
+		if getErr != nil {
+			t.Fatalf("get analysis run: %v", getErr)
+		}
+		if details.AnalysisRun.Status == "completed" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("analysis run did not complete: %#v", details.AnalysisRun)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	if analyzer.input.ModelID != "openai/gpt-5-mini" || analyzer.input.ProviderID != "openrouter" {
+		t.Fatalf("selected model was not forwarded to AI analyzer: %#v", analyzer.input)
+	}
+}
+
 func TestGetContentOptimizerCrawlReplacesLatestWithFreshSelectedResult(t *testing.T) {
 	ctx := context.Background()
 	crawler := &recordingContentCrawler{
@@ -710,6 +750,7 @@ func TestGetContentOptimizerCrawlReportsDetailedSEOAndGEOIssues(t *testing.T) {
 				Status:     "completed",
 				HTTPStatus: 200,
 				Title:      "Pricing",
+				HTML:       "<html><head></head><body>Pricing</body></html>",
 				Markdown: strings.Join([]string{
 					"# Pricing",
 					"Buy now. Best platform. Contact us.",
