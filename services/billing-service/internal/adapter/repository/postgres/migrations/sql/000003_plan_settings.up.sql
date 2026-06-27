@@ -18,7 +18,7 @@ INSERT INTO billing_plan_settings (
   updated_at
 )
 VALUES
-  ('starter', 4900, 3900, 50, 3, 0, NOW()),
-  ('growth', 14900, 11900, 200, 6, 0, NOW()),
-  ('pro', 39900, 31900, 1000000, 0, 0, NOW())
+  ('starter', 5900, 4900, 100, 2, 0, NOW()),
+  ('growth', 19900, 15900, 750, 6, 0, NOW()),
+  ('pro', 49900, 39900, 3000, 15, 0, NOW())
 ON CONFLICT (plan) DO NOTHING;

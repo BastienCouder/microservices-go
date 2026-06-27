@@ -134,6 +134,68 @@ func (m *memoryRepo) DeletePricingTier(_ context.Context, promptVolume int) erro
 	return nil
 }
 
+func TestPublicPlanSettingsExcludeDeveloper(t *testing.T) {
+	repo := &memoryRepo{
+		planSettings: map[string]domain.PlanSettings{
+			domain.PlanDeveloper: {
+				Plan:              domain.PlanDeveloper,
+				MonthlyPriceCents: 2900,
+				YearlyPriceCents:  0,
+				MonthlyQuota:      1000,
+			},
+			domain.PlanStarter: {
+				Plan:                    domain.PlanStarter,
+				MonthlyPriceCents:       5900,
+				YearlyPriceCents:        4900,
+				MonthlyQuota:            100,
+				ModelSelectionLimit:     2,
+				MonthlyModelChangeLimit: 0,
+				MaxProjects:             1,
+			},
+			domain.PlanGrowth: {
+				Plan:                    domain.PlanGrowth,
+				MonthlyPriceCents:       19900,
+				YearlyPriceCents:        15900,
+				MonthlyQuota:            750,
+				ModelSelectionLimit:     6,
+				MonthlyModelChangeLimit: 0,
+				MaxProjects:             5,
+				IsMostChosen:            true,
+			},
+			domain.PlanPro: {
+				Plan:                    domain.PlanPro,
+				MonthlyPriceCents:       49900,
+				YearlyPriceCents:        39900,
+				MonthlyQuota:            3000,
+				ModelSelectionLimit:     15,
+				MonthlyModelChangeLimit: 0,
+				MaxProjects:             20,
+			},
+		},
+	}
+	svc := usecase.NewService(repo)
+	h := NewHandler(svc, nil)
+	mux := http.NewServeMux()
+	h.Register(mux)
+
+	req := httptest.NewRequest(http.MethodGet, "/billing/public/plans", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, `"plan":"developer"`) {
+		t.Fatalf("expected developer to be hidden from public plans, got %s", body)
+	}
+	for _, plan := range []string{domain.PlanStarter, domain.PlanGrowth, domain.PlanPro} {
+		if !strings.Contains(body, `"plan":"`+plan+`"`) {
+			t.Fatalf("expected public plan %s in payload, got %s", plan, body)
+		}
+	}
+}
+
 type noopStripeProvider struct{}
 
 func (n *noopStripeProvider) CreateSubscriptionCheckoutSession(_ context.Context, _ usecase.StripeCheckoutSessionRequest) (usecase.StripeCheckoutSession, error) {

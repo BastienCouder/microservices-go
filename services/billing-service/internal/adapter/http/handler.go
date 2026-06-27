@@ -26,7 +26,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("GET /ready", h.ready)
 	mux.HandleFunc("GET /billing/plans", h.listPlanSettings)
-	mux.HandleFunc("GET /billing/public/plans", h.listPlanSettings)
+	mux.HandleFunc("GET /billing/public/plans", h.listPublicPlanSettings)
 	mux.HandleFunc("GET /billing/pricing-tiers", h.listPricingTiers)
 	mux.HandleFunc("GET /billing/public/pricing-tiers", h.listPricingTiers)
 	mux.HandleFunc("GET /billing/credit-cost-settings", h.getCreditCostSettings)
@@ -134,6 +134,22 @@ func (h *Handler) listPlanSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, settings)
+}
+
+func (h *Handler) listPublicPlanSettings(w http.ResponseWriter, r *http.Request) {
+	settings, err := h.svc.ListPlanSettings(r.Context())
+	if err != nil {
+		httpjson.WriteError(w, http.StatusInternalServerError, "internal server error")
+		return
+	}
+	publicSettings := make([]domain.PlanSettings, 0, len(settings))
+	for _, item := range settings {
+		switch domain.NormalizePlan(item.Plan) {
+		case domain.PlanStarter, domain.PlanGrowth, domain.PlanPro:
+			publicSettings = append(publicSettings, item)
+		}
+	}
+	writeJSON(w, http.StatusOK, publicSettings)
 }
 
 func (h *Handler) updatePlanSettings(w http.ResponseWriter, r *http.Request) {
