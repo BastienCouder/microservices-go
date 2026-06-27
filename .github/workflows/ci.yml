@@ -12,6 +12,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   branch-policy:
     name: Branch policy
@@ -36,6 +39,7 @@ jobs:
       langgraph_scheduler: ${{ steps.filter.outputs.langgraph_scheduler }}
       go: ${{ steps.filter.outputs.go }}
       go_dirs: ${{ steps.filter.outputs.go_dirs }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -54,16 +58,28 @@ jobs:
           SHA="${{ github.sha }}"
 
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            git fetch origin "$BASE_REF" --depth=1
-            RANGE="origin/$BASE_REF...HEAD"
+            git fetch origin "+refs/heads/$BASE_REF:refs/remotes/origin/$BASE_REF"
+
+            if git merge-base "origin/$BASE_REF" HEAD >/dev/null 2>&1; then
+              RANGE="origin/$BASE_REF...HEAD"
+              echo "Diff range: $RANGE"
+              git diff --name-only "$RANGE" | tee /tmp/changed-files.txt
+            else
+              echo "No merge base found. Falling back to direct diff."
+              echo "Diff range: origin/$BASE_REF HEAD"
+              git diff --name-only "origin/$BASE_REF" HEAD | tee /tmp/changed-files.txt
+            fi
+
           elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            RANGE="$BEFORE...$SHA"
+            echo "Diff range: $BEFORE $SHA"
+            git diff --name-only "$BEFORE" "$SHA" | tee /tmp/changed-files.txt
           else
-            RANGE="HEAD~1...HEAD"
+            echo "Diff range: HEAD~1 HEAD"
+            git diff --name-only HEAD~1 HEAD | tee /tmp/changed-files.txt
           fi
 
-          echo "Diff range: $RANGE"
-          git diff --name-only "$RANGE" | tee /tmp/changed-files.txt
+          echo "Changed files:"
+          cat /tmp/changed-files.txt
 
           has_any() {
             grep -Eq "$1" /tmp/changed-files.txt
@@ -127,6 +143,7 @@ jobs:
     needs: changes
     if: github.event_name != 'pull_request' || github.head_ref == 'develop'
     runs-on: ubuntu-latest
+
     steps:
       - name: Skip when no Go code changed
         if: needs.changes.outputs.go != 'true'
@@ -193,9 +210,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.app == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: apps/app
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -219,9 +238,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.web == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: apps/web
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -253,9 +274,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.crawler_service == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: services/crawler-service
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -279,9 +302,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.langgraph_scheduler == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: services/langgraph-scheduler
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -308,9 +333,11 @@ jobs:
     needs: changes
     if: needs.changes.outputs.email == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
     runs-on: ubuntu-latest
+
     defaults:
       run:
         working-directory: apps/email
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

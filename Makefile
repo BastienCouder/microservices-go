@@ -6,14 +6,20 @@ SHELL := /bin/sh
 
 COMPOSE := docker compose
 COMPOSE_FILES := -f docker-compose.yml -f docker-compose.secrets.generated.yml
+
+COMPOSE_PROD_PROJECT ?= microservices-go-prod
 COMPOSE_DEV := $(COMPOSE) -p microservices-go-dev $(COMPOSE_FILES) -f docker-compose.dev.yml
-COMPOSE_PROD := $(COMPOSE) -p microservices-go-prod $(COMPOSE_FILES)
+COMPOSE_PROD := $(COMPOSE) -p $(COMPOSE_PROD_PROJECT) $(COMPOSE_FILES)
 COMPOSE_PROD_LOCAL := $(COMPOSE_PROD)
 COMPOSE_PROD_LOCAL_SERIAL := $(COMPOSE_PROD_LOCAL)
 
 ANSIBLE_INVENTORY := ansible/inventory/production.ini
 ANSIBLE_PLAYBOOK := ansible/playbooks/deploy.yml
 ANSIBLE_BACKUP_CRON_PLAYBOOK := ansible/playbooks/postgres-r2-backup-cron.yml
+
+PROD_REMOTE_PATH ?= /opt/visia
+PROD_REMOTE_USER ?= deploy
+PROD_REMOTE_COMPOSE_PROJECT ?= visia
 
 SECRETS_DIR := secrets
 STRIPE_FORWARD_TO ?= http://localhost:50000/billing/stripe/webhook
@@ -29,6 +35,7 @@ BACKUP_POSTGRES_USER ?= postgres
 R2_PREFIX ?= postgres
 R2_REGION ?= auto
 SEED_USER_EMAIL ?= couderbastien
+SEED_COMPOSE_PROJECT_NAME_PROD ?= $(COMPOSE_PROD_PROJECT)
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -120,7 +127,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	backup-r2-once \
 	prod-doc prod-email \
 	db-generate db-migrate \
-	stripe-listen stripe-trigger stripe-trigger-checkout \
+	stripe-listen stripe-listen-docker stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
 	test lint lint-services lint-fix fmt build build-services ci ci-services \
 	go-test go-vet go-build go-ci docker-build \
@@ -131,6 +138,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	crawler-check crawler-build crawler-ci \
 	ts-ci frontend-ci ci-all \
 	seed-nike seed-nike-live seed-nike-prod seed-nike-prod-live \
+	seed-nike-prod-server seed-nike-prod-live-server deploy-prod-seed-nike deploy-prod-seed-nike-live \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
 	$(foreach service,$(MIGRATION_SERVICES),migrate-$(service) migrate-$(service)-dev)
 
@@ -176,7 +184,12 @@ help:
 	@echo "    make prod-services-crawler  Rebuild and start crawler-service"
 	@echo "    make prod-services-api-gateway Rebuild and start api-gateway"
 	@echo "    make prod-migrate     Run all production migrations"
-	@echo "    make seed-nike-prod   Migrate and seed a complete Nike project for SEED_USER_EMAIL"
+	@echo "    make seed-nike-prod   Migrate and seed a complete Nike project locally"
+	@echo "    make seed-nike-prod-live Migrate and seed a complete Nike project locally with live analysis"
+	@echo "    make seed-nike-prod-server Run prod Nike seed on the VPS"
+	@echo "    make seed-nike-prod-live-server Run prod Nike live seed on the VPS"
+	@echo "    make deploy-prod-seed-nike Deploy prod, then run Nike seed on the VPS"
+	@echo "    make deploy-prod-seed-nike-live Deploy prod, then run live Nike seed on the VPS"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
@@ -415,6 +428,30 @@ deploy-prod-service:
 
 deploy-prod-backup-cron:
 	ansible-playbook -i $(ANSIBLE_INVENTORY) $(ANSIBLE_BACKUP_CRON_PLAYBOOK) --ask-become-pass
+
+seed-nike-prod-server:
+	@test -n "$(SEED_USER_EMAIL)" || (echo "Usage: make seed-nike-prod-server SEED_USER_EMAIL=email@example.com"; exit 1)
+	ansible -i $(ANSIBLE_INVENTORY) production \
+		--ask-become-pass \
+		--become \
+		--become-user=$(PROD_REMOTE_USER) \
+		-m shell \
+		-a 'cd $(PROD_REMOTE_PATH) && make seed-nike-prod COMPOSE_PROD_PROJECT=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_COMPOSE_PROJECT_NAME_PROD=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_USER_EMAIL="$(SEED_USER_EMAIL)"'
+
+seed-nike-prod-live-server:
+	@test -n "$(SEED_USER_EMAIL)" || (echo "Usage: make seed-nike-prod-live-server SEED_USER_EMAIL=email@example.com"; exit 1)
+	ansible -i $(ANSIBLE_INVENTORY) production \
+		--ask-become-pass \
+		--become \
+		--become-user=$(PROD_REMOTE_USER) \
+		-m shell \
+		-a 'cd $(PROD_REMOTE_PATH) && make seed-nike-prod-live COMPOSE_PROD_PROJECT=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_COMPOSE_PROJECT_NAME_PROD=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_USER_EMAIL="$(SEED_USER_EMAIL)"'
+
+deploy-prod-seed-nike: deploy-prod
+	$(MAKE) seed-nike-prod-server SEED_USER_EMAIL="$(SEED_USER_EMAIL)"
+
+deploy-prod-seed-nike-live: deploy-prod
+	$(MAKE) seed-nike-prod-live-server SEED_USER_EMAIL="$(SEED_USER_EMAIL)"
 
 backup-r2-once: secrets-check
 	$(COMPOSE_PROD_LOCAL) --profile infra --profile backup run --rm --no-deps \
@@ -671,7 +708,7 @@ seed-nike:
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=synthetic \
-		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 seed-nike-live:
 	docker run --rm \
@@ -683,7 +720,7 @@ seed-nike-live:
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=live \
-		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 seed-nike-prod: prod-migrate
 	docker run --rm \
@@ -691,11 +728,11 @@ seed-nike-prod: prod-migrate
 		-v /usr/bin/docker:/usr/local/bin/docker \
 		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_PROJECT_NAME=$(SEED_COMPOSE_PROJECT_NAME_PROD) \
 		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=synthetic \
-		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 seed-nike-prod-live: prod-migrate
 	docker run --rm \
@@ -703,11 +740,11 @@ seed-nike-prod-live: prod-migrate
 		-v /usr/bin/docker:/usr/local/bin/docker \
 		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
 		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_PROJECT_NAME=$(SEED_COMPOSE_PROJECT_NAME_PROD) \
 		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=live \
-		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 # Backward-compatible aliases.
 up-dev-full: dev-build

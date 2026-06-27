@@ -5,6 +5,7 @@
   vars_files:
     - ../group_vars/production.yml
     - ../group_vars/generated_secrets.yml
+
   tasks:
     - name: Check repository was deployed
       ansible.builtin.stat:
@@ -29,6 +30,18 @@
     - name: Determine whether R2 backup cron can be enabled
       ansible.builtin.set_fact:
         postgres_backup_r2_enabled: "{{ r2_backup_secret_files.results | map(attribute='stat.exists') | list | min }}"
+
+    - name: Install cron package
+      ansible.builtin.apt:
+        name: cron
+        state: present
+        update_cache: true
+
+    - name: Ensure cron service is enabled and started
+      ansible.builtin.service:
+        name: cron
+        state: started
+        enabled: true
 
     - name: Create backup log directory
       ansible.builtin.file:
