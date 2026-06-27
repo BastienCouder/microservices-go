@@ -30,7 +30,7 @@ const SENTIMENT_LABELS: Record<string, string> = {
 };
 
 function cleanSheetName(value: string) {
-  return value.replace(/[\[\]:*?/\\]/g, " ").slice(0, 31) || "Feuille";
+  return value.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Feuille";
 }
 
 function escapeXml(value: string) {

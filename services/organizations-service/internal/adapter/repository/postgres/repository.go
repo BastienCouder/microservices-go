@@ -169,7 +169,9 @@ func (r *Repository) DeleteOrganization(ctx context.Context, organizationID int6
 	if err != nil {
 		return fmt.Errorf("begin delete organization transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	deletedAt = deletedAt.UTC()
 	tag, err := tx.Exec(ctx, `
@@ -463,7 +465,9 @@ func (r *Repository) AcceptInvitationByToken(ctx context.Context, token string, 
 	if err != nil {
 		return nil, nil, fmt.Errorf("begin accept invitation transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	qtx := r.queries.WithTx(tx)
 	invitationRow, err := qtx.GetInvitationByTokenForUpdate(ctx, token)
@@ -513,7 +517,9 @@ func (r *Repository) RefuseInvitationByToken(ctx context.Context, token string, 
 	if err != nil {
 		return nil, fmt.Errorf("begin refuse invitation transaction: %w", err)
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	qtx := r.queries.WithTx(tx)
 	invitationRow, err := qtx.GetInvitationByTokenForUpdate(ctx, token)

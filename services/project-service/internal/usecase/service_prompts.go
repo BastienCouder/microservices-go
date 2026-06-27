@@ -357,9 +357,7 @@ func (s *Service) ListPrompts(ctx context.Context, projectID string, organizatio
 	}
 
 	items := make([]Prompt, 0, end-start)
-	for _, prompt := range prompts[start:end] {
-		items = append(items, prompt)
-	}
+	items = append(items, prompts[start:end]...)
 
 	return PromptPage{
 		Items:       items,

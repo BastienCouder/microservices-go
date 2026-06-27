@@ -4,7 +4,6 @@
   "status": "All systems operational",
   "groups": {
     "product": "Product",
-    "company": "Company",
     "legal": "Legal"
   },
   "links": {
@@ -13,13 +12,9 @@
     "developers": "Developers",
     "pricing": "Pricing",
     "faq": "FAQ",
-    "about": "About",
-    "blog": "Blog",
-    "careers": "Careers",
-    "hiring": "Hiring",
-    "contact": "Contact",
-    "privacy": "Privacy",
-    "terms": "Terms",
-    "security": "Security"
+    "legalNotice": "Legal notice",
+    "privacyPolicy": "Privacy policy",
+    "returnPolicy": "Return policy",
+    "termsAndConditions": "Terms and conditions"
   }
 }

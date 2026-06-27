@@ -326,7 +326,9 @@ func (s *Service) SyncOpenRouterModels(ctx context.Context, input SyncOpenRouter
 	if err != nil {
 		return SyncOpenRouterModelsResult{}, fmt.Errorf("%w: openrouter models unavailable", ErrDependencyUnavailable)
 	}
-	defer res.Body.Close()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return SyncOpenRouterModelsResult{}, fmt.Errorf("%w: openrouter models returned %d", ErrDependencyUnavailable, res.StatusCode)

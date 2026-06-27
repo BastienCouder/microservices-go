@@ -21,7 +21,6 @@ import { cn } from "@/shared/utils";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import type { ContentOptimizerCrawlRecord } from "../../../_lib/content-optimizer-api";
 import {
-  computeGeoKpiSummaries,
   computePriority,
   decodeHTMLText,
   geoInsightGroups,
@@ -87,6 +86,22 @@ function loadingRows(count = 6) {
   ));
 }
 
+function loadingCards(count = 4) {
+  return Array.from({ length: count }).map((_, index) => (
+    <div key={index} className="rounded-md border bg-background p-3">
+      <div className="space-y-2">
+        <Skeleton className="h-4 w-4/5" />
+        <Skeleton className="h-3 w-2/3" />
+      </div>
+      <div className="mt-3 grid grid-cols-3 gap-2">
+        <Skeleton className="h-6 rounded-full" />
+        <Skeleton className="h-6 rounded-full" />
+        <Skeleton className="h-6 rounded-full" />
+      </div>
+    </div>
+  ));
+}
+
 function signalCountLabel(
   count: number,
   t: (key: string, options?: Record<string, unknown>) => string,
@@ -133,47 +148,6 @@ function issueSourceDisplayLabel(
     return t("issueSourceAi");
   }
   return t("issueSourceRule");
-}
-
-function CrawlerKpiStrip({
-  records,
-}: {
-  records: ContentOptimizerCrawlRecord[];
-}) {
-  const { t } = useScopedI18n("crawler-panel");
-  const kpis = computeGeoKpiSummaries(records);
-
-  return (
-    <section
-      className="border-b bg-muted/20 px-4 py-3"
-      aria-label={t("resultsKpiAriaLabel")}
-    >
-      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-        {kpis.map((kpi) => (
-          <div
-            key={kpi.id}
-            className={cn(
-              "rounded-md border bg-background px-3 py-2.5 shadow-sm",
-              kpi.tone === "success" && "border-emerald-200 bg-emerald-50/70",
-              kpi.tone === "warning" && "border-amber-200 bg-amber-50/70",
-            )}
-          >
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {kpi.label}
-            </p>
-            <div className="mt-1 flex items-end justify-between gap-2">
-              <p className="text-xl font-bold leading-none text-foreground">
-                {kpi.value}
-              </p>
-              <p className="truncate text-right text-[11px] font-medium text-muted-foreground">
-                {kpi.caption}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function CrawlerDetailPane({
@@ -326,6 +300,61 @@ function CrawlerDetailPane({
   );
 }
 
+function CrawlerRecordCard({
+  record,
+  selected,
+  onSelect,
+}: {
+  record: ContentOptimizerCrawlRecord;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { t } = useScopedI18n("crawler-panel");
+  const priority = computePriority(record);
+  const recordTitle = decodeHTMLText(record.title) || record.url;
+
+  return (
+    <button
+      type="button"
+      aria-selected={selected}
+      onClick={onSelect}
+      className={cn(
+        "w-full rounded-md border bg-background p-3 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+        selected && "border-primary bg-muted/40",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="line-clamp-2 text-sm font-semibold leading-5 text-foreground">
+            {recordTitle}
+          </p>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {hostnameFromURL(record.url)}
+          </p>
+          <p className="truncate text-[11px] text-muted-foreground">
+            {pathnameFromURL(record.url)}
+          </p>
+        </div>
+        <Badge variant="outline" className="h-6 shrink-0 rounded-sm px-2 text-xs">
+          HTTP {record.httpStatus ?? "-"}
+        </Badge>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Badge variant={statusTone(record.status)}>
+          {statusDisplayLabel(record.status, t)}
+        </Badge>
+        <Badge className={priority.className}>
+          {priorityDisplayLabel(priority.rank, t)}
+        </Badge>
+        <Badge variant="outline">
+          {signalCountLabel(record.issues?.length ?? 0, t)}
+        </Badge>
+      </div>
+    </button>
+  );
+}
+
 export function CrawlerResultsView({
   errorLabel,
   loadingLatest,
@@ -382,10 +411,10 @@ export function CrawlerResultsView({
     <>
     {/*   <CrawlerKpiStrip records={records} /> */}
 
-      <div className="border-b px-4 py-3">
+      <div className="border-b px-3 py-3 md:px-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-1 items-center flex-col gap-3 md:flex-row">
-            <div className="relative flex-1">
+          <div className="grid flex-1 grid-cols-1 gap-2 md:grid-cols-2 lg:flex lg:items-center lg:gap-3">
+            <div className="relative md:col-span-2 lg:col-span-1 lg:flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
@@ -396,7 +425,7 @@ export function CrawlerResultsView({
             </div>
 
             <PeriodFilterPicker
-              className="w-full sm:w-[220px]"
+              className="w-full lg:w-[220px]"
               value={statusFilter}
               onValueChange={(value) => onStatusFilterChange(value as StatusFilter)}
               options={statusFilterOptions}
@@ -405,7 +434,7 @@ export function CrawlerResultsView({
             />
 
             <PeriodFilterPicker
-              className="w-full sm:w-[220px]"
+              className="w-full lg:w-[220px]"
               value={severityFilter}
               onValueChange={(value) =>
                 onSeverityFilterChange(value as SeverityFilter)
@@ -421,6 +450,35 @@ export function CrawlerResultsView({
 
       <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1fr)_620px]">
         <div className="min-h-0 overflow-auto border-r">
+          <div className="space-y-2 p-3 lg:hidden">
+            {loadingLatest || (running && filteredRecords.length === 0) ? (
+              loadingCards(running ? 1 : 4)
+            ) : filteredRecords.length === 0 ? (
+              <EmptyStateCard
+                label={
+                  errorLabel ||
+                  (records.length === 0
+                    ? t("noResultAvailable")
+                    : t("noResultMatchesFilters"))
+                }
+                className="h-24"
+              />
+            ) : (
+              <>
+                {filteredRecords.map((record) => (
+                  <CrawlerRecordCard
+                    key={record.url}
+                    record={record}
+                    selected={selectedRecord?.url === record.url}
+                    onSelect={() => onSelectRecord(record.url)}
+                  />
+                ))}
+                {running && remainingCount > 0 ? loadingCards(1) : null}
+              </>
+            )}
+          </div>
+
+          <div className="hidden lg:block">
           <Table>
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
@@ -554,9 +612,10 @@ export function CrawlerResultsView({
               )}
             </TableBody>
           </Table>
+          </div>
         </div>
 
-        <aside className="min-h-0 overflow-auto bg-background">
+        <aside className="hidden min-h-0 overflow-auto bg-background lg:block">
           <CrawlerDetailPane selectedRecord={selectedRecord} />
         </aside>
       </div>

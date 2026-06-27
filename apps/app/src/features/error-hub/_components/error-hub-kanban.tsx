@@ -64,7 +64,6 @@ export function ErrorHubKanban({
   canGenerateAiBrief,
   competitors,
   errors,
-  generatedContentByErrorId,
   generatedIds,
   initialSourceFilter,
   loading,

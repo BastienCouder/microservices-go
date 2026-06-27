@@ -1,59 +1,53 @@
 {
-  "title": "Des tarifs qui suivent votre volume.",
-  "description": "Choisissez un plan selon le nombre de prompts analysés chaque mois et montez en puissance sans changer de stack.",
-  "volumeLabel": "Volume mensuel",
-  "volumeSuffix": "prompts suivis",
-  "volumeHelper": "Faites varier le curseur pour estimer le bon plan selon votre usage.",
-  "promptsShort": "prompts",
+  "title": "Des plans simples pour piloter votre visibilité IA.",
+  "description": "Commencez avec le volume dont vous avez besoin aujourd'hui, puis montez en puissance avec plus de projets, de modèles et de crédits chaque mois.",
   "mostPopular": "Le plus choisi",
   "perMonth": "/mois",
   "custom": "Sur devis",
   "plans": {
-    "developer": {
-      "name": "Développeur",
-      "description": "Pour tester Visia sur quelques cas d'usage et brancher l'API rapidement.",
-      "cta": "Démarrer",
-      "features": [
-        "Jusqu'à 1 000 prompts analysés",
-        "Accès API et exports",
-        "1 espace de travail",
-        "Support email"
-      ]
-    },
     "starter": {
       "name": "Starter",
-      "description": "Pour les petites équipes marketing qui veulent suivre leur visibilité sans friction.",
-      "cta": "Choisir Starter",
+      "description": "Pour suivre votre présence IA sur un petit périmètre.",
+      "cta": "Commencer",
       "features": [
-        "Suivi multi-marques",
-        "Historique des analyses",
-        "Benchmarks concurrents",
-        "Recommandations prioritaires",
-        "2 utilisateurs inclus"
+        "100 crédits inclus par mois",
+        "1 projet",
+        "2 modèles IA",
+        "1 utilisateur"
       ]
     },
     "growth": {
       "name": "Growth",
-      "description": "Pour industrialiser le suivi IA sur plusieurs pays, produits ou entités.",
-      "cta": "Passer à Growth",
+      "description": "Pour piloter monitoring, perception, audits et recommandations.",
+      "cta": "Choisir Growth",
       "features": [
-        "Toutes les intégrations",
-        "Alertes et webhooks",
-        "Segments personnalisés",
-        "Rapports exécutifs",
-        "5 utilisateurs inclus"
+        "750 crédits inclus par mois",
+        "5 projets",
+        "6 modèles IA",
+        "3 utilisateurs"
       ]
     },
     "pro": {
-      "name": "Pro",
-      "description": "Pour les équipes avancées qui veulent gouvernance, accompagnement et workflows sur mesure.",
-      "cta": "Parler à l'équipe",
+      "name": "Agency",
+      "description": "Pour les agences qui gèrent plusieurs clients et rapports.",
+      "cta": "Choisir Agency",
       "features": [
-        "Volumes élevés et plans sur mesure",
-        "SSO et contrôle d'accès",
-        "Onboarding dédié",
-        "SLA et support prioritaire",
-        "Aide à la stratégie GEO"
+        "3000 crédits inclus par mois",
+        "20 projets",
+        "15 modèles IA",
+        "5 utilisateurs"
+      ]
+    },
+    "enterprise": {
+      "name": "Enterprise",
+      "description": "Pour les volumes élevés, besoins sécurité, SLA et accompagnement dédié.",
+      "cta": "Nous contacter",
+      "features": [
+        "Crédits sur mesure",
+        "Projets sur mesure",
+        "Modèles et limites personnalisés",
+        "SLA, sécurité et support dédié",
+        "Accompagnement commercial"
       ]
     }
   },
@@ -61,13 +55,15 @@
     "description": "Plan configuré depuis l'administration.",
     "cta": "Choisir {plan}",
     "features": {
-      "monthlyQuota": "{value} prompts app / mois",
+      "monthlyQuota": "{value} crédits / mois",
       "models": "{value} modèles simultanés",
       "unlimitedModels": "Modèles illimités",
       "modelChanges": "{value} changements de modèles / mois",
       "unlimitedModelChanges": "Changements de modèles illimités",
       "projects": "{value} projets maximum",
-      "unlimitedProjects": "Projets illimités"
+      "unlimitedProjects": "Projets illimités",
+      "seats": "{value} utilisateurs",
+      "unlimitedSeats": "Utilisateurs sur mesure"
     }
   }
 }

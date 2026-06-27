@@ -14,6 +14,7 @@ type ResponsiveFiltersToolbarProps = {
   className?: string;
   desktopClassName?: string;
   label: string;
+  mobileChildren?: () => ReactNode;
   mobileClassName?: string;
 };
 
@@ -22,6 +23,7 @@ export function ResponsiveFiltersToolbar({
   className,
   desktopClassName,
   label,
+  mobileChildren,
   mobileClassName,
 }: ResponsiveFiltersToolbarProps) {
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -53,7 +55,7 @@ export function ResponsiveFiltersToolbar({
         </CollapsibleTrigger>
 
         <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down">
-          <div className="mt-3 flex flex-col gap-2">{children()}</div>
+          <div className="mt-3 flex flex-col gap-2">{(mobileChildren ?? children)()}</div>
         </CollapsibleContent>
       </Collapsible>
 

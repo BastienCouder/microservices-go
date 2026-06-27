@@ -59,5 +59,11 @@ export function buildLocalizedMetadata({
   };
 }
 
-export const localizedPages = ["/"] as const;
+export const localizedPages = [
+  "/",
+  "/mentions-legales",
+  "/politique-confidentialite",
+  "/politique-retour",
+  "/conditions-generales",
+] as const;
 export const sitemapDefaultLocale = defaultLocale;

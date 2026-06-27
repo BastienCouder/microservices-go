@@ -280,10 +280,6 @@ func isSameUTCMonth(left, right time.Time) bool {
 	return leftUTC.Year() == rightUTC.Year() && leftUTC.Month() == rightUTC.Month()
 }
 
-func (s *Service) currentMonthlyPromptUsageLocked(organizationID int64, now time.Time) int {
-	return s.currentMonthlyCreditUsageLocked(organizationID, now)
-}
-
 func (s *Service) currentMonthlyCreditUsageLocked(organizationID int64, now time.Time) int {
 	total := 0
 	for _, run := range s.runs {

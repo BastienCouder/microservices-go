@@ -37,7 +37,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("init project grpc client: %v", err)
 	}
-	defer projectResolver.Close()
+	defer func() {
+		if err := projectResolver.Close(); err != nil {
+			log.Printf("close project resolver: %v", err)
+		}
+	}()
 	trafficProvider := ga4client.NewClientWithOAuth(cfg.GA4.OAuthClientID, cfg.GA4.OAuthClientSecret)
 	trafficProvider.SetFakeTrafficEnabled(cfg.GA4.FakeTrafficEnabled)
 	svc := usecase.NewService(projectResolver, trafficProvider)

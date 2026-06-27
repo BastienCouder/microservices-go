@@ -2,61 +2,68 @@
 
 import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
-import { ArrowUpRight } from "lucide-react";
 import { AnimatedWave } from "./animated-wave";
 import { getLocalizedPathname, type Locale } from "@/src/i18n/config";
+
+type FooterLink = {
+  badge?: string;
+  href: string;
+  name: string;
+};
+
+type FooterGroup = {
+  links: FooterLink[];
+  title: string;
+};
 
 export function FooterSection() {
   const t = useTranslations("footer");
   const locale = useLocale() as Locale;
+  const homePath = getLocalizedPathname(locale, "/");
+  const legalNoticePath = getLocalizedPathname(locale, "/mentions-legales");
+  const privacyPolicyPath = getLocalizedPathname(locale, "/politique-confidentialite");
+  const returnPolicyPath = getLocalizedPathname(locale, "/politique-retour");
+  const termsAndConditionsPath = getLocalizedPathname(locale, "/conditions-generales");
 
-  const groups = [
+  const groups: FooterGroup[] = [
     {
       title: t("groups.product"),
       links: [
-        { name: t("links.features"), href: "#features" },
-        { name: t("links.howItWorks"), href: "#how-it-works" },
-        { name: t("links.developers"), href: "#developers" },
-        { name: t("links.pricing"), href: "#pricing" },
-        { name: t("links.faq"), href: "#faq" },
-      ],
-    },
-    {
-      title: t("groups.company"),
-      links: [
-        { name: t("links.about"), href: "#" },
-        { name: t("links.blog"), href: "#" },
-        { name: t("links.careers"), href: "#", badge: t("links.hiring") },
-        { name: t("links.contact"), href: "#" },
+        { name: t("links.features"), href: `${homePath}#features` },
+        { name: t("links.howItWorks"), href: `${homePath}#how-it-works` },
+        { name: t("links.developers"), href: `${homePath}#developers` },
+        { name: t("links.pricing"), href: `${homePath}#pricing` },
+        { name: t("links.faq"), href: `${homePath}#faq` },
       ],
     },
     {
       title: t("groups.legal"),
       links: [
-        { name: t("links.privacy"), href: "#" },
-        { name: t("links.terms"), href: "#" },
-        { name: t("links.security"), href: "#security" },
+        { name: t("links.legalNotice"), href: legalNoticePath },
+        { name: t("links.privacyPolicy"), href: privacyPolicyPath },
+        { name: t("links.returnPolicy"), href: returnPolicyPath },
+        { name: t("links.termsAndConditions"), href: termsAndConditionsPath },
       ],
     },
   ];
 
   return (
     <footer className="relative border-t border-foreground/10">
-      <div className="absolute inset-0 h-64 opacity-20 pointer-events-none overflow-hidden">
+      <div className="absolute inset-0 h-64 overflow-hidden opacity-20 pointer-events-none">
         <AnimatedWave />
       </div>
 
       <div className="relative z-10 max-w-[1400px] mx-auto px-6 lg:px-12">
         <div className="py-14 sm:py-16 lg:py-24">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-12 lg:gap-8">
+          <div className="grid grid-cols-2 gap-12 md:grid-cols-6 lg:gap-8">
             <div className="col-span-2">
-              <Link href={getLocalizedPathname(locale, "/")} className="inline-flex items-center gap-2 mb-6">
+              <Link href={homePath} className="inline-flex items-center gap-2 mb-6">
                 <span className="text-2xl font-display">Visia</span>
               </Link>
 
               <p className="text-muted-foreground leading-relaxed mb-8 max-w-xs">{t("description")}</p>
 
-              <div className="flex gap-6">
+              {/* <div className="flex gap-6">
                 {[
                   { name: "Twitter", href: "#" },
                   { name: "GitHub", href: "#" },
@@ -71,7 +78,7 @@ export function FooterSection() {
                     <ArrowUpRight className="w-3 h-3 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
                   </a>
                 ))}
-              </div>
+              </div> */}
             </div>
 
             {groups.map((group) => (
@@ -80,16 +87,32 @@ export function FooterSection() {
                 <ul className="space-y-4">
                   {group.links.map((link) => (
                     <li key={link.name}>
-                      <a href={link.href} className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2">
+                      <Link
+                        href={link.href}
+                        className="text-sm text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-2"
+                      >
                         {link.name}
-                        {"badge" in link && link.badge ? (
+                        {link.badge ? (
                           <span className="text-xs px-2 py-0.5 bg-foreground text-background rounded-full">{link.badge}</span>
                         ) : null}
-                      </a>
+                      </Link>
                     </li>
                   ))}
                 </ul>
               </div>
+            ))}
+          </div>
+
+          <div className="mt-10 flex flex-wrap gap-4 border-t border-foreground/10 pt-8">
+            {groups[0]?.links.map((link) => (
+              <Link
+                key={link.name}
+                href={link.href}
+                className="group relative text-sm text-foreground/70 transition-colors duration-300 hover:text-foreground"
+              >
+                {link.name}
+                <span className="absolute -bottom-1 left-0 h-px w-0 bg-foreground transition-all duration-300 group-hover:w-full" />
+              </Link>
             ))}
           </div>
         </div>

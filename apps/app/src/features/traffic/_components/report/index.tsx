@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ChevronDown, Download, RefreshCw, SlidersHorizontal } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";

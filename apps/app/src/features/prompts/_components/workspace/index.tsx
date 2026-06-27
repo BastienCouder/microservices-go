@@ -73,55 +73,55 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
         canEdit={canEdit}
       />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-xl rounded-tr-none bg-background">
-        <div className="border-b px-3 pb-3 md:px-4 md:pb-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
-            <div className="min-w-0 flex-1">
-              <PromptsFiltersToolbar
-                currentTab={state.tab}
-                period={state.period}
-                setPeriod={(value) => state.setPeriod(value as PeriodKey)}
-                dateRange={state.dateRange}
-                setDateRange={state.setDateRange}
-                persona={state.persona}
-                setPersona={(value) => state.setPersona(value as "all" | Persona)}
-                availablePersonas={state.availablePersonas}
-                search={state.search}
-                setSearch={state.setSearch}
-                showArchived={state.showArchived}
-                setShowArchived={state.setShowArchived}
-                hasActiveGlobalFilters={state.hasActiveGlobalFilters}
-                clearFilters={state.clearFilters}
-                modelsPopoverOpen={state.modelsPopoverOpen}
-                setModelsPopoverOpen={state.setModelsPopoverOpen}
-                allModelsSelected={state.allModelsSelected}
-                selectedModels={state.selectedModels}
-                availableModels={state.availableModels}
-                modelsLoading={
-                  state.tab === "responses"
-                    ? state.responsesDataLoading
-                    : state.promptsDataLoading
-                }
-                selectedCompetitors={state.selectedCompetitors}
-                toggleCompetitor={state.toggleCompetitor}
-                clearCompetitors={state.clearCompetitors}
-                availableCompetitors={state.availableCompetitors}
-                competitorsLoading={state.responsesDataLoading}
-                getModelVisual={state.getModelVisual}
-                toggleModel={state.toggleModel}
-              />
-            </div>
-          </div>
-        </div>
-
         <Tabs value={state.tab} onValueChange={(value) => changeTab(value as "prompts" | "responses")} className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="border-b px-3 py-3 md:px-4">
-            <TabsList className="h-10 w-full gap-1.5 rounded-xl md:w-auto p-1.5">
+          <div className="order-1 border-b px-3 py-2 md:order-2 md:px-4 md:py-3">
+            <TabsList className="h-10 w-full gap-1 rounded-xl p-1 md:w-auto md:gap-1.5 md:p-1.5">
               <TabsTrigger value="prompts">{content.promptsTab}</TabsTrigger>
               <TabsTrigger value="responses">{content.responsesTab}</TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="prompts" className="m-0 flex min-h-0 min-w-0 flex-1">
+          <div className="order-2 border-b px-3 py-2 md:order-1 md:px-4 md:py-4">
+            <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between md:gap-4">
+              <div className="min-w-0 flex-1">
+                <PromptsFiltersToolbar
+                  currentTab={state.tab}
+                  period={state.period}
+                  setPeriod={(value) => state.setPeriod(value as PeriodKey)}
+                  dateRange={state.dateRange}
+                  setDateRange={state.setDateRange}
+                  persona={state.persona}
+                  setPersona={(value) => state.setPersona(value as "all" | Persona)}
+                  availablePersonas={state.availablePersonas}
+                  search={state.search}
+                  setSearch={state.setSearch}
+                  showArchived={state.showArchived}
+                  setShowArchived={state.setShowArchived}
+                  hasActiveGlobalFilters={state.hasActiveGlobalFilters}
+                  clearFilters={state.clearFilters}
+                  modelsPopoverOpen={state.modelsPopoverOpen}
+                  setModelsPopoverOpen={state.setModelsPopoverOpen}
+                  allModelsSelected={state.allModelsSelected}
+                  selectedModels={state.selectedModels}
+                  availableModels={state.availableModels}
+                  modelsLoading={
+                    state.tab === "responses"
+                      ? state.responsesDataLoading
+                      : state.promptsDataLoading
+                  }
+                  selectedCompetitors={state.selectedCompetitors}
+                  toggleCompetitor={state.toggleCompetitor}
+                  clearCompetitors={state.clearCompetitors}
+                  availableCompetitors={state.availableCompetitors}
+                  competitorsLoading={state.responsesDataLoading}
+                  getModelVisual={state.getModelVisual}
+                  toggleModel={state.toggleModel}
+                />
+              </div>
+            </div>
+          </div>
+
+          <TabsContent value="prompts" className="order-3 m-0 flex min-h-0 min-w-0 flex-1">
             <PromptsTabContent
               filteredPrompts={state.filteredPrompts}
               promptsDataLoading={state.promptsDataLoading}
@@ -168,7 +168,7 @@ export function PromptsWorkspacePanel({ apiBaseURL, routeSearch }: PromptsWorksp
             />
           </TabsContent>
 
-          <TabsContent value="responses" className="m-0 flex min-h-0 flex-1 flex-col">
+          <TabsContent value="responses" className="order-3 m-0 flex min-h-0 flex-1 flex-col">
             <ResponsesTabContent
               noMentionOnly={state.noMentionOnly}
               setNoMentionOnly={state.setNoMentionOnly}

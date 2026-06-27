@@ -40,7 +40,7 @@ const BOOLEAN_LABELS = {
 } as const;
 
 function cleanSheetName(value: string) {
-  return value.replace(/[\[\]:*?/\\]/g, " ").slice(0, 31) || "Feuille";
+  return value.replace(/[[\]:*?/\\]/g, " ").slice(0, 31) || "Feuille";
 }
 
 function escapeXml(value: string) {

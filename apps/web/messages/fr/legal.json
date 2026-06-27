@@ -1,0 +1,56 @@
+{
+  "badge": "Informations légales",
+  "title": "Mentions légales",
+  "description": "Les informations légales provisoires du site Visia.",
+  "intro": "Cette page présente les mentions légales provisoires du site Visia, publiées dans l'attente de la mise en ligne des informations définitives de l'entreprise.",
+  "sections": {
+    "publisher": {
+      "title": "Éditeur du site",
+      "body": [
+        "Raison sociale : Visia Labs SAS",
+        "Forme juridique : Société par actions simplifiée",
+        "Capital social : 10 000 euros",
+        "Siège social : 10 rue de la Paix, 75002 Paris, France",
+        "Immatriculation : RCS Paris 912 345 678",
+        "Numéro de TVA intracommunautaire : FR12 912345678",
+        "Email de contact : contact@visia.example"
+      ]
+    },
+    "publication": {
+      "title": "Direction de la publication",
+      "body": [
+        "Directeur de la publication : Bastien Cdr",
+        "Le directeur de la publication peut être contacté à l'adresse suivante : contact@visia.example"
+      ]
+    },
+    "hosting": {
+      "title": "Hébergement",
+      "body": [
+        "Le site est hébergé par OVHcloud.",
+        "Adresse de l'hébergeur : 2 rue Kellermann, 59100 Roubaix, France.",
+        "Site web : https://www.ovhcloud.com"
+      ]
+    },
+    "intellectualProperty": {
+      "title": "Propriété intellectuelle",
+      "body": [
+        "L'ensemble des contenus présents sur ce site, notamment les textes, éléments graphiques, logos, visuels et composants d'interface, est protégé par le droit de la propriété intellectuelle.",
+        "Toute reproduction, représentation, adaptation ou exploitation, totale ou partielle, sans autorisation écrite préalable, est interdite."
+      ]
+    },
+    "liability": {
+      "title": "Responsabilité",
+      "body": [
+        "L'éditeur s'efforce de fournir des informations aussi exactes que possible, mais ne peut garantir l'exactitude, l'exhaustivité ou l'actualité des contenus publiés.",
+        "L'utilisation du site se fait sous la responsabilité de l'utilisateur."
+      ]
+    },
+    "applicableLaw": {
+      "title": "Droit applicable",
+      "body": [
+        "Les présentes mentions légales sont soumises au droit français.",
+        "En cas de litige, et sauf disposition légale impérative contraire, les tribunaux français seront seuls compétents."
+      ]
+    }
+  }
+}

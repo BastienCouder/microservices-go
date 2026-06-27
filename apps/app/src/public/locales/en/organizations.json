@@ -7,7 +7,7 @@
   "organizationSwitcherPlaceholder": "Select an organization",
   "organizationSwitcherDescription": "Quickly switch organizations to manage another workspace without going back through the sidebar.",
   "organizationName": "Organization name",
-  "sensitiveZoneTitle": "Sensitive zone",
+  "sensitiveZoneTitle": "Delete organization",
   "deleteOrganizationDescription": "Deleting disables the organization, removes access, revokes invitations and API keys, then anonymizes sensitive organization data.",
   "deleteOrganization": "Delete organization",
   "deleteOrganizationTitle": "Delete this organization?",

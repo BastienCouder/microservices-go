@@ -8,6 +8,8 @@ import heroEn from "@/messages/en/hero.json";
 import howItWorksEn from "@/messages/en/howItWorks.json";
 import infrastructureEn from "@/messages/en/infrastructure.json";
 import integrationsEn from "@/messages/en/integrations.json";
+import legalEn from "@/messages/en/legal.json";
+import legalPagesEn from "@/messages/en/legal-pages.json";
 import localeSwitcherEn from "@/messages/en/localeSwitcher.json";
 import metadataEn from "@/messages/en/metadata.json";
 import metricsEn from "@/messages/en/metrics.json";
@@ -25,6 +27,8 @@ import heroFr from "@/messages/fr/hero.json";
 import howItWorksFr from "@/messages/fr/howItWorks.json";
 import infrastructureFr from "@/messages/fr/infrastructure.json";
 import integrationsFr from "@/messages/fr/integrations.json";
+import legalFr from "@/messages/fr/legal.json";
+import legalPagesFr from "@/messages/fr/legal-pages.json";
 import localeSwitcherFr from "@/messages/fr/localeSwitcher.json";
 import metadataFr from "@/messages/fr/metadata.json";
 import metricsFr from "@/messages/fr/metrics.json";
@@ -47,6 +51,8 @@ const messagesByLocale = {
     infrastructure: infrastructureEn,
     metrics: metricsEn,
     integrations: integrationsEn,
+    legal: legalEn,
+    legalPages: legalPagesEn,
     developers: developersEn,
     pricing: pricingEn,
     faq: faqEn,
@@ -65,6 +71,8 @@ const messagesByLocale = {
     infrastructure: infrastructureFr,
     metrics: metricsFr,
     integrations: integrationsFr,
+    legal: legalFr,
+    legalPages: legalPagesFr,
     developers: developersFr,
     pricing: pricingFr,
     faq: faqFr,

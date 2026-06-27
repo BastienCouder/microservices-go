@@ -107,7 +107,7 @@ export function GA4IntegrationCard({
       llmSetupStatus.title,
       llmSetupStatus.description,
     );
-  }, [llmSetupStatus?.description, llmSetupStatus?.title, llmSetupStatus?.tone]);
+  }, [llmSetupStatus]);
 
   function handlePrimaryAction() {
     if (!connected && !hasOAuthToken) {

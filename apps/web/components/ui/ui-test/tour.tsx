@@ -148,7 +148,7 @@ export function TourProvider({
       setIsTourCompleted(true);
       onComplete?.();
     }
-  }, [steps.length, onComplete, currentStep]);
+  }, [steps.length, onComplete, currentStep, setIsTourCompleted]);
 
   const previousStep = useCallback(() => {
     setCurrentStep((prev) => (prev > 0 ? prev - 1 : prev));

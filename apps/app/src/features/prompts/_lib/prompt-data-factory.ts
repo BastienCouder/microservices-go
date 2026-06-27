@@ -150,6 +150,7 @@ export function buildPromptPageItems({
   availableModels,
   stages,
 }: BuildPromptPageItemsParams): PromptItem[] {
+  void competitors;
   const responsesByPromptId = recentPrompts.reduce(
     (map, item) => {
       if (!item.promptId) return map;
@@ -268,6 +269,7 @@ export function buildResponseRows({
   availableModels: string[];
   stages: Stage[];
 }): PromptRunRow[] {
+  void competitors;
   return recentPrompts
     .filter((item) => (item.promptKind ?? "").trim().toLowerCase() !== "perception")
     .map((item, index) => {

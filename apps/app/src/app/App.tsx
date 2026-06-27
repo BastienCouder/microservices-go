@@ -147,10 +147,12 @@ export default function App() {
   const bypassResolvedContext =
     isOnboardingRoute || isInvitationRoute || isBillingRoute || isAdminRoute;
   const baseRouteSearch = useMemo(
-    () =>
-      bypassResolvedContext
+    () => {
+      void selectionVersion;
+      return bypassResolvedContext
         ? location.search
-        : resolveSelectedContextSearch(location.search),
+        : resolveSelectedContextSearch(location.search);
+    },
     [bypassResolvedContext, location.search, selectionVersion],
   );
   const routeProjectToken = useMemo(
@@ -184,7 +186,10 @@ export default function App() {
         adminScope: shouldCheckAdminBootstrapGate,
       }),
   });
-  const organizations = organizationsQuery.data ?? [];
+  const organizations = useMemo(
+    () => organizationsQuery.data ?? [],
+    [organizationsQuery.data],
+  );
   const hasSuperAdminRole = useMemo(
     () => organizations.some((organization) => isSuperAdminRole(organization.role)),
     [organizations],
@@ -205,7 +210,10 @@ export default function App() {
     [organizations],
   );
   const selectedOrganizationToken = useMemo(
-    () => readSelectedOrganizationPublicID(),
+    () => {
+      void selectionVersion;
+      return readSelectedOrganizationPublicID();
+    },
     [selectionVersion],
   );
   const hasHardBillingOrganizationOverride = useMemo(
@@ -282,6 +290,7 @@ export default function App() {
     queryFn: ({ signal }) =>
       loadBillingEntitlements(apiBaseURL, billingOrganizationId, { signal }),
   });
+  const refetchBillingEntitlements = billingEntitlementsQuery.refetch;
   const stripeCheckoutConfirmationQuery = useQuery({
     queryKey: [
       "stripe-checkout-confirmation",
@@ -359,11 +368,7 @@ export default function App() {
       baseRouteSearch,
       bypassResolvedContext,
       hasUnresolvedRouteProjectContext,
-      location.pathname,
       resolvedProjectContext,
-      routeOrganizationToken,
-      routeProjectId,
-      routeProjectToken,
     ],
   );
   const routeSearch = resolvedRouteSearch;
@@ -519,11 +524,11 @@ export default function App() {
     if (billingOrganizationId === "" || billingOrganizationId !== checkoutConfirmationOrganizationId) {
       return;
     }
-    void billingEntitlementsQuery.refetch();
+    void refetchBillingEntitlements();
   }, [
-    billingEntitlementsQuery.refetch,
     billingOrganizationId,
     checkoutConfirmationOrganizationId,
+    refetchBillingEntitlements,
     stripeCheckoutConfirmationQuery.isSuccess,
   ]);
 

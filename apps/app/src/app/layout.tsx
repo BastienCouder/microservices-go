@@ -13,17 +13,17 @@ type AppLayoutProps = {
   onRefresh: () => Promise<void>;
 };
 
-export function AppLayout({ apiBaseURL, busy, children, feedback, userId, onLogout, onRefresh }: AppLayoutProps) {
+export function AppLayout({ apiBaseURL, busy, children, userId, onLogout }: AppLayoutProps) {
   return (
-        <div className="flex h-screen w-full">
-            {/* Desktop Sidebar */}
+        <div className="flex h-dvh min-h-dvh w-full overflow-hidden">
+
             <Sidebar apiBaseURL={apiBaseURL} busy={busy} className="hidden lg:flex" userId={userId} onLogout={onLogout} />
 
 
-            <div className="flex flex-col flex-1 overflow-hidden">
-                <MobileFloatingNav busy={busy} onLogout={onLogout} />
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                <MobileFloatingNav apiBaseURL={apiBaseURL} busy={busy} userId={userId} onLogout={onLogout} />
 
-                <main className="relative flex flex-1 flex-col overflow-y-auto overflow-x-hidden bg-muted lg:overflow-hidden">
+                <main className="relative flex min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden bg-muted lg:overflow-hidden">
                     {children}
                 </main>
 
@@ -41,7 +41,7 @@ export function AdminLayout({
   onLogout,
 }: Pick<AppLayoutProps, "busy" | "children" | "onLogout">) {
   return (
-    <div className="flex h-screen w-full bg-slate-100">
+    <div className="flex h-dvh min-h-dvh w-full overflow-hidden bg-slate-100">
       <AdminSidebar busy={busy} onLogout={onLogout} />
 
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">

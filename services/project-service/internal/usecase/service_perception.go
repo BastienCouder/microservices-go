@@ -226,7 +226,7 @@ func (s *Service) RunPerceptionAnalysis(ctx context.Context, projectID string, o
 	}
 
 	backup := s.snapshotLocked()
-	prompts := make([]AnalysisPromptText, 0)
+	var prompts []AnalysisPromptText
 	var promptErr error
 	if len(input.PromptIDs) > 0 {
 		prompts, promptErr = s.selectedPerceptionPromptTextsLocked(projectID, input.PromptIDs, modelIDs)

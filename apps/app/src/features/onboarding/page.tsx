@@ -3,9 +3,7 @@ import {
   OnboardingProvider,
   useOnboarding,
 } from "@/hooks/use-onboarding";
-import { OnboardingLeftPanel } from "./left-panel";
 import { StepAttribution } from "./step-attribution";
-import { StepAccountType } from "./step-account-type";
 import { StepBrand } from "./step-brand";
 import { StepCompetitors } from "./step-competitors";
 import { StepModels } from "./step-models";

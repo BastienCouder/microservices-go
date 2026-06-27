@@ -41,7 +41,7 @@ export function FilterHeroInsightCard({
     : insight.title;
 
   return (
-    <section className="hidden lg:flex relative  flex-col overflow-hidden rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
+    <section className="relative flex flex-col overflow-hidden rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground shadow-[inset_0_1px_0_hsl(var(--primary-foreground)/0.14)] md:p-5">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_20%,rgba(255,255,255,0.16),transparent_34%),radial-gradient(circle_at_74%_72%,rgba(255,255,255,0.08),transparent_28%)] opacity-80" />
         <div className="h-full absolute right-[22%] w-px bg-white/14" />

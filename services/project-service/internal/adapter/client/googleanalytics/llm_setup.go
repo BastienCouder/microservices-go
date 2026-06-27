@@ -308,7 +308,9 @@ func (c *Client) getAdminJSON(ctx context.Context, accessToken, endpoint string,
 	if err != nil {
 		return fmt.Errorf("send ga4 admin request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return readGoogleError(resp, "ga4 admin")
 	}
@@ -342,7 +344,9 @@ func (c *Client) sendAdminJSON(ctx context.Context, method, accessToken, endpoin
 	if err != nil {
 		return fmt.Errorf("send ga4 admin request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return readGoogleError(resp, "ga4 admin")
 	}

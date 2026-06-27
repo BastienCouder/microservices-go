@@ -8,11 +8,9 @@ type BillingGateLayoutProps = {
   userEmail?: string;
 };
 
-export function BillingGateLayout({
-  apiBaseURL: _apiBaseURL,
-  routeSearch: _routeSearch,
-  userEmail: _userEmail,
-}: BillingGateLayoutProps) {
+export function BillingGateLayout(props: BillingGateLayoutProps) {
+  void props;
+
   useLayoutEffect(() => {
     redirectToWebPricing();
   }, []);

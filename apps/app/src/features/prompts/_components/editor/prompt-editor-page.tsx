@@ -65,7 +65,10 @@ export function PromptEditorPage({
 
   useEffect(() => {
     const nextModels = prompt?.models.length ? prompt.models : availableModels.slice(0, 1);
-    const nextSchedule = normalizeEditorSchedule(prompt?.schedule ?? schedule, nextModels);
+    const nextSchedule = normalizeEditorSchedule(
+      prompt?.schedule ?? defaultPromptSchedule(),
+      nextModels,
+    );
     setPromptText(prompt?.prompt ?? "");
     setLanguage(prompt?.language ?? (locale === "en" ? "en" : "fr"));
     setSelectedModels(nextModels);
@@ -76,7 +79,18 @@ export function PromptEditorPage({
         : "UTC",
     });
     setStatus(prompt?.status ?? "active");
-  }, [availableModels, locale, mode, prompt?.id, prompt?.language, prompt?.prompt, prompt?.schedule, promptModelKey]);
+  }, [
+    availableModels,
+    locale,
+    mode,
+    prompt?.id,
+    prompt?.language,
+    prompt?.models,
+    prompt?.prompt,
+    prompt?.schedule,
+    prompt?.status,
+    promptModelKey,
+  ]);
 
   useEffect(() => {
     if (availableModels.length === 0) return;

@@ -29,7 +29,6 @@ function buildAppSuccessURL(appURL: string, organizationId: string): string {
 export function CheckoutCompleteClient({
   appURL,
   gatewayURL,
-  localePrefix: _localePrefix,
 }: CheckoutCompleteClientProps) {
   const searchParams = useSearchParams();
   const [error, setError] = useState("");

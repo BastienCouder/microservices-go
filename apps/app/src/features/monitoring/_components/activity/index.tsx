@@ -80,8 +80,6 @@ export function ActivityPanel() {
             filteredPrompts={viewModel.filteredPrompts}
             previewCount={PROMPTS_PREVIEW_COUNT}
             onSelectPrompt={viewModel.selectPrompt}
-            onRequestDeletePrompt={setPromptToDelete}
-            deletingResponseId={deletingResponseId}
           />
         </div>
       </div>

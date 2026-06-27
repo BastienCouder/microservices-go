@@ -102,7 +102,9 @@ func (c *Client) getByAuthIdentityID(ctx context.Context, token, authIdentityID 
 	if err != nil {
 		return 0, fmt.Errorf("%w: get user by auth identity: %v", ErrProfileProvisionUnavailable, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return resp.StatusCode, nil
 }
@@ -127,7 +129,9 @@ func (c *Client) createUser(ctx context.Context, token, email, firstName, lastNa
 	if err != nil {
 		return 0, fmt.Errorf("%w: create user: %v", ErrProfileProvisionUnavailable, err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	_, _ = io.Copy(io.Discard, resp.Body)
 	return resp.StatusCode, nil
 }

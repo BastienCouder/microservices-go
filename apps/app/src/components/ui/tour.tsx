@@ -138,6 +138,10 @@ export function TourProvider({
     };
   }, [updateElementPosition]);
 
+  const setIsTourCompleted = useCallback((completed: boolean) => {
+    setIsCompleted(completed);
+  }, []);
+
   const nextStep = useCallback(async () => {
     setCurrentStep((prev) => {
       if (prev >= steps.length - 1) {
@@ -150,7 +154,7 @@ export function TourProvider({
       setIsTourCompleted(true);
       onComplete?.();
     }
-  }, [steps.length, onComplete, currentStep]);
+  }, [steps.length, onComplete, currentStep, setIsTourCompleted]);
 
   const previousStep = useCallback(() => {
     setCurrentStep((prev) => (prev > 0 ? prev - 1 : prev));
@@ -193,10 +197,6 @@ export function TourProvider({
       window.removeEventListener("click", handleClick);
     };
   }, [handleClick]);
-
-  const setIsTourCompleted = useCallback((completed: boolean) => {
-    setIsCompleted(completed);
-  }, []);
 
   return (
     <TourContext.Provider

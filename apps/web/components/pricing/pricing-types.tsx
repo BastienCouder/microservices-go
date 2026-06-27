@@ -1,5 +1,3 @@
-import type { ReactNode } from "react";
-
 export type MarketingPricingTier = {
   prompt_volume?: number;
   credit_volume?: number;
@@ -32,7 +30,6 @@ export type PricingTier = {
 
 export type PlanTemplate = {
   name: string;
-  icon: ReactNode;
   description: string;
   features: string[];
   cta: string;

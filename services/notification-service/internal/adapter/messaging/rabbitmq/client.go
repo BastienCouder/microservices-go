@@ -10,12 +10,12 @@ import (
 )
 
 type NotificationMessage struct {
-	Channel   string `json:"channel"`
-	Recipient string `json:"recipient"`
-	Subject   string `json:"subject"`
-	Message   string `json:"message"`
-	Template  string `json:"template,omitempty"`
-	Locale    string `json:"locale,omitempty"`
+	Channel   string          `json:"channel"`
+	Recipient string          `json:"recipient"`
+	Subject   string          `json:"subject"`
+	Message   string          `json:"message"`
+	Template  string          `json:"template,omitempty"`
+	Locale    string          `json:"locale,omitempty"`
 	Data      json.RawMessage `json:"data,omitempty"`
 }
 

@@ -45,7 +45,7 @@ export function PerceptionTrendChart({
             <CardTitle className="text-base">
               <SectionTitle>{t("trendTitle")}</SectionTitle>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="hidden md:block">
               {t("trendDescription", { periodLabel })}
             </CardDescription>
           </div>

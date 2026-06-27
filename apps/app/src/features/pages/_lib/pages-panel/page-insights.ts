@@ -67,7 +67,6 @@ function buildPageMetrics(
   monitoring: MonitoringData,
   projectHosts: Set<string>,
 ): PagesMetrics {
-  const totalPromptCount = Math.max(1, monitoring.recent_prompts.length);
   const citationCount = pages.reduce((sum, page) => sum + page.citationCount, 0);
   const promptIdsWithOwnedSource = new Set<string>();
   const modelIdsWithOwnedSource = new Set<string>();

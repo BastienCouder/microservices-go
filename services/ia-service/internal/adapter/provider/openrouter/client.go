@@ -128,7 +128,9 @@ func (c *Client) Generate(ctx context.Context, input usecase.ProviderGenerateInp
 		}
 
 		raw, readErr := io.ReadAll(io.LimitReader(resp.Body, maxProviderBodyBytes))
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			return usecase.ProviderResult{}, fmt.Errorf("close provider response body: %w", closeErr)
+		}
 		if readErr != nil {
 			return usecase.ProviderResult{}, fmt.Errorf("read provider response: %w", readErr)
 		}

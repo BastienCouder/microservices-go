@@ -4,5 +4,13 @@
   "loginTitle": "Connexion",
   "loginDescription": "Connectez-vous à Visia pour reprendre votre analyse de visibilité IA et accéder à votre espace.",
   "registerTitle": "Créer un compte",
-  "registerDescription": "Créez votre compte Visia pour commencer à mesurer et améliorer votre présence dans les réponses IA."
+  "registerDescription": "Créez votre compte Visia pour commencer à mesurer et améliorer votre présence dans les réponses IA.",
+  "legalNoticeTitle": "Mentions légales",
+  "legalNoticeDescription": "Consultez les mentions légales provisoires du site Visia.",
+  "privacyPolicyTitle": "Politique de confidentialité",
+  "privacyPolicyDescription": "Consultez la politique de confidentialité provisoire du site Visia.",
+  "returnPolicyTitle": "Politique de retour",
+  "returnPolicyDescription": "Consultez la politique de retour provisoire du site Visia.",
+  "termsAndConditionsTitle": "Conditions générales",
+  "termsAndConditionsDescription": "Consultez les conditions générales provisoires du site Visia."
 }

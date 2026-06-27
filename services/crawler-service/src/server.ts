@@ -97,6 +97,14 @@ const databaseURL =
   process.env.DATABASE_URL ||
   `postgres://${encodeURIComponent(process.env.ANALYSIS_DB_USER || "analysissvc")}:${encodeURIComponent(databasePassword)}@${process.env.ANALYSIS_DB_HOST || "postgres"}:${process.env.ANALYSIS_DB_PORT || "5432"}/${process.env.ANALYSIS_DB_NAME || "analysissvc"}?sslmode=${process.env.ANALYSIS_DB_SSLMODE || "disable"}`;
 const serviceToken = secret("CRAWLER_SERVICE_TOKEN", "CRAWLER_SERVICE_TOKEN_FILE");
+const dnsServers = (process.env.CRAWLER_DNS_SERVERS || "1.1.1.1,8.8.8.8")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+const externalResolver = new dns.Resolver();
+if (dnsServers.length > 0) {
+  externalResolver.setServers(dnsServers);
+}
 const pool = new Pool({ connectionString: databaseURL });
 const activeJobs = new Set<string>();
 const nonContentExtensions = [
@@ -183,14 +191,46 @@ function sleep(ms: number): Promise<void> {
 function isRetryableDNSError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const code = (error as NodeJS.ErrnoException).code;
-  return code === "EAI_AGAIN" || code === "ETIMEOUT" || code === "ECONNREFUSED";
+  return (
+    code === "EAI_AGAIN" ||
+    code === "ESERVFAIL" ||
+    code === "ETIMEOUT" ||
+    code === "ECONNREFUSED"
+  );
+}
+
+async function resolveHostname(hostname: string): Promise<LookupAddress[]> {
+  if (dnsServers.length === 0) {
+    return dns.lookup(hostname, { all: true });
+  }
+
+  const [ipv4, ipv6] = await Promise.allSettled([
+    externalResolver.resolve4(hostname),
+    externalResolver.resolve6(hostname),
+  ]);
+  const addresses: LookupAddress[] = [];
+  if (ipv4.status === "fulfilled") {
+    addresses.push(...ipv4.value.map((address) => ({ address, family: 4 })));
+  }
+  if (ipv6.status === "fulfilled") {
+    addresses.push(...ipv6.value.map((address) => ({ address, family: 6 })));
+  }
+  if (addresses.length > 0) return addresses;
+
+  const reason =
+    ipv4.status === "rejected"
+      ? ipv4.reason
+      : ipv6.status === "rejected"
+        ? ipv6.reason
+        : null;
+  throw reason instanceof Error ? reason : new Error(`unable to resolve ${hostname}`);
 }
 
 async function lookupHostname(hostname: string): Promise<LookupAddress[]> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
-      return await dns.lookup(hostname, { all: true });
+      return await resolveHostname(hostname);
     } catch (error) {
       lastError = error;
       if (!isRetryableDNSError(error) || attempt === 2) break;

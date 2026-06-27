@@ -78,13 +78,6 @@ func (s *Service) UpdateProjectAIBriefSettings(ctx context.Context, projectID st
 	return copyProjectAIBriefSettings(settings), nil
 }
 
-func (s *Service) getProjectAIBriefSettingsLocked(projectID string) ProjectAIBriefSettings {
-	if settings, ok := s.aiBriefSettings[projectID]; ok {
-		return copyProjectAIBriefSettings(settings)
-	}
-	return ProjectAIBriefSettings{ProjectID: projectID}
-}
-
 func (s *Service) getProjectAIBriefSettings(ctx context.Context, projectID string, organizationID int64) (ProjectAIBriefSettings, error) {
 	settings, err := s.GetProjectAIBriefSettings(ctx, projectID, organizationID)
 	if err != nil {

@@ -2,6 +2,7 @@
 
 import { useTranslations } from 'next-intl';
 import { useEffect, useState, useRef } from "react";
+import { getSectionRevealClass } from "./section-styles";
 
 function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffix?: string; prefix?: string }) {
   const [count, setCount] = useState(0);
@@ -13,7 +14,6 @@ function AnimatedCounter({ end, suffix = "", prefix = "" }: { end: number; suffi
       ([entry]) => {
         if (entry.isIntersecting && !hasAnimated) {
           setHasAnimated(true);
-          let start = 0;
           const duration = 2000;
           const startTime = performance.now();
 
@@ -86,9 +86,7 @@ export function MetricsSection() {
               {t('eyebrow')}
             </span>
             <h2
-              className={`text-4xl lg:text-6xl font-display tracking-tight transition-all duration-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}
+              className={`text-4xl lg:text-6xl font-display tracking-tight ${getSectionRevealClass(isVisible, "up", "sm")}`}
             >
               {t('title')}
               <br />
@@ -110,9 +108,7 @@ export function MetricsSection() {
           {metrics.map((metric, index) => (
             <div
               key={metric.label}
-              className={`bg-background p-8 lg:p-12 transition-all duration-700 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-              }`}
+              className={`bg-background p-8 lg:p-12 ${getSectionRevealClass(isVisible)}`}
               style={{ transitionDelay: `${index * 100}ms` }}
             >
               <AnimatedCounter 

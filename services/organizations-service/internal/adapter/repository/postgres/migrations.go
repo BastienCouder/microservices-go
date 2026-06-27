@@ -21,7 +21,9 @@ func RunMigrations(databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("open database for migrations: %w", err)
 	}
-	defer db.Close()
+	defer func() {
+		_ = db.Close()
+	}()
 
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -37,7 +39,9 @@ func RunMigrations(databaseURL string) error {
 	if err != nil {
 		return fmt.Errorf("create migrate instance: %w", err)
 	}
-	defer m.Close()
+	defer func() {
+		_, _ = m.Close()
+	}()
 
 	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("run migrations up: %w", err)

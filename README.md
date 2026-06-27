@@ -214,6 +214,12 @@ docker compose --profile infra --profile backup run --rm \
   postgres-backup-r2
 ```
 
+Ou simplement:
+
+```bash
+make backup-r2-once
+```
+
 Exécution en boucle:
 
 ```bash

@@ -220,11 +220,13 @@ export function PromptActions({
 }
 
 export function BulkStatusButton({
+  className,
   label,
   toneClassName,
   disabled,
   onClick,
 }: {
+  className?: string;
   label: string;
   toneClassName: string;
   disabled: boolean;
@@ -235,7 +237,7 @@ export function BulkStatusButton({
       type="button"
       size="sm"
       variant="outline"
-      className="h-9 rounded-lg px-3 text-sm"
+      className={cn("h-9 rounded-lg px-3 text-sm", className)}
       disabled={disabled}
       onClick={onClick}
     >

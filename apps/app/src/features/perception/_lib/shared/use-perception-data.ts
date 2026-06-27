@@ -33,7 +33,7 @@ export function usePerceptionData(apiBaseURL: string, routeSearch: string): UseP
 
   const reload = useCallback(async () => {
     await perceptionQuery.refetch();
-  }, [perceptionQuery.refetch]);
+  }, [perceptionQuery]);
 
   return {
     data: perceptionQuery.data?.data ?? null,

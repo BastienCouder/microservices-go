@@ -155,7 +155,9 @@ func (r *Repository) ClaimGlobalSuperAdmin(ctx context.Context, userID int64) (*
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(727379360001)`); err != nil {
 		return nil, err
@@ -283,7 +285,9 @@ func (r *Repository) UpsertMember(ctx context.Context, member *domain.Member) er
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if _, err := tx.Exec(ctx, `
 		DELETE FROM member_roles
@@ -323,7 +327,9 @@ func (r *Repository) RemoveMember(ctx context.Context, organizationID, userID in
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if _, err := tx.Exec(ctx, `
 		DELETE FROM project_members
@@ -398,7 +404,9 @@ func (r *Repository) DeleteOrganizationPermissions(ctx context.Context, organiza
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	if _, err := tx.Exec(ctx, `DELETE FROM project_members WHERE organization_id = $1`, organizationID); err != nil {
 		return err

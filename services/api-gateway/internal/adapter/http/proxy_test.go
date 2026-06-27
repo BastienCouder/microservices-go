@@ -557,7 +557,9 @@ func TestGatewayAdminUsersForbiddenWithoutAdminRole(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen grpc: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		_ = grpcListener.Close()
+	}()
 	grpcServer := grpc.NewServer()
 	permissionv1.RegisterPermissionServiceServer(grpcServer, &permissionGRPCDenyService{t: t})
 	defer grpcServer.GracefulStop()
@@ -661,7 +663,9 @@ func TestGatewayDeleteOrganizationCancelsBillingFirst(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listen grpc: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		_ = grpcListener.Close()
+	}()
 	grpcServer := grpc.NewServer()
 	permissionv1.RegisterPermissionServiceServer(grpcServer, &permissionGRPCAllowService{})
 	defer grpcServer.GracefulStop()

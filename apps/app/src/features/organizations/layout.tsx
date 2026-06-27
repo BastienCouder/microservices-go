@@ -68,6 +68,8 @@ export function OrganizationsLayout({
   onSelectOrganization,
   onRefetchOrganizations,
 }: OrganizationsPageViewModel) {
+  void activeError;
+  void setActiveTab;
   const { t } = useScopedI18n("organizations");
 
   useEffect(() => {

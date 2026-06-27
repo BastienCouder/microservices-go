@@ -71,11 +71,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 				if err != nil {
 					continue
 				}
-				providerCredentials[modelID] = ScheduledModelProviderCredential{
-					ProviderID:      credential.ProviderID,
-					ProviderModelID: credential.ProviderModelID,
-					ProviderAPIKey:  credential.ProviderAPIKey,
-				}
+				providerCredentials[modelID] = ScheduledModelProviderCredential(credential)
 			}
 
 			jobs = append(jobs, ScheduledAnalysisJob{

@@ -45,7 +45,7 @@ export const VisibilityAnalytics = memo(function VisibilityAnalytics({
             <CardTitle className="text-base font-semibold sm:text-lg">
               <SectionTitle>{title || content.visibilityAnalyticsTitle}</SectionTitle>
             </CardTitle>
-            <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">
+            <CardDescription className="hidden text-xs leading-relaxed md:block md:text-sm">
               {content.modelVisibilityMetricDescription}
               {hasCompetitorFilter
                 ? ` ${content.modelVisibilityMetricDescriptionWithCompetitor}`

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import {
@@ -8,7 +8,9 @@ import {
   ArrowUpRight,
   Check,
   ChevronsUpDown,
+  Menu,
   TrendingUp,
+  X,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -32,7 +34,6 @@ const sidebarNavSections = [
       { label: "Vue d’ensemble", active: true },
       { label: "Prompts suivis", active: false },
       { label: "Réponses IA", active: false },
-      { label: "Pages citées", active: false },
     ],
   },
   {
@@ -45,7 +46,6 @@ const sidebarNavSections = [
     indent: true,
     items: [
       { label: "Optimisation contenu", active: false },
-      { label: "Audit du site", active: false },
       { label: "Problèmes détectés", active: false },
     ],
   },
@@ -86,7 +86,7 @@ const kpis = [
   {
     title: "Mention rate",
     value: "64%",
-    sub: "Nike est citée dans 128 réponses IA.",
+    sub: "Visia est citée dans 128 réponses IA.",
     trend: "+12%",
     trendDir: "up",
     active: true,
@@ -117,9 +117,9 @@ const models = [
 ] as const;
 
 const competitors = [
-  { id: "adidas", name: "Adidas", value: "42.8%" },
-  { id: "puma", name: "Puma", value: "31.4%" },
-  { id: "new-balance", name: "New Balance", value: "18.6%" },
+  { id: "lorem-a", name: "Lorem A", value: "42.8%" },
+  { id: "ipsum-b", name: "Ipsum B", value: "31.4%" },
+  { id: "dolor-c", name: "Dolor C", value: "18.6%" },
 ] as const;
 
 const visibilityBars = [
@@ -130,10 +130,10 @@ const visibilityBars = [
 ] as const;
 
 const brandRows = [
-  { id: "nike", label: "Nike", sov: 38, mention: 72, color: "bg-primary" },
-  { id: "adidas", label: "Adidas", sov: 27, mention: 58, color: "bg-[#8db7ff]" },
-  { id: "puma", label: "Puma", sov: 19, mention: 42, color: "bg-[#b9c8e8]" },
-  { id: "new-balance", label: "New Balance", sov: 14, mention: 33, color: "bg-[#d7def0]" },
+  { id: "visia", label: "Visia", sov: 38, mention: 72, color: "bg-primary" },
+  { id: "lorem-a", label: "Lorem A", sov: 27, mention: 58, color: "bg-[#8db7ff]" },
+  { id: "ipsum-b", label: "Ipsum B", sov: 19, mention: 42, color: "bg-[#b9c8e8]" },
+  { id: "dolor-c", label: "Dolor C", sov: 14, mention: 33, color: "bg-[#d7def0]" },
 ] as const;
 
 const prompts = [
@@ -154,7 +154,7 @@ const prompts = [
     name: "Sonar",
     icon: "/models/perplexity.svg",
     time: "09:18",
-    text: "Compare Nike, Adidas et Puma pour un équipement de marathon.",
+    text: "Compare Visia, Lorem A et Ipsum B pour une plateforme de visibilité IA.",
     score: 76,
     status: "Mentionné",
     rank: "#3",
@@ -309,14 +309,14 @@ function FilterColumnReplica({
 
   return (
     <div className="h-full min-h-0 overflow-hidden rounded-md bg-white p-2">
-      <div className="h-full min-h-0 overflow-y-auto p-2 no-scrollbar">
+      <div className="h-full min-h-0 p-2 lg:overflow-y-auto lg:no-scrollbar">
         <div className="flex flex-col gap-5 pb-4">
           <section className="relative hidden flex-col overflow-hidden rounded-md bg-linear-to-br from-primary via-primary to-primary/80 p-4 text-primary-foreground xl:flex">
 
             <div className="relative z-10 mb-5 flex items-start justify-between gap-2">
               <div>
                 <span className="block text-3xl font-semibold leading-none tracking-tight text-white">
-                  Nike
+                  Visia
                 </span>
                 <span className="block text-sm font-medium leading-tight text-primary-foreground/92">
                   gagne en visibilité
@@ -522,7 +522,7 @@ function AnalyticsColumnReplica({
       : visibilityBars;
   const displayedBrandRows = brandRows.filter(
     (row) =>
-      row.id === "nike" ||
+      row.id === "visia" ||
       selectedCompetitorIds.length === 0 ||
       selectedCompetitorIds.includes(row.id as CompetitorId),
   );
@@ -539,7 +539,7 @@ function AnalyticsColumnReplica({
   );
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-1 no-scrollbar">
+    <div className="h-full min-h-0 px-1 lg:overflow-y-auto lg:no-scrollbar">
       <div className="flex flex-col gap-4 pb-4">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {activeKpis.map((kpi) => (
@@ -719,13 +719,13 @@ function ActivityColumnReplica({
       ? prompts.filter((prompt) => selectedModelIds.includes(prompt.modelId))
       : prompts;
   const alerts = [
-    ["critical", "Adidas dépasse Nike sur 8 prompts liés au marathon."],
+    ["critical", "Lorem A dépasse Visia sur 8 prompts liés à la catégorie cible."],
     ["warning", "La visibilité Claude recule de 6 points depuis hier."],
-    ["warning", "3 nouvelles pages concurrentes citent Puma et New Balance."],
+    ["warning", "3 nouvelles pages concurrentes citent Ipsum B et Dolor C."],
   ] as const;
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-1 no-scrollbar">
+    <div className="h-full min-h-0 px-1 lg:overflow-y-auto lg:no-scrollbar">
       <div className="flex flex-col gap-6 pb-4">
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-3">
@@ -864,7 +864,7 @@ export function LinearMonitoringPreview() {
     "anthropic",
   ]);
   const [selectedCompetitorIds, setSelectedCompetitorIds] = useState<CompetitorId[]>([
-    "adidas",
+    "lorem-a",
   ]);
   const [brandMetric, setBrandMetric] = useState<BrandMetric>("sov");
 
@@ -887,14 +887,14 @@ export function LinearMonitoringPreview() {
   const resetFilters = () => {
     setPeriod("30d");
     setSelectedModelIds(["openai", "anthropic"]);
-    setSelectedCompetitorIds(["adidas"]);
+    setSelectedCompetitorIds(["lorem-a"]);
     setBrandMetric("sov");
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4 bg-muted/30 px-3 pb-6 pt-3">
-      <div className="grid h-full min-h-0 grid-cols-1 gap-3 xl:grid-cols-12">
-        <div className="h-full min-h-0 overflow-hidden xl:col-span-3">
+    <div className="flex min-h-full flex-col gap-2 bg-muted/30 px-2 pb-3 pt-2 sm:gap-4 sm:px-3 sm:pb-6 sm:pt-3">
+      <div className="grid grid-cols-1 gap-2 xl:grid-cols-12 xl:gap-3">
+        <div className="overflow-hidden xl:col-span-3">
           <FilterColumnReplica
             period={period}
             selectedModelIds={selectedModelIds}
@@ -906,7 +906,7 @@ export function LinearMonitoringPreview() {
             onResetFilters={resetFilters}
           />
         </div>
-        <div className="h-full min-h-0 overflow-hidden xl:col-span-6">
+        <div className="overflow-hidden xl:col-span-6">
           <AnalyticsColumnReplica
             period={period}
             selectedModelIds={selectedModelIds}
@@ -915,7 +915,7 @@ export function LinearMonitoringPreview() {
             onBrandMetricChange={setBrandMetric}
           />
         </div>
-        <div className="h-full min-h-0 overflow-hidden xl:col-span-3">
+        <div className="overflow-hidden xl:col-span-3">
           <ActivityColumnReplica
             selectedModelIds={selectedModelIds}
           />
@@ -926,34 +926,70 @@ export function LinearMonitoringPreview() {
 }
 
 function LinearAppSidebarReplica() {
-  return (
-    <aside className="flex h-auto max-h-[360px] min-h-0 w-full min-w-0 flex-col overflow-hidden border-b border-border bg-primary lg:h-full lg:max-h-none lg:min-h-[520px] lg:w-[220px] lg:min-w-[220px] lg:border-b-0 lg:border-r">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/40 px-3">
-          <span className="ml-2 truncate text-sm font-semibold text-background">
-            <img src="/logos/logo_white.svg" alt="Logo" className="h-10" />
-          </span>
-        </div>
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
-        <div className="shrink-0 border-b border-border/40 px-3 py-4">
+  return (
+    <>
+      <div className="flex items-center justify-between border-b border-border/40 bg-primary px-4 py-3 text-background lg:hidden">
+        <div className="flex items-center gap-3">
+          <img src="/logos/logo_white.svg" alt="Logo" className="h-8" />
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMobileNavOpen((value) => !value)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-background/20 bg-background/10"
+          aria-label={isMobileNavOpen ? "Fermer la navigation" : "Ouvrir la navigation"}
+        >
+          {isMobileNavOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
+      </div>
+
+      <div
+        className={`fixed inset-0 z-40 bg-black/30 transition-opacity duration-300 lg:hidden ${
+          isMobileNavOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0"
+        }`}
+        onClick={() => setIsMobileNavOpen(false)}
+      />
+
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex w-[84vw] max-w-[320px] flex-col bg-primary text-background transition-transform duration-300 lg:hidden ${
+          isMobileNavOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-14 shrink-0 items-center justify-between border-b border-background/20 px-4">
+          <img src="/logos/logo_white.svg" alt="Logo" className="h-9" />
           <button
             type="button"
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md bg-background/10 px-2 py-1.5 transition-colors hover:bg-background/20"
+            onClick={() => setIsMobileNavOpen(false)}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-background/20 bg-background/10"
+            aria-label="Fermer la navigation"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="shrink-0 border-b border-background/20 px-4 py-4">
+          <button
+            type="button"
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-md bg-background/10 px-2 py-2 transition-colors hover:bg-background/20"
           >
             <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200">
-              <span className="text-[10px] font-semibold text-primary">NK</span>
+              <span className="text-[10px] font-semibold text-primary">VI</span>
             </div>
             <div className="min-w-0 flex-1 text-left">
               <div className="truncate text-sm font-medium text-background">
-                Nike
+                Visia
+              </div>
+              <div className="truncate text-xs text-background/70">
+                Workspace demo
               </div>
             </div>
             <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-background" />
           </button>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:py-6">
-          <div className="space-y-3">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+          <div className="space-y-4">
             {sidebarNavSections.map((section, index) => (
               <section
                 key={section.title ?? `sidebar-section-${index}`}
@@ -970,66 +1006,155 @@ function LinearAppSidebarReplica() {
                     <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-white/22" />
                   ) : null}
                   {section.items.map((item) => (
-                    <LinearSidebarNavItem
+                    <button
                       key={item.label}
-                      label={item.label}
-                      active={item.active}
-                      indent={section.indent}
-                    />
+                      type="button"
+                      onClick={() => setIsMobileNavOpen(false)}
+                      className="w-full text-left"
+                    >
+                      <LinearSidebarNavItem
+                        label={item.label}
+                        active={item.active}
+                        indent={section.indent}
+                      />
+                    </button>
                   ))}
                 </div>
               </section>
             ))}
           </div>
         </nav>
-      </div>
 
-      <div className="shrink-0 border-t border-background/40 p-2">
-        <div className="mb-2 px-1">
-          <div className="w-full rounded-lg px-2 py-2">
-            <div className="space-y-1.5">
-              <div className="h-1.5 overflow-hidden rounded-full bg-background/20">
-                <div className="h-full w-[38%] rounded-full bg-background/40" />
-              </div>
-              <div className="truncate text-xs font-medium text-background/80">
-                182 / 500 credits
-              </div>
+        <div className="shrink-0 border-t border-background/20 p-4">
+          <div className="space-y-1.5 rounded-lg bg-background/8 px-3 py-3">
+            <div className="h-1.5 overflow-hidden rounded-full bg-background/20">
+              <div className="h-full w-[38%] rounded-full bg-background/50" />
+            </div>
+            <div className="truncate text-xs font-medium text-background/80">
+              182 / 500 credits
             </div>
           </div>
         </div>
       </div>
-    </aside>
+
+      <aside className="hidden h-full min-h-[520px] w-[220px] min-w-[220px] flex-col overflow-hidden border-r border-border bg-primary lg:flex">
+        <div className="flex min-h-0 flex-1 flex-col">
+          <div className="flex h-14 shrink-0 items-center justify-between border-b border-border/40 px-3">
+            <span className="ml-2 truncate text-sm font-semibold text-background">
+              <img src="/logos/logo_white.svg" alt="Logo" className="h-10" />
+            </span>
+          </div>
+
+          <div className="shrink-0 border-b border-border/40 px-3 py-4">
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-center gap-2.5 rounded-md bg-background/10 px-2 py-1.5 transition-colors hover:bg-background/20"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-blue-200">
+                <span className="text-[10px] font-semibold text-primary">VI</span>
+              </div>
+              <div className="min-w-0 flex-1 text-left">
+                <div className="truncate text-sm font-medium text-background">
+                  Visia
+                </div>
+              </div>
+              <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-background" />
+            </button>
+          </div>
+
+          <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4 lg:py-6">
+            <div className="space-y-3">
+              {sidebarNavSections.map((section, index) => (
+                <section
+                  key={section.title ?? `sidebar-section-${index}`}
+                  className="space-y-2 pb-2"
+                >
+                  {section.title ? (
+                    <div className="px-2 pb-1 text-xs font-bold uppercase tracking-[0.04em] text-white/55">
+                      {section.title}
+                    </div>
+                  ) : null}
+
+                  <div className="relative space-y-1.5">
+                    {section.indent ? (
+                      <div className="absolute bottom-1 left-[11px] top-1 w-[2px] rounded-full bg-white/22" />
+                    ) : null}
+                    {section.items.map((item) => (
+                      <LinearSidebarNavItem
+                        key={item.label}
+                        label={item.label}
+                        active={item.active}
+                        indent={section.indent}
+                      />
+                    ))}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </nav>
+        </div>
+
+        <div className="shrink-0 border-t border-background/40 p-2">
+          <div className="mb-2 px-1">
+            <div className="w-full rounded-lg px-2 py-2">
+              <div className="space-y-1.5">
+                <div className="h-1.5 overflow-hidden rounded-full bg-background/20">
+                  <div className="h-full w-[38%] rounded-full bg-background/40" />
+                </div>
+                <div className="truncate text-xs font-medium text-background/80">
+                  182 / 500 credits
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 }
 
 export default function LinearHeroCard({
   children,
-  title = "Faster app launch",
-  eyebrow = "ENG-2703",
   className = "",
 }: LinearHeroCardProps) {
+  const [enableIntroAnimation, setEnableIntroAnimation] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)");
+    const update = () => setEnableIntroAnimation(mediaQuery.matches);
+
+    update();
+    mediaQuery.addEventListener("change", update);
+
+    return () => mediaQuery.removeEventListener("change", update);
+  }, []);
+
   return (
     <>
-      <div className="relative mx-auto flex min-h-screen max-w-[1400px] items-center px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+      <div className="relative mx-auto flex max-w-[1400px] items-center px-4 py-6 sm:px-6 sm:py-8 lg:px-8 lg:py-16">
         <motion.div
-          initial={{ opacity: 0, y: 24, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          initial={enableIntroAnimation ? { opacity: 0, y: 24, scale: 0.98 } : false}
+          animate={enableIntroAnimation ? { opacity: 1, y: 0, scale: 1 } : undefined}
+          transition={enableIntroAnimation ? { duration: 0.7, ease: [0.22, 1, 0.36, 1] } : undefined}
           className={cn(
-            "relative mx-auto flex h-full w-full max-w-[1400px] flex-col overflow-hidden rounded-xl border border-border bg-background backdrop-blur-xl sm:rounded-2xl lg:h-[760px] lg:max-h-[85vh]",
+            "relative mx-auto flex h-[68vh] min-h-[540px] w-full max-w-[1400px] flex-col overflow-hidden rounded-xl border border-border bg-background backdrop-blur-xl sm:h-[72vh] sm:min-h-[600px] sm:rounded-2xl lg:h-[760px] lg:max-h-[85vh]",
             className,
           )}
         >
        <div className="px-6 py-4 border-b border-foreground/10 flex items-center justify-between">
-                <span className="text-sm font-mono text-primary uppercase tracking-widest">sc</span>
+                <span className="text-sm font-mono text-primary uppercase tracking-widest">Monitoring</span>
                 <span className="flex items-center gap-2 text-xs font-mono text-green-600">
                   <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                 sc
+                 Preview live
                 </span>
               </div>
           <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden lg:grid-cols-[220px_minmax(0,1fr)]">
             <LinearAppSidebarReplica />
-            <div className="min-h-0 min-w-0">{children}</div>
+            <div className="min-h-0 min-w-0 overflow-y-auto">{children}</div>
           </div>
 
         </motion.div>

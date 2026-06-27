@@ -8,6 +8,7 @@ import (
 	permissionv1 "github.com/bastiencouder/microservices-go/contracts/gen/go/permission/v1"
 	grpctls "github.com/bastiencouder/microservices-go/contracts/pkg/grpctls"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -26,13 +27,12 @@ func newPermissionGRPCClient(target string, tlsConfig grpctls.ClientConfig) (*pe
 	if err != nil {
 		return nil, fmt.Errorf("configure permission grpc tls: %w", err)
 	}
-	dialOptions = append(dialOptions, grpc.WithBlock())
-	conn, err := grpc.DialContext(
-		ctx,
-		target,
-		dialOptions...,
-	)
+	conn, err := grpc.NewClient(target, dialOptions...)
 	if err != nil {
+		return nil, fmt.Errorf("dial permission grpc: %w", err)
+	}
+	if err := waitForGRPCReady(ctx, conn); err != nil {
+		_ = conn.Close()
 		return nil, fmt.Errorf("dial permission grpc: %w", err)
 	}
 	return &permissionGRPCClient{
@@ -60,4 +60,20 @@ func (c *permissionGRPCClient) Check(ctx context.Context, req *permissionv1.Chec
 
 func grpcMetadataWithBearer(ctx context.Context, bearerToken string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+bearerToken)
+}
+
+func waitForGRPCReady(ctx context.Context, conn *grpc.ClientConn) error {
+	for {
+		state := conn.GetState()
+		if state == connectivity.Ready {
+			return nil
+		}
+		if state == connectivity.Shutdown {
+			return fmt.Errorf("grpc connection is shut down")
+		}
+		conn.Connect()
+		if !conn.WaitForStateChange(ctx, state) {
+			return fmt.Errorf("grpc connection is not ready")
+		}
+	}
 }

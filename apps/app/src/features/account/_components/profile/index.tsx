@@ -30,7 +30,6 @@ export function AccountProfilePanel({
   busy,
   profile,
   onLogout,
-  onRefresh,
   onDeleteAccount,
   onUpdateProfile,
 }: AccountProfilePanelProps) {

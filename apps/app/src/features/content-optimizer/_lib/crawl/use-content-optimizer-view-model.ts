@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 
 import {
@@ -239,45 +239,45 @@ export function useContentOptimizerViewModel({
     canDiscover &&
     (selectedCount > 0 || crawlRecords.length > 0 || !crawlResult);
 
-  function clearSelectionState() {
+  const clearSelectionState = useCallback(() => {
     setSelectedURLs(new Set());
     setSelectedResultURL("");
-  }
+  }, []);
 
-  function showURLSelection() {
+  const showURLSelection = useCallback(() => {
     setReviewingURLSelection(true);
-  }
+  }, []);
 
-  function hideURLSelection() {
+  const hideURLSelection = useCallback(() => {
     setReviewingURLSelection(false);
-  }
+  }, []);
 
-  function limitSelectionURLs(urls: string[]): string[] {
+  const limitSelectionURLs = useCallback((urls: string[]): string[] => {
     const normalized = Array.from(new Set(urls.map((url) => url.trim()).filter(Boolean)));
     return selectedCrawlLimit === null
       ? normalized
       : normalized.slice(0, selectedCrawlLimit);
-  }
+  }, [selectedCrawlLimit]);
 
-  function showSelectedPlanLimitIfNeeded(totalCount: number) {
+  const showSelectedPlanLimitIfNeeded = useCallback((totalCount: number) => {
     if (selectedCrawlLimit !== null && totalCount > selectedCrawlLimit) {
       setError(t("selectedPlanLimitError", { count: selectedCrawlLimit }));
     }
-  }
+  }, [selectedCrawlLimit, t]);
 
-  function applySelectedRecords(records: ContentOptimizerCrawlRecord[]) {
+  const applySelectedRecords = useCallback((records: ContentOptimizerCrawlRecord[]) => {
     const allURLs = records.map(pageURL).filter(Boolean);
     const selectedURLs = limitSelectionURLs(allURLs);
     setSelectedURLs(new Set(selectedURLs));
     setSelectedResultURL(selectedURLs[0] ?? "");
     showSelectedPlanLimitIfNeeded(new Set(allURLs).size);
-  }
+  }, [limitSelectionURLs, showSelectedPlanLimitIfNeeded]);
 
-  function clearResultsState() {
+  const clearResultsState = useCallback(() => {
     setDiscoveryResult(null);
     setCrawlResult(null);
     clearSelectionState();
-  }
+  }, [clearSelectionState]);
 
   useLayoutEffect(() => {
     setProjectWebsiteURL("");
@@ -294,7 +294,7 @@ export function useContentOptimizerViewModel({
     setPendingReviewSelectedURLs(null);
     setSelectedCrawlLimitResolved(false);
     hideURLSelection();
-  }, [projectScopeKey]);
+  }, [clearResultsState, hideURLSelection, projectScopeKey]);
 
   useEffect(() => {
     if (hasProjectScope) {
@@ -392,7 +392,7 @@ export function useContentOptimizerViewModel({
     return () => {
       cancelled = true;
     };
-  }, [apiBaseURL, hasProjectScope, organizationId, projectId]);
+  }, [apiBaseURL, hasProjectScope, organizationId, projectId, t]);
 
   useEffect(() => {
     if (
@@ -487,8 +487,11 @@ export function useContentOptimizerViewModel({
     };
   }, [
     apiBaseURL,
+    applySelectedRecords,
     discoveryLoadedKey,
     hasProjectScope,
+    hideURLSelection,
+    limitSelectionURLs,
     organizationId,
     phase,
     projectId,
@@ -497,6 +500,8 @@ export function useContentOptimizerViewModel({
     projectWebsiteURL,
     selectedCrawlLimit,
     selectedCrawlLimitResolved,
+    showURLSelection,
+    showSelectedPlanLimitIfNeeded,
   ]);
 
   useEffect(() => {
@@ -640,7 +645,8 @@ export function useContentOptimizerViewModel({
       setSelectedResultURL("");
       return { limit };
     },
-    onSuccess: (job, _options, context) => {
+    onSuccess: (job, _unusedOptions, context) => {
+      void _unusedOptions;
       setActiveJobId(job.id);
       setActiveJobKind("crawl");
       setCrawlResult({
@@ -652,7 +658,9 @@ export function useContentOptimizerViewModel({
       });
       hideURLSelection();
     },
-    onError: (nextError, _options, context) => {
+    onError: (nextError, _unusedOptions, context) => {
+      void _unusedOptions;
+      void context;
       setPhase("review");
       showURLSelection();
       setError(
@@ -785,10 +793,17 @@ export function useContentOptimizerViewModel({
   }, [
     activeJobId,
     activeJobKind,
+    applySelectedRecords,
     apiBaseURL,
+    hideURLSelection,
+    limitSelectionURLs,
     organizationId,
+    pendingReviewSelectedURLs,
     projectId,
     projectWebsiteURL,
+    showURLSelection,
+    showSelectedPlanLimitIfNeeded,
+    t,
   ]);
 
   function togglePage(nextURL: string, checked: boolean) {

@@ -11,10 +11,9 @@ type AgentReadyLayoutProps = {
   routeSearch: string;
 };
 
-export const AgentReadyLayout = memo(function AgentReadyLayout({
-  apiBaseURL: _apiBaseURL,
-  routeSearch: _routeSearch,
-}: AgentReadyLayoutProps) {
+export const AgentReadyLayout = memo(function AgentReadyLayout(props: AgentReadyLayoutProps) {
+  void props;
+
   const { t } = useScopedI18n("ai-agent-ready");
 
   return (

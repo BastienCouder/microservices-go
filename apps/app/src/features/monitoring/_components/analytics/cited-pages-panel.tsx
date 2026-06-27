@@ -15,7 +15,13 @@ type CitedPagesPanelProps = {
   longTailShare: number;
 };
 
-export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, topCitedTotal, longTailShare }: CitedPagesPanelProps) {
+export const CitedPagesPanel = memo(function CitedPagesPanel({
+  topCitedPages,
+  topCitedTotal,
+  longTailShare,
+}: CitedPagesPanelProps) {
+  void topCitedTotal;
+  void longTailShare;
   const content = useI18nScope("monitoring-analytics-panel");
   const barVariants = [
     "from-primary to-primary/90",
@@ -31,7 +37,7 @@ export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, to
           <CardTitle className="text-lg font-semibold">
             <SectionTitle>{content.topCitedPagesTitle}</SectionTitle>
           </CardTitle>
-          <CardDescription className="hidden md:block text-xs leading-relaxed md:text-sm">{content.topCitedPagesDescription}</CardDescription>
+          <CardDescription className="hidden text-xs leading-relaxed md:block md:text-sm">{content.topCitedPagesDescription}</CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -39,35 +45,30 @@ export const CitedPagesPanel = memo(function CitedPagesPanel({ topCitedPages, to
           <EmptyStateCard label={content.noDataAvailable} className="h-[180px] text-sm" />
         ) : (
           <div className="space-y-3">
-          {topCitedPages.map((page, index) => (
-            <div key={page.url} className="space-y-1.5">
-              <span className="block truncate text-xs font-medium md:text-sm">{page.url}</span>
-              <div className="flex items-center gap-3 p-2 rounded-full bg-muted">
-                <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-muted ">
-                  <div
-                    className={cn(
-                      "relative h-full rounded-full bg-primary",
-                      barVariants[index % barVariants.length],
-                    )}
-                    style={{ width: `${page.value}%` }}
-                  >
-                    <div className="absolute inset-0 rounded-full opacity-80" />
-                    <div className="absolute inset-x-0 top-0 h-[55%] rounded-full" />
+            {topCitedPages.map((page, index) => (
+              <div key={page.url} className="space-y-1.5">
+                <span className="block truncate text-xs font-medium md:text-sm">{page.url}</span>
+                <div className="rounded-full bg-muted p-2">
+                  <div className="flex items-center gap-3">
+                    <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={cn(
+                          "relative h-full rounded-full bg-primary",
+                          barVariants[index % barVariants.length],
+                        )}
+                        style={{ width: `${page.value}%` }}
+                      >
+                        <div className="absolute inset-0 rounded-full opacity-80" />
+                        <div className="absolute inset-x-0 top-0 h-[55%] rounded-full" />
+                      </div>
+                    </div>
+                    <span className="mr-2 min-w-10 text-right text-xs font-semibold text-muted-foreground">
+                      {page.value}%
+                    </span>
                   </div>
                 </div>
-                <span className="min-w-10 mr-2 text-right text-xs font-semibold text-muted-foreground">
-                  {page.value}%
-                </span>
               </div>
-            </div>
-          ))}
-{/* 
-          <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border/50 pt-4">
-            <div className="rounded-md border p-2">
-              <div className="text-xs text-muted-foreground">{content.top3Coverage}</div>
-              <div className="text-sm font-semibold md:text-base">{topCitedTotal}%</div>
-            </div>
-          </div> */}
+            ))}
           </div>
         )}
       </CardContent>

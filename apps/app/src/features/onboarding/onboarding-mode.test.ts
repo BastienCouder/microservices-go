@@ -51,8 +51,8 @@ describe("onboarding mode", () => {
       value: {
         localStorage: {
           getItem: (key: string) => storage.get(key) ?? null,
-          setItem: (_key: string, _value: string) => {},
-          removeItem: (_key: string) => {},
+          setItem: () => {},
+          removeItem: () => {},
         },
       },
     });
@@ -77,8 +77,8 @@ describe("onboarding mode", () => {
       value: {
         localStorage: {
           getItem: (key: string) => storage.get(key) ?? null,
-          setItem: (_key: string, _value: string) => {},
-          removeItem: (_key: string) => {},
+          setItem: () => {},
+          removeItem: () => {},
         },
       },
     });

@@ -123,7 +123,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen grpc error: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		if err := grpcListener.Close(); err != nil {
+			log.Printf("close grpc listener: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("ia-service listening on %s", cfg.HTTPAddr)

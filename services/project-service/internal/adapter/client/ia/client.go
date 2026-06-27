@@ -13,6 +13,7 @@ import (
 	"github.com/bastiencouder/microservices-go/services/project-service/internal/usecase"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -117,14 +118,12 @@ func NewClientWithOptions(target, jwtSecret, jwtIssuer string, tlsConfig grpctls
 	if err != nil {
 		return nil, fmt.Errorf("configure ia grpc tls: %w", err)
 	}
-	dialOptions = append(dialOptions, grpc.WithBlock())
-
-	conn, err := grpc.DialContext(
-		ctx,
-		target,
-		dialOptions...,
-	)
+	conn, err := grpc.NewClient(target, dialOptions...)
 	if err != nil {
+		return nil, fmt.Errorf("dial ia grpc: %w", err)
+	}
+	if err := waitForGRPCReady(ctx, conn); err != nil {
+		_ = conn.Close()
 		return nil, fmt.Errorf("dial ia grpc: %w", err)
 	}
 
@@ -144,6 +143,22 @@ func (c *Client) Close() error {
 		return nil
 	}
 	return c.conn.Close()
+}
+
+func waitForGRPCReady(ctx context.Context, conn *grpc.ClientConn) error {
+	for {
+		state := conn.GetState()
+		if state == connectivity.Ready {
+			return nil
+		}
+		if state == connectivity.Shutdown {
+			return fmt.Errorf("grpc connection is shut down")
+		}
+		conn.Connect()
+		if !conn.WaitForStateChange(ctx, state) {
+			return fmt.Errorf("grpc connection is not ready")
+		}
+	}
 }
 
 func (c *Client) ExecutePrompt(ctx context.Context, input usecase.IAExecutePromptInput) (usecase.IAExecutePromptResult, error) {

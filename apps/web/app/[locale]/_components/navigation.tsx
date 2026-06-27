@@ -86,6 +86,29 @@ export function Navigation() {
     };
   }, [gatewayURL]);
 
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+
+    const { body, documentElement } = document;
+    const previousBodyOverflow = body.style.overflow;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousHtmlOverflow = documentElement.style.overflow;
+
+    if (isMobileMenuOpen) {
+      body.style.overflow = "hidden";
+      body.style.touchAction = "none";
+      documentElement.style.overflow = "hidden";
+    }
+
+    return () => {
+      body.style.overflow = previousBodyOverflow;
+      body.style.touchAction = previousBodyTouchAction;
+      documentElement.style.overflow = previousHtmlOverflow;
+    };
+  }, [isMobileMenuOpen]);
+
   function closeMobileMenu() {
     setIsMobileMenuOpen(false);
   }

@@ -35,7 +35,7 @@ func NewClient(target, jwtSecret, jwtIssuer string, tlsConfig grpctls.ClientConf
 	if err != nil {
 		return nil, fmt.Errorf("configure project grpc tls: %w", err)
 	}
-	conn, err := grpc.Dial(target, dialOptions...)
+	conn, err := grpc.NewClient(target, dialOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("dial project grpc: %w", err)
 	}

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { motion } from "framer-motion";
 import {
+  getSectionRevealClass,
   sectionHeadingClass,
   sectionHeadingMutedClass,
   sectionIntroTextClass,
@@ -21,24 +22,24 @@ export function IntegrationsSection() {
       color: "group-hover:text-[#E27625]",
       icon: <img src="/icon/ga4.svg" alt="GA4" className="w-6 h-6" />,
     },
-    {
-      name: "HubSpot",
-      category: t("items.hubspot.category"),
-      color: "group-hover:text-[#FF7A59]",
-      icon: <img src="/icon/hubspot.svg" alt="HubSpot" className="w-6 h-6" />,
-    },
-    {
-      name: "Stripe",
-      category: t("items.stripe.category"),
-      color: "group-hover:text-[#635BFF]",
-      icon: <img src="/icon/stripe.svg" alt="Stripe" className="w-6 h-6" />,
-    },
-    {
-      name: "Webflow",
-      category: t("items.webflow.category"),
-      color: "group-hover:text-[#4353FF]",
-      icon: <img src="/icon/webflow.svg" alt="Webflow" className="w-6 h-6" />,
-    },
+    // {
+    //   name: "HubSpot",
+    //   category: t("items.hubspot.category"),
+    //   color: "group-hover:text-[#FF7A59]",
+    //   icon: <img src="/icon/hubspot.svg" alt="HubSpot" className="w-6 h-6" />,
+    // },
+    // {
+    //   name: "Stripe",
+    //   category: t("items.stripe.category"),
+    //   color: "group-hover:text-[#635BFF]",
+    //   icon: <img src="/icon/stripe.svg" alt="Stripe" className="w-6 h-6" />,
+    // },
+    // {
+    //   name: "Webflow",
+    //   category: t("items.webflow.category"),
+    //   color: "group-hover:text-[#4353FF]",
+    //   icon: <img src="/icon/webflow.svg" alt="Webflow" className="w-6 h-6" />,
+    // },
     {
       name: "Markdown",
       category: t("items.markdown.category"),
@@ -46,6 +47,7 @@ export function IntegrationsSection() {
       icon: <img src="/icon/markdown.svg" alt="Markdown" className="w-6 h-6" />,
     },
   ];
+  const repeatedIntegrations = Array.from({ length: 12 }, () => integrations).flat();
 
   useEffect(() => {
     const observer = new IntersectionObserver(([entry]) => {
@@ -65,9 +67,7 @@ export function IntegrationsSection() {
     <section ref={sectionRef} className="relative py-16 sm:py-20 lg:py-28 overflow-hidden bg-background">
       <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
         <div
-          className={`text-center max-w-3xl mx-auto mb-20 lg:mb-24 transition-all duration-1000 ${
-            isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-          }`}
+          className={`text-center max-w-3xl mx-auto mb-20 lg:mb-24 ${getSectionRevealClass(isVisible)}`}
         >
           <h2 className={`${sectionHeadingClass} mb-8`}>
             {t("title")}
@@ -86,10 +86,10 @@ export function IntegrationsSection() {
           <motion.div
             animate={{ x: ["0%", "-50%"] }}
             className="flex gap-8 pr-8"
-            transition={{ duration: 30, ease: "linear", repeat: Infinity }}
+            transition={{ duration: 16, ease: "linear", repeat: Infinity }}
             whileHover={{ animationPlayState: "paused" }}
           >
-            {[...integrations, ...integrations, ...integrations, ...integrations].map((item, index) => (
+            {repeatedIntegrations.map((item, index) => (
               <div
                 key={`${item.name}-${index}`}
                 className="shrink-0 flex items-center gap-5 px-8 py-5 border border-primary/10 bg-background/[0.01] rounded-lg backdrop-blur-sm transition-all duration-500 group/card hover:border-primary/20 hover:bg-primary/[0.03]"

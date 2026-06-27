@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { useTranslation } from "react-i18next";
+import { useTranslations } from "next-intl";
 import { Shield, Lock, Eye, FileCheck } from "lucide-react";
+import { getSectionRevealClass } from "./section-styles";
 
 export function SecuritySection() {
-  const { t } = useTranslation();
+  const t = useTranslations("security");
   const [isVisible, setIsVisible] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -52,9 +53,7 @@ export function SecuritySection() {
         <div className="grid lg:grid-cols-2 gap-16 lg:gap-24">
           {/* Left: Content */}
           <div
-            className={`transition-all duration-700 ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-            }`}
+            className={getSectionRevealClass(isVisible)}
           >
             <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
               <span className="w-8 h-px bg-foreground/30" />
@@ -74,9 +73,7 @@ export function SecuritySection() {
               {certifications.map((cert, index) => (
                 <span
                   key={cert}
-                  className={`px-4 py-2 border border-foreground/10 text-sm font-mono transition-all duration-500 ${
-                    isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-                  }`}
+                  className={`px-4 py-2 border border-foreground/10 text-sm font-mono ${getSectionRevealClass(isVisible, "up", "sm")}`}
                   style={{ transitionDelay: `${index * 50 + 200}ms` }}
                 >
                   {cert}
@@ -90,9 +87,7 @@ export function SecuritySection() {
             {securityFeatures.map((feature, index) => (
               <div
                 key={feature.title}
-                className={`p-6 border border-foreground/10 hover:border-foreground/20 transition-all duration-500 group ${
-                  isVisible ? "opacity-100 translate-x-0" : "opacity-0 translate-x-8"
-                }`}
+                className={`p-6 border border-foreground/10 hover:border-foreground/20 group ${getSectionRevealClass(isVisible, "right")}`}
                 style={{ transitionDelay: `${index * 100}ms` }}
               >
                 <div className="flex items-start gap-4">

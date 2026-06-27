@@ -100,7 +100,9 @@ func (c *Client) ListProperties(ctx context.Context, refreshToken string) ([]use
 	if err != nil {
 		return nil, fmt.Errorf("send ga4 account summaries request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return nil, readGoogleError(resp, "ga4 account summaries")
 	}
@@ -168,7 +170,9 @@ func (c *Client) postForm(ctx context.Context, endpoint string, form url.Values,
 	if err != nil {
 		return fmt.Errorf("send google oauth request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return readGoogleError(resp, "google oauth")
 	}

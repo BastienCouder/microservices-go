@@ -116,7 +116,7 @@ function PromptMobileLoadingCards() {
   return (
     <>
       {Array.from({ length: 4 }).map((_, index) => (
-        <div key={index} className="rounded-md border bg-card p-4">
+        <div key={index} className="rounded-md border bg-card p-3.5">
           <div className="mb-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1 space-y-2">
               <Skeleton className="h-4 w-full" />
@@ -209,11 +209,11 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
           <PanelToolbar
             summary={
               props.promptsDataLoading ? (
-                <Skeleton className="hidden h-9 w-32 rounded-full md:flex" />
+                <Skeleton className="hidden h-9 w-32 rounded-full lg:flex" />
               ) : (
                 <Badge
                   variant="outline"
-                  className="hidden h-9 w-fit shrink-0 justify-center px-3 text-sm md:inline-flex"
+                  className="hidden h-9 w-fit shrink-0 justify-center px-3 text-sm lg:inline-flex"
                 >
                   {t("promptsCount", { count: props.promptTotalItems })}
                 </Badge>
@@ -221,13 +221,13 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
             }
           >
               <div className="flex w-full min-w-0 flex-col gap-2 sm:gap-3">
-                <div className="flex w-full items-center justify-between gap-2 md:hidden">
+                <div className="flex w-full items-center justify-between gap-2 lg:hidden">
                   {props.promptsDataLoading ? (
-                    <Skeleton className="h-9 w-24 shrink-0 rounded-full" />
+                    <Skeleton className="h-8 w-24 shrink-0 rounded-full" />
                   ) : (
                     <Badge
                       variant="outline"
-                      className="h-9 w-fit shrink-0 justify-center px-3 text-sm"
+                      className="h-8 w-fit shrink-0 justify-center px-3 text-sm"
                     >
                       {t("promptsCount", { count: props.promptTotalItems })}
                     </Badge>
@@ -237,34 +237,41 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                   </div>
                 </div>
                 {hasSelectedPrompts || !isMobile ? (
-                  <div className="flex min-w-0 items-center gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+                  <div className="grid min-w-0 grid-cols-2 gap-2 lg:flex lg:items-center lg:flex-wrap">
                     {hasSelectedPrompts && isMobile && props.canEdit ? (
                       <>
-                        <RunSelectedButton
-                          disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts}
-                          runningSelectedPrompts={props.runningSelectedPrompts}
-                          selectedRunnablePromptCount={props.selectedRunnablePromptCount}
-                          runSelectedPrompts={props.runSelectedPrompts}
-                        />
+                        <div className="col-span-2">
+                          <RunSelectedButton
+                            className="w-full"
+                            disabled={!props.canRunSelectedPrompts || props.runningSelectedPrompts}
+                            runningSelectedPrompts={props.runningSelectedPrompts}
+                            selectedRunnablePromptCount={props.selectedRunnablePromptCount}
+                            runSelectedPrompts={props.runSelectedPrompts}
+                          />
+                        </div>
                         <BulkStatusButton
+                          className="w-full"
                           label={content.bulkActivate}
                           toneClassName="text-emerald-600"
                           disabled={!canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("active")}
                         />
                         <BulkStatusButton
+                          className="w-full"
                           label={content.bulkDisable}
                           toneClassName="text-amber-600"
                           disabled={!canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("disabled")}
                         />
                         <BulkStatusButton
+                          className="w-full"
                           label={content.bulkArchive}
                           toneClassName="text-rose-600"
                           disabled={!canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("archived")}
                         />
                         <BulkStatusButton
+                          className="w-full"
                           label={content.bulkDelete}
                           toneClassName="text-rose-700"
                           disabled={selectedDeletePrompts.length === 0}
@@ -275,6 +282,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     {!isMobile && props.canEdit ? (
                       <>
                         <RunSelectedButton
+                          className="col-span-2 w-full lg:w-auto"
                           disabled={
                             !hasSelectedPrompts ||
                             !props.canRunSelectedPrompts ||
@@ -285,24 +293,28 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                           runSelectedPrompts={props.runSelectedPrompts}
                         />
                         <BulkStatusButton
+                          className="w-full lg:w-auto"
                           label={content.bulkActivate}
                           toneClassName="text-emerald-600"
                           disabled={!hasSelectedPrompts || !canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("active")}
                         />
                         <BulkStatusButton
+                          className="w-full lg:w-auto"
                           label={content.bulkDisable}
                           toneClassName="text-amber-600"
                           disabled={!hasSelectedPrompts || !canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("disabled")}
                         />
                         <BulkStatusButton
+                          className="w-full lg:w-auto"
                           label={content.bulkArchive}
                           toneClassName="text-rose-600"
                           disabled={!hasSelectedPrompts || !canEditGlobalStatus}
                           onClick={() => props.applyBulkStatus("archived")}
                         />
                         <BulkStatusButton
+                          className="w-full lg:w-auto"
                           label={content.bulkDelete}
                           toneClassName="text-rose-700"
                           disabled={!hasSelectedPrompts || selectedDeletePrompts.length === 0}
@@ -312,13 +324,13 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
                     ) : null}
                   </div>
                 ) : null}
-                <div className="hidden justify-end md:flex">
+                <div className="hidden justify-end lg:flex">
                   <PromptRowModeSwitch promptRowMode={props.promptRowMode} setPromptRowMode={props.setPromptRowMode} />
                 </div>
               </div>
           </PanelToolbar>
 
-          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-4">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto px-3 md:px-4">
             <div className="hidden min-h-0 min-w-0 w-full lg:block">
               <div className="overflow-x-auto pb-4">
                 <WorkspaceTable
@@ -359,7 +371,7 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
               </div>
             </div>
 
-            <div className="space-y-3 py-4 lg:hidden">
+            <div className="space-y-3 py-3 lg:hidden">
               {props.promptsDataLoading ? (
                 <PromptMobileLoadingCards />
               ) : props.filteredPrompts.length === 0 ? (
@@ -398,12 +410,17 @@ export function PromptsTabContent(props: PromptsTabContentProps) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between gap-3 border-t px-4 py-3 md:px-6">
+          <div className="flex items-center justify-between gap-3 border-t px-3 py-3 md:px-6">
             <div className="min-w-0 text-sm text-muted-foreground">
               {props.promptsDataLoading ? (
                 <Skeleton className="h-4 w-28" />
               ) : (
-                t("pageSummary", { page: props.promptPage, total: props.promptTotalPages })
+                <>
+                  <span className="hidden sm:inline">
+                    {t("pageSummary", { page: props.promptPage, total: props.promptTotalPages })}
+                  </span>
+                  <span className="sm:hidden">{props.promptPage}/{props.promptTotalPages}</span>
+                </>
               )}
             </div>
             <div className="flex shrink-0 items-center gap-2">

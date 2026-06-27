@@ -138,7 +138,9 @@ func (c *Client) AnalyzeContentIssues(ctx context.Context, input usecase.Content
 	if err != nil {
 		return nil, fmt.Errorf("call ia service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {
@@ -226,7 +228,9 @@ func (c *Client) executeStructuredPrompt(ctx context.Context, body executePrompt
 	if err != nil {
 		return "", fmt.Errorf("call ia service: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
 	if err != nil {

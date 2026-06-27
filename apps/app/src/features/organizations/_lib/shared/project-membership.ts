@@ -47,6 +47,7 @@ export function getMemberActionPolicy({
   targetRoles: string[];
   isCurrentUser?: boolean;
 }): MemberActionPolicy {
+  void targetRoles;
   const actorIsEditor = hasRole(actorRoles, "editor");
   if (!actorIsEditor) return EMPTY_MEMBER_ACTION_POLICY;
   if (isCurrentUser) return EMPTY_MEMBER_ACTION_POLICY;

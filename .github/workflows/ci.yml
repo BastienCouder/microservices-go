@@ -1,0 +1,327 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  branch-policy:
+    name: Branch policy
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require develop -> main
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "Only pull requests from develop to main are allowed."
+            exit 1
+          fi
+
+  changes:
+    name: Detect changed code
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      web: ${{ steps.filter.outputs.web }}
+      email: ${{ steps.filter.outputs.email }}
+      crawler_service: ${{ steps.filter.outputs.crawler_service }}
+      langgraph_scheduler: ${{ steps.filter.outputs.langgraph_scheduler }}
+      go: ${{ steps.filter.outputs.go }}
+      go_dirs: ${{ steps.filter.outputs.go_dirs }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed files
+        id: filter
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          EVENT_NAME="${{ github.event_name }}"
+          BASE_REF="${{ github.base_ref }}"
+          BEFORE="${{ github.event.before }}"
+          SHA="${{ github.sha }}"
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            git fetch origin "$BASE_REF" --depth=1
+            RANGE="origin/$BASE_REF...HEAD"
+          elif [ -n "$BEFORE" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            RANGE="$BEFORE...$SHA"
+          else
+            RANGE="HEAD~1...HEAD"
+          fi
+
+          echo "Diff range: $RANGE"
+          git diff --name-only "$RANGE" | tee /tmp/changed-files.txt
+
+          has_any() {
+            grep -Eq "$1" /tmp/changed-files.txt
+          }
+
+          ALL=false
+
+          # Si le workflow CI change, on relance tout pour valider la CI.
+          if has_any '^\.github/workflows/ci\.yml$'; then
+            ALL=true
+          fi
+
+          set_bool_output() {
+            NAME="$1"
+            PATTERN="$2"
+
+            if [ "$ALL" = "true" ] || has_any "$PATTERN"; then
+              echo "$NAME=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$NAME=false" >> "$GITHUB_OUTPUT"
+            fi
+          }
+
+          FRONTEND_COMMON='^(package\.json|bun\.lockb|bun\.lock|tsconfig\.json)$'
+
+          set_bool_output app "^apps/app/|$FRONTEND_COMMON"
+          set_bool_output web "^apps/web/|$FRONTEND_COMMON"
+          set_bool_output email "^apps/email/|$FRONTEND_COMMON"
+          set_bool_output crawler_service "^services/crawler-service/|$FRONTEND_COMMON"
+          set_bool_output langgraph_scheduler "^services/langgraph-scheduler/|$FRONTEND_COMMON"
+
+          GO_DIRS=""
+
+          if [ "$ALL" = "true" ] || has_any '^services/(go\.work|go\.mod|go\.sum|internal/|pkg/)'; then
+            GO_DIRS="$(find services -mindepth 2 -maxdepth 2 -name go.mod -exec dirname {} \; | sort | tr '\n' ' ')"
+          else
+            GO_DIRS="$(
+              awk -F/ '/^services\/[^/]+\// { print "services/" $2 }' /tmp/changed-files.txt \
+                | sort -u \
+                | while read -r dir; do
+                    if [ -f "$dir/go.mod" ]; then
+                      echo "$dir"
+                    fi
+                  done \
+                | tr '\n' ' '
+            )"
+          fi
+
+          echo "go_dirs=$GO_DIRS" >> "$GITHUB_OUTPUT"
+
+          if [ -n "$GO_DIRS" ]; then
+            echo "go=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "Detected Go dirs: $GO_DIRS"
+
+  go-checks:
+    name: Go checks
+    needs: changes
+    if: github.event_name != 'pull_request' || github.head_ref == 'develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Skip when no Go code changed
+        if: needs.changes.outputs.go != 'true'
+        run: echo "No Go service changed. Skipping."
+
+      - name: Checkout repository
+        if: needs.changes.outputs.go == 'true'
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        if: needs.changes.outputs.go == 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/go.work
+
+      - name: Configure Go cache
+        if: needs.changes.outputs.go == 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/go-build"
+          go env -w GOCACHE="$RUNNER_TEMP/go-build"
+
+      - name: Check Go formatting
+        if: needs.changes.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+
+          for dir in ${{ needs.changes.outputs.go_dirs }}; do
+            echo "Checking format in $dir"
+            test -z "$(gofmt -l "$dir")" || (echo "Go files need formatting:" && gofmt -l "$dir" && exit 1)
+          done
+
+      - name: Run Go vet
+        if: needs.changes.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+
+          for dir in ${{ needs.changes.outputs.go_dirs }}; do
+            echo "Vetting $dir"
+            (cd "$dir" && go vet ./...)
+          done
+
+      - name: Run Go tests
+        if: needs.changes.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+
+          for dir in ${{ needs.changes.outputs.go_dirs }}; do
+            echo "Testing $dir"
+            (cd "$dir" && go test ./...)
+          done
+
+      - name: Build Go services
+        if: needs.changes.outputs.go == 'true'
+        run: |
+          set -euo pipefail
+
+          for dir in ${{ needs.changes.outputs.go_dirs }}; do
+            echo "Building $dir"
+            (cd "$dir" && go build ./...)
+          done
+
+  app-checks:
+    name: App checks
+    needs: changes
+    if: needs.changes.outputs.app == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/app
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint app
+        run: bun run lint
+
+      - name: Build app
+        run: bun run build
+
+  web-checks:
+    name: Web checks
+    needs: changes
+    if: needs.changes.outputs.web == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint web
+        run: bun run lint
+
+      - name: Check web types
+        run: bun run check-types
+
+      - name: Build web
+        run: npm run build
+
+  crawler-service-checks:
+    name: TypeScript service / crawler-service
+    needs: changes
+    if: needs.changes.outputs.crawler_service == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/crawler-service
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check types
+        run: bun run check
+
+      - name: Build service
+        run: bun run build
+
+  langgraph-scheduler-checks:
+    name: TypeScript service / langgraph-scheduler
+    needs: changes
+    if: needs.changes.outputs.langgraph_scheduler == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/langgraph-scheduler
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check types
+        run: bun run check
+
+      - name: Run tests
+        run: bun test
+
+      - name: Build service
+        run: bun run build
+
+  email-build:
+    name: Email build
+    needs: changes
+    if: needs.changes.outputs.email == 'true' && (github.event_name != 'pull_request' || github.head_ref == 'develop')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/email
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.2.22
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build emails
+        run: bun run build

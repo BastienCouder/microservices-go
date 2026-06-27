@@ -660,10 +660,6 @@ function deriveTrend(
   return buildTrendSeriesByPeriod(responses, referenceDate, latestRunId);
 }
 
-function normalizeStringList(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && item !== "") : [];
-}
-
 function serializeResponses(responses: ParsedResponse[]): PerceptionResponseRecord[] {
   return responses.map((response) => ({
     ...response,

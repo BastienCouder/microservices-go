@@ -48,7 +48,6 @@ export function SidebarOrganizationSwitcher({
   const content = useI18nScope("sidebar");
   const currentProject = projects.find((project) => project.id === activeProjectId) || projects[0];
   const title = currentProject?.name || content.projects;
-  const subtitle = getSubtitle(currentProject, content);
 
   return (
       <Popover open={orgOpen} onOpenChange={setOrgOpen}>

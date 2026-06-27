@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"sort"
@@ -386,67 +385,6 @@ func (s *StateStore) loadBrandCanon(ctx context.Context, state *persistedState) 
 	return rows.Err()
 }
 
-func (s *StateStore) loadModels(ctx context.Context, state *persistedState) error {
-	rows, err := s.db.Query(ctx, `
-		SELECT id, display_name, provider, group_name, icon_key, provider_model_id, is_active, supports_live_search,
-			credit_cost, input_price_per_million, output_price_per_million, openrouter_pricing
-		FROM ai_models
-		ORDER BY display_name ASC, id ASC
-	`)
-	if err != nil {
-		return fmt.Errorf("select models: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var (
-			item        usecase.AIModel
-			group       *string
-			iconKey     *string
-			inputPrice  sql.NullFloat64
-			outputPrice sql.NullFloat64
-			rawPricing  []byte
-		)
-		if err := rows.Scan(
-			&item.ID,
-			&item.Label,
-			&item.Provider,
-			&group,
-			&iconKey,
-			&item.ModelID,
-			&item.IsActive,
-			&item.SupportsLiveSearch,
-			&item.CreditCost,
-			&inputPrice,
-			&outputPrice,
-			&rawPricing,
-		); err != nil {
-			return fmt.Errorf("scan model: %w", err)
-		}
-		if item.CreditCost < 1 {
-			item.CreditCost = 1
-		}
-		if inputPrice.Valid {
-			value := inputPrice.Float64
-			item.InputPricePerMillion = &value
-		}
-		if outputPrice.Valid {
-			value := outputPrice.Float64
-			item.OutputPricePerMillion = &value
-		}
-		if len(rawPricing) > 0 {
-			if err := json.Unmarshal(rawPricing, &item.OpenRouterPricing); err != nil {
-				return fmt.Errorf("decode model openrouter pricing: %w", err)
-			}
-		}
-		item.Group = stringValue(group)
-		item.IconKey = stringValue(iconKey)
-		item.IconPath = iconPathFromKey(item.IconKey)
-		state.Models[item.ID] = item
-	}
-	return rows.Err()
-}
-
 func (s *StateStore) loadProjectModels(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
 		SELECT project_id, model_id, is_enabled
@@ -588,34 +526,6 @@ func (s *StateStore) loadOutbox(ctx context.Context, state *persistedState) erro
 		state.OutboxOrder = append(state.OutboxOrder, item.ID)
 	}
 	return rows.Err()
-}
-
-func insertProjectModelsCatalog(ctx context.Context, tx pgx.Tx, models map[string]usecase.AIModel) error {
-	for _, modelID := range sortedModelIDs(models) {
-		model := models[modelID]
-		creditCost := model.CreditCost
-		if creditCost < 1 {
-			creditCost = 1
-		}
-		var rawPricing []byte
-		if len(model.OpenRouterPricing) > 0 {
-			payload, err := json.Marshal(model.OpenRouterPricing)
-			if err != nil {
-				return fmt.Errorf("encode ai model %s openrouter pricing: %w", model.ID, err)
-			}
-			rawPricing = payload
-		}
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO ai_models (
-				id, provider, display_name, group_name, icon_key, provider_model_id, is_active, supports_live_search,
-				credit_cost, input_price_per_million, output_price_per_million, openrouter_pricing, created_at, updated_at
-			)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, NOW(), NOW())
-		`, model.ID, model.Provider, model.Label, nullIfEmptyOrFallback(model.Group, model.Provider), nullIfEmptyOrFallback(model.IconKey, model.Provider), nullIfEmptyOrFallback(model.ModelID, model.ID), model.IsActive, model.SupportsLiveSearch, creditCost, model.InputPricePerMillion, model.OutputPricePerMillion, rawPricing); err != nil {
-			return fmt.Errorf("insert ai model %s: %w", model.ID, err)
-		}
-	}
-	return nil
 }
 
 func insertBrandCanon(ctx context.Context, tx pgx.Tx, canonByProject map[string]*usecase.BrandCanon) error {
@@ -920,15 +830,6 @@ func sortedBrandCanonProjectIDs(items map[string]*usecase.BrandCanon) []string {
 	return ids
 }
 
-func sortedModelIDs(items map[string]usecase.AIModel) []string {
-	ids := make([]string, 0, len(items))
-	for id := range items {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
 func orderedOutboxIDs(outbox map[string]*usecase.OutboxEvent, order []string) []string {
 	seen := make(map[string]bool, len(order))
 	orderedIDs := make([]string, 0, len(outbox))
@@ -999,20 +900,6 @@ func decodeStringSlice(raw []byte) []string {
 	return values
 }
 
-func decodeMap(raw []byte) map[string]any {
-	if len(raw) == 0 {
-		return map[string]any{}
-	}
-	var values map[string]any
-	if err := json.Unmarshal(raw, &values); err != nil {
-		return map[string]any{}
-	}
-	if values == nil {
-		return map[string]any{}
-	}
-	return values
-}
-
 func timeValue(value *time.Time) time.Time {
 	if value == nil {
 		return time.Time{}
@@ -1025,11 +912,4 @@ func nullIfZeroTime(value time.Time) any {
 		return nil
 	}
 	return value
-}
-
-func iconPathFromKey(iconKey string) string {
-	if iconKey == "" {
-		return ""
-	}
-	return "/models/" + iconKey + ".svg"
 }

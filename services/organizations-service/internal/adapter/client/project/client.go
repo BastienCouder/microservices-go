@@ -74,7 +74,9 @@ func (c *Client) listProjects(ctx context.Context, organizationID, userID int64)
 	if err != nil {
 		return nil, fmt.Errorf("send project request: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))

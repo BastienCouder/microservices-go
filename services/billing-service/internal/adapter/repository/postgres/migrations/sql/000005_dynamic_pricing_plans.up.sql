@@ -4,9 +4,9 @@ ADD COLUMN IF NOT EXISTS max_projects INTEGER NOT NULL DEFAULT 0;
 UPDATE billing_plan_settings
 SET max_projects = CASE plan
   WHEN 'developer' THEN 1
-  WHEN 'starter' THEN 3
+  WHEN 'starter' THEN 1
   WHEN 'growth' THEN 5
-  WHEN 'pro' THEN 0
+  WHEN 'pro' THEN 20
   ELSE max_projects
 END;
 

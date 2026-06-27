@@ -43,18 +43,13 @@ export function PerceptionDonutVisual({
     return [...orderedPoints].sort((left, right) => right.score - left.score);
   }, [points]);
 
-  const overallScore = useMemo(() => averageScore(rankedPoints.map((point) => point.score)), [rankedPoints]);
-  const alignedAxesCount = rankedPoints.filter((point) => point.score >= point.target).length;
-  const bestPoint = rankedPoints[0] ?? null;
-  const weakestPoint = rankedPoints[rankedPoints.length - 1] ?? null;
-
   if (rankedPoints.length === 0) {
     return (
       <div className="px-5 py-3">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0 flex-1">
             <SectionTitle>{t("donutTitle")}</SectionTitle>
-            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+            <p className="mt-2 hidden max-w-2xl text-sm text-muted-foreground md:block">{t("donutSubtitle")}</p>
           </div>
           <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
             {periodLabel}
@@ -70,7 +65,7 @@ export function PerceptionDonutVisual({
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <SectionTitle>{t("donutTitle")}</SectionTitle>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">{t("donutSubtitle")}</p>
+          <p className="mt-2 hidden max-w-2xl text-sm text-muted-foreground md:block">{t("donutSubtitle")}</p>
         </div>
         <Badge variant="secondary" className="w-fit shrink-0 bg-muted/50 text-xs font-normal uppercase text-muted-foreground md:text-sm">
           {periodLabel}
@@ -156,9 +151,4 @@ function AxisProgressRow({
       </div>
     </div>
   );
-}
-
-function averageScore(values: number[]): number {
-  if (values.length === 0) return 0;
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }

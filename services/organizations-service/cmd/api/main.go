@@ -77,7 +77,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("init invitation notification publisher: %v", err)
 	}
-	defer invitationNotifier.Close()
+	defer func() {
+		if err := invitationNotifier.Close(); err != nil {
+			log.Printf("close invitation notifier: %v", err)
+		}
+	}()
 	svc.EnableInvitationNotifications(invitationNotifier, cfg.AppBaseURL, cfg.InvitationLoginURL)
 	h := httpadapter.NewHandler(svc, serviceboot.DatabaseReadiness(db))
 	g := grpcadapter.NewServer(svc)
@@ -106,7 +110,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("listen grpc error: %v", err)
 	}
-	defer grpcListener.Close()
+	defer func() {
+		if err := grpcListener.Close(); err != nil {
+			log.Printf("close grpc listener: %v", err)
+		}
+	}()
 
 	go func() {
 		log.Printf("organizations-service listening on %s", cfg.HTTPAddr)
