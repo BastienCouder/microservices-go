@@ -3,7 +3,7 @@ export const locales = ["fr", "en"] as const;
 export type Locale = (typeof locales)[number];
 
 export const defaultLocale: Locale = "fr";
-export const localePrefix = "as-needed";
+export const localePrefix = "always";
 
 export function isLocale(value: string): value is Locale {
   return locales.includes(value as Locale);
@@ -36,10 +36,5 @@ export function stripLocalePrefix(pathname: string): string {
 
 export function getLocalizedPathname(locale: Locale, pathname: string): string {
   const normalizedPathname = stripLocalePrefix(pathname);
-
-  if (locale === defaultLocale) {
-    return normalizedPathname;
-  }
-
   return normalizedPathname === "/" ? `/${locale}` : `/${locale}${normalizedPathname}`;
 }

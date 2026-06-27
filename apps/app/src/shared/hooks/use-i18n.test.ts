@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 
 import { getI18nText, translateI18nText } from "./use-i18n";
 
+const hookSource = await Bun.file(new URL("./use-i18n.ts", import.meta.url)).text();
+
 describe("getI18nText", () => {
   test("returns the localized monitoring copy for French and English", () => {
     expect(getI18nText("monitoring-analytics-panel", "visibilityAnalyticsTitle", "fr-FR")).toBe(
@@ -52,5 +54,12 @@ describe("translateI18nText", () => {
         count: 1,
       }),
     ).toBe("1 competitor");
+  });
+});
+
+describe("useScopedI18n", () => {
+  test("keeps the translation callback stable between renders", () => {
+    expect(hookSource.includes("const t = useCallback(")).toBe(true);
+    expect(hookSource.includes("[locale, namespace]")).toBe(true);
   });
 });

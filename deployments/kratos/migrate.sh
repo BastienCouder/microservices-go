@@ -27,6 +27,20 @@ if [ -z "${KRATOS_OIDC_GOOGLE_CLIENT_SECRET:-}" ] && [ -f /run/secrets/google_oi
   KRATOS_OIDC_GOOGLE_CLIENT_SECRET="$(tr -d '\r\n' < /run/secrets/google_oidc_client_secret)"
   export KRATOS_OIDC_GOOGLE_CLIENT_SECRET
 fi
+if [ -z "${KRATOS_SMTP_CONNECTION_URI:-}" ] && [ -f /run/secrets/resend_smtp_connection_uri ]; then
+  KRATOS_SMTP_CONNECTION_URI="$(tr -d '\r\n' < /run/secrets/resend_smtp_connection_uri)"
+  export KRATOS_SMTP_CONNECTION_URI
+fi
+if [ -z "${KRATOS_SMTP_FROM_ADDRESS:-}" ] && [ -f /run/secrets/resend_from_email ]; then
+  resend_from="$(tr -d '\r\n' < /run/secrets/resend_from_email)"
+  case "${resend_from}" in
+    *\<*\>) KRATOS_SMTP_FROM_ADDRESS="${resend_from#*<}"; KRATOS_SMTP_FROM_ADDRESS="${KRATOS_SMTP_FROM_ADDRESS%>*}" ;;
+    *) KRATOS_SMTP_FROM_ADDRESS="${resend_from}" ;;
+  esac
+  export KRATOS_SMTP_FROM_ADDRESS
+fi
+: "${KRATOS_SMTP_FROM_NAME:=Visia}"
+export KRATOS_SMTP_FROM_NAME
 
 if [ -z "${KRATOS_OIDC_GOOGLE_CLIENT_ID:-}" ]; then
   echo "KRATOS_OIDC_GOOGLE_CLIENT_ID is required (env or /run/secrets/google_oidc_client_id)" >&2
@@ -34,6 +48,14 @@ if [ -z "${KRATOS_OIDC_GOOGLE_CLIENT_ID:-}" ]; then
 fi
 if [ -z "${KRATOS_OIDC_GOOGLE_CLIENT_SECRET:-}" ]; then
   echo "KRATOS_OIDC_GOOGLE_CLIENT_SECRET is required (env or /run/secrets/google_oidc_client_secret)" >&2
+  exit 1
+fi
+if [ -z "${KRATOS_SMTP_CONNECTION_URI:-}" ]; then
+  echo "KRATOS_SMTP_CONNECTION_URI is required (env or /run/secrets/resend_smtp_connection_uri)" >&2
+  exit 1
+fi
+if [ -z "${KRATOS_SMTP_FROM_ADDRESS:-}" ]; then
+  echo "KRATOS_SMTP_FROM_ADDRESS is required (env or /run/secrets/resend_from_email)" >&2
   exit 1
 fi
 

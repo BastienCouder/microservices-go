@@ -8,7 +8,6 @@ use (
 	./billing-service
 	./contracts
 	./ia-service
-	./mcp-server
 	./notification-service
 	./organizations-service
 	./permission-service

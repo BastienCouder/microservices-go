@@ -49,6 +49,14 @@ type ContentOptimizerCrawlResultInput struct {
 	SkipAnalysis bool   `json:"skipAnalysis,omitempty"`
 }
 
+type ContentOptimizerAnalysisStartInput struct {
+	Records         []ContentOptimizerCrawlRecord `json:"records"`
+	ModelID         string                        `json:"modelId"`
+	ProviderModelID string                        `json:"providerModelId"`
+	ProviderID      string                        `json:"providerId"`
+	CreditCost      int                           `json:"creditCost"`
+}
+
 type ContentOptimizerCrawlJob struct {
 	ID     string `json:"id"`
 	Status string `json:"status"`
@@ -79,6 +87,7 @@ type ContentOptimizerCrawlRecord struct {
 type ContentOptimizerCrawlResult struct {
 	ID                 string                        `json:"id"`
 	Status             string                        `json:"status"`
+	AnalysisStatus     string                        `json:"analysisStatus,omitempty"`
 	BrowserSecondsUsed float64                       `json:"browserSecondsUsed,omitempty"`
 	Total              int                           `json:"total"`
 	Finished           int                           `json:"finished"`
@@ -218,11 +227,12 @@ func (s *Service) AnalyzeSelectedContentOptimizerRecords(
 	}
 
 	result := ContentOptimizerCrawlResult{
-		ID:       jobID,
-		Status:   "completed",
-		Total:    len(normalizedRecords),
-		Finished: len(normalizedRecords),
-		Records:  normalizedRecords,
+		ID:             jobID,
+		Status:         "completed",
+		AnalysisStatus: "completed",
+		Total:          len(normalizedRecords),
+		Finished:       len(normalizedRecords),
+		Records:        normalizedRecords,
 	}
 	result = s.analyzeContentOptimizerCrawlResult(ctx, projectID, organizationID, result)
 	if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, jobID, result); err != nil {
@@ -235,6 +245,96 @@ func (s *Service) AnalyzeSelectedContentOptimizerRecords(
 	return result, nil
 }
 
+func (s *Service) StartContentOptimizerAnalysis(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	input ContentOptimizerAnalysisStartInput,
+) (AnalysisRun, error) {
+	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
+		return AnalysisRun{}, err
+	}
+	records := normalizeSelectedContentOptimizerRecords(input.Records)
+	if len(records) == 0 {
+		return AnalysisRun{}, fmt.Errorf("%w: at least one selected record is required", ErrValidation)
+	}
+	input.ModelID = strings.TrimSpace(input.ModelID)
+	input.ProviderModelID = strings.TrimSpace(input.ProviderModelID)
+	input.ProviderID = strings.TrimSpace(input.ProviderID)
+	if input.ModelID == "" || input.ProviderModelID == "" || input.ProviderID == "" {
+		return AnalysisRun{}, fmt.Errorf("%w: modelId, providerModelId and providerId are required", ErrValidation)
+	}
+	if input.CreditCost <= 0 {
+		return AnalysisRun{}, fmt.Errorf("%w: creditCost must be positive", ErrValidation)
+	}
+	if s.projectModels != nil {
+		enabled, err := s.projectModels.ListProjectEnabledModels(ctx, projectID, organizationID)
+		if err != nil {
+			return AnalysisRun{}, err
+		}
+		allowed := false
+		for _, id := range enabled {
+			if strings.TrimSpace(id) == input.ModelID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return AnalysisRun{}, fmt.Errorf("%w: selected model is not enabled for this project", ErrValidation)
+		}
+	}
+
+	requestID := "content-analysis-" + strconv.FormatInt(s.now().UTC().UnixNano(), 10)
+	run, err := s.ReserveCreditUsage(ctx, CreditUsageInput{
+		RequestID: requestID, OrganizationID: organizationID, ProjectID: projectID,
+		RunType: RunTypeContentSelectedAnalysis, Credits: len(records) * input.CreditCost,
+	})
+	if err != nil {
+		return AnalysisRun{}, err
+	}
+
+	baseRecords := append([]ContentOptimizerCrawlRecord(nil), records...)
+	if latest, latestErr := s.GetLatestContentOptimizerCrawl(ctx, projectID, organizationID); latestErr == nil && len(latest.Result.Records) > 0 {
+		baseRecords = append([]ContentOptimizerCrawlRecord(nil), latest.Result.Records...)
+	}
+	go s.runContentOptimizerAnalysis(run.ID, projectID, organizationID, baseRecords, records, input.ProviderModelID, input.ProviderID)
+	return run, nil
+}
+
+func (s *Service) runContentOptimizerAnalysis(runID string, projectID string, organizationID int64, baseRecords []ContentOptimizerCrawlRecord, records []ContentOptimizerCrawlRecord, modelID string, providerID string) {
+	ctx := context.Background()
+	for index := range records {
+		records[index].Issues = nil
+	}
+	result := ContentOptimizerCrawlResult{
+		ID: runID, Status: "completed", AnalysisStatus: "completed",
+		Total: len(records), Finished: len(records), Records: records,
+	}
+	result = s.analyzeContentOptimizerCrawlResultWithModel(ctx, projectID, organizationID, result, modelID, providerID)
+	analyzedByURL := make(map[string]ContentOptimizerCrawlRecord, len(result.Records))
+	for _, record := range result.Records {
+		analyzedByURL[strings.TrimSpace(record.URL)] = record
+	}
+	merged := append([]ContentOptimizerCrawlRecord(nil), baseRecords...)
+	for index, record := range merged {
+		if analyzed, ok := analyzedByURL[strings.TrimSpace(record.URL)]; ok {
+			merged[index] = analyzed
+			delete(analyzedByURL, strings.TrimSpace(record.URL))
+		}
+	}
+	for _, record := range analyzedByURL {
+		merged = append(merged, record)
+	}
+	result.Records = merged
+	result.Total = len(merged)
+	result.Finished = len(merged)
+	if err := s.saveLatestContentOptimizerCrawl(ctx, projectID, organizationID, runID, result); err != nil {
+		_, _ = s.ReleaseCreditUsage(ctx, runID)
+		return
+	}
+	_, _ = s.CompleteCreditUsage(ctx, runID)
+}
+
 func (s *Service) GetLatestContentOptimizerCrawl(
 	ctx context.Context,
 	projectID string,
@@ -243,6 +343,15 @@ func (s *Service) GetLatestContentOptimizerCrawl(
 	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return ContentOptimizerCrawlSnapshot{}, err
 	}
+
+	s.mu.RLock()
+	localSnapshot, hasLocalSnapshot := s.contentCrawls[contentOptimizerCrawlKey(projectID, organizationID)]
+	if hasLocalSnapshot && localSnapshot != nil && localSnapshot.Result.AnalysisStatus == "completed" {
+		out := copyContentOptimizerCrawlSnapshot(localSnapshot)
+		s.mu.RUnlock()
+		return out, nil
+	}
+	s.mu.RUnlock()
 
 	if provider, ok := s.contentCrawler.(interface {
 		GetLatestCrawl(context.Context, string, int64) (ContentOptimizerCrawlSnapshot, error)
@@ -547,6 +656,7 @@ func contentOptimizerCrawlKey(projectID string, organizationID int64) string {
 }
 
 func analyzeContentOptimizerCrawlResult(result ContentOptimizerCrawlResult) ContentOptimizerCrawlResult {
+	result.AnalysisStatus = "completed"
 	result.Records = append([]ContentOptimizerCrawlRecord(nil), result.Records...)
 	for index := range result.Records {
 		result.Records[index].Issues = mergeContentOptimizerIssues(
@@ -576,6 +686,17 @@ func (s *Service) analyzeContentOptimizerCrawlResult(
 	organizationID int64,
 	result ContentOptimizerCrawlResult,
 ) ContentOptimizerCrawlResult {
+	return s.analyzeContentOptimizerCrawlResultWithModel(ctx, projectID, organizationID, result, "", "")
+}
+
+func (s *Service) analyzeContentOptimizerCrawlResultWithModel(
+	ctx context.Context,
+	projectID string,
+	organizationID int64,
+	result ContentOptimizerCrawlResult,
+	modelID string,
+	providerID string,
+) ContentOptimizerCrawlResult {
 	result = analyzeContentOptimizerCrawlResult(result)
 	if s.contentIssueAnalyzer == nil {
 		return result
@@ -586,6 +707,8 @@ func (s *Service) analyzeContentOptimizerCrawlResult(
 		aiIssues, err := s.contentIssueAnalyzer.AnalyzeContentIssues(ctx, ContentIssueAnalysisInput{
 			ProjectID:           projectID,
 			OrganizationID:      organizationID,
+			ModelID:             modelID,
+			ProviderID:          providerID,
 			Record:              record,
 			DeterministicIssues: append([]ContentOptimizerIssue(nil), record.Issues...),
 		})
@@ -672,7 +795,7 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		})
 	}
 
-	if !contentOptimizerHasMetaDescription(record.HTML) {
+	if strings.TrimSpace(record.HTML) != "" && !contentOptimizerHasMetaDescription(record.HTML) {
 		issues = append(issues, ContentOptimizerIssue{
 			ID:             contentOptimizerIssueID(record.URL, "missing_meta_description"),
 			Category:       "seo",
@@ -838,7 +961,7 @@ func analyzeContentOptimizerRecord(record ContentOptimizerCrawlRecord) []Content
 		})
 	}
 
-	if !containsAny(lowerHTML, "schema.org", "application/ld+json", "\"@type\"", "\"@context\"") {
+	if strings.TrimSpace(record.HTML) != "" && !containsAny(lowerHTML, "schema.org", "application/ld+json", "\"@type\"", "\"@context\"") {
 		issues = append(issues, ContentOptimizerIssue{
 			ID:             contentOptimizerIssueID(record.URL, "missing_schema_markup"),
 			Category:       "geo",

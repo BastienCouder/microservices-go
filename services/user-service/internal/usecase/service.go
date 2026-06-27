@@ -18,21 +18,51 @@ func NewService(repo domain.Repository) *Service {
 	return &Service{repo: repo, now: time.Now}
 }
 
-func (s *Service) CreateUser(ctx context.Context, authIdentityID, email, firstName, lastName string) (*domain.User, error) {
+func (s *Service) CreateUser(ctx context.Context, authIdentityID, email, firstName, lastName string, consentAccepted bool, consentType, consentVersion string) (*domain.User, error) {
+	consentType = strings.TrimSpace(consentType)
+	consentVersion = strings.TrimSpace(consentVersion)
+	if !consentAccepted || consentType != domain.ConsentTypePrivacyPolicy || consentVersion != domain.ConsentVersionV1 {
+		return nil, domain.ErrConsentRequired
+	}
+	acceptedAt := s.now().UTC()
 	user := &domain.User{
 		AuthIdentityID: strings.TrimSpace(authIdentityID),
 		Email:          strings.TrimSpace(strings.ToLower(email)),
 		FirstName:      strings.TrimSpace(firstName),
 		LastName:       strings.TrimSpace(lastName),
-		CreatedAt:      s.now().UTC(),
+		CreatedAt:      acceptedAt,
 	}
 	if err := user.Validate(); err != nil {
 		return nil, err
 	}
-	if err := s.repo.Create(ctx, user); err != nil {
+	consent := domain.UserConsent{Type: consentType, Version: consentVersion, AcceptedAt: acceptedAt}
+	if err := s.repo.Create(ctx, user, consent); err != nil {
 		return nil, fmt.Errorf("create user: %w", err)
 	}
 	return user, nil
+}
+
+func (s *Service) HasValidConsent(ctx context.Context, authIdentityID, consentType, version string) (bool, error) {
+	authIdentityID = strings.TrimSpace(authIdentityID)
+	if authIdentityID == "" || strings.TrimSpace(consentType) == "" || strings.TrimSpace(version) == "" {
+		return false, domain.ErrConsentRequired
+	}
+	ok, err := s.repo.HasConsentByAuthIdentityID(ctx, authIdentityID, consentType, version)
+	if err != nil {
+		return false, fmt.Errorf("check user consent: %w", err)
+	}
+	return ok, nil
+}
+
+func (s *Service) AcceptConsent(ctx context.Context, authIdentityID, consentType, version string) error {
+	if strings.TrimSpace(authIdentityID) == "" || consentType != domain.ConsentTypePrivacyPolicy || version != domain.ConsentVersionV1 {
+		return domain.ErrConsentRequired
+	}
+	consent := domain.UserConsent{Type: consentType, Version: version, AcceptedAt: s.now().UTC()}
+	if err := s.repo.AddConsentByAuthIdentityID(ctx, strings.TrimSpace(authIdentityID), consent); err != nil {
+		return fmt.Errorf("accept user consent: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) ListUsers(ctx context.Context) ([]domain.User, error) {

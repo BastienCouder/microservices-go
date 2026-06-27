@@ -1,6 +1,7 @@
 package ga4
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -476,5 +477,21 @@ func TestBuildFakeTrafficReportFillsDashboardRows(t *testing.T) {
 	}
 	if report.BySource[0].ShareOfTrafficSessions <= 0 {
 		t.Fatalf("expected fake source shares, got %+v", report.BySource[0])
+	}
+}
+
+func TestSeedTrafficPropertyReturnsDemoReportWithoutGoogleCredentials(t *testing.T) {
+	client := NewClient()
+	from := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC)
+	to := time.Date(2026, 5, 31, 0, 0, 0, 0, time.UTC)
+	report, err := client.GetTrafficReport(context.Background(), usecase.ProjectMetadata{
+		ID:  "nike",
+		GA4: usecase.ProjectGA4Integration{PropertyID: usecase.SeedTrafficPropertyID},
+	}, from, to, usecase.TrafficFilters{})
+	if err != nil {
+		t.Fatalf("expected seed report, got %v", err)
+	}
+	if report.DataSource != usecase.TrafficDataSourceFake || len(report.BySource) == 0 || len(report.Timeseries) == 0 {
+		t.Fatalf("expected complete seeded traffic report, got %+v", report)
 	}
 }

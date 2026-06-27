@@ -8,8 +8,14 @@ import (
 )
 
 var (
-	ErrUserNotFound = errors.New("user not found")
-	ErrInvalidUser  = errors.New("invalid user")
+	ErrUserNotFound    = errors.New("user not found")
+	ErrInvalidUser     = errors.New("invalid user")
+	ErrConsentRequired = errors.New("valid consent required")
+)
+
+const (
+	ConsentTypePrivacyPolicy = "privacy_policy"
+	ConsentVersionV1         = "v1"
 )
 
 type User struct {
@@ -29,6 +35,14 @@ type AnonymizedUser struct {
 	Email          string
 	FirstName      string
 	LastName       string
+}
+
+type UserConsent struct {
+	ID         string
+	UserID     int64
+	Type       string
+	Version    string
+	AcceptedAt time.Time
 }
 
 func (u *User) Validate() error {

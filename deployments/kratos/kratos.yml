@@ -88,7 +88,9 @@ log:
 courier:
   template_override_path: /etc/config/kratos/courier
   smtp:
-    connection_uri: smtp://mailhog:1025/?skip_ssl_verify=true
+    connection_uri: ${KRATOS_SMTP_CONNECTION_URI}
+    from_address: ${KRATOS_SMTP_FROM_ADDRESS}
+    from_name: ${KRATOS_SMTP_FROM_NAME}
 
 secrets:
   cookie:

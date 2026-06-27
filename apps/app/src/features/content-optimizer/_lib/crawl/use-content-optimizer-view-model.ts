@@ -3,12 +3,16 @@ import { useMutation } from "@tanstack/react-query";
 
 import {
   dismissToast,
+  pushErrorToast,
   pushInfoToast,
   pushLoadingToast,
+  pushSuccessToast,
 } from "@/components/ui/toast-actions";
 import {
+  analyzeSelectedContentOptimizerRecords,
   getContentOptimizerSelectionDraft,
   getContentOptimizerCrawl,
+  getContentOptimizerAnalysisRun,
   getLatestContentOptimizerCrawl,
   getProjectSummary,
   saveContentOptimizerSelectionDraft,
@@ -176,6 +180,7 @@ export function useContentOptimizerViewModel({
   );
   const [selectedCrawlLimitResolved, setSelectedCrawlLimitResolved] =
     useState(false);
+  const [diagnosticAnalysisRunning, setDiagnosticAnalysisRunning] = useState(false);
 
   const discoveredPages = useMemo(
     () =>
@@ -727,7 +732,8 @@ export function useContentOptimizerViewModel({
             showURLSelection();
             setPhase("review");
           } else {
-            setCrawlResult(completed);
+            const pendingAnalysis = { ...completed, analysisStatus: "pending" as const };
+            setCrawlResult(pendingAnalysis);
             setDiscoveryResult(null);
             applySelectedRecords(completed.records);
             hideURLSelection();
@@ -918,6 +924,62 @@ export function useContentOptimizerViewModel({
     discoverMutation.mutate();
   }
 
+  async function analyzeDiagnostics(model: {
+    id: string;
+    provider: string;
+    providerModelId: string;
+    creditCost: number;
+  }, record: ContentOptimizerCrawlRecord) {
+    if (diagnosticAnalysisRunning || !record.url) return;
+    setDiagnosticAnalysisRunning(true);
+    setError(null);
+    setCrawlResult((current) => current ? { ...current, analysisStatus: "pending" } : current);
+    const toastId = pushLoadingToast(
+      t("analysisInProgress"),
+      t("backgroundAnalysisAcceptedDescription"),
+    );
+    try {
+      const run = await analyzeSelectedContentOptimizerRecords(apiBaseURL, {
+        projectId,
+        organizationId,
+        records: [record],
+        modelId: model.id,
+        providerModelId: model.providerModelId,
+        providerId: model.provider,
+        creditCost: model.creditCost,
+      });
+      for (;;) {
+        await new Promise((resolve) => window.setTimeout(resolve, CRAWL_POLL_INTERVAL_MS));
+        const currentRun = await getContentOptimizerAnalysisRun(apiBaseURL, {
+          runId: run.id,
+          organizationId,
+        });
+        if (currentRun.status === "failed" || currentRun.status === "cancelled") {
+          throw new Error(t("analyzeSiteError"));
+        }
+        if (currentRun.status === "completed") break;
+      }
+      const latest = await getLatestContentOptimizerCrawl(apiBaseURL, {
+        projectId,
+        organizationId,
+      });
+      if (latest?.result) {
+        setCrawlResult(latest.result);
+        applySelectedRecords(latest.result.records);
+        setSelectedResultURL(record.url);
+      }
+      dismissToast(toastId);
+      pushSuccessToast(t("analysisCompletedToastTitle"), t("analysisCompletedToastDescription"));
+    } catch (analysisError) {
+      dismissToast(toastId);
+      setCrawlResult((current) => current ? { ...current, analysisStatus: "failed" } : current);
+      setError(analysisError instanceof Error ? analysisError.message : t("analyzeSiteError"));
+      pushErrorToast(analysisError, t("analyzeSiteError"));
+    } finally {
+      setDiagnosticAnalysisRunning(false);
+    }
+  }
+
   return {
     projectId,
     organizationId,
@@ -951,6 +1013,8 @@ export function useContentOptimizerViewModel({
     crawling:
       phase === "crawling" ||
       crawlMutation.isPending,
+    diagnosticAnalysisRunning,
+    analyzeDiagnostics,
     discover: () => {
       discoverMutation.mutate();
     },

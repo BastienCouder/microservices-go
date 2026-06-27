@@ -28,6 +28,7 @@ BACKUP_POSTGRES_PORT ?= 5432
 BACKUP_POSTGRES_USER ?= postgres
 R2_PREFIX ?= postgres
 R2_REGION ?= auto
+SEED_USER_EMAIL ?= couderbastien
 
 PROFILES_DEV := --profile frontend --profile backend
 PROFILES_PROD := --profile frontend --profile backend --profile infra
@@ -108,7 +109,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 
 .PHONY: help \
 	dev dev-build dev-down dev-logs dev-migrate dev-reset dev-clean-cache \
-	dev-doc dev-email dev-mcp \
+	dev-doc dev-email \
 	prod prod-build prod-down prod-restart prod-rebuild prod-logs prod-migrate \
 	prod-front prod-app prod-web prod-services prod-service \
 	prod-services-api-gateway prod-services-user prod-services-organizations \
@@ -117,7 +118,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	prod-services-kratos \
 	prod-ping prod-check deploy-prod deploy-prod-front deploy-prod-app deploy-prod-web deploy-prod-services deploy-prod-service deploy-prod-backup-cron \
 	backup-r2-once \
-	prod-doc prod-email prod-mcp \
+	prod-doc prod-email \
 	db-generate db-migrate \
 	stripe-listen stripe-trigger stripe-trigger-checkout \
 	secrets-generate secrets-verify-generated secrets-init secrets-check \
@@ -129,7 +130,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	langgraph-check langgraph-test langgraph-build langgraph-ci \
 	crawler-check crawler-build crawler-ci \
 	ts-ci frontend-ci ci-all \
-	seed-nike seed-nike-live \
+	seed-nike seed-nike-live seed-nike-prod seed-nike-prod-live \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
 	$(foreach service,$(MIGRATION_SERVICES),migrate-$(service) migrate-$(service)-dev)
 
@@ -146,7 +147,6 @@ help:
 	@echo "    make dev-reset        Stop, clean Go cache, rebuild backend"
 	@echo "    make dev-doc          Start docs only"
 	@echo "    make dev-email        Start email renderer only"
-	@echo "    make dev-mcp          Start MCP server only"
 	@echo ""
 	@echo "  Database"
 	@echo "    make db-generate      Run sqlc for all configured services"
@@ -176,9 +176,9 @@ help:
 	@echo "    make prod-services-crawler  Rebuild and start crawler-service"
 	@echo "    make prod-services-api-gateway Rebuild and start api-gateway"
 	@echo "    make prod-migrate     Run all production migrations"
+	@echo "    make seed-nike-prod   Migrate and seed a complete Nike project for SEED_USER_EMAIL"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
-	@echo "    make prod-mcp         Start MCP server only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
 	@echo "    make prod-check       Ansible syntax check"
 	@echo "    make deploy-prod      Deploy full production stack with Ansible"
@@ -252,9 +252,6 @@ dev-doc: secrets-check
 
 dev-email: secrets-check
 	$(COMPOSE_DEV) --profile email up
-
-dev-mcp: secrets-check
-	$(COMPOSE_DEV) --profile mcp up
 
 db-generate:
 	@for service in $(SQLC_SERVICES); do \
@@ -390,9 +387,6 @@ prod-doc: secrets-check
 
 prod-email: secrets-check
 	$(COMPOSE_PROD_LOCAL_SERIAL) --profile email up -d
-
-prod-mcp: secrets-check
-	$(COMPOSE_PROD_LOCAL_SERIAL) --profile mcp up -d
 
 prod-ping:
 	ansible -i $(ANSIBLE_INVENTORY) production -m ping --ask-become-pass
@@ -675,6 +669,7 @@ seed-nike:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=synthetic \
 		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 
@@ -686,6 +681,31 @@ seed-nike-live:
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
+		-e SEED_ANALYSIS_MODE=live \
+		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+
+seed-nike-prod: prod-migrate
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace \
+		-v /usr/bin/docker:/usr/local/bin/docker \
+		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
+		-e SEED_ANALYSIS_MODE=synthetic \
+		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
+
+seed-nike-prod-live: prod-migrate
+	docker run --rm \
+		-v "$$(pwd):/workspace" -w /workspace \
+		-v /usr/bin/docker:/usr/local/bin/docker \
+		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		-e SEED_COMPOSE_PROJECT_NAME=microservices-go-prod \
+		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
+		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
 		-e SEED_ANALYSIS_MODE=live \
 		oven/bun:1.2.22 bun scripts/seed-nike-backend.ts
 

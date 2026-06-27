@@ -53,7 +53,10 @@ describe("seed-nike-backend", () => {
     expect(plan.cleanupProjectIDs).toEqual(["nike", plan.projectId]);
     expect(plan.prompts).toHaveLength(6);
     expect(plan.competitors).toHaveLength(6);
-    expect(plan.runs).toHaveLength(9);
+    expect(plan.perceptionPrompts).toHaveLength(3);
+    expect(plan.runs).toHaveLength(10);
+    expect(plan.runs.at(-1)?.runType).toBe("perception");
+    expect(plan.runs.at(-1)?.promptKind).toBe("perception");
     expect(plan.alerts).toHaveLength(4);
     expectScopedUUID(plan.prompts[0]!.id, "prm");
     expectScopedUUID(plan.competitors[0]!.id, "cmp");

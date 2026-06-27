@@ -589,7 +589,11 @@ type startContentOptimizerCrawlRequest struct {
 }
 
 type analyzeSelectedContentOptimizerRecordsRequest struct {
-	Records []usecase.ContentOptimizerCrawlRecord `json:"records"`
+	Records         []usecase.ContentOptimizerCrawlRecord `json:"records"`
+	ModelID         string                                `json:"modelId"`
+	ProviderModelID string                                `json:"providerModelId"`
+	ProviderID      string                                `json:"providerId"`
+	CreditCost      int                                   `json:"creditCost"`
 }
 
 type contentOptimizerSelectionDraftRequest struct {
@@ -671,12 +675,14 @@ func (h *Handler) analyzeSelectedContentOptimizerRecords(w http.ResponseWriter, 
 		return
 	}
 
-	result, err := h.svc.AnalyzeSelectedContentOptimizerRecords(r.Context(), projectID, organizationID, req.Records)
+	result, err := h.svc.StartContentOptimizerAnalysis(r.Context(), projectID, organizationID, usecase.ContentOptimizerAnalysisStartInput{
+		Records: req.Records, ModelID: req.ModelID, ProviderModelID: req.ProviderModelID, ProviderID: req.ProviderID, CreditCost: req.CreditCost,
+	})
 	if err != nil {
 		h.writeUsecaseError(w, err)
 		return
 	}
-	writeSuccess(w, http.StatusOK, result)
+	writeSuccess(w, http.StatusAccepted, result)
 }
 
 func (h *Handler) getContentOptimizerSelectionDraft(w http.ResponseWriter, r *http.Request, projectID string) {

@@ -16,6 +16,7 @@ var (
 const (
 	TrafficDataSourceGA4  = "ga4"
 	TrafficDataSourceFake = "fake"
+	SeedTrafficPropertyID = "seed_nike_demo"
 )
 
 type TrafficDateRange struct {

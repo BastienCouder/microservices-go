@@ -3,8 +3,9 @@ package domain
 import "encoding/json"
 
 type BrowserFlow struct {
-	ID string `json:"id"`
-	UI struct {
+	ID    string `json:"id"`
+	State string `json:"state"`
+	UI    struct {
 		Nodes []FlowNode `json:"nodes"`
 	} `json:"ui"`
 }

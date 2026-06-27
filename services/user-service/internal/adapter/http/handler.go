@@ -30,6 +30,8 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /users/me", h.deleteMe)
 	mux.HandleFunc("GET /users/", h.getUserByID)
 	mux.HandleFunc("GET /users/by-auth/", h.getUserByAuthIdentityID)
+	mux.HandleFunc("GET /users/consent/check", h.checkConsent)
+	mux.HandleFunc("POST /users/consent", h.acceptConsent)
 	mux.HandleFunc("GET /admin/users", h.adminListUsers)
 	mux.HandleFunc("POST /admin/users/", h.adminUserAction)
 }
@@ -47,9 +49,12 @@ func (h *Handler) ready(w http.ResponseWriter, r *http.Request) {
 }
 
 type createUserRequest struct {
-	Email     string `json:"email"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
+	Email           string `json:"email"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
+	ConsentAccepted bool   `json:"consent_accepted"`
+	ConsentType     string `json:"consent_type"`
+	ConsentVersion  string `json:"consent_version"`
 }
 
 func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
@@ -71,8 +76,15 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 		req.Email,
 		req.FirstName,
 		req.LastName,
+		req.ConsentAccepted,
+		req.ConsentType,
+		req.ConsentVersion,
 	)
 	if err != nil {
+		if errors.Is(err, domain.ErrConsentRequired) {
+			httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent v1 is required")
+			return
+		}
 		if errors.Is(err, domain.ErrInvalidUser) {
 			httpjson.WriteValidationError(w)
 			return
@@ -82,6 +94,56 @@ func (h *Handler) createUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, user)
+}
+
+func (h *Handler) checkConsent(w http.ResponseWriter, r *http.Request) {
+	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
+	if authIdentityID == "" {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated identity")
+		return
+	}
+	ok, err := h.svc.HasValidConsent(r.Context(), authIdentityID, r.URL.Query().Get("type"), r.URL.Query().Get("version"))
+	if err != nil {
+		httpjson.WriteInternalError(w)
+		return
+	}
+	if !ok {
+		httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent is required")
+		return
+	}
+	httpjson.WriteJSON(w, http.StatusOK, map[string]bool{"valid": true})
+}
+
+type acceptConsentRequest struct {
+	Type     string `json:"type"`
+	Version  string `json:"version"`
+	Accepted bool   `json:"accepted"`
+}
+
+func (h *Handler) acceptConsent(w http.ResponseWriter, r *http.Request) {
+	authIdentityID := strings.TrimSpace(r.Header.Get("X-Authenticated-Identity-ID"))
+	if authIdentityID == "" {
+		httpjson.WriteError(w, http.StatusUnauthorized, "missing authenticated identity")
+		return
+	}
+	var req acceptConsentRequest
+	if err := httpjson.DecodeJSON(w, r, &req); err != nil {
+		httpjson.WriteInvalidJSON(w)
+		return
+	}
+	if !req.Accepted {
+		httpjson.WriteError(w, http.StatusForbidden, "explicit consent is required")
+		return
+	}
+	if err := h.svc.AcceptConsent(r.Context(), authIdentityID, req.Type, req.Version); err != nil {
+		if errors.Is(err, domain.ErrConsentRequired) {
+			httpjson.WriteError(w, http.StatusForbidden, "privacy policy consent v1 is required")
+			return
+		}
+		httpjson.WriteInternalError(w)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) me(w http.ResponseWriter, r *http.Request) {

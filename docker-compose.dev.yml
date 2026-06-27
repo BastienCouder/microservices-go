@@ -45,18 +45,6 @@ services:
       - ./apps/email:/app
       - email-node_modules:/app/node_modules
 
-  mcp-server:
-    build:
-      target: dev
-    image: microservices-go/mcp-server:dev
-    pull_policy: never
-    working_dir: /workspace/services/mcp-server
-    command: ["air", "-c", ".air.toml"]
-    volumes:
-      - ./:/workspace
-      - go-mod-cache:/go/pkg/mod
-      - go-build-cache:/root/.cache/go-build
-
   api-gateway:
     build:
       target: dev

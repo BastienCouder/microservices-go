@@ -1,4 +1,5 @@
 import type { TOptions } from "i18next";
+import { useCallback } from "react";
 import { useTranslation } from "react-i18next";
 
 import i18n, { translations } from "@/shared/i18n";
@@ -88,10 +89,15 @@ export function useScopedI18n(namespace?: string): {
   const locale = normalizeLocale(
     translationInstance.resolvedLanguage || translationInstance.language || i18n.language,
   );
+  const t = useCallback(
+    (key: string, options?: TOptions) =>
+      translateI18nText(namespace, key, locale, options),
+    [locale, namespace],
+  );
 
   return {
     locale,
-    t: (key, options) => translateI18nText(namespace, key, locale, options),
+    t,
   };
 }
 

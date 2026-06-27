@@ -292,12 +292,6 @@ make prod-doc
 make prod-email
 ```
 
-### MCP
-
-```bash
-make prod-mcp
-```
-
 ## Cas d'usage rapides
 
 ### J'ai modifié seulement `billing-service`

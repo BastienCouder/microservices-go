@@ -14,12 +14,11 @@ La colonne `Contraintes / defaut` reprend les informations utiles au niveau colo
 | `billing-service` | `billing_subscriptions`, `billing_stripe_webhook_events`, `billing_plan_settings`, `billing_pricing_tiers`, `billing_credit_cost_settings` |
 | `ia-service` | `ai_models` |
 | `langgraph-scheduler` | Aucune table PostgreSQL propre detectee |
-| `mcp-server` | Aucune table PostgreSQL propre detectee |
 | `notification-service` | `notifications` |
 | `organizations-service` | `organizations`, `organization_members`, `member_roles`, `organization_invitations`, `organization_api_keys`, `project_members` |
 | `permission-service` | `permission_role_policies` |
 | `project-service` | `projects`, `prompts`, `competitors`, `brand_canon`, `project_models`, `outbox_events`, `prompt_models`, `project_impact_integrations`, `project_model_selection_changes` |
-| `user-service` | `users` |
+| `user-service` | `users`, `user_consent` |
 
 ## analysis-service
 
@@ -195,10 +194,6 @@ Aucune table PostgreSQL propre detectee dans les migrations du service.
 
 Aucune table PostgreSQL propre detectee dans les migrations du service.
 
-## mcp-server
-
-Aucune table PostgreSQL propre detectee dans les migrations du service.
-
 ## notification-service
 
 ### `notifications`
@@ -223,6 +218,18 @@ Aucune table PostgreSQL propre detectee dans les migrations du service.
 | `owner_user_id` | `BIGINT` | NOT NULL |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL |
 | `deleted_at` | `TIMESTAMPTZ` | - |
+
+### `user_consent`
+
+| Colonne | Type | Contraintes / defaut |
+| --- | --- | --- |
+| `id` | `UUID` | PRIMARY KEY DEFAULT gen_random_uuid() |
+| `user_id` | `BIGINT` | NOT NULL REFERENCES users(id) ON DELETE CASCADE |
+| `type` | `TEXT` | NOT NULL |
+| `version` | `TEXT` | NOT NULL DEFAULT 'v1' |
+| `accepted_at` | `TIMESTAMPTZ` | NOT NULL |
+
+Une seule acceptation est conservée par utilisateur, type et version. Le consentement `privacy_policy/v1` est obligatoire à la création du profil et contrôlé à chaque login.
 
 ### `organization_members`
 

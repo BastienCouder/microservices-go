@@ -23,18 +23,67 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db, queries: sqlc.New(db)}
 }
 
-func (r *Repository) Create(ctx context.Context, user *domain.User) error {
-	created, err := r.queries.CreateUser(ctx, sqlc.CreateUserParams{
-		AuthIdentityID: user.AuthIdentityID,
-		Email:          user.Email,
-		FirstName:      user.FirstName,
-		LastName:       user.LastName,
-		CreatedAt:      toPgTimestamptz(user.CreatedAt),
-	})
+func (r *Repository) Create(ctx context.Context, user *domain.User, consent domain.UserConsent) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin create user: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	var created sqlc.CreateUserRow
+	err = tx.QueryRow(ctx, `
+		INSERT INTO users (auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at)
+		VALUES ($1, $2, $3, $4, FALSE, NULL, $5, NULL)
+		RETURNING id, auth_identity_id, email, first_name, last_name, banned, banned_at, created_at, deleted_at
+	`, user.AuthIdentityID, user.Email, user.FirstName, user.LastName, user.CreatedAt).Scan(
+		&created.ID, &created.AuthIdentityID, &created.Email, &created.FirstName, &created.LastName,
+		&created.Banned, &created.BannedAt, &created.CreatedAt, &created.DeletedAt,
+	)
 	if err != nil {
 		return fmt.Errorf("insert user: %w", err)
 	}
+	if _, err := tx.Exec(ctx, `INSERT INTO user_consent (user_id, type, version, accepted_at) VALUES ($1, $2, $3, $4)`, created.ID, consent.Type, consent.Version, consent.AcceptedAt); err != nil {
+		return fmt.Errorf("insert user consent: %w", err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit create user: %w", err)
+	}
 	*user = *toDomainUserFromCreateRow(created)
+	return nil
+}
+
+func (r *Repository) HasConsentByAuthIdentityID(ctx context.Context, authIdentityID, consentType, version string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1 FROM user_consent c
+			JOIN users u ON u.id = c.user_id
+			WHERE u.auth_identity_id = $1 AND u.deleted_at IS NULL AND c.type = $2 AND c.version = $3
+		)
+	`, authIdentityID, consentType, version).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("query user consent: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *Repository) AddConsentByAuthIdentityID(ctx context.Context, authIdentityID string, consent domain.UserConsent) error {
+	tag, err := r.db.Exec(ctx, `
+		INSERT INTO user_consent (user_id, type, version, accepted_at)
+		SELECT id, $2, $3, $4 FROM users WHERE auth_identity_id = $1 AND deleted_at IS NULL
+		ON CONFLICT (user_id, type, version) DO NOTHING
+	`, authIdentityID, consent.Type, consent.Version, consent.AcceptedAt)
+	if err != nil {
+		return fmt.Errorf("insert user consent: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		ok, checkErr := r.HasConsentByAuthIdentityID(ctx, authIdentityID, consent.Type, consent.Version)
+		if checkErr != nil {
+			return checkErr
+		}
+		if !ok {
+			return domain.ErrUserNotFound
+		}
+	}
 	return nil
 }
 

@@ -6,7 +6,9 @@ import (
 )
 
 type Repository interface {
-	Create(ctx context.Context, user *User) error
+	Create(ctx context.Context, user *User, consent UserConsent) error
+	HasConsentByAuthIdentityID(ctx context.Context, authIdentityID, consentType, version string) (bool, error)
+	AddConsentByAuthIdentityID(ctx context.Context, authIdentityID string, consent UserConsent) error
 	List(ctx context.Context) ([]User, error)
 	GetByID(ctx context.Context, id int64) (*User, error)
 	GetByAuthIdentityID(ctx context.Context, authIdentityID string) (*User, error)
