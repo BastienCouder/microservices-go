@@ -7,6 +7,8 @@ import {
   ACCOUNT_SETUP_SEARCH,
   PROJECT_SETUP_SEARCH,
   getOnboardingSetupMode,
+  markAccountSetupPending,
+  readPendingAccountSetupOrganizationId,
 } from "@/features/onboarding/onboarding-mode";
 import { AdminBootstrapClaim } from "@/features/admin/admin-bootstrap-claim";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
@@ -144,6 +146,8 @@ export default function App() {
     if (!isCheckoutSuccessRoute) return "";
     return new URLSearchParams(location.search).get("organization_id")?.trim() ?? "";
   }, [isCheckoutSuccessRoute, location.search]);
+  const pendingAccountSetupOrganizationId =
+    readPendingAccountSetupOrganizationId();
   const bypassResolvedContext =
     isOnboardingRoute || isInvitationRoute || isBillingRoute || isAdminRoute;
   const baseRouteSearch = useMemo(
@@ -335,6 +339,10 @@ export default function App() {
       ),
     [routeOrganizationToken, routeProjectContextQuery.data, routeProjectToken],
   );
+  const isRouteProjectContextPending =
+    shouldResolveRouteProjectContext &&
+    resolvedProjectContext === null &&
+    (routeProjectContextQuery.isLoading || routeProjectContextQuery.isFetching);
   const hasUnresolvedRouteProjectContext =
     apiBaseURL.trim() !== "" &&
     !busy &&
@@ -454,6 +462,8 @@ export default function App() {
         projectGuardQuery.isLoading || projectGuardQuery.isFetching
           ? null
           : projectGuardQuery.data ?? null,
+      isCheckoutSuccessRoute:
+        isCheckoutSuccessRoute || pendingAccountSetupOrganizationId !== "",
     });
   const mustRedirectAccountOnboardingToBilling =
     shouldRedirectAccountOnboardingToBilling({
@@ -516,6 +526,14 @@ export default function App() {
       window.removeEventListener("storage", refreshSelection);
     };
   }, []);
+
+  useEffect(() => {
+    if (!isCheckoutSuccessRoute || checkoutConfirmationOrganizationId === "") {
+      return;
+    }
+    markAccountSetupPending(checkoutConfirmationOrganizationId);
+    setSelectionVersion((current) => current + 1);
+  }, [checkoutConfirmationOrganizationId, isCheckoutSuccessRoute]);
 
   useEffect(() => {
     if (!stripeCheckoutConfirmationQuery.isSuccess) {
@@ -635,6 +653,10 @@ export default function App() {
     return null;
   }
 
+  if (isRouteProjectContextPending) {
+    return null;
+  }
+
   if (
     shouldCheckBillingGuard &&
     billingAccess === "loading" &&
@@ -659,20 +681,21 @@ export default function App() {
     return null;
   }
 
-  if (
-    shouldResolveRouteProjectContext &&
-    routeProjectContextQuery.isLoading &&
-    routeProjectContextQuery.data === undefined
-  ) {
-    return null;
-  }
-
   if (mustRedirectToOnboarding) {
     const onboardingSearch =
+      pendingAccountSetupOrganizationId !== "" ||
       billingAccess === "missing_organization"
         ? ACCOUNT_SETUP_SEARCH
         : PROJECT_SETUP_SEARCH;
     return <Navigate replace to={`/onboarding${onboardingSearch}`} />;
+  }
+
+  if (
+    isOnboardingRoute &&
+    onboardingSetupMode === "resume" &&
+    pendingAccountSetupOrganizationId !== ""
+  ) {
+    return <Navigate replace to={`/onboarding${ACCOUNT_SETUP_SEARCH}`} />;
   }
 
   if (mustRedirectAwayFromAccountOnboarding) {

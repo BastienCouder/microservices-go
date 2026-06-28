@@ -95,7 +95,7 @@ describe("createOnboardingProject", () => {
     expect(requestBody.organizationName).toBe("Acme");
   });
 
-  test("does not invent an organization name when an organization is already selected", async () => {
+  test("renames an organization that was already created by checkout", async () => {
     let requestBody: Record<string, unknown> = {};
     globalThis.fetch = (async (_input, init) => {
       requestBody = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
@@ -111,7 +111,7 @@ describe("createOnboardingProject", () => {
 
     await createOnboardingProject("http://api.test", {
       organizationId: "42",
-      organizationName: "Stale organization name",
+      organizationName: "Acme Workspace",
       brandName: "Acme Project",
       websiteUrl: "https://acme.test",
       attributionSource: "",
@@ -123,6 +123,6 @@ describe("createOnboardingProject", () => {
     });
 
     expect(requestBody.organizationId).toBe("42");
-    expect(requestBody.organizationName).toBe("");
+    expect(requestBody.organizationName).toBe("Acme Workspace");
   });
 });

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Loader2, Search } from "lucide-react";
 
 import { EmptyStateCard } from "@/components/shared/empty-state-card";
 import {

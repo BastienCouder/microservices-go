@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Save, Search, ShieldCheck } from "lucide-react";
+import { Save, Search, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ import { appQueryKeys } from "@/lib/query-keys";
 import { apiRoutes } from "@/lib/api-config";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import {
+  deleteOrganization,
   loadOrganizationSummaries,
   type OrganizationMember,
   type OrganizationProject,
@@ -314,6 +315,64 @@ export function AdminOrganizationsPage({
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (organizationId: string) =>
+      deleteOrganization(apiBaseURL, organizationId),
+    onMutate: async (organizationId) => {
+      await Promise.all([
+        queryClient.cancelQueries({
+          queryKey: appQueryKeys.organizations(apiBaseURL, null, "admin"),
+        }),
+        queryClient.cancelQueries({ queryKey: quotaQueryKey }),
+      ]);
+
+      const previousOrganizations = queryClient.getQueryData<OrganizationSummary[]>(
+        appQueryKeys.organizations(apiBaseURL, null, "admin"),
+      );
+      const previousRows =
+        queryClient.getQueryData<OrganizationQuotaRow[]>(quotaQueryKey);
+
+      queryClient.setQueryData<OrganizationSummary[]>(
+        appQueryKeys.organizations(apiBaseURL, null, "admin"),
+        (current) => (current ?? []).filter((organization) => organization.id !== organizationId),
+      );
+      queryClient.setQueryData<OrganizationQuotaRow[]>(
+        quotaQueryKey,
+        (current) => (current ?? []).filter((row) => row.organization.id !== organizationId),
+      );
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[organizationId];
+        return next;
+      });
+
+      return { previousOrganizations, previousRows };
+    },
+    onSuccess: () => {
+      pushSuccessToast(t("organizationDeleted"));
+    },
+    onError: (error, _organizationId, context) => {
+      if (context?.previousOrganizations) {
+        queryClient.setQueryData(
+          appQueryKeys.organizations(apiBaseURL, null, "admin"),
+          context.previousOrganizations,
+        );
+      }
+      if (context?.previousRows) {
+        queryClient.setQueryData(quotaQueryKey, context.previousRows);
+      }
+      pushErrorToast(error, t("organizationDeleteError"));
+    },
+    onSettled: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: appQueryKeys.organizations(apiBaseURL, null, "admin"),
+        }),
+        queryClient.invalidateQueries({ queryKey: quotaQueryKey }),
+      ]);
+    },
+  });
+
   const updateDraft = (organizationId: string, patch: Partial<Draft>) => {
     setDrafts((current) => ({
       ...current,
@@ -339,7 +398,6 @@ export function AdminOrganizationsPage({
   };
 
   const isLoading = organizationsQuery.isLoading || quotasQuery.isLoading;
-  const isFetching = organizationsQuery.isFetching || quotasQuery.isFetching;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-2 md:p-4">
@@ -355,18 +413,6 @@ export function AdminOrganizationsPage({
             </Badge>
             <Badge variant="outline">{t("creditQuotas")}</Badge>
           </>
-        }
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void quotasQuery.refetch()}
-            disabled={isFetching || manageableOrganizations.length === 0}
-            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
-          >
-            <RefreshCw data-icon="inline-start" />
-            {isFetching ? t("refreshing") : t("refresh")}
-          </Button>
         }
       />
 
@@ -464,8 +510,13 @@ export function AdminOrganizationsPage({
                           updateMutation.variables?.organizationId ===
                             row.organization.id
                         }
+                        deletePending={
+                          deleteMutation.isPending &&
+                          deleteMutation.variables === row.organization.id
+                        }
                         onUpdateDraft={updateDraft}
                         onSave={saveQuota}
+                        onDelete={(organizationId) => deleteMutation.mutate(organizationId)}
                         planOptions={availablePlans}
                       />
                     ))}
@@ -487,8 +538,13 @@ export function AdminOrganizationsPage({
                       updateMutation.variables?.organizationId ===
                         row.organization.id
                     }
+                    deletePending={
+                      deleteMutation.isPending &&
+                      deleteMutation.variables === row.organization.id
+                    }
                     onUpdateDraft={updateDraft}
                     onSave={saveQuota}
+                    onDelete={(organizationId) => deleteMutation.mutate(organizationId)}
                     planOptions={availablePlans}
                   />
                 ))}
@@ -510,15 +566,19 @@ function AdminOrganizationTableRow({
   row,
   draft,
   pending,
+  deletePending,
   onUpdateDraft,
   onSave,
+  onDelete,
   planOptions,
 }: {
   row: OrganizationQuotaRow;
   draft: Draft;
   pending: boolean;
+  deletePending: boolean;
   onUpdateDraft: (organizationId: string, patch: Partial<Draft>) => void;
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
+  onDelete: (organizationId: string) => void;
   planOptions: BillingPlanCode[];
 }) {
   const { t } = useScopedI18n("admin-organizations");
@@ -565,9 +625,19 @@ function AdminOrganizationTableRow({
         />
       </TableCell>
       <TableCell className="text-right">
-        <form onSubmit={(event) => onSave(event, row)}>
-          <SaveButton pending={pending} />
-        </form>
+        <div className="flex justify-end gap-2">
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending || deletePending}
+            onClick={() => onDelete(row.organization.id)}
+          >
+            {deletePending ? t("deleting") : t("delete")}
+          </Button>
+          <form onSubmit={(event) => onSave(event, row)}>
+            <SaveButton pending={pending} disabled={deletePending} />
+          </form>
+        </div>
       </TableCell>
     </TableRow>
   );
@@ -577,15 +647,19 @@ function AdminOrganizationMobileCard({
   row,
   draft,
   pending,
+  deletePending,
   onUpdateDraft,
   onSave,
+  onDelete,
   planOptions,
 }: {
   row: OrganizationQuotaRow;
   draft: Draft;
   pending: boolean;
+  deletePending: boolean;
   onUpdateDraft: (organizationId: string, patch: Partial<Draft>) => void;
   onSave: (event: FormEvent<HTMLFormElement>, row: OrganizationQuotaRow) => void;
+  onDelete: (organizationId: string) => void;
   planOptions: BillingPlanCode[];
 }) {
   const { t } = useScopedI18n("admin-organizations");
@@ -624,7 +698,18 @@ function AdminOrganizationMobileCard({
             onUpdateDraft(row.organization.id, { monthlyQuota })
           }
         />
-        <SaveButton pending={pending} className="w-full" />
+        <div className="flex flex-col gap-2">
+          <SaveButton pending={pending} disabled={deletePending} className="w-full" />
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={pending || deletePending}
+            onClick={() => onDelete(row.organization.id)}
+            className="w-full"
+          >
+            {deletePending ? t("deleting") : t("delete")}
+          </Button>
+        </div>
       </div>
     </form>
   );
@@ -769,15 +854,17 @@ function QuotaInput({
 
 function SaveButton({
   pending,
+  disabled,
   className,
 }: {
   pending: boolean;
+  disabled?: boolean;
   className?: string;
 }) {
   const { t } = useScopedI18n("admin-organizations");
 
   return (
-    <Button type="submit" disabled={pending} className={className}>
+    <Button type="submit" disabled={pending || disabled} className={className}>
       <Save data-icon="inline-start" />
       {pending ? t("saving") : t("save")}
     </Button>

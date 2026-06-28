@@ -26,6 +26,7 @@ type ShouldRedirectAwayFromAccountOnboardingInput = {
   onboardingSetupMode: OnboardingSetupMode;
   organizationCount: number | null;
   projectCount: number | null;
+  isCheckoutSuccessRoute?: boolean;
 };
 
 type ShouldRedirectAccountOnboardingToBillingInput = {
@@ -107,6 +108,7 @@ export function shouldRedirectAwayFromAccountOnboarding({
   onboardingSetupMode,
   organizationCount,
   projectCount,
+  isCheckoutSuccessRoute = false,
 }: ShouldRedirectAwayFromAccountOnboardingInput): boolean {
   if (apiBaseURL.trim() === "") {
     return false;
@@ -115,6 +117,9 @@ export function shouldRedirectAwayFromAccountOnboarding({
     return false;
   }
   if (onboardingSetupMode !== "account") {
+    return false;
+  }
+  if (isCheckoutSuccessRoute) {
     return false;
   }
   if (organizationCount === null) {

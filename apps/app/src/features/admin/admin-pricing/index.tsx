@@ -370,7 +370,6 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
   };
 
   const isLoading = organizationsQuery.isLoading || plansQuery.isLoading;
-  const isFetching = organizationsQuery.isFetching || plansQuery.isFetching;
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-col overflow-y-auto p-2 md:p-4">
@@ -380,17 +379,6 @@ export function AdminPricingPage({ apiBaseURL }: AdminPricingPageProps) {
         actionsVariant="classic"
         className="mb-2 md:mb-3"
         meta={<Badge variant="outline">{t("plansCount", { count: visiblePlanIds.length })}</Badge>}
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void plansQuery.refetch()}
-            disabled={isFetching || !organizationId}
-            className="h-10 min-w-0 px-3 sm:h-auto sm:min-w-fit sm:px-4.5"
-          >
-            {isFetching ? t("refreshing") : t("refresh")}
-          </Button>
-        }
       />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col rounded-md rounded-tr-none bg-background">

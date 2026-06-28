@@ -1,6 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
-import { MODELS, buildRuntimeSeedPlan, createIDAllocator, readAnalysisMode, signInternalJWT } from "./seed-nike-backend.ts";
+import {
+  MODELS,
+  buildRuntimeSeedPlan,
+  createIDAllocator,
+  defaultMonthlyQuotaForPlan,
+  readAnalysisMode,
+  signInternalJWT,
+} from "./seed-nike-backend.ts";
 
 function expectScopedUUID(value: string, prefix: string) {
   expect(value).toMatch(new RegExp(`^${prefix}_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`, "i"));
@@ -18,6 +25,12 @@ function decodePayload(token: string): Record<string, unknown> {
 }
 
 describe("seed-nike-backend", () => {
+  test("billing quotas match the public web pricing grid", () => {
+    expect(defaultMonthlyQuotaForPlan("starter")).toBe(100);
+    expect(defaultMonthlyQuotaForPlan("growth")).toBe(750);
+    expect(defaultMonthlyQuotaForPlan("pro")).toBe(3_000);
+  });
+
   test("readAnalysisMode supports synthetic and live", () => {
     expect(readAnalysisMode(undefined)).toBe("synthetic");
     expect(readAnalysisMode("synthetic")).toBe("synthetic");

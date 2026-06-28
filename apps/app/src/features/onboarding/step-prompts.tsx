@@ -23,9 +23,6 @@ type StepPromptsProps = {
 
 export function StepPrompts({ hideBack = false, nextLabel }: StepPromptsProps) {
   const {
-    brandName,
-    competitors,
-    industry,
     selectedPrompts,
     setSelectedPrompts,
     nextStep,
@@ -58,94 +55,9 @@ export function StepPrompts({ hideBack = false, nextLabel }: StepPromptsProps) {
     ]);
   };
 
-  const generatePromptsWithAI = () => {
-    const resolvedBrand = brandName.trim() || t("yourBrand");
-    const competitorName = competitors[0]?.name?.trim();
-    const resolvedIndustry = industry.trim();
-    const resolvedUseCase =
-      resolvedIndustry || (locale === "fr" ? "mon besoin" : "my use case");
-
-    const generatedTexts =
-      locale === "fr"
-        ? [
-            `meilleure alternative à ${resolvedBrand}`,
-            `remplacer ${resolvedBrand} par quoi ?`,
-            `outil similaire à ${resolvedBrand}`,
-            `c'est quoi comme ${resolvedBrand} mais moins cher`,
-            competitorName
-              ? `${resolvedBrand} ou ${competitorName} lequel choisir`
-              : `${resolvedBrand} ou quel concurrent choisir`,
-            competitorName
-              ? `différence entre ${resolvedBrand} et ${competitorName}`
-              : `différence entre ${resolvedBrand} et ses concurrents`,
-            competitorName
-              ? `${resolvedBrand} vs ${competitorName}`
-              : `${resolvedBrand} vs concurrents`,
-            `${resolvedBrand} c'est bien ?`,
-            `${resolvedBrand} avis`,
-            `${resolvedBrand} ça vaut quoi`,
-            `${resolvedBrand} fiable ou pas`,
-            `meilleur outil pour ${resolvedUseCase}`,
-            `quel outil pour ${resolvedUseCase}`,
-            `comment faire ${resolvedUseCase} avec l'IA`,
-            resolvedIndustry
-              ? `outil IA ${resolvedIndustry} recommandation`
-              : `outil IA recommandation`,
-            `${resolvedBrand} ça coûte combien`,
-            `${resolvedBrand} gratuit ou payant`,
-            `vaut le coup ${resolvedBrand} pour une petite boite`,
-          ]
-        : [
-            `best alternative to ${resolvedBrand}`,
-            `what can replace ${resolvedBrand}?`,
-            `tool similar to ${resolvedBrand}`,
-            `what is like ${resolvedBrand} but cheaper`,
-            competitorName
-              ? `${resolvedBrand} or ${competitorName} which one to choose`
-              : `${resolvedBrand} or which competitor to choose`,
-            competitorName
-              ? `difference between ${resolvedBrand} and ${competitorName}`
-              : `difference between ${resolvedBrand} and competitors`,
-            competitorName
-              ? `${resolvedBrand} vs ${competitorName}`
-              : `${resolvedBrand} vs competitors`,
-            `is ${resolvedBrand} good?`,
-            `${resolvedBrand} reviews`,
-            `is ${resolvedBrand} worth it`,
-            `is ${resolvedBrand} reliable or not`,
-            `best tool for ${resolvedUseCase}`,
-            `which tool for ${resolvedUseCase}`,
-            `how to do ${resolvedUseCase} with AI`,
-            resolvedIndustry
-              ? `recommended AI tool for ${resolvedIndustry}`
-              : `recommended AI tool`,
-            `how much does ${resolvedBrand} cost`,
-            `${resolvedBrand} free or paid`,
-            `is ${resolvedBrand} worth it for a small business`,
-          ];
-
-    const existingTexts = new Set(
-      selectedPrompts.map((prompt) => prompt.text.trim().toLowerCase()),
-    );
-    const generatedPrompts = generatedTexts
-      .filter((text) => !existingTexts.has(text.trim().toLowerCase()))
-      .map((text) => ({ text, language: locale }));
-
-    if (generatedPrompts.length === 0) {
-      return;
-    }
-
-    setSelectedPrompts([...selectedPrompts, ...generatedPrompts]);
-  };
-
   return (
     <OnboardingStep
       title={t("promptsTitle")}
-      headerAction={
-        <Button type="button" variant="outline" onClick={generatePromptsWithAI}>
-          {t("generateWithAI")}
-        </Button>
-      }
       footer={
         <OnboardingStepFooter
           hideBack={hideBack}

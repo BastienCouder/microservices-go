@@ -35,8 +35,6 @@ export function StepBrand({
     setKeyFeatures,
     competitors,
     setCompetitors,
-    selectedPrompts,
-    setSelectedPrompts,
     brandPreparationCompleted,
     setBrandPreparationCompleted,
     nextStep,
@@ -99,9 +97,6 @@ export function StepBrand({
               })),
             );
           }
-          if (selectedPrompts.length === 0 && preview.prompts.length > 0) {
-            setSelectedPrompts(preview.prompts);
-          }
           setPrepProgress(100);
           setBrandPreparationCompleted(true);
         })
@@ -123,14 +118,12 @@ export function StepBrand({
     competitors,
     industry,
     keyFeatures,
-    selectedPrompts,
     setBrandDescription,
     setBrandName,
     setBrandPreparationCompleted,
     setCompetitors,
     setIndustry,
     setKeyFeatures,
-    setSelectedPrompts,
     websiteUrl,
   ]);
 

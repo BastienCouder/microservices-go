@@ -33,6 +33,10 @@
   "membersCount_other": "{{count}} users",
   "newQuota": "new {{value}}",
   "savedQuota": "saved {{value}}",
+  "delete": "Delete",
+  "deleting": "Deleting...",
+  "organizationDeleted": "Organization deleted.",
+  "organizationDeleteError": "Unable to delete this organization.",
   "save": "Save",
   "saving": "Saving..."
 }

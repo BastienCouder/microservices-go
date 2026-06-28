@@ -46,4 +46,9 @@ describe("app onboarding guard", () => {
     expect(source.includes('routeProjectToken !== "" && routeProjectId === "" && routeOrganizationToken === ""')).toBe(false);
     expect(source.includes("buildScopedHref(location.pathname")).toBe(false);
   });
+
+  test("waits for a newly created project context before running route guards", () => {
+    expect(source.includes("const isRouteProjectContextPending =")).toBe(true);
+    expect(source.includes("if (isRouteProjectContextPending) {")).toBe(true);
+  });
 });

@@ -339,10 +339,10 @@ function readPositiveIntEnv(rawValue: string | undefined, fallback: number): num
   return parsedValue;
 }
 
-function defaultMonthlyQuotaForPlan(plan: BillingPlan): number {
-  if (plan === "starter") return 50;
-  if (plan === "growth") return 200;
-  return 1_000_000;
+export function defaultMonthlyQuotaForPlan(plan: BillingPlan): number {
+  if (plan === "starter") return 100;
+  if (plan === "growth") return 750;
+  return 3_000;
 }
 
 export function createIDAllocator(startSeq: number): IDAllocator {
