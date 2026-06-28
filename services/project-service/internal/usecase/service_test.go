@@ -345,8 +345,19 @@ func TestUpdateBrandCanonUpdatesProjectView(t *testing.T) {
 	}
 }
 
-func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
-	svc := NewService()
+func TestDeleteProjectSoftDeletesProjectAndHidesIt(t *testing.T) {
+	store := &mutableProjectStore{}
+	svc, err := NewServiceWithDependencies(context.Background(), Dependencies{
+		Store: store,
+		ProjectMembershipClient: &fakeProjectMembershipClient{
+			membersByUser: map[int64][]ProjectMember{
+				99: {{ProjectID: "placeholder"}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("new service with store: %v", err)
+	}
 	ctx := context.Background()
 
 	project, err := svc.CreateProject(ctx, CreateProjectInput{
@@ -365,25 +376,95 @@ func TestDeleteProjectRemovesProjectAndRelatedState(t *testing.T) {
 	if _, err := svc.AddCompetitors(ctx, project.ID, 42, []AddCompetitorInput{{Name: "Rival"}}); err != nil {
 		t.Fatalf("add competitors: %v", err)
 	}
+	brandName := "Acme"
+	if _, err := svc.UpdateBrandCanon(ctx, project.ID, 42, UpdateBrandCanonInput{
+		BrandName: &brandName,
+	}); err != nil {
+		t.Fatalf("update brand canon: %v", err)
+	}
+	svc.projectMembershipClient = &fakeProjectMembershipClient{
+		membersByUser: map[int64][]ProjectMember{
+			99: {{
+				ProjectID:      project.ID,
+				OrganizationID: 42,
+				UserID:         99,
+				Role:           "editor",
+				AddedAt:        time.Now().UTC(),
+			}},
+		},
+	}
 
 	if err := svc.DeleteProject(ctx, project.ID, 42); err != nil {
 		t.Fatalf("delete project: %v", err)
 	}
+
+	storedProject, ok := svc.projects[project.ID]
+	if !ok {
+		t.Fatalf("expected project record to remain stored after soft delete")
+	}
+	if storedProject.DeletedAt == nil || storedProject.DeletedAt.IsZero() {
+		t.Fatalf("expected project deletedAt to be set")
+	}
 	if _, err := svc.GetProject(ctx, project.ID, 42); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("expected project not found, got %v", err)
 	}
-	if _, ok := svc.projectModels[project.ID]; ok {
-		t.Fatalf("expected project models to be removed")
+	projects, err := svc.ListProjects(ctx, 42)
+	if err != nil {
+		t.Fatalf("list projects: %v", err)
 	}
+	if len(projects) != 0 {
+		t.Fatalf("expected deleted project to be hidden from list, got %d items", len(projects))
+	}
+	userProjects, err := svc.ListProjectsForUser(ctx, 42, 99)
+	if err != nil {
+		t.Fatalf("list projects for user: %v", err)
+	}
+	if len(userProjects) != 0 {
+		t.Fatalf("expected deleted project to be hidden from membership list, got %d items", len(userProjects))
+	}
+	if _, ok := svc.projectModels[project.ID]; !ok {
+		t.Fatalf("expected project models to remain stored after soft delete")
+	}
+	foundPrompt := false
 	for _, prompt := range svc.prompts {
 		if prompt.ProjectID == project.ID {
-			t.Fatalf("expected project prompts to be removed")
+			foundPrompt = true
+			break
 		}
 	}
+	if !foundPrompt {
+		t.Fatalf("expected project prompts to remain stored after soft delete")
+	}
+	foundCompetitor := false
 	for _, competitor := range svc.competitors {
 		if competitor.ProjectID == project.ID {
-			t.Fatalf("expected project competitors to be removed")
+			foundCompetitor = true
+			break
 		}
+	}
+	if !foundCompetitor {
+		t.Fatalf("expected project competitors to remain stored after soft delete")
+	}
+	if _, ok := svc.brandCanonByProject[project.ID]; !ok {
+		t.Fatalf("expected project brand canon to remain stored after soft delete")
+	}
+
+	reloaded, err := NewServiceWithDependencies(ctx, Dependencies{
+		Store:                   store,
+		ProjectMembershipClient: svc.projectMembershipClient,
+	})
+	if err != nil {
+		t.Fatalf("reload service with store: %v", err)
+	}
+	if _, err := reloaded.GetProject(ctx, project.ID, 42); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected reloaded deleted project to stay hidden, got %v", err)
+	}
+	reloadedProjects, err := reloaded.ListProjects(ctx, 42)
+	if err != nil {
+		t.Fatalf("reloaded list projects: %v", err)
+	}
+	if len(reloadedProjects) != 0 {
+		t.Fatalf("expected reloaded deleted project to stay hidden from list, got %d items", len(reloadedProjects))
 	}
 }
 

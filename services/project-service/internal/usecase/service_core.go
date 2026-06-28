@@ -331,6 +331,9 @@ func (s *Service) getProjectForOrganizationLocked(projectID string, organization
 	if project.OrganizationID != organizationID {
 		return nil, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
+	if isProjectDeleted(project) {
+		return nil, fmt.Errorf("%w: project", ErrNotFound)
+	}
 	return project, nil
 }
 
@@ -355,7 +358,12 @@ func copyProject(project *Project) Project {
 	if project == nil {
 		return Project{}
 	}
-	return *project
+	out := *project
+	if project.DeletedAt != nil {
+		deletedAt := project.DeletedAt.UTC()
+		out.DeletedAt = &deletedAt
+	}
+	return out
 }
 
 func applyBrandCanonToProject(project Project, canon *BrandCanon) Project {
@@ -378,6 +386,10 @@ func applyBrandCanonToProject(project Project, canon *BrandCanon) Project {
 
 func (s *Service) effectiveProjectLocked(project *Project) Project {
 	return applyBrandCanonToProject(copyProject(project), s.brandCanonByProject[project.ID])
+}
+
+func isProjectDeleted(project *Project) bool {
+	return project != nil && project.DeletedAt != nil && !project.DeletedAt.IsZero()
 }
 
 func copyProjectImpactIntegrations(value *ProjectImpactIntegrations) ProjectImpactIntegrations {

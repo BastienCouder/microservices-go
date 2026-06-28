@@ -56,7 +56,8 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 				"country": "FR",
 				"status": "active",
 				"createdAt": "2026-03-01T10:00:00Z",
-				"updatedAt": "2026-03-01T11:00:00Z"
+				"updatedAt": "2026-03-01T11:00:00Z",
+				"deletedAt": "2026-03-02T09:00:00Z"
 			}
 		},
 		"prompts": {
@@ -195,6 +196,9 @@ func TestStateStoreRoundTripUsesRelationalTables(t *testing.T) {
 	project := projects["prj-1"].(map[string]any)
 	if project["domain"] != "acme.test" {
 		t.Fatalf("expected project domain acme.test, got %#v", project["domain"])
+	}
+	if project["deletedAt"] != "2026-03-02T09:00:00Z" {
+		t.Fatalf("expected project deletedAt round-trip, got %#v", project["deletedAt"])
 	}
 	brandCanonByProject := got["brandCanonByProject"].(map[string]any)
 	brandCanon := brandCanonByProject["prj-1"].(map[string]any)

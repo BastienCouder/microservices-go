@@ -164,7 +164,7 @@ func (s *StateStore) Save(ctx context.Context, payload []byte) error {
 
 func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) error {
 	rows, err := s.db.Query(ctx, `
-		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at
+		SELECT id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at, deleted_at
 		FROM projects
 		ORDER BY created_at ASC, id ASC
 	`)
@@ -177,6 +177,7 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 		var (
 			item              usecase.Project
 			attributionSource *string
+			deletedAt         *time.Time
 		)
 		if err := rows.Scan(
 			&item.ID,
@@ -190,10 +191,12 @@ func (s *StateStore) loadProjects(ctx context.Context, state *persistedState) er
 			&item.Country,
 			&item.CreatedAt,
 			&item.UpdatedAt,
+			&deletedAt,
 		); err != nil {
 			return fmt.Errorf("scan project: %w", err)
 		}
 		item.AttributionSource = stringValue(attributionSource)
+		item.DeletedAt = timePointerValue(deletedAt)
 		project := item
 		state.Projects[item.ID] = &project
 	}
@@ -627,9 +630,9 @@ func insertProjects(ctx context.Context, tx pgx.Tx, projects map[string]*usecase
 	for _, projectID := range sortedProjectIDs(projects) {
 		project := projects[projectID]
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt); err != nil {
+			INSERT INTO projects (id, organization_id, created_by, name, domain, website_url, attribution_source, primary_language, country, created_at, updated_at, deleted_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		`, project.ID, project.OrganizationID, project.CreatedBy, project.Name, project.Domain, project.WebsiteURL, nullIfEmpty(project.AttributionSource), nullIfEmptyOrFallback(project.PrimaryLanguage, "fr"), nullIfEmptyOrFallback(project.Country, "FR"), project.CreatedAt, project.UpdatedAt, nullIfTimePointer(project.DeletedAt)); err != nil {
 			return fmt.Errorf("insert project %s: %w", project.ID, err)
 		}
 	}
@@ -907,9 +910,24 @@ func timeValue(value *time.Time) time.Time {
 	return value.UTC()
 }
 
+func timePointerValue(value *time.Time) *time.Time {
+	if value == nil || value.IsZero() {
+		return nil
+	}
+	result := value.UTC()
+	return &result
+}
+
 func nullIfZeroTime(value time.Time) any {
 	if value.IsZero() {
 		return nil
 	}
 	return value
+}
+
+func nullIfTimePointer(value *time.Time) any {
+	if value == nil || value.IsZero() {
+		return nil
+	}
+	return value.UTC()
 }

@@ -36,20 +36,21 @@ const (
 )
 
 type Project struct {
-	ID                string    `json:"id"`
-	OrganizationID    int64     `json:"organizationId"`
-	CreatedBy         int64     `json:"createdBy"`
-	Name              string    `json:"name"`
-	Domain            string    `json:"domain"`
-	WebsiteURL        string    `json:"websiteUrl"`
-	AttributionSource string    `json:"attributionSource,omitempty"`
-	BrandName         string    `json:"brandName,omitempty"`
-	BrandDescription  string    `json:"brandDescription,omitempty"`
-	Industry          string    `json:"industry,omitempty"`
-	PrimaryLanguage   string    `json:"primaryLanguage"`
-	Country           string    `json:"country"`
-	CreatedAt         time.Time `json:"createdAt"`
-	UpdatedAt         time.Time `json:"updatedAt"`
+	ID                string     `json:"id"`
+	OrganizationID    int64      `json:"organizationId"`
+	CreatedBy         int64      `json:"createdBy"`
+	Name              string     `json:"name"`
+	Domain            string     `json:"domain"`
+	WebsiteURL        string     `json:"websiteUrl"`
+	AttributionSource string     `json:"attributionSource,omitempty"`
+	BrandName         string     `json:"brandName,omitempty"`
+	BrandDescription  string     `json:"brandDescription,omitempty"`
+	Industry          string     `json:"industry,omitempty"`
+	PrimaryLanguage   string     `json:"primaryLanguage"`
+	Country           string     `json:"country"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
+	DeletedAt         *time.Time `json:"deletedAt,omitempty"`
 }
 
 type ProjectMember struct {

@@ -107,6 +107,9 @@ func (s *Service) UpdateCompetitor(ctx context.Context, competitorID string, org
 	if !ok {
 		return Competitor{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
+	if isProjectDeleted(project) {
+		return Competitor{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
 	if project.OrganizationID != organizationID {
 		return Competitor{}, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
@@ -150,6 +153,9 @@ func (s *Service) DeleteCompetitor(ctx context.Context, competitorID string, org
 	}
 	project, ok := s.projects[competitor.ProjectID]
 	if !ok {
+		return fmt.Errorf("%w: project", ErrNotFound)
+	}
+	if isProjectDeleted(project) {
 		return fmt.Errorf("%w: project", ErrNotFound)
 	}
 	if project.OrganizationID != organizationID {

@@ -386,6 +386,9 @@ func (s *Service) UpdatePrompt(ctx context.Context, promptID string, organizatio
 	if !ok {
 		return Prompt{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
+	if isProjectDeleted(project) {
+		return Prompt{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
 	if project.OrganizationID != organizationID {
 		return Prompt{}, fmt.Errorf("%w: project access denied", ErrUnauthorized)
 	}
@@ -539,6 +542,9 @@ func (s *Service) DeletePrompt(ctx context.Context, promptID string, organizatio
 	}
 	project, ok := s.projects[prompt.ProjectID]
 	if !ok {
+		return fmt.Errorf("%w: project", ErrNotFound)
+	}
+	if isProjectDeleted(project) {
 		return fmt.Errorf("%w: project", ErrNotFound)
 	}
 	if project.OrganizationID != organizationID {
