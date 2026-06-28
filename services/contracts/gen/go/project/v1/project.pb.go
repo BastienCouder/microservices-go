@@ -541,6 +541,142 @@ func (x *ListProjectEnabledModelsResponse) GetModelIds() []string {
 	return nil
 }
 
+type GetProjectBrandCanonRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProjectBrandCanonRequest) Reset() {
+	*x = GetProjectBrandCanonRequest{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectBrandCanonRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectBrandCanonRequest) ProtoMessage() {}
+
+func (x *GetProjectBrandCanonRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectBrandCanonRequest.ProtoReflect.Descriptor instead.
+func (*GetProjectBrandCanonRequest) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *GetProjectBrandCanonRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+type GetProjectBrandCanonResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ProjectId     string                 `protobuf:"bytes,1,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
+	BrandName     string                 `protobuf:"bytes,2,opt,name=brand_name,json=brandName,proto3" json:"brand_name,omitempty"`
+	Category      string                 `protobuf:"bytes,3,opt,name=category,proto3" json:"category,omitempty"`
+	Positioning   string                 `protobuf:"bytes,4,opt,name=positioning,proto3" json:"positioning,omitempty"`
+	Audience      []string               `protobuf:"bytes,5,rep,name=audience,proto3" json:"audience,omitempty"`
+	UseCases      []string               `protobuf:"bytes,6,rep,name=use_cases,json=useCases,proto3" json:"use_cases,omitempty"`
+	Features      []string               `protobuf:"bytes,7,rep,name=features,proto3" json:"features,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetProjectBrandCanonResponse) Reset() {
+	*x = GetProjectBrandCanonResponse{}
+	mi := &file_proto_project_v1_project_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetProjectBrandCanonResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetProjectBrandCanonResponse) ProtoMessage() {}
+
+func (x *GetProjectBrandCanonResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_proto_project_v1_project_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetProjectBrandCanonResponse.ProtoReflect.Descriptor instead.
+func (*GetProjectBrandCanonResponse) Descriptor() ([]byte, []int) {
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *GetProjectBrandCanonResponse) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *GetProjectBrandCanonResponse) GetBrandName() string {
+	if x != nil {
+		return x.BrandName
+	}
+	return ""
+}
+
+func (x *GetProjectBrandCanonResponse) GetCategory() string {
+	if x != nil {
+		return x.Category
+	}
+	return ""
+}
+
+func (x *GetProjectBrandCanonResponse) GetPositioning() string {
+	if x != nil {
+		return x.Positioning
+	}
+	return ""
+}
+
+func (x *GetProjectBrandCanonResponse) GetAudience() []string {
+	if x != nil {
+		return x.Audience
+	}
+	return nil
+}
+
+func (x *GetProjectBrandCanonResponse) GetUseCases() []string {
+	if x != nil {
+		return x.UseCases
+	}
+	return nil
+}
+
+func (x *GetProjectBrandCanonResponse) GetFeatures() []string {
+	if x != nil {
+		return x.Features
+	}
+	return nil
+}
+
 type PromptSchedule struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Mode          string                 `protobuf:"bytes,1,opt,name=mode,proto3" json:"mode,omitempty"`
@@ -553,7 +689,7 @@ type PromptSchedule struct {
 
 func (x *PromptSchedule) Reset() {
 	*x = PromptSchedule{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	mi := &file_proto_project_v1_project_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -565,7 +701,7 @@ func (x *PromptSchedule) String() string {
 func (*PromptSchedule) ProtoMessage() {}
 
 func (x *PromptSchedule) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[10]
+	mi := &file_proto_project_v1_project_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -578,7 +714,7 @@ func (x *PromptSchedule) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PromptSchedule.ProtoReflect.Descriptor instead.
 func (*PromptSchedule) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{10}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *PromptSchedule) GetMode() string {
@@ -628,7 +764,7 @@ type ScheduledAnalysisJob struct {
 
 func (x *ScheduledAnalysisJob) Reset() {
 	*x = ScheduledAnalysisJob{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[11]
+	mi := &file_proto_project_v1_project_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -640,7 +776,7 @@ func (x *ScheduledAnalysisJob) String() string {
 func (*ScheduledAnalysisJob) ProtoMessage() {}
 
 func (x *ScheduledAnalysisJob) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[11]
+	mi := &file_proto_project_v1_project_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -653,7 +789,7 @@ func (x *ScheduledAnalysisJob) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledAnalysisJob.ProtoReflect.Descriptor instead.
 func (*ScheduledAnalysisJob) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{11}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *ScheduledAnalysisJob) GetProjectId() string {
@@ -744,7 +880,7 @@ type ScheduledModelProviderCredential struct {
 
 func (x *ScheduledModelProviderCredential) Reset() {
 	*x = ScheduledModelProviderCredential{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[12]
+	mi := &file_proto_project_v1_project_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -756,7 +892,7 @@ func (x *ScheduledModelProviderCredential) String() string {
 func (*ScheduledModelProviderCredential) ProtoMessage() {}
 
 func (x *ScheduledModelProviderCredential) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[12]
+	mi := &file_proto_project_v1_project_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -769,7 +905,7 @@ func (x *ScheduledModelProviderCredential) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScheduledModelProviderCredential.ProtoReflect.Descriptor instead.
 func (*ScheduledModelProviderCredential) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{12}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ScheduledModelProviderCredential) GetProviderId() string {
@@ -801,7 +937,7 @@ type ListScheduledAnalysisJobsRequest struct {
 
 func (x *ListScheduledAnalysisJobsRequest) Reset() {
 	*x = ListScheduledAnalysisJobsRequest{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[13]
+	mi := &file_proto_project_v1_project_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -813,7 +949,7 @@ func (x *ListScheduledAnalysisJobsRequest) String() string {
 func (*ListScheduledAnalysisJobsRequest) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[13]
+	mi := &file_proto_project_v1_project_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -826,7 +962,7 @@ func (x *ListScheduledAnalysisJobsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListScheduledAnalysisJobsRequest.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsRequest) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{13}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{15}
 }
 
 type ListScheduledAnalysisJobsResponse struct {
@@ -838,7 +974,7 @@ type ListScheduledAnalysisJobsResponse struct {
 
 func (x *ListScheduledAnalysisJobsResponse) Reset() {
 	*x = ListScheduledAnalysisJobsResponse{}
-	mi := &file_proto_project_v1_project_proto_msgTypes[14]
+	mi := &file_proto_project_v1_project_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -850,7 +986,7 @@ func (x *ListScheduledAnalysisJobsResponse) String() string {
 func (*ListScheduledAnalysisJobsResponse) ProtoMessage() {}
 
 func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_proto_project_v1_project_proto_msgTypes[14]
+	mi := &file_proto_project_v1_project_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -863,7 +999,7 @@ func (x *ListScheduledAnalysisJobsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListScheduledAnalysisJobsResponse.ProtoReflect.Descriptor instead.
 func (*ListScheduledAnalysisJobsResponse) Descriptor() ([]byte, []int) {
-	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{14}
+	return file_proto_project_v1_project_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *ListScheduledAnalysisJobsResponse) GetJobs() []*ScheduledAnalysisJob {
@@ -916,7 +1052,20 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"?\n" +
 	" ListProjectEnabledModelsResponse\x12\x1b\n" +
-	"\tmodel_ids\x18\x01 \x03(\tR\bmodelIds\"\xe0\x01\n" +
+	"\tmodel_ids\x18\x01 \x03(\tR\bmodelIds\"<\n" +
+	"\x1bGetProjectBrandCanonRequest\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\"\xef\x01\n" +
+	"\x1cGetProjectBrandCanonResponse\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x1d\n" +
+	"\n" +
+	"brand_name\x18\x02 \x01(\tR\tbrandName\x12\x1a\n" +
+	"\bcategory\x18\x03 \x01(\tR\bcategory\x12 \n" +
+	"\vpositioning\x18\x04 \x01(\tR\vpositioning\x12\x1a\n" +
+	"\baudience\x18\x05 \x03(\tR\baudience\x12\x1b\n" +
+	"\tuse_cases\x18\x06 \x03(\tR\buseCases\x12\x1a\n" +
+	"\bfeatures\x18\a \x03(\tR\bfeatures\"\xe0\x01\n" +
 	"\x0ePromptSchedule\x12\x12\n" +
 	"\x04mode\x18\x01 \x01(\tR\x04mode\x12\x12\n" +
 	"\x04cron\x18\x02 \x01(\tR\x04cron\x12\x1a\n" +
@@ -953,12 +1102,13 @@ const file_proto_project_v1_project_proto_rawDesc = "" +
 	"\x10provider_api_key\x18\x03 \x01(\tR\x0eproviderApiKey\"\"\n" +
 	" ListScheduledAnalysisJobsRequest\"Y\n" +
 	"!ListScheduledAnalysisJobsResponse\x124\n" +
-	"\x04jobs\x18\x01 \x03(\v2 .project.v1.ScheduledAnalysisJobR\x04jobs2\xcb\x04\n" +
+	"\x04jobs\x18\x01 \x03(\v2 .project.v1.ScheduledAnalysisJobR\x04jobs2\xb6\x05\n" +
 	"\x0eProjectService\x12c\n" +
 	"\x12CheckProjectAccess\x12%.project.v1.CheckProjectAccessRequest\x1a&.project.v1.CheckProjectAccessResponse\x12r\n" +
 	"\x17GetProjectImpactContext\x12*.project.v1.GetProjectImpactContextRequest\x1a+.project.v1.GetProjectImpactContextResponse\x12o\n" +
 	"\x16ListProjectCompetitors\x12).project.v1.ListProjectCompetitorsRequest\x1a*.project.v1.ListProjectCompetitorsResponse\x12u\n" +
-	"\x18ListProjectEnabledModels\x12+.project.v1.ListProjectEnabledModelsRequest\x1a,.project.v1.ListProjectEnabledModelsResponse\x12x\n" +
+	"\x18ListProjectEnabledModels\x12+.project.v1.ListProjectEnabledModelsRequest\x1a,.project.v1.ListProjectEnabledModelsResponse\x12i\n" +
+	"\x14GetProjectBrandCanon\x12'.project.v1.GetProjectBrandCanonRequest\x1a(.project.v1.GetProjectBrandCanonResponse\x12x\n" +
 	"\x19ListScheduledAnalysisJobs\x12,.project.v1.ListScheduledAnalysisJobsRequest\x1a-.project.v1.ListScheduledAnalysisJobsResponseBQZOgithub.com/bastiencouder/microservices-go/contracts/gen/go/project/v1;projectv1b\x06proto3"
 
 var (
@@ -973,7 +1123,7 @@ func file_proto_project_v1_project_proto_rawDescGZIP() []byte {
 	return file_proto_project_v1_project_proto_rawDescData
 }
 
-var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_proto_project_v1_project_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
 var file_proto_project_v1_project_proto_goTypes = []any{
 	(*CheckProjectAccessRequest)(nil),         // 0: project.v1.CheckProjectAccessRequest
 	(*CheckProjectAccessResponse)(nil),        // 1: project.v1.CheckProjectAccessResponse
@@ -985,34 +1135,38 @@ var file_proto_project_v1_project_proto_goTypes = []any{
 	(*ListProjectCompetitorsResponse)(nil),    // 7: project.v1.ListProjectCompetitorsResponse
 	(*ListProjectEnabledModelsRequest)(nil),   // 8: project.v1.ListProjectEnabledModelsRequest
 	(*ListProjectEnabledModelsResponse)(nil),  // 9: project.v1.ListProjectEnabledModelsResponse
-	(*PromptSchedule)(nil),                    // 10: project.v1.PromptSchedule
-	(*ScheduledAnalysisJob)(nil),              // 11: project.v1.ScheduledAnalysisJob
-	(*ScheduledModelProviderCredential)(nil),  // 12: project.v1.ScheduledModelProviderCredential
-	(*ListScheduledAnalysisJobsRequest)(nil),  // 13: project.v1.ListScheduledAnalysisJobsRequest
-	(*ListScheduledAnalysisJobsResponse)(nil), // 14: project.v1.ListScheduledAnalysisJobsResponse
-	nil, // 15: project.v1.PromptSchedule.ModelCronsEntry
-	nil, // 16: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
+	(*GetProjectBrandCanonRequest)(nil),       // 10: project.v1.GetProjectBrandCanonRequest
+	(*GetProjectBrandCanonResponse)(nil),      // 11: project.v1.GetProjectBrandCanonResponse
+	(*PromptSchedule)(nil),                    // 12: project.v1.PromptSchedule
+	(*ScheduledAnalysisJob)(nil),              // 13: project.v1.ScheduledAnalysisJob
+	(*ScheduledModelProviderCredential)(nil),  // 14: project.v1.ScheduledModelProviderCredential
+	(*ListScheduledAnalysisJobsRequest)(nil),  // 15: project.v1.ListScheduledAnalysisJobsRequest
+	(*ListScheduledAnalysisJobsResponse)(nil), // 16: project.v1.ListScheduledAnalysisJobsResponse
+	nil, // 17: project.v1.PromptSchedule.ModelCronsEntry
+	nil, // 18: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
 }
 var file_proto_project_v1_project_proto_depIdxs = []int32{
 	3,  // 0: project.v1.ProjectImpactIntegrations.ga4:type_name -> project.v1.ProjectGA4Integration
 	4,  // 1: project.v1.GetProjectImpactContextResponse.integrations:type_name -> project.v1.ProjectImpactIntegrations
-	15, // 2: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
-	10, // 3: project.v1.ScheduledAnalysisJob.schedule:type_name -> project.v1.PromptSchedule
-	16, // 4: project.v1.ScheduledAnalysisJob.provider_credentials:type_name -> project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
-	11, // 5: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
-	12, // 6: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry.value:type_name -> project.v1.ScheduledModelProviderCredential
+	17, // 2: project.v1.PromptSchedule.model_crons:type_name -> project.v1.PromptSchedule.ModelCronsEntry
+	12, // 3: project.v1.ScheduledAnalysisJob.schedule:type_name -> project.v1.PromptSchedule
+	18, // 4: project.v1.ScheduledAnalysisJob.provider_credentials:type_name -> project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry
+	13, // 5: project.v1.ListScheduledAnalysisJobsResponse.jobs:type_name -> project.v1.ScheduledAnalysisJob
+	14, // 6: project.v1.ScheduledAnalysisJob.ProviderCredentialsEntry.value:type_name -> project.v1.ScheduledModelProviderCredential
 	0,  // 7: project.v1.ProjectService.CheckProjectAccess:input_type -> project.v1.CheckProjectAccessRequest
 	2,  // 8: project.v1.ProjectService.GetProjectImpactContext:input_type -> project.v1.GetProjectImpactContextRequest
 	6,  // 9: project.v1.ProjectService.ListProjectCompetitors:input_type -> project.v1.ListProjectCompetitorsRequest
 	8,  // 10: project.v1.ProjectService.ListProjectEnabledModels:input_type -> project.v1.ListProjectEnabledModelsRequest
-	13, // 11: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
-	1,  // 12: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
-	5,  // 13: project.v1.ProjectService.GetProjectImpactContext:output_type -> project.v1.GetProjectImpactContextResponse
-	7,  // 14: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
-	9,  // 15: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
-	14, // 16: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
-	12, // [12:17] is the sub-list for method output_type
-	7,  // [7:12] is the sub-list for method input_type
+	10, // 11: project.v1.ProjectService.GetProjectBrandCanon:input_type -> project.v1.GetProjectBrandCanonRequest
+	15, // 12: project.v1.ProjectService.ListScheduledAnalysisJobs:input_type -> project.v1.ListScheduledAnalysisJobsRequest
+	1,  // 13: project.v1.ProjectService.CheckProjectAccess:output_type -> project.v1.CheckProjectAccessResponse
+	5,  // 14: project.v1.ProjectService.GetProjectImpactContext:output_type -> project.v1.GetProjectImpactContextResponse
+	7,  // 15: project.v1.ProjectService.ListProjectCompetitors:output_type -> project.v1.ListProjectCompetitorsResponse
+	9,  // 16: project.v1.ProjectService.ListProjectEnabledModels:output_type -> project.v1.ListProjectEnabledModelsResponse
+	11, // 17: project.v1.ProjectService.GetProjectBrandCanon:output_type -> project.v1.GetProjectBrandCanonResponse
+	16, // 18: project.v1.ProjectService.ListScheduledAnalysisJobs:output_type -> project.v1.ListScheduledAnalysisJobsResponse
+	13, // [13:19] is the sub-list for method output_type
+	7,  // [7:13] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1029,7 +1183,7 @@ func file_proto_project_v1_project_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_proto_project_v1_project_proto_rawDesc), len(file_proto_project_v1_project_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   17,
+			NumMessages:   19,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

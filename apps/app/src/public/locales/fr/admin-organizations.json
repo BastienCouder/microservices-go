@@ -35,6 +35,8 @@
   "savedQuota": "enregistré {{value}}",
   "delete": "Supprimer",
   "deleting": "Suppression...",
+  "deleteOrganizationTitle": "Supprimer l’organisation {{name}} ?",
+  "deleteOrganizationConfirmDescription": "Cette action est irréversible. L’organisation sera supprimée de façon logique et ses données sensibles seront anonymisées.",
   "organizationDeleted": "Organisation supprimée.",
   "organizationDeleteError": "Impossible de supprimer cette organisation.",
   "save": "Sauvegarder",

@@ -144,6 +144,41 @@ func (s *Server) ListProjectEnabledModels(ctx context.Context, req *projectv1.Li
 	}, nil
 }
 
+func (s *Server) GetProjectBrandCanon(ctx context.Context, req *projectv1.GetProjectBrandCanonRequest) (*projectv1.GetProjectBrandCanonResponse, error) {
+	if req.GetProjectId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "project_id is required")
+	}
+
+	claims, ok := internalauth.ClaimsFromContext(ctx)
+	if !ok || claims.Organization <= 0 {
+		return nil, status.Error(codes.Unauthenticated, "missing organization claim")
+	}
+
+	canon, err := s.svc.GetBrandCanon(ctx, req.GetProjectId(), claims.Organization)
+	if err != nil {
+		if errors.Is(err, usecase.ErrNotFound) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		if errors.Is(err, usecase.ErrUnauthorized) {
+			return nil, status.Error(codes.PermissionDenied, err.Error())
+		}
+		if errors.Is(err, usecase.ErrValidation) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &projectv1.GetProjectBrandCanonResponse{
+		ProjectId:   canon.ProjectID,
+		BrandName:   canon.BrandName,
+		Category:    canon.Category,
+		Positioning: canon.Positioning,
+		Audience:    append([]string(nil), canon.Audience...),
+		UseCases:    append([]string(nil), canon.UseCases...),
+		Features:    append([]string(nil), canon.Features...),
+	}, nil
+}
+
 func (s *Server) ListScheduledAnalysisJobs(ctx context.Context, _ *projectv1.ListScheduledAnalysisJobsRequest) (*projectv1.ListScheduledAnalysisJobsResponse, error) {
 	jobs, err := s.svc.ListScheduledAnalysisJobs(ctx)
 	if err != nil {

@@ -1,6 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { createHmac, randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +18,6 @@ type OrganizationSeed = {
 };
 
 type BillingPlan = "starter" | "growth" | "pro";
-export type SeedAnalysisMode = "synthetic" | "live";
 
 type PromptSeed = {
   id: string;
@@ -93,7 +91,6 @@ type SeedContentCrawlRecord = {
 type RuntimeSeedPlan = {
   cleanupProjectIDs: string[];
   projectId: string;
-  liveRequestId: string;
   crawlJobId: string;
   discoveryCrawlJobId: string;
   prompts: PromptSeed[];
@@ -106,39 +103,6 @@ type RuntimeSeedPlan = {
 type IDAllocator = {
   next: (prefix: string) => string;
   current: () => number;
-};
-
-type SuccessEnvelope<T> = {
-  success: boolean;
-  data: T;
-};
-
-type StartAnalysisResponse = {
-  analysisRun: {
-    id: string;
-  };
-  promptRuns: Array<{
-    id: string;
-    promptId: string;
-    promptText: string;
-  }>;
-};
-
-type IAExecuteResponse = {
-  rawResponse: string;
-  modelId: string;
-  analysis: {
-    brandMentioned: boolean;
-    brandPosition: string;
-    citationFound: boolean;
-    citedUrls: string[];
-    sentiment: string;
-  };
-};
-
-type LiveSeedResult = {
-  runId: string;
-  responsesRecorded: number;
 };
 
 const COMPOSE_PROJECT_NAME = process.env.SEED_COMPOSE_PROJECT_NAME?.trim() || "microservices-go-prod";
@@ -158,20 +122,14 @@ const SEED_AUTH_ID = process.env.SEED_AUTH_ID?.trim() ?? "";
 const SEED_USER_ID = process.env.SEED_USER_ID?.trim() ?? "";
 const SEED_USER_EMAIL = process.env.SEED_USER_EMAIL?.trim() || "couderbastien";
 const SEED_BILLING_PLAN = readBillingPlan(process.env.SEED_BILLING_PLAN);
-const SEED_BILLING_SEATS = readPositiveIntEnv(process.env.SEED_BILLING_SEATS, 1);
+const SEED_BILLING_SEATS = readPositiveIntEnv(
+  process.env.SEED_BILLING_SEATS,
+  defaultSeatsForPlan(SEED_BILLING_PLAN),
+);
 const SEED_BILLING_MONTHLY_QUOTA = readPositiveIntEnv(
   process.env.SEED_BILLING_MONTHLY_QUOTA,
   defaultMonthlyQuotaForPlan(SEED_BILLING_PLAN),
 );
-const SEED_ANALYSIS_MODE = readAnalysisMode(process.env.SEED_ANALYSIS_MODE);
-const SEED_ANALYSIS_BASE_URL = process.env.SEED_ANALYSIS_BASE_URL?.trim() || "http://localhost:50009";
-const SEED_IA_BASE_URL = process.env.SEED_IA_BASE_URL?.trim() || "http://localhost:50011";
-const SEED_HTTP_TIMEOUT_MS = readPositiveIntEnv(process.env.SEED_HTTP_TIMEOUT_MS, 120_000);
-const SEED_INTERNAL_JWT_SECRET_FILE = process.env.SEED_INTERNAL_JWT_SECRET_FILE?.trim() || "deployments/secrets/internal_jwt_secret.txt";
-const SEED_OPENROUTER_API_KEY_FILE = process.env.SEED_OPENROUTER_API_KEY_FILE?.trim() || "deployments/secrets/openrouter_api_key.txt";
-const SEED_INTERNAL_JWT_ISSUER = process.env.SEED_INTERNAL_JWT_ISSUER?.trim() || "api-gateway";
-const SEED_INTERNAL_JWT_SUBJECT = process.env.SEED_INTERNAL_JWT_SUBJECT?.trim() || "seed-nike-backend";
-const SEED_LIVE_REQUEST_ID_OVERRIDE = process.env.SEED_LIVE_REQUEST_ID?.trim() ?? "";
 
 const NOW = new Date().toISOString();
 const EARLIER = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString();
@@ -320,14 +278,6 @@ function readBillingPlan(rawPlan: string | undefined): BillingPlan {
   throw new Error(`SEED_BILLING_PLAN invalide: ${rawPlan}`);
 }
 
-export function readAnalysisMode(rawMode: string | undefined): SeedAnalysisMode {
-  const mode = rawMode?.trim().toLowerCase() ?? "synthetic";
-  if (mode === "synthetic" || mode === "live") {
-    return mode;
-  }
-  throw new Error(`SEED_ANALYSIS_MODE invalide: ${rawMode}`);
-}
-
 function readPositiveIntEnv(rawValue: string | undefined, fallback: number): number {
   if (!rawValue?.trim()) {
     return fallback;
@@ -343,6 +293,12 @@ export function defaultMonthlyQuotaForPlan(plan: BillingPlan): number {
   if (plan === "starter") return 100;
   if (plan === "growth") return 750;
   return 3_000;
+}
+
+export function defaultSeatsForPlan(plan: BillingPlan): number {
+  if (plan === "starter") return 1;
+  if (plan === "growth") return 3;
+  return 5;
 }
 
 export function createIDAllocator(startSeq: number): IDAllocator {
@@ -370,10 +326,6 @@ function isScopedUUIDID(value: string, prefix: string): boolean {
 
 function dedupeStrings(values: readonly string[]): string[] {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
-}
-
-function buildLiveRequestID(projectID: string): string {
-  return SEED_LIVE_REQUEST_ID_OVERRIDE || `${projectID}-live-seed`;
 }
 
 function isoDaysAgo(daysAgo: number, minuteOffset = 0): string {
@@ -436,78 +388,11 @@ function quoteLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function readSecretFile(filePath: string, label: string): string {
-  const resolvedPath = path.resolve(filePath);
-  const value = readFileSync(resolvedPath, "utf8").trim();
-  if (value === "") {
-    throw new Error(`${label} vide dans ${resolvedPath}`);
-  }
-  return value;
-}
-
-function looksLikePlaceholderSecret(value: string): boolean {
-  const normalized = value.trim().toLowerCase();
-  return normalized === "" || normalized.includes("change-me") || normalized.includes("xxxxxxxx");
-}
-
-function base64url(value: string): string {
-  return Buffer.from(value)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/g, "");
-}
-
-export function signInternalJWT({
-  secret,
-  issuer,
-  audience,
-  subject,
-  organizationId = 0,
-  userId = 0,
-  ttlSeconds = 300,
-}: {
-  secret: string;
-  issuer: string;
-  audience: string;
-  subject: string;
-  organizationId?: number;
-  userId?: number;
-  ttlSeconds?: number;
-}): string {
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: "HS256", typ: "JWT" };
-  const payload: Record<string, number | string> = {
-    iss: issuer,
-    sub: subject,
-    aud: audience,
-    iat: now,
-    exp: now + ttlSeconds,
-  };
-
-  if (organizationId > 0) {
-    payload.organization_id = organizationId;
-  }
-  if (userId > 0) {
-    payload.user_id = userId;
-  }
-
-  const encodedHeader = base64url(JSON.stringify(header));
-  const encodedPayload = base64url(JSON.stringify(payload));
-  const unsignedToken = `${encodedHeader}.${encodedPayload}`;
-  const signature = createHmac("sha256", secret).update(unsignedToken).digest("base64url");
-
-  return `${unsignedToken}.${signature}`;
-}
-
-async function runDocker(args: string[], stdin?: string, envOverrides?: Record<string, string>): Promise<string> {
+async function runDocker(args: string[], stdin?: string): Promise<string> {
   try {
     const output = execFileSync("docker", args, {
       cwd: process.cwd(),
-      env: {
-        ...process.env,
-        ...envOverrides,
-      },
+      env: process.env,
       input: stdin,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "pipe"],
@@ -518,65 +403,6 @@ async function runDocker(args: string[], stdin?: string, envOverrides?: Record<s
     const stdout = error instanceof Error && "stdout" in error ? String((error as { stdout?: string }).stdout ?? "") : "";
     throw new Error(stderr.trim() || stdout.trim() || `docker command failed: ${args.join(" ")}`);
   }
-}
-
-async function postJSON<TResponse>(url: string, body: unknown, token: string): Promise<TResponse> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(SEED_HTTP_TIMEOUT_MS),
-  });
-
-  const raw = await response.text();
-  let parsed: unknown;
-  try {
-    parsed = raw === "" ? null : JSON.parse(raw);
-  } catch {
-    parsed = raw;
-  }
-
-  if (!response.ok) {
-    const message =
-      typeof parsed === "object" && parsed !== null && "error" in parsed && typeof (parsed as { error?: unknown }).error === "string"
-        ? (parsed as { error: string }).error
-        : raw || `${response.status} ${response.statusText}`;
-    throw new Error(`HTTP ${response.status} ${url}: ${message}`);
-  }
-
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    !("success" in parsed) ||
-    !("data" in parsed) ||
-    (parsed as { success?: unknown }).success !== true
-  ) {
-    throw new Error(`Réponse inattendue depuis ${url}`);
-  }
-
-  return (parsed as SuccessEnvelope<TResponse>).data;
-}
-
-async function waitForReady(serviceName: string, baseURL: string): Promise<void> {
-  let lastError = "";
-  for (let attempt = 1; attempt <= 40; attempt += 1) {
-    try {
-      const response = await fetch(`${baseURL.replace(/\/$/, "")}/ready`, {
-        signal: AbortSignal.timeout(5_000),
-      });
-      if (response.ok) {
-        return;
-      }
-      lastError = `${response.status} ${response.statusText}`;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1_000));
-  }
-  throw new Error(`${serviceName} n'est pas prêt: ${lastError}`);
 }
 
 async function psql(database: string, sql: string, opts?: { quiet?: boolean }): Promise<string> {
@@ -835,39 +661,57 @@ async function saveJSONState(database: string, table: string, state: object) {
 
 export const MODELS = [
   {
-    id: "gpt-oss-20b-free",
-    label: "gpt-oss-20b (free)",
+    id: "gpt-4o-mini",
+    label: "GPT-4o mini",
     provider: "openai",
-    group: "gpt-oss",
+    group: "chatgpt",
     iconKey: "openai",
-    modelId: "openai/gpt-oss-20b:free",
+    modelId: "openai/gpt-4o-mini",
     supportsLiveSearch: false,
   },
   {
-    id: "gpt-oss-120b-free",
-    label: "gpt-oss-120b (free)",
-    provider: "openai",
-    group: "gpt-oss",
-    iconKey: "openai",
-    modelId: "openai/gpt-oss-120b:free",
+    id: "claude-3-5-sonnet",
+    label: "Claude 3.5 Sonnet",
+    provider: "anthropic",
+    group: "claude",
+    iconKey: "anthropic",
+    modelId: "anthropic/claude-3.5-sonnet",
     supportsLiveSearch: false,
   },
   {
-    id: "gemma-3-4b-free",
-    label: "Gemma 3 4B (free)",
+    id: "gemini-2.0-flash",
+    label: "Gemini 2.0 Flash",
     provider: "google",
-    group: "gemma",
+    group: "gemini",
     iconKey: "google",
-    modelId: "google/gemma-3-4b-it:free",
+    modelId: "google/gemini-2.0-flash-001",
     supportsLiveSearch: false,
   },
   {
-    id: "gemma-3-27b-free",
-    label: "Gemma 3 27B (free)",
-    provider: "google",
-    group: "gemma",
-    iconKey: "google",
-    modelId: "google/gemma-3-27b-it:free",
+    id: "sonar",
+    label: "Sonar",
+    provider: "perplexity",
+    group: "perplexity",
+    iconKey: "perplexity",
+    modelId: "perplexity/sonar",
+    supportsLiveSearch: true,
+  },
+  {
+    id: "mistral-large",
+    label: "Mistral Large",
+    provider: "mistral",
+    group: "mistral",
+    iconKey: "mistral",
+    modelId: "mistralai/mistral-large",
+    supportsLiveSearch: false,
+  },
+  {
+    id: "glm-4.5",
+    label: "GLM 4.5",
+    provider: "z-ai",
+    group: "glm",
+    iconKey: "zai",
+    modelId: "zai/glm-4.5",
     supportsLiveSearch: false,
   },
 ] as const;
@@ -989,9 +833,9 @@ function buildPerceptionSeedRun(projectID: string, prompts: PromptSeed[], alloca
     createdAt: isoDaysAgo(2, 16 + index),
   }));
   const responseTexts = [
-    "Nike est une marque mondiale de sportswear, chaussures et équipement sportif. Son positionnement associe innovation de performance, design iconique, culture sportive et partenariats avec les athlètes.",
-    "Nike s'adresse aux athlètes, runners, amateurs de sneakers et consommateurs au mode de vie actif. La marque couvre le running, le basketball, le training, le lifestyle et le membership.",
-    "Face à Adidas, ASICS, Puma et New Balance, Nike se différencie par l'innovation de performance, le design iconique, ses partenariats athlètes et son écosystème mondial de membership. Sa puissance de marque est un signal de confiance, malgré une forte pression concurrentielle.",
+    "Nike est une marque de Sportswear, chaussures et equipement sportif. Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception. Elle s'adresse aux Athletes, Runners, Sneaker enthusiasts et Active lifestyle consumers. Ses usages couvrent Running, Basketball, Training, Lifestyle et Membership. Ses forces sont Performance innovation, Iconic design, Athlete partnerships et Global membership ecosystem.",
+    "Nike accompagne les Athletes, Runners, Sneaker enthusiasts et Active lifestyle consumers. La marque repond aux cas d'usage Running, Basketball, Training, Lifestyle et Membership avec Performance innovation, Iconic design, Athlete partnerships et Global membership ecosystem. Elle appartient au secteur Sportswear, chaussures et equipement sportif et son positionnement est celui d'une Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception.",
+    "Face a Adidas, ASICS, Puma et New Balance, Nike reste bien positionnee dans le Sportswear, chaussures et equipement sportif. Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception, elle couvre Running, Basketball, Training, Lifestyle et Membership. Ses atouts sont Performance innovation, Iconic design, Athlete partnerships et Global membership ecosystem pour les Athletes, Runners, Sneaker enthusiasts et Active lifestyle consumers.",
   ];
   const responses = promptRuns.flatMap((promptRun, promptIndex) =>
     MODELS.map((model, modelIndex) => ({
@@ -1096,7 +940,6 @@ export function buildRuntimeSeedPlan({
   return {
     cleanupProjectIDs: dedupeStrings([...cleanupProjectIDs, projectId]),
     projectId,
-    liveRequestId: buildLiveRequestID(projectId),
     crawlJobId: randomUUID(),
     discoveryCrawlJobId: randomUUID(),
     prompts,
@@ -1163,7 +1006,9 @@ async function resetProjectRelationalData(plan: RuntimeSeedPlan) {
 async function seedProjectRelational(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan) {
   const allPrompts = [...plan.prompts, ...plan.perceptionPrompts];
   const promptStatements = allPrompts.map(
-    (prompt) => `
+    (prompt) => {
+      const isPerception = plan.perceptionPrompts.some((item) => item.id === prompt.id);
+      return `
       insert into prompts (id, project_id, text, intent, language, country, is_active, status, schedule_mode, schedule_cron, schedule_timezone, kind, created_at, updated_at)
       values (
         ${quoteLiteral(prompt.id)},
@@ -1172,12 +1017,12 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
         ${quoteLiteral(prompt.intent)},
         'fr',
         'FR',
-        true,
-        'active',
+        ${isPerception ? "true" : "false"},
+        ${quoteLiteral(isPerception ? "active" : "disabled")},
         'global',
         '0 */6 * * *',
         'UTC',
-        ${quoteLiteral(plan.perceptionPrompts.some((item) => item.id === prompt.id) ? "perception" : "monitoring")},
+        ${quoteLiteral(isPerception ? "perception" : "monitoring")},
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
       )
@@ -1192,7 +1037,8 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
         schedule_timezone = excluded.schedule_timezone,
         kind = excluded.kind,
         updated_at = excluded.updated_at;
-    `,
+    `;
+    },
   ).join("\n");
 
   const competitorStatements = plan.competitors.map(
@@ -1370,7 +1216,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
       ${run.responses.length},
       ${run.responses.length},
       ${run.visibilityScore},
-      ${run.responses.length},
+      0,
       ${quoteLiteral(run.createdAt)},
       ${quoteLiteral(run.createdAt)}
     )
@@ -1610,103 +1456,6 @@ async function resetAnalysisDataForProjects(projectIDs: readonly string[]) {
   );
 }
 
-async function ensureIAServiceProviderMode() {
-  const apiKey = readSecretFile(SEED_OPENROUTER_API_KEY_FILE, "OpenRouter API key");
-  if (looksLikePlaceholderSecret(apiKey)) {
-    throw new Error(
-      `La clé OpenRouter dans ${path.resolve(SEED_OPENROUTER_API_KEY_FILE)} est encore un placeholder. Remplace-la avant un seed live.`,
-    );
-  }
-
-  logStep("Ensure ia-service runs in provider mode");
-  await runDocker(
-    [...COMPOSE_ARGS, "--profile", "backend", "up", "-d", "--build", "ia-service"],
-    undefined,
-    { IA_EXECUTION_MODE: "provider" },
-  );
-  await waitForReady("ia-service", SEED_IA_BASE_URL);
-}
-
-async function seedAnalysisLive(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan): Promise<LiveSeedResult> {
-  await waitForReady("analysis-service", SEED_ANALYSIS_BASE_URL);
-  await waitForReady("ia-service", SEED_IA_BASE_URL);
-
-  const jwtSecret = readSecretFile(SEED_INTERNAL_JWT_SECRET_FILE, "Internal JWT secret");
-  const analysisToken = signInternalJWT({
-    secret: jwtSecret,
-    issuer: SEED_INTERNAL_JWT_ISSUER,
-    audience: "analysis-service",
-    subject: SEED_INTERNAL_JWT_SUBJECT,
-    organizationId: organization.id,
-    userId: user.id,
-  });
-  const iaToken = signInternalJWT({
-    secret: jwtSecret,
-    issuer: SEED_INTERNAL_JWT_ISSUER,
-    audience: "ia-service",
-    subject: SEED_INTERNAL_JWT_SUBJECT,
-    organizationId: organization.id,
-    userId: user.id,
-  });
-
-  const startResult = await postJSON<StartAnalysisResponse>(
-    `${SEED_ANALYSIS_BASE_URL.replace(/\/$/, "")}/analysis/projects/${plan.projectId}/analyze`,
-    {
-      requestId: plan.liveRequestId,
-      promptTexts: plan.prompts.map((prompt) => ({ id: prompt.id, text: prompt.text })),
-      modelIds: MODELS.map((model) => model.id),
-      runType: "manual",
-    },
-    analysisToken,
-  );
-
-  const promptRunsByPromptId = new Map(startResult.promptRuns.map((item) => [item.promptId, item]));
-  let responsesRecorded = 0;
-
-  for (const prompt of plan.prompts) {
-    const promptRun = promptRunsByPromptId.get(prompt.id);
-    if (!promptRun) {
-      throw new Error(`Prompt run manquant pour ${prompt.id}`);
-    }
-
-    for (const model of MODELS) {
-      const iaResult = await postJSON<IAExecuteResponse>(
-        `${SEED_IA_BASE_URL.replace(/\/$/, "")}/ai/execute`,
-        {
-          promptId: prompt.id,
-          promptText: prompt.text,
-          modelId: model.id,
-          brandName: PROJECT_NAME,
-          competitors: plan.competitors.map((competitor) => competitor.name),
-        },
-        iaToken,
-      );
-
-      await postJSON<{ recorded: boolean }>(
-        `${SEED_ANALYSIS_BASE_URL.replace(/\/$/, "")}/analysis/runs/${startResult.analysisRun.id}/responses`,
-        {
-          promptRunId: promptRun.id,
-          modelId: model.id,
-          rawResponse: iaResult.rawResponse,
-          brandMentioned: iaResult.analysis?.brandMentioned ?? false,
-          brandPosition: iaResult.analysis?.brandPosition ?? "unknown",
-          citationFound: iaResult.analysis?.citationFound ?? false,
-          citedUrls: iaResult.analysis?.citedUrls ?? [],
-          sentiment: iaResult.analysis?.sentiment ?? "neutral",
-        },
-        analysisToken,
-      );
-
-      responsesRecorded += 1;
-    }
-  }
-
-  return {
-    runId: startResult.analysisRun.id,
-    responsesRecorded,
-  };
-}
-
 async function main() {
   console.log("Backend seed (organization + project + analysis)");
   console.log(`SEED_COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME}`);
@@ -1714,11 +1463,6 @@ async function main() {
   console.log(`SEED_ORG_NAME=${ORGANIZATION_NAME}`);
   console.log(`SEED_PROJECT_ID=${EXPLICIT_PROJECT_ID || "<auto>"}`);
   console.log(`SEED_USER_EMAIL=${SEED_USER_EMAIL}`);
-  console.log(`SEED_ANALYSIS_MODE=${SEED_ANALYSIS_MODE}`);
-
-  if (SEED_ANALYSIS_MODE === "live") {
-    await ensureIAServiceProviderMode();
-  }
 
   logStep("Resolve seed user from usersvc");
   const user = await getSeedUser();
@@ -1753,12 +1497,6 @@ async function main() {
   logStep("Create clean monitoring and perception history in analysissvc");
   await seedAnalysisRelational(user, organization, seedPlan);
 
-  let liveResult: LiveSeedResult | null = null;
-  if (SEED_ANALYSIS_MODE === "live") {
-    logStep("Create additional live OpenRouter monitoring run");
-    liveResult = await seedAnalysisLive(user, organization, seedPlan);
-  }
-
   logStep("Create content optimizer crawl seed in analysissvc");
   await seedContentOptimizerCrawl(organization, seedPlan);
 
@@ -1771,10 +1509,6 @@ async function main() {
   console.log(`- seeded perception prompts: ${seedPlan.perceptionPrompts.length}`);
   console.log(`- seeded competitors: ${seedPlan.competitors.length}`);
   console.log(`- seeded content optimizer pages: ${SEED_CONTENT_CRAWL_RECORDS.length}`);
-  if (SEED_ANALYSIS_MODE === "live" && liveResult) {
-    console.log(`- live run id: ${liveResult.runId}`);
-    console.log(`- live responses recorded: ${liveResult.responsesRecorded}`);
-  }
   console.log(`- seeded historical runs: ${seedPlan.runs.length}`);
   console.log(`- seeded historical responses: ${seedPlan.runs.reduce((total, run) => total + run.responses.length, 0)}`);
   console.log("- traffic: seeded attribution demo (ChatGPT, Perplexity, Gemini, Claude, Copilot, etc.)");

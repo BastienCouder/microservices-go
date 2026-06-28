@@ -48,12 +48,18 @@ export const apiRoutes = {
     models: (projectId: string) => `/projects/${projectId}/models`,
     prompts: (
       projectId: string,
-      options?: { page?: number; pageSize?: number; search?: string },
+      options?: {
+        page?: number;
+        pageSize?: number;
+        search?: string;
+        kind?: "monitoring" | "perception" | "all";
+      },
     ) => {
       const params = new URLSearchParams();
       if (options?.page && options.page > 0) params.set("page", String(options.page));
       if (options?.pageSize && options.pageSize > 0) params.set("page_size", String(options.pageSize));
       if (options?.search && options.search.trim() !== "") params.set("search", options.search.trim());
+      if (options?.kind) params.set("kind", options.kind);
       const query = params.toString();
       return `/projects/${projectId}/prompts${query ? `?${query}` : ""}`;
     },

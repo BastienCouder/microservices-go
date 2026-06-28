@@ -265,6 +265,48 @@ func (c *Client) ListProjectEnabledModels(ctx context.Context, projectID string,
 	return append([]string(nil), modelIDs...), nil
 }
 
+func (c *Client) GetProjectBrandCanon(ctx context.Context, projectID string, organizationID int64) (usecase.BrandCanon, error) {
+	projectID = strings.TrimSpace(projectID)
+	if projectID == "" {
+		return usecase.BrandCanon{}, fmt.Errorf("%w: projectId is required", usecase.ErrValidation)
+	}
+	if organizationID <= 0 {
+		return usecase.BrandCanon{}, fmt.Errorf("%w: organizationId must be a positive integer", usecase.ErrValidation)
+	}
+
+	token, err := internalauth.SignInternalJWT(c.jwtSecret, c.jwtIssuer, "project-service", "analysis-service", internalauth.Claims{Organization: organizationID})
+	if err != nil {
+		return usecase.BrandCanon{}, fmt.Errorf("sign internal jwt: %w", err)
+	}
+
+	callCtx := metadata.AppendToOutgoingContext(ctx, "authorization", "Bearer "+token)
+	resp, err := c.client.GetProjectBrandCanon(callCtx, &projectv1.GetProjectBrandCanonRequest{ProjectId: projectID})
+	if err != nil {
+		st, ok := status.FromError(err)
+		if ok {
+			switch st.Code() {
+			case codes.InvalidArgument:
+				return usecase.BrandCanon{}, fmt.Errorf("%w: %s", usecase.ErrValidation, st.Message())
+			case codes.NotFound:
+				return usecase.BrandCanon{}, fmt.Errorf("%w: project", usecase.ErrNotFound)
+			case codes.PermissionDenied, codes.Unauthenticated:
+				return usecase.BrandCanon{}, fmt.Errorf("%w: project access denied", usecase.ErrUnauthorized)
+			}
+		}
+		return usecase.BrandCanon{}, err
+	}
+
+	return usecase.BrandCanon{
+		ProjectID:   resp.GetProjectId(),
+		BrandName:   resp.GetBrandName(),
+		Category:    resp.GetCategory(),
+		Positioning: resp.GetPositioning(),
+		Audience:    append([]string(nil), resp.GetAudience()...),
+		UseCases:    append([]string(nil), resp.GetUseCases()...),
+		Features:    append([]string(nil), resp.GetFeatures()...),
+	}, nil
+}
+
 func (c *Client) executeWithResilience(
 	ctx context.Context,
 	attempts int,

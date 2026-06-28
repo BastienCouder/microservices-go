@@ -10,6 +10,9 @@ func (s *Service) GetBrandCanon(ctx context.Context, projectID string, organizat
 	if err := s.verifyProjectAccess(ctx, projectID, organizationID); err != nil {
 		return BrandCanon{}, err
 	}
+	if s.projectBrandCanon != nil {
+		return s.projectBrandCanon.GetProjectBrandCanon(ctx, projectID, organizationID)
+	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()

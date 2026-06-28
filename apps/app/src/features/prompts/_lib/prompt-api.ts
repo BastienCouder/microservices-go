@@ -123,7 +123,12 @@ export async function loadPromptPage(
 ): Promise<PromptPageResult> {
   const response = await gatewayJSON<unknown>(
     apiBaseURL,
-    apiRoutes.projects.prompts(projectId, { page, pageSize, search }),
+    apiRoutes.projects.prompts(projectId, {
+      page,
+      pageSize,
+      search,
+      kind: "monitoring",
+    }),
     {
       method: "GET",
       organizationId,
