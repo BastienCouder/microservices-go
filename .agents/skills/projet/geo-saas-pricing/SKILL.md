@@ -16,6 +16,10 @@ description: Use when working on GEO/AI Search Visibility SaaS pricing, billing 
 
 ## Final Grid
 
+The canonical public grid is implemented in
+`apps/web/components/pricing/pricing-utils.ts` as `FINAL_PUBLIC_PLANS`.
+Seeds, billing defaults, migrations, Stripe fallbacks, and UI copy must match it.
+
 | Public plan | Technical plan | Monthly | Annual monthly equivalent | Credits/month | Projects | Models | Seats |
 | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Starter | `starter` | 59 EUR | 49 EUR | 100 | 1 | 2 | 1 |
@@ -25,11 +29,13 @@ description: Use when working on GEO/AI Search Visibility SaaS pricing, billing 
 
 ## Implementation Notes
 
+- Public web source of truth lives in `apps/web/components/pricing/pricing-utils.ts`.
 - Billing default plan settings live in `services/billing-service/internal/usecase/plan_settings.go`.
 - Default public/admin price tiers live in `services/billing-service/internal/usecase/pricing_tiers.go`.
 - Stripe fallback quotas live in `services/billing-service/internal/usecase/service_stripe.go`.
 - UI labels for known plan codes live in `apps/app/src/shared/billing-plan.ts`.
 - Stripe catalog product names live in `services/billing-service/internal/usecase/service_stripe_catalog.go`.
+- The Nike demo seed quotas live in `scripts/seed-nike-backend.ts` and must use Starter `100`, Growth `750`, and Agency/`pro` `3000`.
 
 ## Credit Usage Model
 

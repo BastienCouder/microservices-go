@@ -17,6 +17,7 @@ describe("step models", () => {
     expect(source.includes("createOnboardingProject")).toBe(true);
     expect(source.includes("finishOnboarding")).toBe(true);
     expect(source.includes("clearPersistedOnboardingState")).toBe(true);
+    expect(source.includes("clearPendingAccountSetup")).toBe(true);
     expect(source.includes('buildScopedHref("/monitoring"')).toBe(true);
     expect(source.includes("createProject")).toBe(true);
   });

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { Search, ShieldCheck } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +21,6 @@ import { pushErrorToast, pushSuccessToast } from "@/components/ui/toast-actions"
 import { apiRoutes } from "@/lib/api-config";
 import { gatewayJSON, unwrapGatewayPayload } from "@/shared/api/gateway";
 import { useScopedI18n } from "@/shared/hooks/use-i18n";
-import { cn } from "@/shared/utils";
 
 type AdminUsersPageProps = {
   apiBaseURL: string;
@@ -142,18 +141,6 @@ export function AdminUsersPage({ apiBaseURL }: AdminUsersPageProps) {
         actionsVariant="classic"
         className="mb-3 md:mb-4"
         meta={<Badge variant="default">{t("usersCount", { count: users.length })}</Badge>}
-        actions={
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void usersQuery.refetch()}
-            disabled={usersQuery.isFetching}
-            className="gap-2"
-          >
-            <RefreshCw className={cn("size-4", usersQuery.isFetching && "animate-spin")} />
-            {usersQuery.isFetching ? t("refreshing") : t("refresh")}
-          </Button>
-        }
       />
 
       <div className="flex min-h-0 flex-1 flex-col rounded-md rounded-tr-none bg-background">

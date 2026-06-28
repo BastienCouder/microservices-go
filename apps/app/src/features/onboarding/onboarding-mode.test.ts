@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test";
 
 import {
+  clearPendingAccountSetup,
   createFreshOnboardingInitialState,
   getOnboardingSetupMode,
+  markAccountSetupPending,
   resolveOnboardingOrganizationId,
   shouldStartFreshOnboarding,
 } from "./onboarding-mode";
@@ -37,6 +39,7 @@ describe("onboarding mode", () => {
     expect(getOnboardingSetupMode("?setup-account")).toBe("account");
     expect(getOnboardingSetupMode("?setup=account")).toBe("account");
     expect(getOnboardingSetupMode("?setup=project")).toBe("project");
+    expect(getOnboardingSetupMode("?checkout=success&organization_id=42")).toBe("account");
     expect(getOnboardingSetupMode("?setup=other")).toBe("resume");
   });
 
@@ -93,5 +96,30 @@ describe("onboarding mode", () => {
 
   test("prefers the organization from the route when onboarding is explicitly scoped", () => {
     expect(resolveOnboardingOrganizationId("?setup=account&organizationId=42")).toBe("42");
+  });
+
+  test("resumes pending account onboarding instead of resetting it", () => {
+    const storage = new Map<string, string>();
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        sessionStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          setItem: (key: string, value: string) => storage.set(key, value),
+          removeItem: (key: string) => storage.delete(key),
+        },
+      },
+    });
+
+    expect(shouldStartFreshOnboarding("?checkout=success")).toBe(true);
+    markAccountSetupPending("42");
+    expect(shouldStartFreshOnboarding("?setup-account")).toBe(false);
+    clearPendingAccountSetup();
+
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
   });
 });

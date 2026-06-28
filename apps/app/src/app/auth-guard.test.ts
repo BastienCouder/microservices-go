@@ -154,4 +154,19 @@ describe("auth route guards", () => {
       }),
     ).toBe(false);
   });
+
+  test("keeps checkout-created organizations in account onboarding", () => {
+    expect(
+      shouldRedirectAwayFromAccountOnboarding({
+        apiBaseURL: "https://api.local",
+        busy: false,
+        user,
+        isOnboardingRoute: true,
+        onboardingSetupMode: "account",
+        organizationCount: 1,
+        projectCount: 0,
+        isCheckoutSuccessRoute: true,
+      }),
+    ).toBe(false);
+  });
 });

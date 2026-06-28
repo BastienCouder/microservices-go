@@ -34,6 +34,7 @@ import { useScopedI18n } from "@/shared/hooks/use-i18n";
 import { getBillingPlanLabel } from "@/shared/billing-plan";
 import { useResolvedBillingOrganizationId } from "@/shared/use-resolved-billing-organization-id";
 import { createOnboardingProject } from "./onboarding-api";
+import { clearPendingAccountSetup } from "./onboarding-mode";
 import { invalidateOrganizationScope } from "@/shared/api/query-refresh";
 import {
   buildScopedHref,
@@ -466,6 +467,7 @@ export function StepModels({
         projectId: result.projectId,
       });
       clearPersistedOnboardingState();
+      clearPendingAccountSetup();
       if (result.warnings.length > 0) {
         pushWarningToast(result.warnings.join(" "));
       }

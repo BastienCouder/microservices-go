@@ -5,7 +5,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Bot,
   CloudDownload,
-  RefreshCw,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
@@ -240,15 +239,6 @@ export function AdminModelsTemplate({
         }
         actions={
           <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => void catalogQuery.refetch()}
-              disabled={catalogQuery.isFetching}
-            >
-              <RefreshCw data-icon="inline-start" />
-              {catalogQuery.isFetching ? t("refreshing") : t("refresh")}
-            </Button>
             <Button
               type="button"
               onClick={() => {

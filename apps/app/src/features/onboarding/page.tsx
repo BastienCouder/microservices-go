@@ -34,6 +34,7 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
   const setupMode = getOnboardingSetupMode(routeSearch);
   const selectedOrganizationId = resolveOnboardingOrganizationId(routeSearch);
   const hasOrganizationContext = selectedOrganizationId !== "";
+  const includesAccountSetup = setupMode === "account" || !hasOrganizationContext;
 
   const steps = [
     /* ...(!hasOrganizationContext ? [{ component: <StepAccountType />, id: 1 }] : []),*/
@@ -45,15 +46,15 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
           showOrganizationName={setupMode === "account"}
         />
       ),
-      id: hasOrganizationContext ? 1 : 2,
+      id: 1,
     },
-    ...(!hasOrganizationContext ? [{ component: <StepAttribution />, id: 3 }] : []),
+    ...(includesAccountSetup ? [{ component: <StepAttribution />, id: 2 }] : []),
     {
       component: <StepBrand apiBaseURL={apiBaseURL} />,
-      id: hasOrganizationContext ? 2 : 4,
+      id: includesAccountSetup ? 3 : 2,
     },
-    { component: <StepCompetitors />, id: hasOrganizationContext ? 3 : 5 },
-    { component: <StepPrompts />, id: hasOrganizationContext ? 4 : 6 },
+    { component: <StepCompetitors />, id: includesAccountSetup ? 4 : 3 },
+    { component: <StepPrompts />, id: includesAccountSetup ? 5 : 4 },
     {
       component: (
         <StepModels
@@ -61,7 +62,7 @@ function OnboardingContent({ apiBaseURL, routeSearch = "" }: OnboardingPageProps
           organizationId={selectedOrganizationId}
         />
       ),
-      id: hasOrganizationContext ? 5 : 7,
+      id: includesAccountSetup ? 6 : 5,
     },
   ];
 
@@ -115,7 +116,7 @@ export function OnboardingPage({ apiBaseURL, routeSearch }: OnboardingPageProps)
   const normalizedRouteSearch = routeSearch ?? "";
   const setupMode = getOnboardingSetupMode(normalizedRouteSearch);
   const selectedOrganizationId = resolveOnboardingOrganizationId(normalizedRouteSearch);
-  const totalSteps = selectedOrganizationId ? 5 : 7;
+  const totalSteps = setupMode === "account" || !selectedOrganizationId ? 6 : 5;
   const providerKey =
     setupMode === "resume"
       ? selectedOrganizationId || "no-organization"
