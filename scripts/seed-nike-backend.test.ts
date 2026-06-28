@@ -37,6 +37,16 @@ describe("seed-nike-backend", () => {
     ]);
   });
 
+  test("model catalog upserts by its production natural key", () => {
+    expect(seedSource.includes("on conflict (provider, provider_model_id) do update set")).toBe(true);
+    expect(seedSource.includes("returning id;")).toBe(true);
+    expect(seedSource.includes("runtimeModels = resolvedModels;")).toBe(true);
+  });
+
+  test("organization public id is returned by the update", () => {
+    expect(seedSource.includes("where id = ${orgID}\n      returning public_id;")).toBe(true);
+  });
+
   test("id allocator increments shared sequences with service prefixes", () => {
     const allocator = createIDAllocator(357);
     expectScopedUUID(allocator.next("prj"), "prj");

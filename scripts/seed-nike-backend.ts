@@ -19,6 +19,16 @@ type OrganizationSeed = {
 
 type BillingPlan = "starter" | "growth" | "pro";
 
+type ModelSeed = {
+  id: string;
+  label: string;
+  provider: string;
+  group: string;
+  iconKey: string;
+  modelId: string;
+  supportsLiveSearch: boolean;
+};
+
 type PromptSeed = {
   id: string;
   text: string;
@@ -491,8 +501,8 @@ async function ensureOrganization(user: UserRecord): Promise<OrganizationSeed> {
     `
       update organizations
       set name = ${quoteLiteral(ORGANIZATION_NAME)}, owner_user_id = ${user.id}, deleted_at = null
-      where id = ${orgID};
-      select public_id from organizations where id = ${orgID};
+      where id = ${orgID}
+      returning public_id;
     `,
     { quiet: true },
   );
@@ -592,8 +602,11 @@ async function seedBillingSubscription(organization: OrganizationSeed) {
 }
 
 async function seedIAModelCatalog() {
-  const statements = MODELS.map(
-    (model) => `
+  const resolvedModels: ModelSeed[] = [];
+  for (const model of MODELS) {
+    const rawID = await psql(
+      "iasvc",
+      `
       insert into ai_models (
         id, provider, display_name, group_name, icon_key, provider_model_id,
         is_active, supports_live_search, credit_cost, created_at, updated_at
@@ -603,18 +616,24 @@ async function seedIAModelCatalog() {
         true, ${model.supportsLiveSearch ? "true" : "false"}, 1,
         ${quoteLiteral(EARLIER)}, ${quoteLiteral(NOW)}
       )
-      on conflict (id) do update set
-        provider = excluded.provider,
+      on conflict (provider, provider_model_id) do update set
         display_name = excluded.display_name,
         group_name = excluded.group_name,
         icon_key = excluded.icon_key,
-        provider_model_id = excluded.provider_model_id,
         is_active = excluded.is_active,
         supports_live_search = excluded.supports_live_search,
-        updated_at = excluded.updated_at;
-    `,
-  ).join("\n");
-  await psql("iasvc", statements);
+        updated_at = excluded.updated_at
+      returning id;
+      `,
+      { quiet: true },
+    );
+    const id = rawID.split("\n").map((item) => item.trim()).find(Boolean);
+    if (!id) {
+      throw new Error(`Impossible de résoudre le modèle ${model.provider}/${model.modelId}.`);
+    }
+    resolvedModels.push({ ...model, id });
+  }
+  runtimeModels = resolvedModels;
 }
 
 async function seedPermissions(user: UserRecord, organization: OrganizationSeed, plan: RuntimeSeedPlan) {
@@ -659,7 +678,7 @@ async function saveJSONState(database: string, table: string, state: object) {
   );
 }
 
-export const MODELS = [
+export const MODELS: readonly ModelSeed[] = [
   {
     id: "gpt-4o-mini",
     label: "GPT-4o mini",
@@ -716,6 +735,8 @@ export const MODELS = [
   },
 ] as const;
 
+let runtimeModels: readonly ModelSeed[] = MODELS;
+
 function sqlTextArray(values: readonly string[]): string {
   if (values.length === 0) {
     return "array[]::text[]";
@@ -736,7 +757,7 @@ function buildSeedRuns(projectID: string, prompts: PromptSeed[], competitors: Co
     }));
 
     const responses = promptRuns.flatMap((promptRun, promptIndex) =>
-      MODELS.map((model, modelIndex) => {
+      runtimeModels.map((model, modelIndex) => {
         const prompt = prompts[promptIndex]!;
         const [firstCompetitor, secondCompetitor] = pickCompetitorPair(runIndex, promptIndex, modelIndex, competitors);
         const competitorNames = [firstCompetitor.name, secondCompetitor.name];
@@ -804,7 +825,7 @@ function buildSeedRuns(projectID: string, prompts: PromptSeed[], competitors: Co
           citationFound,
           citedUrls,
           sentiment,
-          createdAt: isoDaysAgo(run.daysAgo, runIndex * 9 + promptIndex * MODELS.length + modelIndex + 2),
+          createdAt: isoDaysAgo(run.daysAgo, runIndex * 9 + promptIndex * runtimeModels.length + modelIndex + 2),
         };
       }),
     );
@@ -838,7 +859,7 @@ function buildPerceptionSeedRun(projectID: string, prompts: PromptSeed[], alloca
     "Face a Adidas, ASICS, Puma et New Balance, Nike reste bien positionnee dans le Sportswear, chaussures et equipement sportif. Marque sport globale utilisee comme dataset de demo pour le monitoring IA, les prompts et la perception, elle couvre Running, Basketball, Training, Lifestyle et Membership. Ses atouts sont Performance innovation, Iconic design, Athlete partnerships et Global membership ecosystem pour les Athletes, Runners, Sneaker enthusiasts et Active lifestyle consumers.",
   ];
   const responses = promptRuns.flatMap((promptRun, promptIndex) =>
-    MODELS.map((model, modelIndex) => ({
+    runtimeModels.map((model, modelIndex) => ({
       id: allocator.next("resp"),
       runId: runID,
       promptRunId: promptRun.id,
@@ -849,7 +870,7 @@ function buildPerceptionSeedRun(projectID: string, prompts: PromptSeed[], alloca
       citationFound: modelIndex !== 3,
       citedUrls: modelIndex !== 3 ? [buildProjectURL(prompts[promptIndex]!.pagePath)] : [],
       sentiment: "positive" as const,
-      createdAt: isoDaysAgo(2, 20 + promptIndex * MODELS.length + modelIndex),
+      createdAt: isoDaysAgo(2, 20 + promptIndex * runtimeModels.length + modelIndex),
     })),
   );
   return {
@@ -1064,7 +1085,7 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
     `,
   ).join("\n");
 
-  const projectModelStatements = MODELS.map(
+  const projectModelStatements = runtimeModels.map(
     (model) => `
       insert into project_models (project_id, model_id, is_enabled, created_at, updated_at)
       values (
@@ -1081,7 +1102,7 @@ async function seedProjectRelational(user: UserRecord, organization: Organizatio
   ).join("\n");
 
   const promptModelStatements = allPrompts.flatMap((prompt) =>
-    MODELS.map(
+    runtimeModels.map(
       (model) => `
         insert into prompt_models (prompt_id, model_id, created_at, updated_at)
         values (
@@ -1212,7 +1233,7 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
       ${quoteLiteral(run.runType)},
       'completed',
       ${run.promptRuns.length},
-      ${MODELS.length},
+      ${runtimeModels.length},
       ${run.responses.length},
       ${run.responses.length},
       ${run.visibilityScore},
@@ -1313,9 +1334,9 @@ async function seedAnalysisRelational(user: UserRecord, organization: Organizati
         project_id, brief_model_id, brief_provider, brief_provider_model_id, created_at, updated_at
       ) values (
         ${quoteLiteral(plan.projectId)},
-        ${quoteLiteral(MODELS[0].id)},
+        ${quoteLiteral(runtimeModels[0]!.id)},
         'openrouter',
-        ${quoteLiteral(MODELS[0].modelId)},
+        ${quoteLiteral(runtimeModels[0]!.modelId)},
         ${quoteLiteral(EARLIER)},
         ${quoteLiteral(NOW)}
       )
@@ -1472,15 +1493,15 @@ async function main() {
   const organization = await ensureOrganization(user);
   console.log(`  organization.id=${organization.id} public_id=${organization.publicID}`);
 
+  logStep("Create or update model catalog seed in iasvc");
+  await seedIAModelCatalog();
+
   logStep("Resolve coherent runtime ids for the seed");
   const seedPlan = await resolveRuntimeSeedPlan(user, organization);
   console.log(`  project.id=${seedPlan.projectId} cleanup=${seedPlan.cleanupProjectIDs.join(", ")}`);
 
   logStep("Create or update billing subscription seed in billsvc");
   await seedBillingSubscription(organization);
-
-  logStep("Create or update model catalog seed in iasvc");
-  await seedIAModelCatalog();
 
   logStep("Reset existing project seed in projectsvc");
   await resetProjectRelationalData(seedPlan);
