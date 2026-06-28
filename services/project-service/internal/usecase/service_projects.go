@@ -94,7 +94,7 @@ func (s *Service) ListProjects(ctx context.Context, organizationID int64) ([]Pro
 
 	projects := make([]Project, 0)
 	for _, project := range s.projects {
-		if project != nil && project.OrganizationID == organizationID {
+		if project != nil && project.OrganizationID == organizationID && !isProjectDeleted(project) {
 			projects = append(projects, s.effectiveProjectLocked(project))
 		}
 	}
@@ -141,7 +141,7 @@ func (s *Service) listProjectsForMembershipsLocked(organizationID int64, members
 	}
 	projects := make([]Project, 0, len(assignedProjectIDs))
 	for projectID := range assignedProjectIDs {
-		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID {
+		if project, ok := s.projects[projectID]; ok && project.OrganizationID == organizationID && !isProjectDeleted(project) {
 			projects = append(projects, s.effectiveProjectLocked(project))
 		}
 	}
@@ -226,21 +226,10 @@ func (s *Service) DeleteProject(ctx context.Context, projectID string, organizat
 	}
 
 	backup := s.snapshotLocked()
-	delete(s.projects, projectID)
-	delete(s.projectModels, projectID)
-	delete(s.modelSelectionChanges, projectID)
-	delete(s.impactIntegrations, projectID)
-	delete(s.providerCredentials, projectID)
-	for promptID, prompt := range s.prompts {
-		if prompt.ProjectID == projectID {
-			delete(s.prompts, promptID)
-		}
-	}
-	for competitorID, competitor := range s.competitors {
-		if competitor.ProjectID == projectID {
-			delete(s.competitors, competitorID)
-		}
-	}
+	project := s.projects[projectID]
+	now := s.now().UTC()
+	project.DeletedAt = &now
+	project.UpdatedAt = now
 
 	if err := s.persistLocked(ctx); err != nil {
 		s.restoreLocked(backup)
@@ -305,7 +294,7 @@ func (s *Service) FinalizeProject(ctx context.Context, projectID string, organiz
 func countProjectsForOrganization(projectsByID map[string]*Project, organizationID int64) int {
 	count := 0
 	for _, project := range projectsByID {
-		if project.OrganizationID == organizationID {
+		if project.OrganizationID == organizationID && !isProjectDeleted(project) {
 			count++
 		}
 	}

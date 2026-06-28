@@ -330,11 +330,11 @@ export function AuthPageClient({ config, mode }: AuthPageClientProps) {
       <section className="relative z-10 w-full max-w-md rounded-xl border bg-background/90 p-8">
         <header className="mb-8 space-y-2 text-center">
           <h1 className="text-3xl font-semibold tracking-tight">
-            Connexion
+            {mode === "login" ? t("loginTitle") : t("registerTitle")}
           </h1>
 
           <p className="text-sm leading-6 text-muted-foreground">
-            Connectez-vous ou créez votre compte.
+            {mode === "login" ? t("loginSubtitle") : t("registerSubtitle")}
           </p>
         </header>
 

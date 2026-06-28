@@ -15,7 +15,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 
 	projectIDs := make([]string, 0, len(s.projects))
 	for projectID, project := range s.projects {
-		if project == nil {
+		if project == nil || isProjectDeleted(project) {
 			continue
 		}
 		projectIDs = append(projectIDs, projectID)
@@ -35,7 +35,7 @@ func (s *Service) ListScheduledAnalysisJobs(ctx context.Context) ([]ScheduledAna
 	jobs := make([]ScheduledAnalysisJob, 0)
 	for _, projectID := range projectIDs {
 		project := s.projects[projectID]
-		if project == nil {
+		if project == nil || isProjectDeleted(project) {
 			continue
 		}
 		effectiveProject := s.effectiveProjectLocked(project)

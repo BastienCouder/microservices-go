@@ -27,6 +27,9 @@ func (s *Service) GetProjectScope(ctx context.Context, projectID string) (Resour
 	if !ok {
 		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
+	if isProjectDeleted(project) {
+		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
 	return ResourceScope{OrganizationID: project.OrganizationID, ProjectID: project.ID}, nil
 }
 
@@ -50,6 +53,9 @@ func (s *Service) GetPromptScope(ctx context.Context, promptID string) (Resource
 	if !ok {
 		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
+	if isProjectDeleted(project) {
+		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
 	return ResourceScope{OrganizationID: project.OrganizationID, ProjectID: project.ID}, nil
 }
 
@@ -71,6 +77,9 @@ func (s *Service) GetCompetitorScope(ctx context.Context, competitorID string) (
 	}
 	project, ok := s.projects[competitor.ProjectID]
 	if !ok {
+		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
+	}
+	if isProjectDeleted(project) {
 		return ResourceScope{}, fmt.Errorf("%w: project", ErrNotFound)
 	}
 	return ResourceScope{OrganizationID: project.OrganizationID, ProjectID: project.ID}, nil
