@@ -280,6 +280,10 @@ type ProjectModelsProvider interface {
 	ListProjectEnabledModels(ctx context.Context, projectID string, organizationID int64) ([]string, error)
 }
 
+type ProjectBrandCanonProvider interface {
+	GetProjectBrandCanon(ctx context.Context, projectID string, organizationID int64) (BrandCanon, error)
+}
+
 type BillingQuotaProvider interface {
 	GetMonthlyQuota(ctx context.Context, organizationID int64) (monthlyQuota int, found bool, err error)
 }
@@ -360,6 +364,7 @@ type Dependencies struct {
 	ProjectVerifier                ProjectAccessVerifier
 	ProjectCompetitors             ProjectCompetitorsProvider
 	ProjectModels                  ProjectModelsProvider
+	ProjectBrandCanon              ProjectBrandCanonProvider
 	BillingQuota                   BillingQuotaProvider
 	ContentCrawler                 ContentCrawler
 	ContentIssueAnalyzer           ContentIssueAnalyzer
@@ -410,6 +415,7 @@ type Service struct {
 	projectVerifier                ProjectAccessVerifier
 	projectCompetitors             ProjectCompetitorsProvider
 	projectModels                  ProjectModelsProvider
+	projectBrandCanon              ProjectBrandCanonProvider
 	billingQuota                   BillingQuotaProvider
 	contentCrawler                 ContentCrawler
 	contentIssueAnalyzer           ContentIssueAnalyzer

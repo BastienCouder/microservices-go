@@ -137,8 +137,7 @@ GO_SERVICE_DIR = services/$(SERVICE)
 	langgraph-check langgraph-test langgraph-build langgraph-ci \
 	crawler-check crawler-build crawler-ci \
 	ts-ci frontend-ci ci-all \
-	seed-nike seed-nike-live seed-nike-prod seed-nike-prod-live \
-	seed-nike-prod-server seed-nike-prod-live-server deploy-prod-seed-nike deploy-prod-seed-nike-live \
+	seed-nike seed-nike-prod seed-nike-prod-server deploy-prod-seed-nike \
 	up-dev-full down-dev logs-dev up-full down logs migrate-all \
 	$(foreach service,$(MIGRATION_SERVICES),migrate-$(service) migrate-$(service)-dev)
 
@@ -185,11 +184,8 @@ help:
 	@echo "    make prod-services-api-gateway Rebuild and start api-gateway"
 	@echo "    make prod-migrate     Run all production migrations"
 	@echo "    make seed-nike-prod   Migrate and seed a complete Nike project locally"
-	@echo "    make seed-nike-prod-live Migrate and seed a complete Nike project locally with live analysis"
 	@echo "    make seed-nike-prod-server Run prod Nike seed on the VPS"
-	@echo "    make seed-nike-prod-live-server Run prod Nike live seed on the VPS"
 	@echo "    make deploy-prod-seed-nike Deploy prod, then run Nike seed on the VPS"
-	@echo "    make deploy-prod-seed-nike-live Deploy prod, then run live Nike seed on the VPS"
 	@echo "    make prod-doc         Start docs only, sequentially"
 	@echo "    make prod-email       Start email renderer only, sequentially"
 	@echo "    make prod-ping        Ping production inventory"
@@ -438,20 +434,8 @@ seed-nike-prod-server:
 		-m shell \
 		-a 'cd $(PROD_REMOTE_PATH) && make seed-nike-prod COMPOSE_PROD_PROJECT=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_COMPOSE_PROJECT_NAME_PROD=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_USER_EMAIL="$(SEED_USER_EMAIL)"'
 
-seed-nike-prod-live-server:
-	@test -n "$(SEED_USER_EMAIL)" || (echo "Usage: make seed-nike-prod-live-server SEED_USER_EMAIL=email@example.com"; exit 1)
-	ansible -i $(ANSIBLE_INVENTORY) production \
-		--ask-become-pass \
-		--become \
-		--become-user=$(PROD_REMOTE_USER) \
-		-m shell \
-		-a 'cd $(PROD_REMOTE_PATH) && make seed-nike-prod-live COMPOSE_PROD_PROJECT=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_COMPOSE_PROJECT_NAME_PROD=$(PROD_REMOTE_COMPOSE_PROJECT) SEED_USER_EMAIL="$(SEED_USER_EMAIL)"'
-
 deploy-prod-seed-nike: deploy-prod
 	$(MAKE) seed-nike-prod-server SEED_USER_EMAIL="$(SEED_USER_EMAIL)"
-
-deploy-prod-seed-nike-live: deploy-prod
-	$(MAKE) seed-nike-prod-live-server SEED_USER_EMAIL="$(SEED_USER_EMAIL)"
 
 backup-r2-once: secrets-check
 	$(COMPOSE_PROD_LOCAL) --profile infra --profile backup run --rm --no-deps \
@@ -707,19 +691,6 @@ seed-nike:
 		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
 		-e SEED_COMPOSE_FILES=docker-compose.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
-		-e SEED_ANALYSIS_MODE=synthetic \
-		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
-
-seed-nike-live:
-	docker run --rm \
-		-v "$$(pwd):/workspace" -w /workspace \
-		-v /usr/bin/docker:/usr/local/bin/docker \
-		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e SEED_COMPOSE_PROJECT_NAME=microservices-go \
-		-e SEED_COMPOSE_FILES=docker-compose.yml \
-		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
-		-e SEED_ANALYSIS_MODE=live \
 		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 seed-nike-prod: prod-migrate
@@ -731,19 +702,6 @@ seed-nike-prod: prod-migrate
 		-e SEED_COMPOSE_PROJECT_NAME=$(SEED_COMPOSE_PROJECT_NAME_PROD) \
 		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
 		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
-		-e SEED_ANALYSIS_MODE=synthetic \
-		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
-
-seed-nike-prod-live: prod-migrate
-	docker run --rm \
-		-v "$$(pwd):/workspace" -w /workspace \
-		-v /usr/bin/docker:/usr/local/bin/docker \
-		-v /usr/libexec/docker/cli-plugins:/usr/libexec/docker/cli-plugins \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-e SEED_COMPOSE_PROJECT_NAME=$(SEED_COMPOSE_PROJECT_NAME_PROD) \
-		-e SEED_COMPOSE_FILES=docker-compose.yml,docker-compose.secrets.generated.yml \
-		-e SEED_USER_EMAIL=$(SEED_USER_EMAIL) \
-		-e SEED_ANALYSIS_MODE=live \
 		$(FRONTEND_BUN_IMAGE) bun scripts/seed-nike-backend.ts
 
 # Backward-compatible aliases.

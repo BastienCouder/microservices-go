@@ -110,6 +110,7 @@ func main() {
 		ProjectVerifier:                projectGRPCClient,
 		ProjectCompetitors:             projectGRPCClient,
 		ProjectModels:                  projectGRPCClient,
+		ProjectBrandCanon:              projectGRPCClient,
 		BillingQuota:                   billingHTTPClient,
 		ContentCrawler:                 contentCrawler,
 		ContentIssueAnalyzer:           contentIssueAnalyzer,

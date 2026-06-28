@@ -10,6 +10,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Save, Search, ShieldCheck } from "lucide-react";
 
+import { ConfirmDialog } from "@/components/shared/confirm-dialog";
 import { PageHeader } from "@/components/shared/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -626,14 +627,18 @@ function AdminOrganizationTableRow({
       </TableCell>
       <TableCell className="text-right">
         <div className="flex justify-end gap-2">
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending || deletePending}
-            onClick={() => onDelete(row.organization.id)}
-          >
-            {deletePending ? t("deleting") : t("delete")}
-          </Button>
+          <ConfirmDialog
+            title={t("deleteOrganizationTitle", { name: row.organization.name })}
+            description={t("deleteOrganizationConfirmDescription")}
+            confirmLabel={t("delete")}
+            loading={deletePending}
+            onConfirm={() => onDelete(row.organization.id)}
+            trigger={
+              <Button type="button" variant="destructive" disabled={pending || deletePending}>
+                {deletePending ? t("deleting") : t("delete")}
+              </Button>
+            }
+          />
           <form onSubmit={(event) => onSave(event, row)}>
             <SaveButton pending={pending} disabled={deletePending} />
           </form>
@@ -700,15 +705,23 @@ function AdminOrganizationMobileCard({
         />
         <div className="flex flex-col gap-2">
           <SaveButton pending={pending} disabled={deletePending} className="w-full" />
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={pending || deletePending}
-            onClick={() => onDelete(row.organization.id)}
-            className="w-full"
-          >
-            {deletePending ? t("deleting") : t("delete")}
-          </Button>
+          <ConfirmDialog
+            title={t("deleteOrganizationTitle", { name: row.organization.name })}
+            description={t("deleteOrganizationConfirmDescription")}
+            confirmLabel={t("delete")}
+            loading={deletePending}
+            onConfirm={() => onDelete(row.organization.id)}
+            trigger={
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={pending || deletePending}
+                className="w-full"
+              >
+                {deletePending ? t("deleting") : t("delete")}
+              </Button>
+            }
+          />
         </div>
       </div>
     </form>

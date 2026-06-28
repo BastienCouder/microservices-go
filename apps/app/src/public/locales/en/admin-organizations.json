@@ -35,6 +35,8 @@
   "savedQuota": "saved {{value}}",
   "delete": "Delete",
   "deleting": "Deleting...",
+  "deleteOrganizationTitle": "Delete organization {{name}}?",
+  "deleteOrganizationConfirmDescription": "This action is irreversible. The organization will be soft-deleted and its sensitive data will be anonymized.",
   "organizationDeleted": "Organization deleted.",
   "organizationDeleteError": "Unable to delete this organization.",
   "save": "Save",

@@ -23,6 +23,7 @@ const (
 	ProjectService_GetProjectImpactContext_FullMethodName   = "/project.v1.ProjectService/GetProjectImpactContext"
 	ProjectService_ListProjectCompetitors_FullMethodName    = "/project.v1.ProjectService/ListProjectCompetitors"
 	ProjectService_ListProjectEnabledModels_FullMethodName  = "/project.v1.ProjectService/ListProjectEnabledModels"
+	ProjectService_GetProjectBrandCanon_FullMethodName      = "/project.v1.ProjectService/GetProjectBrandCanon"
 	ProjectService_ListScheduledAnalysisJobs_FullMethodName = "/project.v1.ProjectService/ListScheduledAnalysisJobs"
 )
 
@@ -34,6 +35,7 @@ type ProjectServiceClient interface {
 	GetProjectImpactContext(ctx context.Context, in *GetProjectImpactContextRequest, opts ...grpc.CallOption) (*GetProjectImpactContextResponse, error)
 	ListProjectCompetitors(ctx context.Context, in *ListProjectCompetitorsRequest, opts ...grpc.CallOption) (*ListProjectCompetitorsResponse, error)
 	ListProjectEnabledModels(ctx context.Context, in *ListProjectEnabledModelsRequest, opts ...grpc.CallOption) (*ListProjectEnabledModelsResponse, error)
+	GetProjectBrandCanon(ctx context.Context, in *GetProjectBrandCanonRequest, opts ...grpc.CallOption) (*GetProjectBrandCanonResponse, error)
 	ListScheduledAnalysisJobs(ctx context.Context, in *ListScheduledAnalysisJobsRequest, opts ...grpc.CallOption) (*ListScheduledAnalysisJobsResponse, error)
 }
 
@@ -85,6 +87,16 @@ func (c *projectServiceClient) ListProjectEnabledModels(ctx context.Context, in 
 	return out, nil
 }
 
+func (c *projectServiceClient) GetProjectBrandCanon(ctx context.Context, in *GetProjectBrandCanonRequest, opts ...grpc.CallOption) (*GetProjectBrandCanonResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetProjectBrandCanonResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetProjectBrandCanon_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) ListScheduledAnalysisJobs(ctx context.Context, in *ListScheduledAnalysisJobsRequest, opts ...grpc.CallOption) (*ListScheduledAnalysisJobsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListScheduledAnalysisJobsResponse)
@@ -103,6 +115,7 @@ type ProjectServiceServer interface {
 	GetProjectImpactContext(context.Context, *GetProjectImpactContextRequest) (*GetProjectImpactContextResponse, error)
 	ListProjectCompetitors(context.Context, *ListProjectCompetitorsRequest) (*ListProjectCompetitorsResponse, error)
 	ListProjectEnabledModels(context.Context, *ListProjectEnabledModelsRequest) (*ListProjectEnabledModelsResponse, error)
+	GetProjectBrandCanon(context.Context, *GetProjectBrandCanonRequest) (*GetProjectBrandCanonResponse, error)
 	ListScheduledAnalysisJobs(context.Context, *ListScheduledAnalysisJobsRequest) (*ListScheduledAnalysisJobsResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
@@ -125,6 +138,9 @@ func (UnimplementedProjectServiceServer) ListProjectCompetitors(context.Context,
 }
 func (UnimplementedProjectServiceServer) ListProjectEnabledModels(context.Context, *ListProjectEnabledModelsRequest) (*ListProjectEnabledModelsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListProjectEnabledModels not implemented")
+}
+func (UnimplementedProjectServiceServer) GetProjectBrandCanon(context.Context, *GetProjectBrandCanonRequest) (*GetProjectBrandCanonResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetProjectBrandCanon not implemented")
 }
 func (UnimplementedProjectServiceServer) ListScheduledAnalysisJobs(context.Context, *ListScheduledAnalysisJobsRequest) (*ListScheduledAnalysisJobsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ListScheduledAnalysisJobs not implemented")
@@ -222,6 +238,24 @@ func _ProjectService_ListProjectEnabledModels_Handler(srv interface{}, ctx conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetProjectBrandCanon_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectBrandCanonRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetProjectBrandCanon(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetProjectBrandCanon_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetProjectBrandCanon(ctx, req.(*GetProjectBrandCanonRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_ListScheduledAnalysisJobs_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListScheduledAnalysisJobsRequest)
 	if err := dec(in); err != nil {
@@ -262,6 +296,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListProjectEnabledModels",
 			Handler:    _ProjectService_ListProjectEnabledModels_Handler,
+		},
+		{
+			MethodName: "GetProjectBrandCanon",
+			Handler:    _ProjectService_GetProjectBrandCanon_Handler,
 		},
 		{
 			MethodName: "ListScheduledAnalysisJobs",

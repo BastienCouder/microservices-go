@@ -36,6 +36,7 @@ func NewServiceWithDependencies(ctx context.Context, deps Dependencies) (*Servic
 	svc.projectVerifier = deps.ProjectVerifier
 	svc.projectCompetitors = deps.ProjectCompetitors
 	svc.projectModels = deps.ProjectModels
+	svc.projectBrandCanon = deps.ProjectBrandCanon
 	svc.billingQuota = deps.BillingQuota
 	svc.contentCrawler = deps.ContentCrawler
 	svc.contentIssueAnalyzer = deps.ContentIssueAnalyzer
